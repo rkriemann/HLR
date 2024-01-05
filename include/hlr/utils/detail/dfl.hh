@@ -68,13 +68,7 @@ struct dfl
         auto  zptr = reinterpret_cast< storage_t * >( zdata );
 
         for ( size_t  i = 0; i < nsize; ++i )
-        {
-            const double    fval  = data[i];
-            const uint64_t  ival = (*reinterpret_cast< const uint64_t * >( & fval ) );
-            const uint64_t  zval  = ival >> dfl_mant_shift;
-            
-            zptr[i] = zval;
-        }// for
+            zptr[i] = (*reinterpret_cast< const uint64_t * >( & data[i] ) ) >> dfl_mant_shift;
     }
 
     static
@@ -87,11 +81,9 @@ struct dfl
         
         for ( size_t  i = 0; i < nsize; ++i )
         {
-            const uint64_t  zval = zptr[i];
-            const uint64_t  ztmp = zval << dfl_mant_shift;
-            const double    fval = * reinterpret_cast< const double * >( & ztmp );
+            const uint64_t  zval = uint64_t( zptr[i] ) << dfl_mant_shift;
             
-            data[i] = fval;
+            data[i] = * reinterpret_cast< const double * >( & zval );
         }// for
     }
 };
@@ -158,10 +150,10 @@ compress< double > ( const config &   config,
                      const size_t     dim2,
                      const size_t     dim3 )
 {
-    const size_t    nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
-    const uint32_t  nbits = byte_pad( 1 + 11 + config.bitrate ); // total no. of bits per value
-    const uint32_t  nbyte = nbits / 8;
-    zarray          zdata( dfl_header_ofs + nbyte * nsize );
+    const size_t   nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
+    const uint8_t  nbits = byte_pad( 1 + 11 + config.bitrate ); // total no. of bits per value
+    const uint8_t  nbyte = nbits / 8;
+    zarray         zdata( dfl_header_ofs + nbyte * nsize );
 
     zdata[0] = nbyte;
 
@@ -344,12 +336,12 @@ compress_lr< double > ( const blas::matrix< double > &  U,
 
     for ( uint32_t  l = 0; l < k; ++l )
     {
-        const auto      nprecbits = eps_to_rate( S(l) );
-        const uint32_t  nbits     = byte_pad( 1 + 11 + nprecbits );
-        const uint32_t  nbyte     = nbits / 8;
+        const auto     nprecbits = eps_to_rate( S(l) );
+        const uint8_t  nbits     = byte_pad( 1 + 11 + nprecbits );
+        const uint8_t  nbyte     = nbits / 8;
 
         b[l]   = nbyte;
-        zsize += 1 + nbyte * n;
+        zsize += 1 + n * nbyte;
     }// for
 
     //
@@ -361,7 +353,7 @@ compress_lr< double > ( const blas::matrix< double > &  U,
         
     for ( uint32_t  l = 0; l < k; ++l )
     {
-        const uint32_t  nbyte = b[l];
+        const uint8_t  nbyte = b[l];
 
         zdata[pos] = nbyte;
         pos += 1;
@@ -404,7 +396,7 @@ decompress_lr< double > ( const zarray &            zdata,
 
     for ( uint32_t  l = 0; l < k; ++l )
     {
-        const uint32_t  nbyte = zdata[ pos ];
+        const uint8_t  nbyte = zdata[ pos ];
 
         pos += 1;
 
@@ -443,7 +435,6 @@ mulvec ( const size_t       nrows,
 {
     static constexpr uint64_t  dfl_mant_bits  = 8 * sizeof(storage_t) - 1 - 11;  // 1 sign bit, 11 exponent bits
     static constexpr uint64_t  dfl_mant_shift = fp64_mant_bits - dfl_mant_bits;
-    const auto                 scale          = alpha;
 
     switch ( op_A )
     {
@@ -457,7 +448,7 @@ mulvec ( const size_t       nrows,
                 
                 for ( size_t  i = 0; i < nrows; ++i, pos++ )
                 {
-                    const uint64_t  zval = uint64_t( zA[i] ) << dfl_mant_shift;
+                    const uint64_t  zval = uint64_t( zA[pos] ) << dfl_mant_shift;
                     const double    fval = * reinterpret_cast< const double * >( & zval );
                     
                     y[i] += fval * x_j;
@@ -476,7 +467,7 @@ mulvec ( const size_t       nrows,
                 
                 for ( size_t  i = 0; i < nrows; ++i, pos++ )
                 {
-                    const uint64_t  zval = uint64_t( zA[i] ) << dfl_mant_shift;
+                    const uint64_t  zval = uint64_t( zA[pos] ) << dfl_mant_shift;
                     const double    fval = * reinterpret_cast< const double * >( & zval );
 
                     y_j += fval * x[i];

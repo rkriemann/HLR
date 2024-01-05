@@ -652,8 +652,8 @@ lrsvmatrix< value_t >::apply_add ( const value_t                    alpha,
     HLR_ASSERT( x.length() == this->ncols( op ) );
     HLR_ASSERT( y.length() == this->nrows( op ) );
 
-    #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP
-    if ( is_compressed() )
+    #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP || HLR_COMPRESSOR == HLR_COMPRESSOR_DFL
+    if ( is_compressed() && ( std::min( this->nrows(), this->ncols() ) > 128 ) )
     {
         const auto  nrows = this->nrows();
         const auto  ncols = this->ncols();
@@ -663,14 +663,14 @@ lrsvmatrix< value_t >::apply_add ( const value_t                    alpha,
         if ( op == Hpro::apply_normal )
         {
             // t := V^H x
-            compress::aflp::mulvec_lr( ncols, k, apply_adjoint, value_t(1), _mpdata.zV, x.data(), t.data() );
+            compress::aplr::blas::mulvec_lr( ncols, k, apply_adjoint, value_t(1), _mpdata.zV, x.data(), t.data() );
 
             // t := α·t
             for ( uint  i = 0; i < k; ++i )
                 t(i) *= value_t(alpha) * _S(i);
         
             // y := y + U t
-            compress::aflp::mulvec_lr( nrows, k, apply_normal, value_t(1), _mpdata.zU, t.data(), y.data() );
+            compress::aplr::blas::mulvec_lr( nrows, k, apply_normal, value_t(1), _mpdata.zU, t.data(), y.data() );
         }// if
         else if ( op == Hpro::apply_transposed )
         {
@@ -679,14 +679,14 @@ lrsvmatrix< value_t >::apply_add ( const value_t                    alpha,
         else if ( op == Hpro::apply_adjoint )
         {
             // t := U^H x
-            compress::aflp::mulvec_lr( nrows, k, apply_adjoint, value_t(1), _mpdata.zU, x.data(), t.data() );
+            compress::aplr::blas::mulvec_lr( nrows, k, apply_adjoint, value_t(1), _mpdata.zU, x.data(), t.data() );
 
             // t := α·t
             for ( uint  i = 0; i < k; ++i )
                 t(i) *= value_t(alpha) * _S(i);
         
             // y := t + V t
-            compress::aflp::mulvec_lr( ncols, k, apply_normal, value_t(1), _mpdata.zV, t.data(), y.data() );
+            compress::aplr::blas::mulvec_lr( ncols, k, apply_normal, value_t(1), _mpdata.zV, t.data(), y.data() );
         }// if
     }// if
     else

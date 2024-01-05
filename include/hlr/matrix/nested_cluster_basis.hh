@@ -363,7 +363,7 @@ public:
     hlr::blas::vector< value_t >
     transform_forward  ( const hlr::blas::vector< value_t > &  v ) const
     {
-        #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP
+        #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP || HLR_COMPRESSOR == HLR_COMPRESSOR_DFL
         if ( is_compressed() )
         {
             const auto  k = this->rank();
@@ -373,9 +373,9 @@ public:
                 auto  t = blas::vector< value_t >( k );
 
                 #if HLR_USE_APLR_NESTED_CB == 1
-                compress::aflp::mulvec_lr( _is.size(), k, apply_adjoint, value_t(1), _zV, v.data(), t.data() );
+                compress::aplr::blas::mulvec_lr( _is.size(), k, apply_adjoint, value_t(1), _zV, v.data(), t.data() );
                 #else
-                compress::aflp::mulvec( _is.size(), k, apply_adjoint, value_t(1), _zV, v.data(), t.data() );
+                compress::blas::mulvec( _is.size(), k, apply_adjoint, value_t(1), _zV, v.data(), t.data() );
                 #endif
 
                 return t;
@@ -394,7 +394,7 @@ public:
                     auto  v_i   = blas::vector< value_t >( v, son_i->is() - is().first() );
                     auto  s_i   = son_i->transform_forward( v_i );
                 
-                    compress::aflp::mulvec( _E[i].nrows(), k, apply_adjoint, value_t(1), _zE[i], s_i.data(), s.data() );
+                    compress::blas::mulvec( _E[i].nrows(), k, apply_adjoint, value_t(1), _zE[i], s_i.data(), s.data() );
                 }// for
 
                 return std::move( s );
@@ -469,7 +469,7 @@ public:
     hlr::blas::vector< value_t >
     transform_backward  ( const hlr::blas::vector< value_t > &  s ) const
     {
-        #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP
+        #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP || HLR_COMPRESSOR == HLR_COMPRESSOR_DFL
         if ( is_compressed() )
         {
             if ( nsons() == 0 )
@@ -478,9 +478,9 @@ public:
                 auto        t = blas::vector< value_t >( n );
 
                 #if HLR_USE_APLR_NESTED_CB == 1
-                compress::aflp::mulvec_lr( n, this->rank(), apply_normal, value_t(1), _zV, s.data(), t.data() );
+                compress::aplr::blas::mulvec_lr( n, this->rank(), apply_normal, value_t(1), _zV, s.data(), t.data() );
                 #else
-                compress::aflp::mulvec( n, this->rank(), apply_normal, value_t(1), _zV, s.data(), t.data() );
+                compress::blas::mulvec( n, this->rank(), apply_normal, value_t(1), _zV, s.data(), t.data() );
                 #endif
 
                 return t;
@@ -499,7 +499,7 @@ public:
                     auto  son_i = son( i );
                     auto  s_i   = blas::vector< value_t >( _E[i].nrows() );
                     
-                    compress::aflp::mulvec( _E[i].nrows(), k, apply_normal, value_t(1), _zE[i], s.data(), s_i.data() );
+                    compress::blas::mulvec( _E[i].nrows(), k, apply_normal, value_t(1), _zE[i], s.data(), s_i.data() );
 
                     auto  t_i   = son_i->transform_backward( s_i );
                     auto  v_i   = blas::vector< value_t >( v, son_i->is() - is().first() );

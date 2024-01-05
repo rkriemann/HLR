@@ -485,9 +485,9 @@ dense_matrix< value_t >::apply_add   ( const value_t                    alpha,
     // #else
 
     #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP || HLR_COMPRESSOR == HLR_COMPRESSOR_DFL
-    if ( is_compressed() )
+    if ( is_compressed() && ( std::min( nrows(), ncols() ) > 64 ) )
     {
-        compress::blas::mulvec( nrows(), ncols(), op, value_t(1), _zM, x.data(), y.data() );
+        compress::blas::mulvec( nrows(), ncols(), op, alpha, _zM, x.data(), y.data() );
     }// if
     else
     #endif

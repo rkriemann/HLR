@@ -215,16 +215,16 @@ public:
     hlr::blas::vector< value_t >
     transform_forward  ( const hlr::blas::vector< value_t > &  v ) const
     {
-        #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP
+        #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP || HLR_COMPRESSOR == HLR_COMPRESSOR_DFL
         if ( is_compressed() )
         {
             const auto  k = this->rank();
             auto        t = blas::vector< value_t >( k );
 
             #if HLR_USE_APLR_SHARED_CB == 1
-            compress::aflp::mulvec_lr( _is.size(), k, apply_adjoint, value_t(1), _zV, v.data(), t.data() );
+            compress::aplr::blas::mulvec_lr( _is.size(), k, apply_adjoint, value_t(1), _zV, v.data(), t.data() );
             #else
-            compress::aflp::mulvec( _is.size(), k, apply_adjoint, value_t(1), _zV, v.data(), t.data() );
+            compress::blas::mulvec( _is.size(), k, apply_adjoint, value_t(1), _zV, v.data(), t.data() );
             #endif
 
             return t;
@@ -254,16 +254,16 @@ public:
     hlr::blas::vector< value_t >
     transform_backward  ( const hlr::blas::vector< value_t > &  s ) const
     {
-        #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP
+        #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP || HLR_COMPRESSOR == HLR_COMPRESSOR_DFL
         if ( is_compressed() )
         {
             const auto  n = _is.size();
             auto        t = blas::vector< value_t >( n );
 
             #if HLR_USE_APLR_SHARED_CB == 1
-            compress::aflp::mulvec_lr( n, this->rank(), apply_normal, value_t(1), _zV, s.data(), t.data() );
+            compress::aplr::blas::mulvec_lr( n, this->rank(), apply_normal, value_t(1), _zV, s.data(), t.data() );
             #else
-            compress::aflp::mulvec( n, this->rank(), apply_normal, value_t(1), _zV, s.data(), t.data() );
+            compress::blas::mulvec( n, this->rank(), apply_normal, value_t(1), _zV, s.data(), t.data() );
             #endif
 
             return t;
@@ -281,15 +281,15 @@ public:
     transform_backward  ( const hlr::blas::vector< value_t > &  s,
                           hlr::blas::vector< value_t > &        v ) const
     {
-        #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP
+        #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP || HLR_COMPRESSOR == HLR_COMPRESSOR_DFL
         if ( is_compressed() )
         {
             HLR_ASSERT( v.length() == _is.size() );
             
             #if HLR_USE_APLR_SHARED_CB == 1
-            compress::aflp::mulvec_lr( _is.size(), this->rank(), apply_normal, value_t(1), _zV, s.data(), v.data() );
+            compress::aplr::blas::mulvec_lr( _is.size(), this->rank(), apply_normal, value_t(1), _zV, s.data(), v.data() );
             #else
-            compress::aflp::mulvec( _is.size(), this->rank(), apply_normal, value_t(1), _zV, s.data(), v.data() );
+            compress::blas::mulvec( _is.size(), this->rank(), apply_normal, value_t(1), _zV, s.data(), v.data() );
             #endif
         }// if
         else
