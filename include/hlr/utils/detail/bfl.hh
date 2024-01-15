@@ -15,7 +15,7 @@
 ////////////////////////////////////////////////////////////
 //
 // compression using general bfl format
-// - use FP32 exponent size and precision dependend mantissa size (1+8+X bits)
+// - use 8 bit exponent and precision dependend mantissa (1+8+X bits)
 //
 ////////////////////////////////////////////////////////////
 
@@ -23,14 +23,14 @@ namespace hlr { namespace compress { namespace bfl {
 
 using byte_t = uint8_t;
 
-constexpr uint32_t  fp32_mant_bits = 23;
+constexpr uint8_t   fp32_mant_bits = 23;
 
 constexpr uint64_t  fp64_sign_mask = (1ul << 63);
-constexpr uint32_t  fp64_mant_bits = 52;
+constexpr uint8_t   fp64_mant_bits = 52;
 constexpr uint64_t  fp64_mant_mask = 0x000fffffffffffff;
 constexpr uint64_t  fp64_exp_mask  = 0x7ff0000000000000;
 
-constexpr uint32_t  bfl_header_ofs = 1;
+constexpr uint8_t   bfl_header_ofs = 1;
 
 inline
 byte_t
@@ -59,28 +59,25 @@ inline config  get_config      ( const double    eps ) { return config{ eps_to_r
 ////////////////////////////////////////////////////////////////////////////////
 
 //
-// convert to float and simply shift bits to the left, 
-// thereby reducing mantissa size
+// simply shift mantissa bits to the left
 //
-template < typename  value_t,
-           typename  storage_t >
+template < typename  storage_t >
 struct bfl32
 {
-    static constexpr uint32_t  bfl_mant_bits  = 8 * sizeof(storage_t) - 1 - 8;  // 1 sign bit, 8 exponent bits
-    static constexpr uint32_t  bfl_mant_shift = fp32_mant_bits - bfl_mant_bits;
+    static constexpr uint8_t  bfl_mant_bits  = 8 * sizeof(storage_t) - 1 - 8;  // 1 sign bit, 8 exponent bits
+    static constexpr uint8_t  bfl_mant_shift = fp32_mant_bits - bfl_mant_bits;
     
     static
     void
-    compress ( const value_t *  data,
-               const size_t     nsize,
-               byte_t *         zdata )
+    compress ( const float *  data,
+               const size_t   nsize,
+               byte_t *       zdata )
     {
         auto  zptr = reinterpret_cast< storage_t * >( zdata );
         
         for ( size_t  i = 0; i < nsize; ++i )
         {
-            const float     fval  = float(data[i]);
-            const uint32_t  ival = (*reinterpret_cast< const uint32_t * >( & fval ) );
+            const uint32_t  ival = (*reinterpret_cast< const uint32_t * >( data + i ) );
             const uint32_t  zval  = ival >> bfl_mant_shift;
             
             zptr[i] = zval;
@@ -89,7 +86,7 @@ struct bfl32
 
     static
     void
-    decompress ( value_t *       data,
+    decompress ( float *         data,
                  const size_t    nsize,
                  const byte_t *  zdata )
     {
@@ -99,41 +96,32 @@ struct bfl32
         {
             const uint32_t  zval = zptr[i];
             const uint32_t  ztmp = zval << bfl_mant_shift;
-            const float     fval = * reinterpret_cast< const float * >( & ztmp );
             
-            data[i] = value_t(fval);
+            data[i] = * reinterpret_cast< const float * >( & ztmp );
         }// for
     }
 };
 
 //
-// specialization for 4 bytes: just convert to float
+// specialization for 4 bytes: just copy memory
 //
-template < typename  value_t >
-struct bfl32< value_t, byte4_t >
+template <>
+struct bfl32< byte4_t >
 {
-    static
-    void
-    compress ( const value_t *  data,
-               const size_t     nsize,
-               byte_t *         zdata )
+    static void  compress   ( const float *  data,
+                              const size_t   nsize,
+                              byte_t *       zdata )
     {
-        auto  zptr = reinterpret_cast< float * >( zdata );
-        
-        for ( size_t  i = 0; i < nsize; ++i )
-            zptr[i] = float(data[i]);
+        std::copy( data, data + nsize, reinterpret_cast< float * >( zdata ) );
     }
 
-    static
-    void
-    decompress ( value_t *       data,
-                 const size_t    nsize,
-                 const byte_t *  zdata )
+    static void  decompress ( float *         data,
+                              const size_t    nsize,
+                              const byte_t *  zdata )
     {
-        auto  zptr = reinterpret_cast< const float * >( zdata );
-        
-        for ( size_t  i = 0; i < nsize; ++i )
-            data[i] = value_t(zptr[i]);
+        std::copy( reinterpret_cast< const float * >( zdata ),
+                   reinterpret_cast< const float * >( zdata ) + nsize,
+                   data );
     }
 };
 
@@ -141,23 +129,22 @@ struct bfl32< value_t, byte4_t >
 // extract sign, exponent and mantissa, then reduce exponent to 8 bits
 // and shorten mantissa
 //
-template < typename  value_t,
-           typename  storage_t >
+template < typename  storage_t >
 struct bfl64
 {
-    static constexpr uint32_t  bfl_mant_bits  = 8 * sizeof(storage_t) - 1 - 8;  // 1 sign bit, 8 exponent bits
-    static constexpr uint32_t  bfl_sign_bit   = bfl_mant_bits + 8;
-    static constexpr uint32_t  bfl_mant_shift = fp64_mant_bits - bfl_mant_bits;
-    static constexpr uint32_t  bfl_sign_shift = 63 - bfl_sign_bit;
+    static constexpr uint8_t   bfl_mant_bits  = 8 * sizeof(storage_t) - 1 - 8;  // 1 sign bit, 8 exponent bits
+    static constexpr uint8_t   bfl_sign_bit   = bfl_mant_bits + 8;
+    static constexpr uint8_t   bfl_mant_shift = fp64_mant_bits - bfl_mant_bits;
+    static constexpr uint8_t   bfl_sign_shift = 63 - bfl_sign_bit;
     static constexpr uint64_t  bfl_sign_mask  = (1ul    << bfl_sign_bit);
     static constexpr uint64_t  bfl_exp_mask   = (0xfful << bfl_mant_bits);
     static constexpr uint64_t  bfl_mant_mask  = (1ul    << bfl_mant_bits) - 1;
         
     static
     void
-    compress ( const value_t *  data,
-               const size_t     nsize,
-               byte_t *         zdata )
+    compress ( const double *  data,
+               const size_t    nsize,
+               byte_t *        zdata )
     {
         auto  zptr = reinterpret_cast< storage_t * >( zdata );
 
@@ -168,7 +155,7 @@ struct bfl64
             const uint32_t  exp  = (ival & fp64_exp_mask ) >> fp64_mant_bits;
             const uint64_t  mant = (ival & fp64_mant_mask) >> bfl_mant_shift;
             const uint64_t  sign = (ival & fp64_sign_mask) >> bfl_sign_shift;
-            const uint64_t  zval = sign | (uint64_t(exp - 0x381u) << bfl_mant_bits) | mant;
+            const uint64_t  zval = sign | (uint64_t(exp - 0x381ul) << bfl_mant_bits) | mant;
 
             zptr[i] = zval;
         }// for
@@ -176,7 +163,7 @@ struct bfl64
 
     static
     void
-    decompress ( value_t *       data,
+    decompress ( double *        data,
                  const size_t    nsize,
                  const byte_t *  zdata )
     {
@@ -198,36 +185,74 @@ struct bfl64
 };
 
 //
-// specialization when using 8 bytes: just stick to double
+// specialization when using 8 bytes: just copy memory
 //
 template <>
-struct bfl64< float, byte8_t >
+struct bfl64< byte8_t >
 {
-    static void compress   ( const float *, const size_t, byte_t * ) { HLR_ERROR( "FP32 with 8 bytes???" ); }
-    static void decompress ( float *, const size_t, const byte_t * ) { HLR_ERROR( "FP32 with 8 bytes???" ); }
-};
-
-template <>
-struct bfl64< double, byte8_t >
-{
-    static
-    void
-    compress ( const double *  data,
-               const size_t    nsize,
-               byte_t *        zdata )
+    static void compress   ( const double *  data,
+                             const size_t    nsize,
+                             byte_t *        zdata )
     {
         std::copy( data, data + nsize, reinterpret_cast< double * >( zdata ) );
     }
 
-    static
-    void
-    decompress ( double *        data,
-                 const size_t    nsize,
-                 const byte_t *  zdata )
+    static void decompress ( double *        data,
+                             const size_t    nsize,
+                             const byte_t *  zdata )
     {
         std::copy( reinterpret_cast< const double * >( zdata ),
                    reinterpret_cast< const double * >( zdata ) + nsize,
                    data );
+    }
+};
+
+template < typename  value_t,
+           typename  storage_t >
+struct bfl
+{
+    static void  compress   ( const value_t *  data,
+                              const size_t     nsize,
+                              byte_t *         zdata );
+
+    static void  decompress ( value_t *        data,
+                              const size_t     nsize,
+                              const byte_t *   zdata );
+};
+
+template < typename  storage_t >
+struct bfl< float, storage_t >
+{
+    static inline void  compress   ( const float *  data,
+                                     const size_t   nsize,
+                                     byte_t *       zdata )
+    {
+        bfl32< storage_t >::compress( data, nsize, zdata );
+    }
+
+    static inline void  decompress ( float *         data,
+                                     const size_t    nsize,
+                                     const byte_t *  zdata )
+    {
+        bfl32< storage_t >::decompress( data, nsize, zdata );
+    }
+};
+
+template < typename  storage_t >
+struct bfl< double, storage_t >
+{
+    static inline void  compress   ( const double *  data,
+                                     const size_t    nsize,
+                                     byte_t *        zdata )
+    {
+        bfl64< storage_t >::compress( data, nsize, zdata );
+    }
+
+    static inline void  decompress ( double *        data,
+                                     const size_t    nsize,
+                                     const byte_t *  zdata )
+    {
+        bfl64< storage_t >::decompress( data, nsize, zdata );
     }
 };
 
@@ -244,7 +269,17 @@ compress ( const config &   config,
            const size_t     dim0,
            const size_t     dim1 = 0,
            const size_t     dim2 = 0,
-           const size_t     dim3 = 0 )
+           const size_t     dim3 = 0 );
+
+template <>
+inline
+zarray
+compress< float > ( const config &   config,
+                    float *          data,
+                    const size_t     dim0,
+                    const size_t     dim1,
+                    const size_t     dim2,
+                    const size_t     dim3 )
 {
     const size_t    nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
     const uint32_t  nbits = byte_pad( 1 + 8 + config.bitrate ); // total no. of bits per value
@@ -255,13 +290,41 @@ compress ( const config &   config,
 
     switch ( nbyte )
     {
-        case 2  : bfl32< value_t, byte2_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
-        case 3  : bfl32< value_t, byte3_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
-        case 4  : bfl32< value_t, byte4_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
-        case 5  : bfl64< value_t, byte5_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
-        case 6  : bfl64< value_t, byte6_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
-        case 7  : bfl64< value_t, byte7_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
-        default : bfl64< value_t, byte8_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 2  : bfl< float, byte2_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 3  : bfl< float, byte3_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 4  : bfl< float, byte4_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
+        default : bfl< float, byte4_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
+    }// switch
+        
+    return zdata;
+}
+
+template <>
+inline
+zarray
+compress< double > ( const config &   config,
+                     double *         data,
+                     const size_t     dim0,
+                     const size_t     dim1,
+                     const size_t     dim2,
+                     const size_t     dim3 )
+{
+    const size_t    nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
+    const uint32_t  nbits = byte_pad( 1 + 8 + config.bitrate ); // total no. of bits per value
+    const uint32_t  nbyte = nbits / 8;
+    zarray          zdata( bfl_header_ofs + nbyte * nsize );
+
+    zdata[0] = nbyte;
+
+    switch ( nbyte )
+    {
+        case 2  : bfl< double, byte2_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 3  : bfl< double, byte3_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 4  : bfl< double, byte4_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 5  : bfl< double, byte5_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 6  : bfl< double, byte6_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 7  : bfl< double, byte7_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
+        default : bfl< double, byte8_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
     }// switch
         
     return zdata;
@@ -312,20 +375,52 @@ decompress ( const zarray &  zdata,
              const size_t    dim0,
              const size_t    dim1 = 0,
              const size_t    dim2 = 0,
-             const size_t    dim3 = 0 )
+             const size_t    dim3 = 0 );
+
+template <>
+inline
+void
+decompress< float > ( const zarray &  zdata,
+                      float *         dest,
+                      const size_t    dim0,
+                      const size_t    dim1,
+                      const size_t    dim2,
+                      const size_t    dim3 )
 {
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
     const auto    nbyte = zdata[0];
 
     switch ( nbyte )
     {
-        case 2  : bfl32< value_t, byte2_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
-        case 3  : bfl32< value_t, byte3_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
-        case 4  : bfl32< value_t, byte4_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
-        case 5  : bfl64< value_t, byte5_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
-        case 6  : bfl64< value_t, byte6_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
-        case 7  : bfl64< value_t, byte7_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
-        default : bfl64< value_t, byte8_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 2  : bfl< float, byte2_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 3  : bfl< float, byte3_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 4  : bfl< float, byte4_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
+        default : bfl< float, byte4_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
+    }// switch
+}
+
+template <>
+inline
+void
+decompress< double > ( const zarray &  zdata,
+                       double *        dest,
+                       const size_t    dim0,
+                       const size_t    dim1,
+                       const size_t    dim2,
+                       const size_t    dim3 )
+{
+    const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
+    const auto    nbyte = zdata[0];
+
+    switch ( nbyte )
+    {
+        case 2  : bfl< double, byte2_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 3  : bfl< double, byte3_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 4  : bfl< double, byte4_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 5  : bfl< double, byte5_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 6  : bfl< double, byte6_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 7  : bfl< double, byte7_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
+        default : bfl< double, byte8_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
     }// switch
 }
 
@@ -407,13 +502,13 @@ compress_lr ( const blas::matrix< value_t > &                       U,
 
         switch ( nbyte )
         {
-            case  2 : bfl32< value_t, byte2_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  3 : bfl32< value_t, byte3_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  4 : bfl32< value_t, byte4_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  5 : bfl64< value_t, byte5_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  6 : bfl64< value_t, byte6_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  7 : bfl64< value_t, byte7_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
-            default : bfl64< value_t, byte8_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
+            case  2 : bfl< value_t, byte2_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
+            case  3 : bfl< value_t, byte3_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
+            case  4 : bfl< value_t, byte4_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
+            case  5 : bfl< value_t, byte5_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
+            case  6 : bfl< value_t, byte6_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
+            case  7 : bfl< value_t, byte7_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
+            default : bfl< value_t, byte8_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
         }// switch
         
         pos += n*nbyte;
@@ -439,13 +534,13 @@ decompress_lr ( const zarray &             zdata,
 
         switch ( nbyte )
         {
-            case  2 : bfl32< value_t, byte2_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  3 : bfl32< value_t, byte3_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  4 : bfl32< value_t, byte4_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  5 : bfl64< value_t, byte5_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  6 : bfl64< value_t, byte6_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  7 : bfl64< value_t, byte7_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
-            default : bfl64< value_t, byte8_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
+            case  2 : bfl< value_t, byte2_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
+            case  3 : bfl< value_t, byte3_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
+            case  4 : bfl< value_t, byte4_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
+            case  5 : bfl< value_t, byte5_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
+            case  6 : bfl< value_t, byte6_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
+            case  7 : bfl< value_t, byte7_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
+            default : bfl< value_t, byte8_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
         }// switch
         
         pos += nbyte * n;
@@ -486,6 +581,183 @@ decompress_lr< std::complex< double > > ( const zarray &                        
                                           blas::matrix< std::complex< double > > &  U )
 {
     HLR_ERROR( "TODO" );
+}
+
+//
+// compressed blas
+//
+
+namespace
+{
+
+template < typename value_t,
+           typename storage_t >
+void
+mulvec ( const size_t       nrows,
+         const size_t       ncols,
+         const matop_t      op_A,
+         const value_t      alpha,
+         const storage_t *  zA,
+         const value_t *    x,
+         value_t *          y )
+{
+    static constexpr uint8_t   bfl_mant_bits  = 8 * sizeof(storage_t) - 1 - 8;  // 1 sign bit, 8 exponent bits
+    static constexpr uint8_t   bfl_sign_bit   = bfl_mant_bits + 8;
+    static constexpr uint8_t   bfl_mant_shift = fp64_mant_bits - bfl_mant_bits;
+    static constexpr uint8_t   bfl_sign_shift = 63 - bfl_sign_bit;
+    static constexpr uint64_t  bfl_sign_mask  = (1ul    << bfl_sign_bit);
+    static constexpr uint64_t  bfl_exp_mask   = (0xfful << bfl_mant_bits);
+    static constexpr uint64_t  bfl_mant_mask  = (1ul    << bfl_mant_bits) - 1;
+
+    switch ( op_A )
+    {
+        case  apply_normal :
+        {
+            size_t  pos = 0;
+            
+            for ( size_t  j = 0; j < ncols; ++j )
+            {
+                const auto  x_j = alpha * x[j];
+                
+                for ( size_t  i = 0; i < nrows; ++i, pos++ )
+                {
+                    const uint64_t  zval = zA[pos];
+                    const uint64_t  sign = (zval & bfl_sign_mask) << bfl_sign_shift;
+                    const uint64_t  exp  = (zval & bfl_exp_mask ) >> bfl_mant_bits;
+                    const uint64_t  mant = (zval & bfl_mant_mask) << bfl_mant_shift;
+                    const uint64_t  ival = sign | ((exp + 0x381ul) << fp64_mant_bits) | mant;
+                    const double    fval = * reinterpret_cast< const double * >( & ival );
+                    
+                    y[i] += fval * x_j;
+                }// for
+            }// for
+        }// case
+        break;
+        
+        case  apply_adjoint :
+        {
+            size_t  pos = 0;
+            
+            for ( size_t  j = 0; j < ncols; ++j )
+            {
+                value_t  y_j = value_t(0);
+                
+                for ( size_t  i = 0; i < nrows; ++i, pos++ )
+                {
+                    const uint64_t  zval = zA[pos];
+                    const uint64_t  sign = (zval & bfl_sign_mask) << bfl_sign_shift;
+                    const uint64_t  exp  = (zval & bfl_exp_mask ) >> bfl_mant_bits;
+                    const uint64_t  mant = (zval & bfl_mant_mask) << bfl_mant_shift;
+                    const uint64_t  ival = sign | ((exp + 0x381ul) << fp64_mant_bits) | mant;
+                    const double    fval = * reinterpret_cast< const double * >( & ival );
+
+                    y_j += fval * x[i];
+                }// for
+
+                y[j] += alpha * y_j;
+            }// for
+        }// case
+        break;
+
+        default:
+            HLR_ERROR( "TODO" );
+    }// switch
+}
+
+}// namespace anonymous
+
+template < typename value_t >
+void
+mulvec ( const size_t     nrows,
+         const size_t     ncols,
+         const matop_t    op_A,
+         const value_t    alpha,
+         const zarray &   zA,
+         const value_t *  x,
+         value_t *        y )
+{
+    using  real_t = Hpro::real_type_t< value_t >;
+
+    const uint8_t  nbyte = zA[0];
+    
+    switch ( nbyte )
+    {
+        case  2 : mulvec( nrows, ncols, op_A, alpha, reinterpret_cast< const byte2_t * >( zA.data() + bfl_header_ofs ), x, y ); break;
+        case  3 : mulvec( nrows, ncols, op_A, alpha, reinterpret_cast< const byte3_t * >( zA.data() + bfl_header_ofs ), x, y ); break;
+        case  4 : mulvec( nrows, ncols, op_A, alpha, reinterpret_cast< const byte4_t * >( zA.data() + bfl_header_ofs ), x, y ); break;
+        case  5 : mulvec( nrows, ncols, op_A, alpha, reinterpret_cast< const byte5_t * >( zA.data() + bfl_header_ofs ), x, y ); break;
+        case  6 : mulvec( nrows, ncols, op_A, alpha, reinterpret_cast< const byte6_t * >( zA.data() + bfl_header_ofs ), x, y ); break;
+        case  7 : mulvec( nrows, ncols, op_A, alpha, reinterpret_cast< const byte7_t * >( zA.data() + bfl_header_ofs ), x, y ); break;
+        case  8 : mulvec( nrows, ncols, op_A, alpha, reinterpret_cast< const byte8_t * >( zA.data() + bfl_header_ofs ), x, y ); break;
+        default :
+            HLR_ERROR( "unsupported byte size" );
+    }// switch
+}
+
+template < typename value_t >
+void
+mulvec_lr ( const size_t     nrows,
+            const size_t     ncols,
+            const matop_t    op_A,
+            const value_t    alpha,
+            const zarray &   zA,
+            const value_t *  x,
+            value_t *        y )
+{
+    using  real_t = Hpro::real_type_t< value_t >;
+
+    size_t  pos = 0;
+
+    switch ( op_A )
+    {
+        case  apply_normal :
+        {
+            for ( uint  l = 0; l < ncols; ++l )
+            {
+                const uint8_t  nbyte = zA[pos];
+        
+                switch ( nbyte )
+                {
+                    case  2 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte2_t * >( zA.data() + pos + bfl_header_ofs ), x+l, y ); break;
+                    case  3 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte3_t * >( zA.data() + pos + bfl_header_ofs ), x+l, y ); break;
+                    case  4 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte4_t * >( zA.data() + pos + bfl_header_ofs ), x+l, y ); break;
+                    case  5 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte5_t * >( zA.data() + pos + bfl_header_ofs ), x+l, y ); break;
+                    case  6 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte6_t * >( zA.data() + pos + bfl_header_ofs ), x+l, y ); break;
+                    case  7 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte7_t * >( zA.data() + pos + bfl_header_ofs ), x+l, y ); break;
+                    case  8 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte8_t * >( zA.data() + pos + bfl_header_ofs ), x+l, y ); break;
+                    default :
+                        HLR_ERROR( "unsupported byte size" );
+                }// switch
+
+                pos += bfl_header_ofs + nbyte * nrows;
+            }// for
+        }// case
+        break;
+        
+        case  apply_adjoint :
+        {
+            for ( uint  l = 0; l < ncols; ++l )
+            {
+                const uint8_t  nbyte = zA[pos];
+        
+                switch ( nbyte )
+                {
+                    case  2 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte2_t * >( zA.data() + pos + bfl_header_ofs ), x, y+l ); break;
+                    case  3 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte3_t * >( zA.data() + pos + bfl_header_ofs ), x, y+l ); break;
+                    case  4 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte4_t * >( zA.data() + pos + bfl_header_ofs ), x, y+l ); break;
+                    case  5 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte5_t * >( zA.data() + pos + bfl_header_ofs ), x, y+l ); break;
+                    case  6 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte6_t * >( zA.data() + pos + bfl_header_ofs ), x, y+l ); break;
+                    case  7 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte7_t * >( zA.data() + pos + bfl_header_ofs ), x, y+l ); break;
+                    case  8 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte8_t * >( zA.data() + pos + bfl_header_ofs ), x, y+l ); break;
+                    default :
+                        HLR_ERROR( "unsupported byte size" );
+                }// switch
+
+                pos += bfl_header_ofs + nbyte * nrows;
+            }// for
+        }// case
+        break;
+    }// switch
 }
 
 }}}// namespace hlr::compress::bfl

@@ -437,6 +437,8 @@ using hlr::compress::bfl::get_config;
 using hlr::compress::bfl::byte_size;
 using hlr::compress::bfl::compressed_size;
 
+namespace blas { using hlr::compress::bfl::mulvec; }
+
 }} // namespace hlr::compress
 
 //////////////////////////////////////////////////////////////////////
@@ -738,6 +740,8 @@ using hlr::compress::bfl::byte_size;
 using hlr::compress::bfl::compressed_size;
 
 static const char provider[] = "bfl";
+
+namespace blas { using hlr::compress::bfl::mulvec_lr; }
 
 }// namespace hlr::compress::aplr
 
