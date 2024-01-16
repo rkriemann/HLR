@@ -14,6 +14,11 @@
 
 #include <hlr/utils/detail/byte_n.hh>
 
+//
+// signal availability of compressed BLAS
+//
+#define HLR_HAS_COMPRESSED_BLAS
+
 ////////////////////////////////////////////////////////////
 //
 // compression using adaptive float representation
@@ -1037,57 +1042,169 @@ decompress_lr< std::complex< double > > ( const zarray &                        
 // compressed blas
 //
 
-// template < typename value_t >
-// class accessor
-// {
-//     using  real_t = Hpro::real_type_t< value_t >;
+template < typename value_t >
+struct accessor
+{
+    using  real_t = Hpro::real_type_t< value_t >;
     
-//     const uint8_t    nexp_bits;
-//     const uint8_t    nprec_bits;
-//     const uint8_t    nbits;
-//     const uint8_t    nbyte;
-//     const uint64_t   prec_mask;
-//     const uint8_t    prec_ofs;
-//     const uint64_t   exp_mask;
-//     const uint32_t   sign_shift;
-//     const uint64_t   zero_val;
-//     const real_t     scale;
-//     const uint8_t *  zptr;
+    const uint8_t      nexp_bits;
+    const uint8_t      nprec_bits;
+    const uint8_t      nbits;
+    const uint8_t      nbyte;
+    const uint64_t     prec_mask;
+    const uint8_t      prec_ofs;
+    const uint64_t     exp_mask;
+    const uint32_t     sign_shift;
+    const uint64_t     zero_val;
+    const real_t       scale;
+    const byte_t *     zptr;
     
-//     accessor ( const zarray &  zA )
-//             : nexp_bits(  zarray[0] )
-//             , nprec_bits( zarray[1] )
-//             , scale( * reinterpret_cast< real_t >( & zarray[2] ) )
-//             , nbits( 1 + nexp_bits + nprec_bits )
-//             , nbyte( nbits / 8 )
-//             , prec_mask( ( 1ul << nprec_bits ) - 1 )
-//             , prec_ofs( fp64_mant_bits - nprec_bits )
-//             , exp_mask( ( 1ul << nexp_bits  ) - 1 )
-//             , sign_shift( nexp_bits + nprec_bits )
-//             , zero_val( fp64_zero_val & (( 1ul << nbits) - 1 ) )
-//     {}
+    accessor ( const zarray &  zdata )
+            : nexp_bits(  zdata[0] )
+            , nprec_bits( zdata[1] )
+            , scale( * reinterpret_cast< const real_t * >( & zdata[2] ) )
+            , nbits( 1 + nexp_bits + nprec_bits )
+            , nbyte( nbits / 8 )
+            , prec_mask( ( 1ul << nprec_bits ) - 1 )
+            , prec_ofs( fp64_mant_bits - nprec_bits )
+            , exp_mask( ( 1ul << nexp_bits  ) - 1 )
+            , sign_shift( nexp_bits + nprec_bits )
+            , zero_val( fp64_zero_val & (( 1ul << nbits) - 1 ) )
+            , zptr( zdata.data() + 2 + sizeof(real_t) )
+    {}
 
-//     value_t  operator () ( const size_t  i ) const
-//     {
-//         const uint64_t  zval = zptr[ i * nbyte ];
+    value_t  operator () ( const size_t  i ) const
+    {
+        uint64_t  zval = 0;
 
-//         if ( zval == zero_val )
-//             return value_t(0);
+        switch ( nbyte )
+        {
+            case  1 : zval = * ( reinterpret_cast< const byte1_t * >( zptr ) + i ); break;
+            case  2 : zval = * ( reinterpret_cast< const byte2_t * >( zptr ) + i ); break;
+            case  3 : zval = * ( reinterpret_cast< const byte3_t * >( zptr ) + i ); break;
+            case  4 : zval = * ( reinterpret_cast< const byte4_t * >( zptr ) + i ); break;
+            case  5 : zval = * ( reinterpret_cast< const byte5_t * >( zptr ) + i ); break;
+            case  6 : zval = * ( reinterpret_cast< const byte6_t * >( zptr ) + i ); break;
+            case  7 : zval = * ( reinterpret_cast< const byte7_t * >( zptr ) + i ); break;
+            case  8 : zval = * ( reinterpret_cast< const byte8_t * >( zptr ) + i ); break;
+            default : HLR_ERROR( "unsupported byte size" );
+        }// switch
+        
+        if ( zval == zero_val )
+            return value_t(0);
                     
-//         const uint64_t  mant  = zval & prec_mask;
-//         const uint64_t  exp   = (zval >> prec_bits) & exp_mask;
-//         const uint64_t  sign  = (zval >> sign_shift) << fp64_sign_bit;
-//         fp64int_t       fival = { ((exp | fp64_exp_highbit) << fp64_mant_bits) | (mant << prec_ofs) };
+        const uint64_t  mant  = zval & prec_mask;
+        const uint64_t  exp   = (zval >> nprec_bits) & exp_mask;
+        const uint64_t  sign  = (zval >> sign_shift) << fp64_sign_bit;
+        fp64int_t       fival = { ((exp | fp64_exp_highbit) << fp64_mant_bits) | (mant << prec_ofs) };
 
-//         fival.f  = scale * ( fival.f - 1.0 );
-//         fival.u |= sign;
+        fival.f  = scale * ( fival.f - 1.0 );
+        fival.u |= sign;
 
-//         return fival.f;
-//     }
-// };
+        return fival.f;
+    }
+
+    struct const_iterator
+    {
+        const accessor *  acc;
+        const byte_t *    zptr;
+
+        const_iterator ( const accessor *  aacc,
+                         const byte_t *    aptr )
+                : acc( aacc )
+                , zptr( aptr )
+        {}
+
+        const_iterator & operator ++ () { zptr += acc->nbyte; return *this; }
+
+        value_t
+        operator * ()
+        {
+            uint64_t  zval = 0;
+
+            switch ( acc->nbyte )
+            {
+                case  1 : zval = * ( reinterpret_cast< const byte1_t * >( zptr ) ); break;
+                case  2 : zval = * ( reinterpret_cast< const byte2_t * >( zptr ) ); break;
+                case  3 : zval = * ( reinterpret_cast< const byte3_t * >( zptr ) ); break;
+                case  4 : zval = * ( reinterpret_cast< const byte4_t * >( zptr ) ); break;
+                case  5 : zval = * ( reinterpret_cast< const byte5_t * >( zptr ) ); break;
+                case  6 : zval = * ( reinterpret_cast< const byte6_t * >( zptr ) ); break;
+                case  7 : zval = * ( reinterpret_cast< const byte7_t * >( zptr ) ); break;
+                case  8 : zval = * ( reinterpret_cast< const byte8_t * >( zptr ) ); break;
+                default : HLR_ERROR( "unsupported byte size" );
+            }// switch
+            
+            if ( zval == acc->zero_val )
+                return value_t(0);
+            
+            const uint64_t  mant  = zval & acc->prec_mask;
+            const uint64_t  exp   = (zval >> acc->nprec_bits) & acc->exp_mask;
+            const uint64_t  sign  = (zval >> acc->sign_shift) << fp64_sign_bit;
+            fp64int_t       fival = { ((exp | fp64_exp_highbit) << fp64_mant_bits) | (mant << acc->prec_ofs) };
+            
+            fival.f  = ( fival.f - 1.0 ) / acc->scale;
+            fival.u |= sign;
+            
+            return fival.f;
+        }
+    };
+
+    const_iterator begin () const  { return const_iterator( this, zptr ); }
+};
 
 namespace
 {
+
+template < typename value_t,
+           typename accessor_t >
+void
+mulvec ( const size_t        nrows,
+         const size_t        ncols,
+         const matop_t       op_A,
+         const value_t       alpha,
+         const accessor_t &  zA,
+         const value_t *     x,
+         value_t *           y )
+{
+    auto  iter_A = zA.begin();
+        
+    switch ( op_A )
+    {
+        case  apply_normal :
+        {
+            size_t  pos = 0;
+            
+            for ( size_t  j = 0; j < ncols; ++j )
+            {
+                const auto  x_j = alpha * x[j];
+                
+                for ( size_t  i = 0; i < nrows; ++i, ++iter_A )
+                    y[i] += *iter_A * x_j;
+            }// for
+        }// case
+        break;
+        
+        case  apply_adjoint :
+        {
+            size_t  pos = 0;
+            
+            for ( size_t  j = 0; j < ncols; ++j )
+            {
+                auto  y_j = value_t(0);
+                
+                for ( size_t  i = 0; i < nrows; ++i, ++iter_A )
+                    y_j += *iter_A * x[i];
+
+                y[j] += alpha * y_j;
+            }// for
+        }// case
+        break;
+
+        default:
+            HLR_ERROR( "TODO" );
+    }// switch
+}
 
 template < typename value_t,
            typename storage_t >
@@ -1190,6 +1307,9 @@ mulvec ( const size_t     nrows,
          const value_t *  x,
          value_t *        y )
 {
+    #if 0
+    mulvec( nrows, ncols, op_A, alpha, accessor< value_t >( zA ), x, y );
+    #else
     using  real_t = Hpro::real_type_t< value_t >;
 
     const uint8_t  exp_bits  = zA[0];
@@ -1212,6 +1332,7 @@ mulvec ( const size_t     nrows,
         default :
             HLR_ERROR( "unsupported byte size" );
     }// switch
+    #endif
 }
 
 template < typename value_t >
@@ -1237,9 +1358,8 @@ mulvec_lr ( const size_t     nrows,
             {
                 const uint8_t  exp_bits  = zA[pos];
                 const uint8_t  prec_bits = zA[pos+1];
-                const uint8_t  nbits     = 1 + exp_bits + prec_bits;
-                const uint8_t  nbyte     = nbits / 8;
-                real_t         scale     = * ( reinterpret_cast< const real_t * >( zA.data() + pos + 2 ) );
+                const uint8_t  nbyte     = ( 1 + exp_bits + prec_bits ) / 8;
+                const real_t   scale     = * ( reinterpret_cast< const real_t * >( zA.data() + pos + 2 ) );
         
                 switch ( nbyte )
                 {
@@ -1266,9 +1386,8 @@ mulvec_lr ( const size_t     nrows,
             {
                 const uint8_t  exp_bits  = zA[pos];
                 const uint8_t  prec_bits = zA[pos+1];
-                const uint8_t  nbits     = 1 + exp_bits + prec_bits;
-                const uint8_t  nbyte     = nbits / 8;
-                real_t         scale     = * ( reinterpret_cast< const real_t * >( zA.data() + pos + 2 ) );
+                const uint8_t  nbyte     = ( 1 + exp_bits + prec_bits ) / 8;
+                const real_t   scale     = * ( reinterpret_cast< const real_t * >( zA.data() + pos + 2 ) );
         
                 switch ( nbyte )
                 {

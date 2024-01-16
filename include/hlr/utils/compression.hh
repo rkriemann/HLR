@@ -741,7 +741,23 @@ using hlr::compress::bfl::compressed_size;
 
 static const char provider[] = "bfl";
 
-namespace blas { using hlr::compress::bfl::mulvec_lr; }
+namespace blas
+{
+
+template < typename value_t >
+void
+mulvec ( const size_t     nrows,
+         const size_t     ncols,
+         const matop_t    op_A,
+         const value_t    alpha,
+         const zarray &   zA,
+         const value_t *  x,
+         value_t *        y )
+{
+    hlr::compress::bfl::mulvec_lr( nrows, ncols, op_A, alpha, zA, x, y );
+}
+
+}// namespace blas
 
 }// namespace hlr::compress::aplr
 
@@ -757,9 +773,25 @@ using hlr::compress::dfl::decompress_lr;
 using hlr::compress::dfl::byte_size;
 using hlr::compress::dfl::compressed_size;
 
-namespace blas { using hlr::compress::dfl::mulvec_lr; }
-
 static const char provider[] = "dfl";
+
+namespace blas
+{
+
+template < typename value_t >
+void
+mulvec ( const size_t     nrows,
+         const size_t     ncols,
+         const matop_t    op_A,
+         const value_t    alpha,
+         const zarray &   zA,
+         const value_t *  x,
+         value_t *        y )
+{
+    hlr::compress::dfl::mulvec_lr( nrows, ncols, op_A, alpha, zA, x, y );
+}
+
+}// namespace blas
 
 }// namespace hlr::compress::aplr
 
@@ -775,9 +807,25 @@ using hlr::compress::aflp::decompress_lr;
 using hlr::compress::aflp::byte_size;
 using hlr::compress::aflp::compressed_size;
 
-namespace blas { using hlr::compress::aflp::mulvec_lr; }
-
 static const char provider[] = "aflp";
+
+namespace blas
+{
+
+template < typename value_t >
+void
+mulvec ( const size_t     nrows,
+         const size_t     ncols,
+         const matop_t    op_A,
+         const value_t    alpha,
+         const zarray &   zA,
+         const value_t *  x,
+         value_t *        y )
+{
+    hlr::compress::aflp::mulvec_lr( nrows, ncols, op_A, alpha, zA, x, y );
+}
+
+}// namespace blas
 
 }// namespace hlr::compress::aplr
 

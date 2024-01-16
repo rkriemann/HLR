@@ -477,7 +477,7 @@ dense_matrix< value_t >::apply_add   ( const value_t                    alpha,
     HLR_ASSERT( x.length() == this->ncols( op ) );
     HLR_ASSERT( y.length() == this->nrows( op ) );
 
-    #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP || HLR_COMPRESSOR == HLR_COMPRESSOR_DFL || HLR_COMPRESSOR == HLR_COMPRESSOR_BFL
+    #if defined(HLR_HAS_COMPRESSED_BLAS)
     if ( is_compressed() )
     {
         compress::blas::mulvec( nrows(), ncols(), op, alpha, _zM, x.data(), y.data() );

@@ -363,7 +363,7 @@ public:
     hlr::blas::vector< value_t >
     transform_forward  ( const hlr::blas::vector< value_t > &  v ) const
     {
-        #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP || HLR_COMPRESSOR == HLR_COMPRESSOR_DFL || HLR_COMPRESSOR == HLR_COMPRESSOR_BFL
+        #if defined(HLR_HAS_COMPRESSED_BLAS)
         if ( is_compressed() )
         {
             const auto  k = this->rank();
@@ -373,7 +373,7 @@ public:
                 auto  t = blas::vector< value_t >( k );
 
                 #if HLR_USE_APLR_NESTED_CB == 1
-                compress::aplr::blas::mulvec_lr( _is.size(), k, apply_adjoint, value_t(1), _zV, v.data(), t.data() );
+                compress::aplr::blas::mulvec( _is.size(), k, apply_adjoint, value_t(1), _zV, v.data(), t.data() );
                 #else
                 compress::blas::mulvec( _is.size(), k, apply_adjoint, value_t(1), _zV, v.data(), t.data() );
                 #endif
@@ -469,7 +469,7 @@ public:
     hlr::blas::vector< value_t >
     transform_backward  ( const hlr::blas::vector< value_t > &  s ) const
     {
-        #if HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP || HLR_COMPRESSOR == HLR_COMPRESSOR_DFL || HLR_COMPRESSOR == HLR_COMPRESSOR_BFL
+        #if defined(HLR_HAS_COMPRESSED_BLAS)
         if ( is_compressed() )
         {
             if ( nsons() == 0 )
@@ -478,7 +478,7 @@ public:
                 auto        t = blas::vector< value_t >( n );
 
                 #if HLR_USE_APLR_NESTED_CB == 1
-                compress::aplr::blas::mulvec_lr( n, this->rank(), apply_normal, value_t(1), _zV, s.data(), t.data() );
+                compress::aplr::blas::mulvec( n, this->rank(), apply_normal, value_t(1), _zV, s.data(), t.data() );
                 #else
                 compress::blas::mulvec( n, this->rank(), apply_normal, value_t(1), _zV, s.data(), t.data() );
                 #endif

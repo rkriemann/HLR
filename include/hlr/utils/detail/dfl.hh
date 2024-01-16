@@ -9,6 +9,12 @@
 //
 
 #include <hlr/utils/detail/bfl.hh>
+#include <hlr/utils/detail/byte_n.hh>
+
+//
+// signal availability of compressed BLAS
+//
+#define HLR_HAS_COMPRESSED_BLAS
 
 ////////////////////////////////////////////////////////////
 //
@@ -19,10 +25,8 @@
 
 namespace hlr { namespace compress { namespace dfl {
 
-using byte_t = uint8_t;
-
-constexpr uint32_t  fp64_mant_bits = 52;
-constexpr uint32_t  dfl_header_ofs = 1;
+constexpr uint8_t  fp64_mant_bits = 52;
+constexpr uint8_t  dfl_header_ofs = 1;
 
 inline
 byte_t
@@ -56,8 +60,8 @@ inline config  get_config      ( const double    eps ) { return config{ eps_to_r
 template < typename  storage_t >
 struct dfl
 {
-    static constexpr uint64_t  dfl_mant_bits  = 8 * sizeof(storage_t) - 1 - 11;  // 1 sign bit, 11 exponent bits
-    static constexpr uint64_t  dfl_mant_shift = fp64_mant_bits - dfl_mant_bits;
+    static constexpr uint8_t  dfl_mant_bits  = 8 * sizeof(storage_t) - 1 - 11;  // 1 sign bit, 11 exponent bits
+    static constexpr uint8_t  dfl_mant_shift = fp64_mant_bits - dfl_mant_bits;
     
     static
     void

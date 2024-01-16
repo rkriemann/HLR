@@ -12,6 +12,11 @@
 
 #include <hlr/utils/detail/byte_n.hh>
 
+//
+// signal availability of compressed BLAS
+//
+#define HLR_HAS_COMPRESSED_BLAS
+
 ////////////////////////////////////////////////////////////
 //
 // compression using general bfl format
