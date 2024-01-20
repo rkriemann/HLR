@@ -23,6 +23,61 @@ using  mutex_map_t = std::map< idx_t, std::unique_ptr< std::mutex > >;
 constexpr size_t  CHUNK_SIZE = 64;
 
 //
+// compute y = y + α op( M ) x
+// - very basic algorithm for educational purposes
+//
+template < typename value_t >
+void
+mul_vec_simple ( const value_t                    alpha,
+                 const Hpro::matop_t              op_M,
+                 const Hpro::TMatrix< value_t > & M,
+                 const blas::vector< value_t > &  x,
+                 blas::vector< value_t > &        y,
+                 const size_t                     ofs_rows,
+                 const size_t                     ofs_cols,
+                 std::mutex &                     mtx )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    if ( is_blocked( M ) )
+    {
+        auto  B = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< size_t >( 0, B->nblock_rows(),
+                                              0, B->nblock_cols() ),
+            [=,&x,&y,&mtx] ( const auto &  r )
+            {
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        auto  B_ij = B->block( i, j );
+                        
+                        if ( ! is_null( B_ij ) )
+                            mul_vec_simple( alpha, op_M, *B_ij, x, y, ofs_rows, ofs_cols, mtx );
+                    }// for
+                }// for
+            } );
+    }// if
+    else
+    {
+        auto  x_is = x( M.col_is( op_M ) - ofs_cols );
+        auto  y_is = y( M.row_is( op_M ) - ofs_rows );
+        auto  t    = blas::vector< value_t >( y_is.length() );
+            
+        M.apply_add( alpha, x_is, t, op_M );
+        
+        {
+            auto  lock = std::scoped_lock( mtx );
+        
+            blas::add( value_t(1), t, y_is );
+        }
+    }// else
+}
+
+//
 // apply t to y in chunks of size CHUNK_SIZE
 // while only locking currently updated chunk
 //

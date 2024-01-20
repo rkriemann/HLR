@@ -49,6 +49,10 @@ mul_vec ( const value_t                     alpha,
           const blas::vector< value_t > &   x,
           blas::vector< value_t > &         y )
 {
+    // auto  mtx = std::mutex();
+    
+    // detail::mul_vec_simple( alpha, op_M, M, x, y, M.row_is( op_M ).first(), M.col_is( op_M ).first(), mtx );
+    
     auto        mtx_map = detail::mutex_map_t();
     const auto  is      = M.row_is( op_M );
 
