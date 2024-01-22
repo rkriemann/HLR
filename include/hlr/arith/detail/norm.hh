@@ -233,7 +233,7 @@ frobenius_squared ( const alpha_t                     alpha,
     //     return val;
     // };
 
-    if ( is_blocked_all( A, B ) )
+    if ( hlr::is_blocked_all( A, B ) )
     {
         auto      BA  = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
         auto      BB  = cptrcast( &B, Hpro::TBlockMatrix< value_t > );

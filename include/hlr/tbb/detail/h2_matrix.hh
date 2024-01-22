@@ -425,7 +425,7 @@ build_nested_cluster_basis ( nested_cluster_basis< value_t > &  cb,
             auto        U_i   = M_i->U( op );
             auto        U_sub = blas::matrix< value_t >( U_i, cb.is() - M_i->row_ofs( op ), blas::range::all );
             auto        X_i   = blas::prod( U_sub, blas::adjoint( C_i ) );
-            auto        X_sub = blas::matrix( X, blas::range::all, blas::range( pos, pos + C_i.nrows() - 1 ) );
+            auto        X_sub = blas::matrix< value_t >( X, blas::range::all, blas::range( pos, pos + C_i.nrows() - 1 ) );
 
             blas::copy( X_i, X_sub );
             pos += C_i.nrows();

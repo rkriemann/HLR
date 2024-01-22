@@ -187,7 +187,7 @@ svd_ortho ( const blas::matrix< value_t > &  U,
         auto  OV = blas::prod( value_t(1), QV, Vk );
         
         // restrict S
-        auto  Sk = blas::vector( Ss, orank_is );
+        auto  Sk = blas::vector< value_t >( Ss, orank_is );
         auto  OS = blas::copy( Sk );
         
         return { std::move( OU ), std::move( OS ), std::move( OV ) };

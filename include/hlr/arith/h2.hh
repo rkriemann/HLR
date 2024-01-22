@@ -200,7 +200,7 @@ add_uniform_to_scalar ( const uniform_vector< cluster_basis_t > &  u,
 
     if ( cb.nsons() == 0 )
     {
-        auto  v_loc = blas::vector( blas::vec( v ), cb.is() - v.ofs() );
+        auto  v_loc = blas::vector< value_t >( blas::vec( v ), cb.is() - v.ofs() );
 
         blas::mulvec( value_t(1), cb.basis(), s, value_t(1), v_loc );
     }// if

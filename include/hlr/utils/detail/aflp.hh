@@ -1380,6 +1380,10 @@ mulvec_lr ( const size_t     nrows,
         }// case
         break;
         
+        case  apply_conjugate  : HLR_ERROR( "TODO" );
+            
+        case  apply_transposed : HLR_ERROR( "TODO" );
+
         case  apply_adjoint :
         {
             for ( uint  l = 0; l < ncols; ++l )

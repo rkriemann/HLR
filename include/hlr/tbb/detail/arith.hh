@@ -384,7 +384,7 @@ mul_vec_row ( const value_t                     alpha,
 ///////////////////////////////////////////////////////////////////////
 
 template < typename value_t > using  matrix_list_t       = std::list< const Hpro::TMatrix< value_t > * >;
-template < typename value_t > using  cluster_block_map_t = std::unordered_map< indexset, matrix_list_t< value_t > >;
+template < typename value_t > using  cluster_block_map_t = std::unordered_map< indexset, matrix_list_t< value_t >, indexset_hash >;
 
 template < typename value_t >
 void
@@ -406,23 +406,25 @@ mul_vec_cl ( const value_t                             alpha,
             0, B->nblock_rows( op_M ),
             [&,alpha,op_M] ( const auto &  i )
             {
-                for ( size_t  j = 0; j < B->nblock_cols( op_M ); ++j )
-                {
-                    auto  B_ij = B->block( i, j );
+                // WARNING: assuming that by following diagonal blocks all clusters are reached
+                auto  B_ii = B->block( i, i );
                     
-                    if ( ! is_null( B_ij ) )
-                        mul_vec_cl( alpha, op_M, *B_ij, blocks, sx, sy );
-                }// for
+                if ( ! is_null( B_ii ) )
+                    mul_vec_cl( alpha, op_M, *B_ii, blocks, sx, sy );
             }
         );
     }// if
 
     if ( ! blocks.contains( M.row_is( op_M ) ) )
         return;
+
+    //
+    // compute update with all block in current block row
+    //
     
-    auto  mat_list = & blocks[ M.row_is( op_M ) ];
-    auto  y_j      = blas::vector< value_t >( blas::vec( sy ), M.row_is( op_M ) - sy.ofs() );
-    auto  yt       = blas::vector< value_t >( y_j.length() );
+    auto &  mat_list = blocks.at( M.row_is( op_M ) );
+    auto    y_j      = blas::vector< value_t >( blas::vec( sy ), M.row_is( op_M ) - sy.ofs() );
+    auto    yt       = blas::vector< value_t >( y_j.length() );
     
     for ( auto  A : mat_list )
     {

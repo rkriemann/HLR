@@ -1084,7 +1084,7 @@ build_mat_map ( const Hpro::TMatrix< value_t > &   A,
         
         {
             auto  accessor = accessor_t< value_t >();
-            auto  entry    = cond_mat_t{ R, std::move( Cv ) };
+            auto  entry    = cond_mat_t< value_t >{ R, std::move( Cv ) };
 
             row_map.insert( accessor, A.row_is() );
             accessor->second.push_back( std::move( entry ) );
@@ -1092,7 +1092,7 @@ build_mat_map ( const Hpro::TMatrix< value_t > &   A,
 
         {
             auto  accessor = accessor_t< value_t >();
-            auto  entry    = cond_mat_t{ R, std::move( Cu ) };
+            auto  entry    = cond_mat_t< value_t >{ R, std::move( Cu ) };
 
             col_map.insert( accessor, A.col_is() );
             accessor->second.push_back( std::move( entry ) );
@@ -1248,7 +1248,7 @@ build_cluster_basis ( shared_cluster_basis< value_t > &     cb,
         for ( const auto  [ R_i, C_i ] : accessor->second )
         {
             auto  U_i = blas::prod( R_i->U( op ), blas::adjoint( C_i ) );
-            auto  X_i = blas::matrix( X, blas::range::all, blas::range( pos, pos + C_i.nrows() - 1 ) );
+            auto  X_i = blas::matrix< value_t >( X, blas::range::all, blas::range( pos, pos + C_i.nrows() - 1 ) );
 
             blas::copy( U_i, X_i );
             pos += C_i.nrows();

@@ -1252,7 +1252,7 @@ copy_tiled ( const hpro::TMatrix< value_t > &  M,
                                                                                RM->col_is(),
                                                                                ntile,
                                                                                RM->U(),
-                                                                               R->V() );
+                                                                               RM->V() );
 
         R->set_id( RM->id() );
 

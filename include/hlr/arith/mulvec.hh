@@ -75,16 +75,33 @@ mul_vec ( const value_t                             alpha,
     mul_vec( alpha, op_M, M, blas::vec( x ), blas::vec( y ) );
 }
 
-// template < typename value_t >
-// void
-// mul_vec ( const value_t                           alpha,
-//           const Hpro::matop_t                     op_M,
-//           const Hpro::TMatrix< value_t > &        M,
-//           const Hpro::TScalarVector< value_t > &  x,
-//           Hpro::TScalarVector< value_t > &        y )
-// {
-//     mul_vec( alpha, op_M, M, Hpro::blas_vec< value_t >( x ), Hpro::blas_vec< value_t >( y ) );
-// }
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+//
+// just dummy implementation
+//
+
+template < typename value_t > using  cluster_block_map_t = int;
+
+template < typename value_t >
+void
+mul_vec_cl ( const value_t                             alpha,
+             const matop_t                             op_M,
+             const Hpro::TMatrix< value_t > &          M,
+             const cluster_block_map_t< value_t > &    /* blocks */,
+             const vector::scalar_vector< value_t > &  x,
+             vector::scalar_vector< value_t > &        y )
+{
+    mul_vec( alpha, op_M, M, x, y );
+}
+
+template < typename value_t >
+void
+setup_cluster_block_map ( const matop_t                     /* op_M */,
+                          const Hpro::TMatrix< value_t > &  /* M */,
+                          cluster_block_map_t< value_t > &  /* blocks */ )
+{}
 
 }// namespace hlr
 

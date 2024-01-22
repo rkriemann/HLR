@@ -73,6 +73,7 @@ struct bfl32
     static constexpr uint8_t  bfl_mant_bits  = 8 * sizeof(storage_t) - 1 - 8;  // 1 sign bit, 8 exponent bits
     static constexpr uint8_t  bfl_mant_shift = fp32_mant_bits - bfl_mant_bits;
     
+    
     static
     void
     compress ( const float *  data,
@@ -298,7 +299,7 @@ compress< float > ( const config &   config,
     {
         case 2  : bfl< float, byte2_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
         case 3  : bfl< float, byte3_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
-        case 4  : bfl< float, byte4_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 4  :
         default : bfl< float, byte4_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
     }// switch
         
@@ -330,6 +331,7 @@ compress< double > ( const config &   config,
         case 5  : bfl< double, byte5_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
         case 6  : bfl< double, byte6_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
         case 7  : bfl< double, byte7_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 8  :
         default : bfl< double, byte8_t >::compress( data, nsize, zdata.data() + bfl_header_ofs ); break;
     }// switch
         
@@ -400,7 +402,7 @@ decompress< float > ( const zarray &  zdata,
     {
         case 2  : bfl< float, byte2_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
         case 3  : bfl< float, byte3_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
-        case 4  : bfl< float, byte4_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
+        case 4  :
         default : bfl< float, byte4_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
     }// switch
 }
@@ -420,12 +422,13 @@ decompress< double > ( const zarray &  zdata,
 
     switch ( nbyte )
     {
-        case 2  : bfl< double, byte2_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
-        case 3  : bfl< double, byte3_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
-        case 4  : bfl< double, byte4_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
-        case 5  : bfl< double, byte5_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
-        case 6  : bfl< double, byte6_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
-        case 7  : bfl< double, byte7_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
+        case  2 : bfl< double, byte2_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
+        case  3 : bfl< double, byte3_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
+        case  4 : bfl< double, byte4_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
+        case  5 : bfl< double, byte5_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
+        case  6 : bfl< double, byte6_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
+        case  7 : bfl< double, byte7_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
+        case  8 :
         default : bfl< double, byte8_t >::decompress( dest, nsize, zdata.data() + bfl_header_ofs ); break;
     }// switch
 }
@@ -473,6 +476,8 @@ zarray
 compress_lr ( const blas::matrix< value_t > &                       U,
               const blas::vector< Hpro::real_type_t< value_t > > &  S )
 {
+    using  real_t = Hpro::real_type_t< value_t >;
+    
     //
     // first, determine exponent bits and mantissa bits for all columns
     //
@@ -506,16 +511,30 @@ compress_lr ( const blas::matrix< value_t > &                       U,
         zdata[pos] = nbyte;
         pos += 1;
 
-        switch ( nbyte )
+        if constexpr ( sizeof(real_t) == 4 )
         {
-            case  2 : bfl< value_t, byte2_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  3 : bfl< value_t, byte3_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  4 : bfl< value_t, byte4_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  5 : bfl< value_t, byte5_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  6 : bfl< value_t, byte6_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  7 : bfl< value_t, byte7_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
-            default : bfl< value_t, byte8_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
-        }// switch
+            switch ( nbyte )
+            {
+                case  2 : bfl< value_t, byte2_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
+                case  3 : bfl< value_t, byte3_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
+                case  4 :
+                default : bfl< value_t, byte4_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
+            }// switch
+        }// if
+        else
+        {
+            switch ( nbyte )
+            {
+                case  2 : bfl< value_t, byte2_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
+                case  3 : bfl< value_t, byte3_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
+                case  4 : bfl< value_t, byte4_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
+                case  5 : bfl< value_t, byte5_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
+                case  6 : bfl< value_t, byte6_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
+                case  7 : bfl< value_t, byte7_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
+                case  8 :
+                default : bfl< value_t, byte8_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
+            }// switch
+        }// else
         
         pos += n*nbyte;
     }// for
@@ -528,6 +547,8 @@ void
 decompress_lr ( const zarray &             zdata,
                 blas::matrix< value_t > &  U )
 {
+    using  real_t = Hpro::real_type_t< value_t >;
+
     const size_t    n   = U.nrows();
     const uint32_t  k   = U.ncols();
     size_t          pos = 0;
@@ -538,16 +559,30 @@ decompress_lr ( const zarray &             zdata,
 
         pos += 1;
 
-        switch ( nbyte )
+        if constexpr ( sizeof(real_t) == 4 )
         {
-            case  2 : bfl< value_t, byte2_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  3 : bfl< value_t, byte3_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  4 : bfl< value_t, byte4_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  5 : bfl< value_t, byte5_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  6 : bfl< value_t, byte6_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  7 : bfl< value_t, byte7_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
-            default : bfl< value_t, byte8_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
-        }// switch
+            switch ( nbyte )
+            {
+                case  2 : bfl< value_t, byte2_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
+                case  3 : bfl< value_t, byte3_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
+                case  4 : 
+                default : bfl< value_t, byte4_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
+            }// switch
+        }// if
+        else
+        {
+            switch ( nbyte )
+            {
+                case  2 : bfl< value_t, byte2_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
+                case  3 : bfl< value_t, byte3_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
+                case  4 : bfl< value_t, byte4_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
+                case  5 : bfl< value_t, byte5_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
+                case  6 : bfl< value_t, byte6_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
+                case  7 : bfl< value_t, byte7_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
+                case  8 :
+                default : bfl< value_t, byte8_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
+            }// switch
+        }// else
         
         pos += nbyte * n;
     }// for
@@ -739,7 +774,11 @@ mulvec_lr ( const size_t     nrows,
             }// for
         }// case
         break;
-        
+
+        case  apply_conjugate  : HLR_ERROR( "TODO" );
+            
+        case  apply_transposed : HLR_ERROR( "TODO" );
+
         case  apply_adjoint :
         {
             for ( uint  l = 0; l < ncols; ++l )

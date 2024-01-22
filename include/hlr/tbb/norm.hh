@@ -75,7 +75,7 @@ frobenius_squared ( const alpha_t                     alpha,
 
     HLR_ASSERT( A.block_is() == B.block_is() );
     
-    if ( is_blocked_all( A, B ) )
+    if ( hlr::is_blocked_all( A, B ) )
     {
         auto         BA   = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
         auto         BB   = cptrcast( &B, Hpro::TBlockMatrix< value_t > );
