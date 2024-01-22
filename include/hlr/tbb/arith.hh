@@ -34,12 +34,12 @@ namespace hlr { namespace tbb {
 
 ///////////////////////////////////////////////////////////////////////
 //
-// general arithmetic functions
+// matrix vector multiplication
 //
 ///////////////////////////////////////////////////////////////////////
 
 //
-// compute y = y + α op( M ) x
+// compute y = y + α op( M ) x with blas vectors
 //
 template < typename value_t >
 void
@@ -62,6 +62,9 @@ mul_vec ( const value_t                     alpha,
     detail::mul_vec_chunk( alpha, op_M, M, x, y, M.row_is( op_M ).first(), M.col_is( op_M ).first(), mtx_map );
 }
 
+//
+// chunk based updates
+//
 template < typename value_t >
 void
 mul_vec_chunk ( const value_t                             alpha,
@@ -70,13 +73,12 @@ mul_vec_chunk ( const value_t                             alpha,
                 const vector::scalar_vector< value_t > &  x,
                 vector::scalar_vector< value_t > &        y )
 {
-    HLR_ASSERT( Hpro::is_complex_type< value_t >::value == M.is_complex() );
-    HLR_ASSERT( Hpro::is_complex_type< value_t >::value == x.is_complex() );
-    HLR_ASSERT( Hpro::is_complex_type< value_t >::value == y.is_complex() );
-
     mul_vec( alpha, op_M, M, blas::vec( x ), blas::vec( y ) );
 }
 
+//
+// recursion only w.r.t. block rows to avoid locking
+//
 template < typename value_t >
 void
 mul_vec_row ( const value_t                             alpha,
@@ -85,13 +87,39 @@ mul_vec_row ( const value_t                             alpha,
               const vector::scalar_vector< value_t > &  x,
               vector::scalar_vector< value_t > &        y )
 {
-    HLR_ASSERT( Hpro::is_complex_type< value_t >::value == M.is_complex() );
-    HLR_ASSERT( Hpro::is_complex_type< value_t >::value == x.is_complex() );
-    HLR_ASSERT( Hpro::is_complex_type< value_t >::value == y.is_complex() );
-
     detail::mul_vec_row( alpha, op_M, M, x, y );
 }
 
+//
+// similar to "mul_vec_row" but with special data structure
+// holding list of all matrix blocks per cluster
+//
+template < typename value_t > using  cluster_block_map_t = detail::cluster_block_map_t< value_t >;
+
+template < typename value_t >
+void
+mul_vec_cl ( const value_t                             alpha,
+             const matop_t                             op_M,
+             const Hpro::TMatrix< value_t > &          M,
+             const cluster_block_map_t< value_t > &    blocks,
+             const vector::scalar_vector< value_t > &  x,
+             vector::scalar_vector< value_t > &        y )
+{
+    detail::mul_vec_cl( alpha, op_M, M, blocks, x, y );
+}
+
+template < typename value_t >
+void
+setup_cluster_block_map ( const matop_t                     op_M,
+                          const Hpro::TMatrix< value_t > &  M,
+                          cluster_block_map_t< value_t > &  blocks )
+{
+    detail::setup_cluster_block_map( op_M, M, blocks );
+}
+
+//
+// pure local sub multiplication and summation of sub results
+//
 template < typename value_t >
 void
 mul_vec_reduce ( const value_t                             alpha,
@@ -100,16 +128,15 @@ mul_vec_reduce ( const value_t                             alpha,
                  const vector::scalar_vector< value_t > &  x,
                  vector::scalar_vector< value_t > &        y )
 {
-    HLR_ASSERT( Hpro::is_complex_type< value_t >::value == M.is_complex() );
-    HLR_ASSERT( Hpro::is_complex_type< value_t >::value == x.is_complex() );
-    HLR_ASSERT( Hpro::is_complex_type< value_t >::value == y.is_complex() );
-
     // just for now
     HLR_ASSERT( op_M == apply_normal );
     
     detail::mul_vec_reduce( alpha, op_M, M, blas::vec( x ), blas::vec( y ) );
 }
 
+//
+// general function
+//
 template < typename value_t >
 void
 mul_vec ( const value_t                             alpha,
@@ -123,17 +150,23 @@ mul_vec ( const value_t                             alpha,
     // mul_vec_reduce( alpha, op_M, M, blas::vec( x ), blas::vec( y ) );
 }
 
+///////////////////////////////////////////////////////////////////////
+//
+// matrix arithmetic functions
+//
+///////////////////////////////////////////////////////////////////////
+
 //
 // compute C := C + α A with different types of A/C
 //
 template < typename value_t,
            typename approx_t >
 void
-add ( const value_t            alpha,
-      const Hpro::TMatrix< value_t > &    A,
-      Hpro::TMatrix< value_t > &          C,
-      const Hpro::TTruncAcc &  acc,
-      const approx_t &         approx )
+add ( const value_t                     alpha,
+      const Hpro::TMatrix< value_t > &  A,
+      Hpro::TMatrix< value_t > &        C,
+      const accuracy &                  acc,
+      const approx_t &                  approx )
 {
     if ( alpha == value_t(0) )
         return;

@@ -8,6 +8,9 @@
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
+#include <list>
+#include <unordered_map>
+
 namespace hlr { namespace tbb { namespace detail {
 
 using indexset = Hpro::TIndexSet;
@@ -246,9 +249,12 @@ mul_vec_chunk ( const value_t                    alpha,
     }// else
 }
 
+///////////////////////////////////////////////////////////////////////
 //
 // mat-vec with parallel execution only along row clusters
 //
+///////////////////////////////////////////////////////////////////////
+
 using hlr::vector::scalar_vector;
 
 template < typename value_t >
@@ -368,6 +374,84 @@ mul_vec_row ( const value_t                     alpha,
         
         M.apply_add( alpha, x_i, yt, op_M );
         blas::add( 1, yt, y_j );
+    }// else
+}
+
+///////////////////////////////////////////////////////////////////////
+//
+// matrix-vector executing all blocks per block row in one task
+//
+///////////////////////////////////////////////////////////////////////
+
+template < typename value_t > using  matrix_list_t       = std::list< const Hpro::TMatrix< value_t > * >;
+template < typename value_t > using  cluster_block_map_t = std::unordered_map< indexset, matrix_list_t< value_t > >;
+
+template < typename value_t >
+void
+mul_vec_cl ( const value_t                             alpha,
+             const matop_t                             op_M,
+             const Hpro::TMatrix< value_t > &          M,
+             const cluster_block_map_t< value_t > &    blocks,
+             const vector::scalar_vector< value_t > &  sx,
+             vector::scalar_vector< value_t > &        sy )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    if ( is_blocked( M ) )
+    {
+        auto  B = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+
+        ::tbb::parallel_for< size_t >(
+            0, B->nblock_rows( op_M ),
+            [&,alpha,op_M] ( const auto &  i )
+            {
+                for ( size_t  j = 0; j < B->nblock_cols( op_M ); ++j )
+                {
+                    auto  B_ij = B->block( i, j );
+                    
+                    if ( ! is_null( B_ij ) )
+                        mul_vec_cl( alpha, op_M, *B_ij, blocks, sx, sy );
+                }// for
+            }
+        );
+    }// if
+
+    if ( ! blocks.contains( M.row_is( op_M ) ) )
+        return;
+    
+    auto  mat_list = & blocks[ M.row_is( op_M ) ];
+    auto  y_j      = blas::vector< value_t >( blas::vec( sy ), M.row_is( op_M ) - sy.ofs() );
+    auto  yt       = blas::vector< value_t >( y_j.length() );
+    
+    for ( auto  A : mat_list )
+    {
+        auto  x_i = blas::vector< value_t >( blas::vec( sx ), A->col_is( op_M ) - sx.ofs() );
+        
+        A->apply_add( 1, x_i, yt, op_M );
+    }// for
+
+    blas::add( alpha, yt, y_j );
+}
+
+template < typename value_t >
+void
+setup_cluster_block_map ( const matop_t                     op_M,
+                          const Hpro::TMatrix< value_t > &  M,
+                          cluster_block_map_t< value_t > &  blocks )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  B = cptrcast( & M, Hpro::TBlockMatrix< value_t > );
+
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+                if ( B->block( i, j ) != nullptr )
+                    setup_cluster_block_map( op_M, * B->block( i, j ), blocks );
+    }// if
+    else
+    {
+        blocks[ M.row_is( op_M ) ].push_back( & M );
     }// else
 }
 

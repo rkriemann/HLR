@@ -30,7 +30,8 @@ using byte_t = uint8_t;
 
 constexpr uint8_t   fp32_mant_bits = 23;
 
-constexpr uint64_t  fp64_sign_mask = (1ul << 63);
+constexpr uint8_t   fp64_sign_bit  = 63;
+constexpr uint64_t  fp64_sign_mask = (1ul << fp64_sign_bit);
 constexpr uint8_t   fp64_mant_bits = 52;
 constexpr uint64_t  fp64_mant_mask = 0x000fffffffffffff;
 constexpr uint64_t  fp64_exp_mask  = 0x7ff0000000000000;
@@ -100,7 +101,7 @@ struct bfl32
         for ( size_t  i = 0; i < nsize; ++i )
         {
             const uint32_t  zval = zptr[i];
-            const uint32_t  ztmp = zval << bfl_mant_shift;
+            const uint32_t  ztmp = zval << uint32_t(bfl_mant_shift);
             
             data[i] = * reinterpret_cast< const float * >( & ztmp );
         }// for
@@ -140,7 +141,7 @@ struct bfl64
     static constexpr uint8_t   bfl_mant_bits  = 8 * sizeof(storage_t) - 1 - 8;  // 1 sign bit, 8 exponent bits
     static constexpr uint8_t   bfl_sign_bit   = bfl_mant_bits + 8;
     static constexpr uint8_t   bfl_mant_shift = fp64_mant_bits - bfl_mant_bits;
-    static constexpr uint8_t   bfl_sign_shift = 63 - bfl_sign_bit;
+    static constexpr uint8_t   bfl_sign_shift = fp64_sign_bit  - bfl_sign_bit;
     static constexpr uint64_t  bfl_sign_mask  = (1ul    << bfl_sign_bit);
     static constexpr uint64_t  bfl_exp_mask   = (0xfful << bfl_mant_bits);
     static constexpr uint64_t  bfl_mant_mask  = (1ul    << bfl_mant_bits) - 1;
@@ -609,7 +610,7 @@ mulvec ( const size_t       nrows,
     static constexpr uint8_t   bfl_mant_bits  = 8 * sizeof(storage_t) - 1 - 8;  // 1 sign bit, 8 exponent bits
     static constexpr uint8_t   bfl_sign_bit   = bfl_mant_bits + 8;
     static constexpr uint8_t   bfl_mant_shift = fp64_mant_bits - bfl_mant_bits;
-    static constexpr uint8_t   bfl_sign_shift = 63 - bfl_sign_bit;
+    static constexpr uint8_t   bfl_sign_shift = fp64_sign_bit  - bfl_sign_bit;
     static constexpr uint64_t  bfl_sign_mask  = (1ul    << bfl_sign_bit);
     static constexpr uint64_t  bfl_exp_mask   = (0xfful << bfl_mant_bits);
     static constexpr uint64_t  bfl_mant_mask  = (1ul    << bfl_mant_bits) - 1;
