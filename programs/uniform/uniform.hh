@@ -203,6 +203,12 @@ program_main ()
         
             std::cout << "    error  = " << format_error( error / normA ) << std::endl;
         }
+        
+        {
+            auto  error = impl::norm::frobenius( 1, *A, -1, *A2 );
+
+            std::cout << "    error = " << format_error( error, error / normA ) << std::endl;
+        }
 
         //
         // preserve for MVM
@@ -291,6 +297,12 @@ program_main ()
             auto  error = hlr::norm::spectral( impl::arithmetic, *diff, 1e-4 );
         
             std::cout << "    error  = " << format_error( error / normA ) << std::endl;
+        }
+        
+        {
+            auto  error = impl::norm::frobenius( 1, *A, -1, *A2 );
+
+            std::cout << "    error = " << format_error( error, error / normA ) << std::endl;
         }
 
         //

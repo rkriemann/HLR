@@ -401,13 +401,13 @@ struct accumulator
                     // just update with U·R·V'
                     //
                     if ( is_null( matrix ) )
-                        matrix = std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(),
-                                                                      std::move( blas::prod( alpha, U, R ) ),
-                                                                      std::move( blas::copy( V ) ) );
+                        matrix = std::make_unique< matrix::lrmatrix< value_t > >( M.row_is(), M.col_is(),
+                                                                                  std::move( blas::prod( alpha, U, R ) ),
+                                                                                  std::move( blas::copy( V ) ) );
                     else
                     {
                         auto  US = blas::prod( alpha, U, R );
-                        auto  T  = Hpro::TRkMatrix( M.row_is(), M.col_is(), US, V );
+                        auto  T  = matrix::lrmatrix( M.row_is(), M.col_is(), US, V );
                 
                         hlr::add( alpha, T, *matrix, acc, approx );
 
@@ -421,10 +421,10 @@ struct accumulator
             //     auto  ZV = blas::join_row< value_t >( { Z, V } );
                 
             //     if ( is_null( matrix ) )
-            //         matrix = std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( UY ), std::move( ZV ) );
+            //         matrix = std::make_unique< matrix::lrmatrix< value_t > >( M.row_is(), M.col_is(), std::move( UY ), std::move( ZV ) );
             //     else
             //     {
-            //         auto  T = Hpro::TRkMatrix( M.row_is(), M.col_is(), UY, ZV );
+            //         auto  T = matrix::lrmatrix( M.row_is(), M.col_is(), UY, ZV );
                     
             //         hlr::add( value_t(1), T, *matrix, acc, approx );
             //     }// else
@@ -432,10 +432,10 @@ struct accumulator
             if ( Z.ncols() > 0 )
             {
                 if ( is_null( matrix ) )
-                    matrix = std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( blas::copy( U ) ), std::move( Z ) );
+                    matrix = std::make_unique< matrix::lrmatrix< value_t > >( M.row_is(), M.col_is(), std::move( blas::copy( U ) ), std::move( Z ) );
                 else
                 {
-                    auto  T = Hpro::TRkMatrix( M.row_is(), M.col_is(), U, Z );
+                    auto  T = matrix::lrmatrix( M.row_is(), M.col_is(), U, Z );
                     
                     hlr::add( value_t(1), T, *matrix, acc, approx );
                 }// else
@@ -444,10 +444,10 @@ struct accumulator
             if ( Y.ncols() > 0 )
             {
                 if ( is_null( matrix ) )
-                    matrix = std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( Y ), std::move( blas::copy( V ) ) );
+                    matrix = std::make_unique< matrix::lrmatrix< value_t > >( M.row_is(), M.col_is(), std::move( Y ), std::move( blas::copy( V ) ) );
                 else
                 {
-                    auto  T = Hpro::TRkMatrix( M.row_is(), M.col_is(), Y, V );
+                    auto  T = matrix::lrmatrix( M.row_is(), M.col_is(), Y, V );
                     
                     hlr::add( value_t(1), T, *matrix, acc, approx );
                 }// else
@@ -531,7 +531,7 @@ struct accumulator
                 //     HLR_ASSERT( ( row_basis.nrows() > 0 ) && ( col_basis.nrows() > 0 ) );
                         
                 //     // check error when representing in local basis
-                //     auto  R  = ptrcast( T.get(), Hpro::TRkMatrix< value_t > );
+                //     auto  R  = ptrcast( T.get(), matrix::lrmatrix< value_t > );
                 //     auto  U  = blas::copy( R->U() );
                 //     auto  V  = blas::copy( R->V() );
 

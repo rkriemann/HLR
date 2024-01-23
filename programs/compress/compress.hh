@@ -48,18 +48,18 @@ program_main ()
     //     auto  tic     = timer::now();
     //     auto  toc     = timer::since( tic );
         
-    //     size_t  n = 4096;
-    //     auto  M = blas::matrix< value_t >( n, n );
+    //     size_t  n = 4;
+    //     auto    M = blas::matrix< value_t >( n, n );
 
     //     for ( int i = 0; i < n*n; ++i )
     //         M.data()[i] = i+1;
 
-    //     // for ( int i = 0; i < n; ++i )
-    //     // {
-    //     //     for ( int j = 0; j < n; ++j )
-    //     //         std::cout << M(i,j) << ", ";
-    //     //     std::cout << std::endl;
-    //     // }// for
+    //     for ( int i = 0; i < n; ++i )
+    //     {
+    //         for ( int j = 0; j < n; ++j )
+    //             std::cout << M(i,j) << ", ";
+    //         std::cout << std::endl;
+    //     }// for
         
     //     auto  x = blas::vector< value_t >( M.ncols() );
     //     auto  y1 = blas::vector< value_t >( M.nrows() );
@@ -73,14 +73,14 @@ program_main ()
     //     auto  zM   = compress::compress( zcfg, M.data(), M.nrows(), M.ncols() );
 
     //     tic = timer::now();
-    //     blas::mulvec( value_t(1), blas::adjoint( M ), x, value_t(1), y1 );
+    //     blas::mulvec( value_t(0.5), blas::adjoint( M ), x, value_t(1), y1 );
     //     toc = timer::since( tic );
     //     std::cout << toc.seconds() << std::endl;
         
     //     std::cout << y1(0) << " / " << y1(1) << " / " << y1(2) << std::endl;
         
     //     tic = timer::now();
-    //     compress::aflp::mulvec( M.nrows(), M.ncols(), apply_adjoint, 1.0, zM, x.data(), y2.data() );
+    //     compress::blas::mulvec( M.nrows(), M.ncols(), apply_adjoint, 0.5, zM, x.data(), y2.data() );
     //     toc = timer::since( tic );
     //     std::cout << toc.seconds() << std::endl;
 
@@ -132,7 +132,7 @@ program_main ()
         
     //     std::cout << y1(0) << " / " << y1(1) << " / " << y1(2) << std::endl;
         
-    //     compress::aflp::mulvec_lr( M.nrows(), M.ncols(), apply_adjoint, 1.0, zM, x.data(), y2.data() );
+    //     compress::aplr::blas::mulvec( M.nrows(), M.ncols(), apply_adjoint, 1.0, zM, x.data(), y2.data() );
 
     //     // for ( uint  i = 0; i < k; ++i )
     //     //     y2(i) *= S(i);
@@ -442,6 +442,53 @@ program_main ()
             t_orig = min( runtime );
             
             y_ref = std::move( y );
+        }
+
+        {
+            runtime.clear();
+                      
+            std::cout << "  "
+                      << term::bullet << term::bold
+                      << "uncompressed (cluster blocks)"
+                      << term::reset << std::endl;
+
+            auto  x = std::make_unique< vector::scalar_vector< value_t > >( A->col_is() );
+            auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
+            
+            x->fill( 1 );
+
+            impl::cluster_block_map_t< value_t >  block_map;
+
+            impl::setup_cluster_block_map( apply_normal, *A, block_map );
+
+            for ( int i = 0; i < nbench; ++i )
+            {
+                tic = timer::now();
+                
+                for ( int j = 0; j < 50; ++j )
+                    impl::mul_vec_cl( 2.0, Hpro::apply_normal, *A, block_map, *x, *y );
+                    
+                toc = timer::since( tic );
+                runtime.push_back( toc.seconds() );
+            
+                std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+  
+                if ( i < nbench-1 )
+                    y->fill( 1 );
+            }// for
+
+            if ( nbench > 1 )
+                std::cout << "  runtime  = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                          << std::endl;
+            
+            auto  diff = y_ref->copy();
+            
+            diff->axpy( value_t(-1), y.get() );
+            
+            const auto  error = diff->norm2();
+          
+            std::cout << "    error  = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
         {

@@ -8,9 +8,6 @@
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
-#include <list>
-#include <unordered_map>
-
 namespace hlr { namespace tbb { namespace detail {
 
 using indexset = Hpro::TIndexSet;
@@ -383,8 +380,7 @@ mul_vec_row ( const value_t                     alpha,
 //
 ///////////////////////////////////////////////////////////////////////
 
-template < typename value_t > using  matrix_list_t       = std::list< const Hpro::TMatrix< value_t > * >;
-template < typename value_t > using  cluster_block_map_t = std::unordered_map< indexset, matrix_list_t< value_t >, indexset_hash >;
+using hlr::cluster_block_map_t;
 
 template < typename value_t >
 void
@@ -410,7 +406,7 @@ mul_vec_cl ( const value_t                             alpha,
                 auto  B_ii = B->block( i, i );
                     
                 if ( ! is_null( B_ii ) )
-                    mul_vec_cl( alpha, op_M, *B_ii, blocks, sx, sy );
+                    hlr::tbb::detail::mul_vec_cl( alpha, op_M, *B_ii, blocks, sx, sy );
             }
         );
     }// if
@@ -434,27 +430,6 @@ mul_vec_cl ( const value_t                             alpha,
     }// for
 
     blas::add( alpha, yt, y_j );
-}
-
-template < typename value_t >
-void
-setup_cluster_block_map ( const matop_t                     op_M,
-                          const Hpro::TMatrix< value_t > &  M,
-                          cluster_block_map_t< value_t > &  blocks )
-{
-    if ( is_blocked( M ) )
-    {
-        auto  B = cptrcast( & M, Hpro::TBlockMatrix< value_t > );
-
-        for ( uint  i = 0; i < B->nblock_rows(); ++i )
-            for ( uint  j = 0; j < B->nblock_cols(); ++j )
-                if ( B->block( i, j ) != nullptr )
-                    setup_cluster_block_map( op_M, * B->block( i, j ), blocks );
-    }// if
-    else
-    {
-        blocks[ M.row_is( op_M ) ].push_back( & M );
-    }// else
 }
 
 ///////////////////////////////////////////////////////////////////////
