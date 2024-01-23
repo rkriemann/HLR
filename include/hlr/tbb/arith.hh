@@ -18,6 +18,7 @@
 
 #include <hlr/arith/defaults.hh>
 #include <hlr/arith/blas.hh>
+#include <hlr/arith/mulvec.hh>
 #include <hlr/arith/multiply.hh>
 #include <hlr/arith/solve.hh>
 #include <hlr/seq/arith.hh>
@@ -108,14 +109,7 @@ mul_vec_cl ( const value_t                             alpha,
     detail::mul_vec_cl( alpha, op_M, M, blocks, x, y );
 }
 
-template < typename value_t >
-void
-setup_cluster_block_map ( const matop_t                     op_M,
-                          const Hpro::TMatrix< value_t > &  M,
-                          cluster_block_map_t< value_t > &  blocks )
-{
-    detail::setup_cluster_block_map( op_M, M, blocks );
-}
+using hlr::setup_cluster_block_map;
 
 //
 // pure local sub multiplication and summation of sub results
