@@ -66,17 +66,31 @@ mul_vec_simple ( const value_t                    alpha,
     }// if
     else
     {
-        auto  x_is = x( M.col_is( op_M ) - ofs_cols );
-        auto  y_is = y( M.row_is( op_M ) - ofs_rows );
-        auto  t    = blas::vector< value_t >( y_is.length() );
-            
-        M.apply_add( alpha, x_is, t, op_M );
-        
+        if constexpr ( false )
         {
-            auto  lock = std::scoped_lock( mtx );
-        
-            blas::add( value_t(1), t, y_is );
-        }
+            auto  x_is = x( M.col_is( op_M ) - ofs_cols );
+            auto  y_is = y( M.row_is( op_M ) - ofs_rows );
+
+            {
+                auto  lock = std::scoped_lock( mtx );
+
+                M.apply_add( alpha, x_is, y_is, op_M );
+            }
+        }// if
+        else
+        {
+            auto  x_is = x( M.col_is( op_M ) - ofs_cols );
+            auto  y_is = y( M.row_is( op_M ) - ofs_rows );
+            auto  t    = blas::vector< value_t >( y_is.length() );
+            
+            M.apply_add( alpha, x_is, t, op_M );
+            
+            {
+                auto  lock = std::scoped_lock( mtx );
+                
+                blas::add( value_t(1), t, y_is );
+            }
+        }// else
     }// else
 }
 
