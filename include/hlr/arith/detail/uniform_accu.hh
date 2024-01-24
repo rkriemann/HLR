@@ -480,7 +480,7 @@ struct accumulator
                     continue;
                 
                 // TODO: non low-rank M
-                if ( ! ( is_lowrank( M ) || matrix::is_lowrankS( M ) || matrix::is_uniform_lowrank( M ) ) )
+                if ( ! ( matrix::is_lowrank( M ) || matrix::is_lowrankS( M ) || matrix::is_uniform_lowrank( M ) ) )
                     HLR_ERROR( "unsupported matrix type: " + M.typestr() );
                 
                 auto  BA = cptrcast( A, Hpro::TBlockMatrix< value_t > );
