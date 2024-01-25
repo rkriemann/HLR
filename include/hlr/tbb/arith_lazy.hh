@@ -20,6 +20,7 @@
 #include "hlr/arith/multiply.hh"
 #include "hlr/matrix/lrsmatrix.hh"
 #include "hlr/matrix/convert.hh"
+#include "hlr/matrix/product.hh"
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/log.hh"
 #include "hlr/utils/io.hh"
@@ -525,14 +526,14 @@ struct lazy_accumulator
                         {
                             HLR_ASSERT( is_null( B ) );
                         
-                            auto  op_AxB = Hpro::matrix_product( alpha, A );
+                            auto  op_AxB = matrix::product( alpha, *A );
                         
                             deleted.push_back( op_AxB.get() );
                             op_list.push_back( op_AxB.release() );
                         }// if
                         else
                         {
-                            auto  op_AxB = Hpro::matrix_product( alpha, A, value_t(1), B );
+                            auto  op_AxB = matrix::product( alpha, *A, 1, *B );
                         
                             deleted.push_back( op_AxB.get() );
                             op_list.push_back( op_AxB.release() );

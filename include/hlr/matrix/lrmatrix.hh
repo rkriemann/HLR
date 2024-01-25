@@ -402,18 +402,18 @@ public:
     
     // same as above but only the dimension of the vector spaces is tested,
     // not the corresponding index sets
-    virtual void  apply_add   ( const value_t                    alpha,
-                                const blas::vector< value_t > &  x,
-                                blas::vector< value_t > &        y,
-                                const matop_t                    op = apply_normal ) const;
+    virtual void  apply_add  ( const value_t                    alpha,
+                               const blas::vector< value_t > &  x,
+                               blas::vector< value_t > &        y,
+                               const matop_t                    op = apply_normal ) const;
 
-    virtual void  apply_add   ( const value_t                    alpha,
-                                const blas::matrix< value_t > &  X,
-                                blas::matrix< value_t > &        Y,
-                                const matop_t                    op = apply_normal ) const;
+    virtual void  apply_add  ( const value_t                    alpha,
+                               const blas::matrix< value_t > &  X,
+                               blas::matrix< value_t > &        Y,
+                               const matop_t                    op = apply_normal ) const;
     
     // truncate matrix to accuracy acc
-    virtual void truncate ( const Hpro::TTruncAcc & acc )
+    virtual void truncate    ( const Hpro::TTruncAcc & acc )
     {
         if ( is_compressed() )
         {
