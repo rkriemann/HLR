@@ -209,19 +209,17 @@ program_main ()
         toc = timer::since( tic );
     }// else
 
+    const auto  mem_A  = A->byte_size();
+    const auto  norm_A = impl::norm::frobenius( *A );
+        
     std::cout << "    dims  = " << A->nrows() << " × " << A->ncols() << std::endl;
     std::cout << "    done in " << format_time( toc ) << std::endl;
-
-    const auto  mem_A = A->byte_size();
-    
     std::cout << "    mem   = " << format_mem( mem_A ) << std::endl;
+    std::cout << "      idx = " << format_mem( mem_A / A->nrows() ) << std::endl;
+    std::cout << "    |A|   = " << format_norm( norm_A ) << std::endl;
 
-    if ( verbose( 3 ) )
-        matrix::print_eps( *A, "A", "noid,nosize" );
-
-    const auto  norm_A = impl::norm::frobenius( *A );
-    
-    std::cout << "    norm  = " << format_norm( norm_A ) << std::endl;
+    if ( hpro::verbose( 3 ) )
+        io::eps::print( *A, "A", "noid" );
 
     //////////////////////////////////////////////////////////////////////
     //
@@ -295,8 +293,8 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
-    auto        zA     = impl::matrix::copy_compressible( *A );
-    const auto  delta  = cmdline::eps; // norm_A * cmdline::eps / std::sqrt( double(A->nrows()) * double(A->ncols()) );
+    auto        zA    = impl::matrix::copy_compressible( *A );
+    const auto  delta = cmdline::eps; // norm_A * cmdline::eps / std::sqrt( double(A->nrows()) * double(A->ncols()) );
     
     std::cout << "  "
               << term::bullet << term::bold
@@ -317,7 +315,6 @@ program_main ()
         {
             tic = timer::now();
     
-            // impl::matrix::compress( *B, Hpro::fixed_prec( norm_A * acc.rel_eps() ) );
             impl::matrix::compress( *zA, lacc );
 
             toc = timer::since( tic );

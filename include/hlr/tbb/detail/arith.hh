@@ -475,10 +475,8 @@ mul_vec_cl ( const value_t                             alpha,
     auto &  mat_list = blocks.at( M.row_is( op_M ) );
     auto    y_j      = blas::vector< value_t >( blas::vec( sy ), M.row_is( op_M ) - sy.ofs() );
 
-    #if 1
-
-    auto  yt = mul_vec_reduce( op_M, mat_list, sx, y_j, 0, mat_list.size() );
-    
+    #if 0
+    auto    yt       = mul_vec_reduce( op_M, mat_list, sx, y_j, 0, mat_list.size() );
     #else
     auto    yt       = blas::vector< value_t >( y_j.length() );
     
