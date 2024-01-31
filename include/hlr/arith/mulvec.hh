@@ -83,7 +83,7 @@ mul_vec ( const value_t                             alpha,
 // just dummy implementation
 //
 
-template < typename value_t > using  matrix_list_t       = std::list< const Hpro::TMatrix< value_t > * >;
+template < typename value_t > using  matrix_list_t       = std::deque< const Hpro::TMatrix< value_t > * >;
 template < typename value_t > using  cluster_block_map_t = std::unordered_map< indexset, matrix_list_t< value_t >, indexset_hash >;
 
 template < typename value_t >
@@ -122,7 +122,7 @@ mul_vec_cl ( const value_t                             alpha,
     auto &  mat_list = blocks.at( M.row_is( op_M ) );
     auto    y_j      = blas::vector< value_t >( blas::vec( y ), M.row_is( op_M ) - y.ofs() );
     auto    yt       = blas::vector< value_t >( y_j.length() );
-    
+
     for ( auto  A : mat_list )
     {
         auto  x_i = blas::vector< value_t >( blas::vec( x ), A->col_is( op_M ) - x.ofs() );

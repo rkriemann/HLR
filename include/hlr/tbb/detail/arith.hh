@@ -397,6 +397,46 @@ mul_vec_row ( const value_t                     alpha,
 using hlr::cluster_block_map_t;
 
 template < typename value_t >
+blas::vector< value_t >
+mul_vec_reduce ( const matop_t                             op_M,
+                 const matrix_list_t< value_t > &          matrices,
+                 const vector::scalar_vector< value_t > &  sx,
+                 const blas::vector< value_t > &           y_j,
+                 const uint                                lb,
+                 const uint                                ub )
+{
+    if ( ub - lb > 16 )
+    {
+        const uint  mid = (ub + lb) / 2;
+        auto        y1  = blas::vector< value_t >();
+        auto        y2  = blas::vector< value_t >();
+
+        ::tbb::parallel_invoke(
+            [&,op_M,lb,mid] () { y1 = std::move( mul_vec_reduce( op_M, matrices, sx, y_j, lb, mid ) ); },
+            [&,op_M,mid,ub] () { y2 = std::move( mul_vec_reduce( op_M, matrices, sx, y_j, mid, ub ) ); }
+        );
+
+        blas::add( value_t(1), y1, y2 );
+
+        return y2;
+    }// if
+    else
+    {
+        auto  yt = blas::vector< value_t >( y_j.length() );
+    
+        for ( uint  i = lb; i < ub; ++i )
+        {
+            const auto  A   = matrices[i];
+            auto        x_i = blas::vector< value_t >( blas::vec( sx ), A->col_is( op_M ) - sx.ofs() );
+        
+            A->apply_add( 1, x_i, yt, op_M );
+        }// for
+
+        return yt;
+    }// else
+}
+    
+template < typename value_t >
 void
 mul_vec_cl ( const value_t                             alpha,
              const matop_t                             op_M,
@@ -429,11 +469,17 @@ mul_vec_cl ( const value_t                             alpha,
         return;
 
     //
-    // compute update with all block in current block row
+    // compute update with all blocks in current block row
     //
     
     auto &  mat_list = blocks.at( M.row_is( op_M ) );
     auto    y_j      = blas::vector< value_t >( blas::vec( sy ), M.row_is( op_M ) - sy.ofs() );
+
+    #if 1
+
+    auto  yt = mul_vec_reduce( op_M, mat_list, sx, y_j, 0, mat_list.size() );
+    
+    #else
     auto    yt       = blas::vector< value_t >( y_j.length() );
     
     for ( auto  A : mat_list )
@@ -442,6 +488,7 @@ mul_vec_cl ( const value_t                             alpha,
         
         A->apply_add( 1, x_i, yt, op_M );
     }// for
+    #endif
 
     blas::add( alpha, yt, y_j );
 }

@@ -156,7 +156,7 @@ decompress ( const byte_t *  zdata,
     blosc2_free_ctx( dctx );
     
     if ( dsize < 0 )
-    {  HLR_ERROR( "internal error in blosc" ); }
+    { HLR_ERROR( "internal error in blosc" ); }
     else if ( dsize < nsize * sizeof(value_t) )
     { HLR_ERROR( "insufficient decompression" ); }
 }
