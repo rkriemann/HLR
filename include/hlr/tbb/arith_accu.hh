@@ -278,9 +278,9 @@ struct accumulator
         // filter computable updates
         for ( auto  [ op_A, A, op_B, B ] : pending )
         {
-            if ( is_blocked_all( A, B ) )
+            if ( hlr::is_blocked_all( *A, *B ) )
             {
-                if ( is_blocked_all( *A, *B, M ) )
+                if ( hlr::is_blocked_all( *A, *B, M ) )
                     continue;
                 
                 //
@@ -530,7 +530,7 @@ solve_lower_tri ( const eval_side_t                 side,
     // apply computable updates
     accu.eval( value_t(1), M, acc, approx );
     
-    if ( is_blocked_all( L, M ) )
+    if ( hlr::is_blocked_all( L, M ) )
     {
         auto  BL = cptrcast( &L, Hpro::TBlockMatrix< value_t > );
         auto  BM =  ptrcast( &M, Hpro::TBlockMatrix< value_t > );
@@ -593,7 +593,7 @@ solve_upper_tri ( const eval_side_t                   side,
     // apply computable updates
     accu.eval( value_t(1), M, acc, approx );
     
-    if ( is_blocked_all( U, M ) )
+    if ( hlr::is_blocked_all( U, M ) )
     {
         auto  BU = cptrcast( &U, Hpro::TBlockMatrix< value_t > );
         auto  BM =  ptrcast( &M, Hpro::TBlockMatrix< value_t > );

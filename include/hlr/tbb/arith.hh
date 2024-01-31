@@ -205,7 +205,7 @@ multiply ( const value_t                     alpha,
            const Hpro::TTruncAcc &           acc,
            const approx_t &                  approx )
 {
-    if ( is_blocked_all( A, B, C ) )
+    if ( hlr::is_blocked_all( A, B, C ) )
     {
         auto  BA = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
         auto  BB = cptrcast( &B, Hpro::TBlockMatrix< value_t > );
@@ -358,7 +358,7 @@ solve_lower_tri ( const eval_side_t                 side,
             HLR_ASSERT( false );
         }// else
     }// if
-    else if ( is_blocked_all( L, M ) )
+    else if ( hlr::is_blocked_all( L, M ) )
     {
         auto  BL = cptrcast( &L, Hpro::TBlockMatrix< value_t > );
         auto  BM =  ptrcast( &M, Hpro::TBlockMatrix< value_t > );
@@ -486,7 +486,7 @@ solve_upper_tri ( const eval_side_t                 side,
                 } );
         }// else
     }// if
-    else if ( is_blocked_all( U, M ) )
+    else if ( hlr::is_blocked_all( U, M ) )
     {
         auto  BU = cptrcast( &U, Hpro::TBlockMatrix< value_t > );
         auto  BM =  ptrcast( &M, Hpro::TBlockMatrix< value_t > );

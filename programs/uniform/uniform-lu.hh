@@ -98,7 +98,7 @@ program_main ()
         io::eps::print_lvl( *A, "L" );
     }// if
 
-    const auto  normA = hlr::norm::spectral( *A, 1e-4 );
+    const auto  normA = hlr::norm::spectral( *A );
     
     //////////////////////////////////////////////////////////////////////
     //
@@ -121,7 +121,7 @@ program_main ()
 
     {
         auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
-        auto  error = hlr::seq::norm::spectral( *diff, 1e-4 );
+        auto  error = hlr::seq::norm::spectral( *diff );
         
         std::cout << "    error  = " << format_error( error / normA ) << std::endl;
     }
@@ -197,7 +197,7 @@ program_main ()
         runtime.clear();
     }// if
 
-    if ( false )
+    if ( true )
     {
         std::cout << "  " << term::bullet << term::bold << "accumulator" << term::reset << std::endl;
                 

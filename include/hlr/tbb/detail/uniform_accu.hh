@@ -464,10 +464,10 @@ struct accumulator
 
         for ( auto  [ op_A, A, op_B, B ] : pending )
         {
-            if ( is_blocked_all( *A, *B, M ) )
+            if ( hlr::is_blocked_all( *A, *B, M ) )
                 continue;
         
-            if ( is_blocked_all( A, B ) )
+            if ( hlr::is_blocked_all( *A, *B ) )
             {
                 //
                 // if M is a leaf and A _and_ B are blocked, a temporary matrix
