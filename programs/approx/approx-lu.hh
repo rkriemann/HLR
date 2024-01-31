@@ -439,7 +439,7 @@ program_main ()
     {
         std::cout << "  " << term::bullet << term::bold << "standard" << term::reset << std::endl;
     
-        // if ( cmdline::approx == "hpro" || cmdline::approx == "all" )
+        // if ( cmdline::aapprox == "hpro" || cmdline::aapprox == "all" )
         // {
         //     std::cout << "    " << term::bullet << term::bold << "Hpro" << term::reset << std::endl;
 
@@ -481,12 +481,12 @@ program_main ()
         //     std::cout << "      error  = " << format_error( norm::inv_error_2( *A, A_inv ) ) << std::endl;
         // }// if
     
-        if ( cmdline::approx == "svd"     || cmdline::approx == "all" ) lu_std< value_t, hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
-        if ( cmdline::approx == "rrqr"    || cmdline::approx == "all" ) lu_std< value_t, hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
-        if ( cmdline::approx == "randsvd" || cmdline::approx == "all" ) lu_std< value_t, hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
-        if ( cmdline::approx == "randlr"  || cmdline::approx == "all" ) lu_std< value_t, hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
-        if ( cmdline::approx == "aca"     || cmdline::approx == "all" ) lu_std< value_t, hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
-        if ( cmdline::approx == "lanczos" || cmdline::approx == "all" ) lu_std< value_t, hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
+        if ( cmdline::aapprox == "svd"     || cmdline::aapprox == "all" ) lu_std< value_t, hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
+        if ( cmdline::aapprox == "rrqr"    || cmdline::aapprox == "all" ) lu_std< value_t, hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
+        if ( cmdline::aapprox == "randsvd" || cmdline::aapprox == "all" ) lu_std< value_t, hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
+        if ( cmdline::aapprox == "randlr"  || cmdline::aapprox == "all" ) lu_std< value_t, hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
+        if ( cmdline::aapprox == "aca"     || cmdline::aapprox == "all" ) lu_std< value_t, hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
+        if ( cmdline::aapprox == "lanczos" || cmdline::aapprox == "all" ) lu_std< value_t, hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
     }// if
     
     //
@@ -497,12 +497,12 @@ program_main ()
     {
         std::cout << "  " << term::bullet << term::bold << "DAG standard" << term::reset << std::endl;
     
-        if ( cmdline::approx == "svd"     || cmdline::approx == "all" ) lu_std_dag< value_t, hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
-        if ( cmdline::approx == "rrqr"    || cmdline::approx == "all" ) lu_std_dag< value_t, hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
-        if ( cmdline::approx == "randsvd" || cmdline::approx == "all" ) lu_std_dag< value_t, hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
-        if ( cmdline::approx == "randlr"  || cmdline::approx == "all" ) lu_std_dag< value_t, hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
-        if ( cmdline::approx == "aca"     || cmdline::approx == "all" ) lu_std_dag< value_t, hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
-        if ( cmdline::approx == "lanczos" || cmdline::approx == "all" ) lu_std_dag< value_t, hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
+        if ( cmdline::aapprox == "svd"     || cmdline::aapprox == "all" ) lu_std_dag< value_t, hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
+        if ( cmdline::aapprox == "rrqr"    || cmdline::aapprox == "all" ) lu_std_dag< value_t, hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
+        if ( cmdline::aapprox == "randsvd" || cmdline::aapprox == "all" ) lu_std_dag< value_t, hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
+        if ( cmdline::aapprox == "randlr"  || cmdline::aapprox == "all" ) lu_std_dag< value_t, hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
+        if ( cmdline::aapprox == "aca"     || cmdline::aapprox == "all" ) lu_std_dag< value_t, hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
+        if ( cmdline::aapprox == "lanczos" || cmdline::aapprox == "all" ) lu_std_dag< value_t, hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
     }// if
 
     //
@@ -513,7 +513,7 @@ program_main ()
     {
         std::cout << "  " << term::bullet << term::bold << "accumulator" << term::reset << std::endl;
     
-        // if ( cmdline::approx == "hpro" || cmdline::approx == "all" )
+        // if ( cmdline::aapprox == "hpro" || cmdline::aapprox == "all" )
         // {
         //     std::cout << "    " << term::bullet << term::bold << "Hpro" << term::reset << std::endl;
 
@@ -560,24 +560,24 @@ program_main ()
         //     std::cout << "      error  = " << format_error( norm::inv_error_2( *A, A_inv ) ) << std::endl;
         // }// if
     
-        if ( cmdline::approx == "svd"     || cmdline::approx == "all" ) lu_accu< value_t, hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
-        if ( cmdline::approx == "rrqr"    || cmdline::approx == "all" ) lu_accu< value_t, hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
-        if ( cmdline::approx == "randsvd" || cmdline::approx == "all" ) lu_accu< value_t, hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
-        if ( cmdline::approx == "randlr"  || cmdline::approx == "all" ) lu_accu< value_t, hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
-        if ( cmdline::approx == "aca"     || cmdline::approx == "all" ) lu_accu< value_t, hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
-        if ( cmdline::approx == "lanczos" || cmdline::approx == "all" ) lu_accu< value_t, hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
+        if ( cmdline::aapprox == "svd"     || cmdline::aapprox == "all" ) lu_accu< value_t, hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
+        if ( cmdline::aapprox == "rrqr"    || cmdline::aapprox == "all" ) lu_accu< value_t, hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
+        if ( cmdline::aapprox == "randsvd" || cmdline::aapprox == "all" ) lu_accu< value_t, hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
+        if ( cmdline::aapprox == "randlr"  || cmdline::aapprox == "all" ) lu_accu< value_t, hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
+        if ( cmdline::aapprox == "aca"     || cmdline::aapprox == "all" ) lu_accu< value_t, hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
+        if ( cmdline::aapprox == "lanczos" || cmdline::aapprox == "all" ) lu_accu< value_t, hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
     }// if
     
     if ( cmdline::arith == "dagaccu" || cmdline::arith == "all" )
     {
         std::cout << "  " << term::bullet << term::bold << "DAG accumulator" << term::reset << std::endl;
     
-        if ( cmdline::approx == "svd"     || cmdline::approx == "all" ) lu_accu_dag< value_t, hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
-        if ( cmdline::approx == "rrqr"    || cmdline::approx == "all" ) lu_accu_dag< value_t, hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
-        if ( cmdline::approx == "randsvd" || cmdline::approx == "all" ) lu_accu_dag< value_t, hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
-        if ( cmdline::approx == "randlr"  || cmdline::approx == "all" ) lu_accu_dag< value_t, hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
-        if ( cmdline::approx == "aca"     || cmdline::approx == "all" ) lu_accu_dag< value_t, hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
-        if ( cmdline::approx == "lanczos" || cmdline::approx == "all" ) lu_accu_dag< value_t, hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
+        if ( cmdline::aapprox == "svd"     || cmdline::aapprox == "all" ) lu_accu_dag< value_t, hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
+        if ( cmdline::aapprox == "rrqr"    || cmdline::aapprox == "all" ) lu_accu_dag< value_t, hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
+        if ( cmdline::aapprox == "randsvd" || cmdline::aapprox == "all" ) lu_accu_dag< value_t, hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
+        if ( cmdline::aapprox == "randlr"  || cmdline::aapprox == "all" ) lu_accu_dag< value_t, hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
+        if ( cmdline::aapprox == "aca"     || cmdline::aapprox == "all" ) lu_accu_dag< value_t, hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
+        if ( cmdline::aapprox == "lanczos" || cmdline::aapprox == "all" ) lu_accu_dag< value_t, hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
     }// if
 
     //
@@ -588,12 +588,12 @@ program_main ()
     {
         std::cout << "  " << term::bullet << term::bold << "lazy" << term::reset << std::endl;
     
-        if ( cmdline::approx == "svd"     || cmdline::approx == "all" ) lu_lazy< value_t, hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
-        if ( cmdline::approx == "rrqr"    || cmdline::approx == "all" ) lu_lazy< value_t, hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
-        if ( cmdline::approx == "randsvd" || cmdline::approx == "all" ) lu_lazy< value_t, hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
-        if ( cmdline::approx == "randlr"  || cmdline::approx == "all" ) lu_lazy< value_t, hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
-        if ( cmdline::approx == "aca"     || cmdline::approx == "all" ) lu_lazy< value_t, hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
-        if ( cmdline::approx == "lanczos" || cmdline::approx == "all" ) lu_lazy< value_t, hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
+        if ( cmdline::aapprox == "svd"     || cmdline::aapprox == "all" ) lu_lazy< value_t, hlr::approx::SVD< value_t > >(     *A, acc, "SVD" );
+        if ( cmdline::aapprox == "rrqr"    || cmdline::aapprox == "all" ) lu_lazy< value_t, hlr::approx::RRQR< value_t > >(    *A, acc, "RRQR" );
+        if ( cmdline::aapprox == "randsvd" || cmdline::aapprox == "all" ) lu_lazy< value_t, hlr::approx::RandSVD< value_t > >( *A, acc, "RandSVD" );
+        if ( cmdline::aapprox == "randlr"  || cmdline::aapprox == "all" ) lu_lazy< value_t, hlr::approx::RandLR< value_t > >(  *A, acc, "RandLR" );
+        if ( cmdline::aapprox == "aca"     || cmdline::aapprox == "all" ) lu_lazy< value_t, hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
+        if ( cmdline::aapprox == "lanczos" || cmdline::aapprox == "all" ) lu_lazy< value_t, hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
     }// if
 }
 
