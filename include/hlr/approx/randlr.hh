@@ -35,7 +35,8 @@ rand_column_basis ( const operator_t &  M,
                     const accuracy &    acc,
                     const uint          block_size,
                     const uint          power_steps,
-                    const uint          oversampling )
+                    const uint          oversampling,
+                    blas::vector< Hpro::real_type_t< typename operator_t::value_t > > *  sv = nullptr )
 {
     using  value_t = typename operator_t::value_t;
     using  real_t  = Hpro::real_type_t< value_t >;
@@ -83,6 +84,17 @@ rand_column_basis ( const operator_t &  M,
             }// for
         }// if
 
+        if ( ! is_null( sv ) )
+        {
+            auto  S = singular_values( R );
+
+            if ( sv->length() != k )
+                *sv = std::move( blas::vector< real_t >( k ) );
+            
+            for ( uint  i = 0; i < k; ++i )
+                (*sv)(i) = S(i);
+        }// if
+        
         return Q;
     }// if
     else
@@ -98,7 +110,8 @@ rand_column_basis ( const operator_t &  M,
         auto        TQ_i    = blas::matrix< value_t >( nrows_M, bsize );
         auto        R       = blas::matrix< value_t >( bsize,   bsize );
         auto        MtQ     = blas::matrix< value_t >( ncols_M, bsize );
-
+        auto        S       = std::list< real_t >();
+        
         for ( uint  i = 0; i < nblocks; ++i )
         {
             //
@@ -185,6 +198,14 @@ rand_column_basis ( const operator_t &  M,
             
             if (( norm_Qi <= abs_eps ) || (( norm_Qi ) <= rel_eps * norm_M ))
                 break;
+
+            if ( ! is_null( sv ) )
+            {
+                auto  S_i = singular_values( R );
+
+                for ( uint  j = 0; j < S_i.length(); ++j )
+                    S.push_back( S_i(j) );
+            }// if
         }// for
         
         //
@@ -202,6 +223,17 @@ rand_column_basis ( const operator_t &  M,
             pos += bsize;
         }// for
 
+        if ( ! is_null( sv ) )
+        {
+            if ( sv->length() != S.size() )
+                *sv = std::move( blas::vector< real_t >( S.size() ) );
+
+            uint  i = 0;
+            
+            for ( auto  s_i : S )
+                (*sv)(i++) = s_i;
+        }// if
+        
         return Q;
     }// else
 }

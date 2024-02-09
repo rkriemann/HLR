@@ -529,7 +529,7 @@ template < typename T_value >
 struct SVD
 {
     using  value_t = T_value;
-    using  real_t  = typename Hpro::real_type< value_t >::type_t;
+    using  real_t  = Hpro::real_type_t< value_t >;
 
     // signal support for general lin. operators
     static constexpr bool supports_general_operator = false;

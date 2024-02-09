@@ -504,12 +504,22 @@ struct RandSVD
     // compute (approximate) column basis
     //
     
+    template < typename value_t >
+    blas::matrix< value_t >
+    column_basis ( const blas::matrix< value_t > &  op,
+                   const accuracy &                 acc,
+                   blas::vector< Hpro::real_type_t< value_t > > *  sv = nullptr ) const
+    {
+        return detail::rand_column_basis( op, acc, 4, power_steps, oversampling, sv );
+    }
+    
     template < typename operator_t >
     blas::matrix< typename operator_t::value_t >
     column_basis ( const operator_t &  op,
-                   const accuracy &    acc ) const
+                   const accuracy &    acc,
+                   blas::vector< Hpro::real_type_t< typename operator_t::value_t > > *  sv = nullptr ) const
     {
-        return detail::rand_column_basis< operator_t >( op, acc, 4, power_steps, oversampling );
+        return detail::rand_column_basis< operator_t >( op, acc, 4, power_steps, oversampling, sv );
     }
 };
 
