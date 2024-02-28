@@ -18,6 +18,9 @@
 #include <hpro/matrix/convert.hh>
 #endif
 
+#include <hlr/arith/mulvec.hh>
+#include <hlr/arith/uniform.hh>
+#include <hlr/arith/h2.hh>
 #include <hlr/seq/norm.hh>
 #include <hlr/seq/arith.hh>
 #include <hlr/seq/arith_uniform.hh>
@@ -389,6 +392,11 @@ program_main ()
     
     std::cout << term::bullet << term::bold << "mat-vec" << term::reset << std::endl;
 
+    const uint  nmvm      = 50;
+    const auto  flops_h   = nmvm * hlr::mul_vec_flops( apply_normal, *A );
+    const auto  flops_uni = nmvm * hlr::uniform::mul_vec_flops( apply_normal, *A_uni, *rowcb_uni, *colcb_uni );
+    const auto  flops_h2  = nmvm * hlr::h2::mul_vec_flops( apply_normal, *A_h2, *rowcb_h2, *colcb_h2 );
+    
     if ( true )
     {
         std::cout << "  " << term::bullet << term::bold << "H-matrices" << term::reset << std::endl;
@@ -407,7 +415,7 @@ program_main ()
         {
             tic = timer::now();
     
-            for ( int j = 0; j < 50; ++j )
+            for ( int j = 0; j < nmvm; ++j )
                 impl::mul_vec< value_t >( 2.0, hpro::apply_normal, *A, *x, *y );
 
             toc = timer::since( tic );
@@ -423,6 +431,8 @@ program_main ()
             std::cout << "  runtime  = "
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
+        
+        std::cout << "    flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
         
         runtime.clear();
     }// if
@@ -464,7 +474,7 @@ program_main ()
         {
             tic = timer::now();
             
-            for ( int j = 0; j < 50; ++j )
+            for ( int j = 0; j < nmvm; ++j )
                 impl::uniform::mul_vec( value_t(2), hpro::apply_normal, *A_uni, *x, *y, *rowcb_uni, *colcb_uni );
             
             toc = timer::since( tic );
@@ -481,6 +491,8 @@ program_main ()
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
 
+        std::cout << "    flops  = " << format_flops( flops_uni, min( runtime ) ) << std::endl;
+        
         runtime.clear();
     }// if
     
@@ -506,7 +518,7 @@ program_main ()
         {
             tic = timer::now();
             
-            for ( int j = 0; j < 50; ++j )
+            for ( int j = 0; j < nmvm; ++j )
                 impl::uniform::mul_vec( value_t(2), hpro::apply_normal, *A_uni, *x, *y, *rowcb_uni, *colcb_uni );
             
             toc = timer::since( tic );
@@ -523,6 +535,8 @@ program_main ()
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
 
+        std::cout << "    flops  = " << format_flops( flops_uni, min( runtime ) ) << std::endl;
+        
         runtime.clear();
     }// if
     
@@ -554,7 +568,7 @@ program_main ()
         {
             tic = timer::now();
     
-            for ( int j = 0; j < 50; ++j )
+            for ( int j = 0; j < nmvm; ++j )
                 // A_h2->mul_vec( 2.0, x.get(), 1.0, y.get(), hpro::apply_normal );
                 impl::h2::mul_vec< value_t >( 2.0, apply_normal, *A_h2, *x, *y, *rowcb_h2, *colcb_h2 );
 
@@ -571,6 +585,8 @@ program_main ()
             std::cout << "  runtime  = "
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
+        
+        std::cout << "    flops  = " << format_flops( flops_h2, min( runtime ) ) << std::endl;
         
         runtime.clear();
     }// if
@@ -599,7 +615,7 @@ program_main ()
         {
             tic = timer::now();
     
-            for ( int j = 0; j < 50; ++j )
+            for ( int j = 0; j < nmvm; ++j )
                 // A_h2->mul_vec( 2.0, x.get(), 1.0, y.get(), hpro::apply_normal );
                 impl::h2::mul_vec< value_t >( 2.0, apply_normal, *A_h21, *x, *y, *rowcb_h21, *colcb_h21 );
 
@@ -616,6 +632,8 @@ program_main ()
             std::cout << "  runtime  = "
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
+        
+        std::cout << "    flops  = " << format_flops( flops_h2, min( runtime ) ) << std::endl;
         
         runtime.clear();
     }// if

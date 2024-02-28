@@ -280,6 +280,102 @@ mul_vec2 ( const value_t                         alpha,
     }// for
 }
 
+//
+// return FLOPs needed to convert vector into uniform basis
+//
+template < typename cluster_basis_t >
+flops_t
+scalar_to_uniform_flops ( const cluster_basis_t &  cb )
+{
+    flops_t  flops = 0;
+    
+    if ( cb.rank() > 0 )
+    {
+        flops += FMULS_GEMV( cb.rank(), cb.is().size() );
+    }// if
+
+    if ( cb.nsons() > 0 )
+    {
+        for ( uint  i = 0; i < cb.nsons(); ++i )
+            flops += scalar_to_uniform_flops( *cb.son(i) );
+    }// if
+
+    return flops;
+}
+
+//
+// return FLOPs needed for computing y = y + α op( M ) x
+// with M in uniform-H format
+//
+template < typename value_t >
+flops_t
+mul_vec_flops ( const Hpro::matop_t               op_M,
+                const Hpro::TMatrix< value_t > &  M )
+{
+    using namespace hlr::matrix;
+    
+    if ( is_blocked( M ) )
+    {
+        auto        B       = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+        const auto  row_ofs = M.row_is( op_M ).first();
+        const auto  col_ofs = M.col_is( op_M ).first();
+        flops_t     flops   = 0;
+    
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                auto  B_ij = B->block( i, j );
+            
+                if ( ! is_null( B_ij ) )
+                    flops += mul_vec_flops( op_M, *B_ij );
+            }// for
+        }// for
+
+        return flops;
+    }// if
+    else if ( matrix::is_uniform_lowrank( M ) )
+    {
+        const auto  R = cptrcast( &M, matrix::uniform_lrmatrix< value_t > );
+        
+        return FMULS_GEMV( R->row_rank( op_M ), R->col_rank( op_M ) );
+    }// if
+    else if ( matrix::is_dense( M ) )
+    {
+        const auto  nrows = M.nrows( op_M );
+        const auto  ncols = M.ncols( op_M );
+        
+        return FMULS_GEMV( nrows, ncols );
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix type: " + M.typestr() );
+
+    return 0;
+}
+
+//
+// return FLOPs for adding vector in uniform cluster basis to scalar vector
+//
+template < typename cluster_basis_t >
+flops_t
+add_uniform_to_scalar_flops ( const cluster_basis_t &  cb )
+{
+    flops_t  flops = 0;
+    
+    if ( cb.rank() > 0 )
+    {
+        flops += FMULS_GEMV( cb.is().size(), cb.rank() );
+    }// if
+
+    if ( cb.nsons() > 0 )
+    {
+        for ( uint  i = 0; i < cb.nsons(); ++i )
+            flops += add_uniform_to_scalar_flops( *cb.son(i) );
+    }// if
+
+    return flops;
+}
+
 }// namespace detail
 
 

@@ -10,6 +10,7 @@
 #include <hlr/approx/svd.hh>
 #include <hlr/approx/accuracy.hh>
 #include <hlr/arith/norm.hh>
+#include <hlr/arith/mulvec.hh>
 #include <hlr/bem/aca.hh>
 #include <hlr/bem/hca.hh>
 #include <hlr/bem/dense.hh>
@@ -388,10 +389,13 @@ program_main ()
 
     //////////////////////////////////////////////////////////////////////
     //
-    // H-matrix matrix vector multiplication
+    // H-matrix vector multiplication
     //
     //////////////////////////////////////////////////////////////////////
 
+    const uint  nmvm      = 50;
+    const auto  flops_mvm = nmvm * hlr::mul_vec_flops( value_t(2), apply_normal, *A );
+    
     if ( nbench > 0 )
     {
         std::cout << term::bullet << term::bold
@@ -419,7 +423,7 @@ program_main ()
             {
                 tic = timer::now();
     
-                for ( int j = 0; j < 50; ++j )
+                for ( int j = 0; j < nmvm; ++j )
                     impl::mul_vec< value_t >( 2.0, Hpro::apply_normal, *A, *x, *y );
 
                 toc = timer::since( tic );
@@ -437,6 +441,8 @@ program_main ()
                           << std::endl;
 
             t_orig = min( runtime );
+            
+            std::cout << "    flops  = " << format_flops( flops_mvm, t_orig ) << std::endl;
             
             y_ref = std::move( y );
         }
@@ -462,7 +468,7 @@ program_main ()
             {
                 tic = timer::now();
                 
-                for ( int j = 0; j < 50; ++j )
+                for ( int j = 0; j < nmvm; ++j )
                     impl::mul_vec_cl( 2.0, Hpro::apply_normal, *A, block_map, *x, *y );
                     
                 toc = timer::since( tic );
@@ -478,6 +484,8 @@ program_main ()
                 std::cout << "  runtime  = "
                           << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                           << std::endl;
+            
+            std::cout << "    flops  = " << format_flops( flops_mvm, min( runtime ) ) << std::endl;
             
             auto  diff = y_ref->copy();
             
@@ -505,7 +513,7 @@ program_main ()
             {
                 tic = timer::now();
     
-                for ( int j = 0; j < 50; ++j )
+                for ( int j = 0; j < nmvm; ++j )
                     impl::mul_vec< value_t >( 2.0, Hpro::apply_normal, *zA, *x, *y );
 
                 toc = timer::since( tic );
@@ -526,6 +534,8 @@ program_main ()
 
             std::cout << "    ratio  = " << boost::format( "%.02f" ) % ( t_compressed / t_orig ) << std::endl;
 
+            std::cout << "    flops  = " << format_flops( flops_mvm, min( runtime ) ) << std::endl;
+            
             auto  diff = y_ref->copy();
 
             diff->axpy( value_t(-1), y.get() );
@@ -556,7 +566,7 @@ program_main ()
             {
                 tic = timer::now();
     
-                for ( int j = 0; j < 50; ++j )
+                for ( int j = 0; j < nmvm; ++j )
                     impl::mul_vec_cl< value_t >( 2.0, Hpro::apply_normal, *zA, block_map, *x, *y );
 
                 toc = timer::since( tic );
@@ -577,6 +587,8 @@ program_main ()
 
             std::cout << "    ratio  = " << boost::format( "%.02f" ) % ( t_compressed / t_orig ) << std::endl;
 
+            std::cout << "    flops  = " << format_flops( flops_mvm, min( runtime ) ) << std::endl;
+            
             auto  diff = y_ref->copy();
 
             diff->axpy( value_t(-1), y.get() );

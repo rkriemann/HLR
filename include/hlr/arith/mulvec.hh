@@ -10,9 +10,11 @@
 
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/h2.hh>
+#include <hlr/matrix/lrmatrix.hh>
 #include <hlr/vector/scalar_vector.hh>
 #include <hlr/utils/log.hh>
 #include <hlr/utils/hash.hh>
+#include <hlr/utils/flops.hh>
 
 namespace hlr
 {
@@ -152,6 +154,60 @@ setup_cluster_block_map ( const matop_t                     op_M,
     {
         blocks[ M.row_is( op_M ) ].push_back( & M );
     }// else
+}
+
+//
+// return FLOPs needed for computing y = y + α op( M ) x
+// (implicit vectors)
+//
+template < typename value_t >
+flops_t
+mul_vec_flops ( const Hpro::matop_t               op_M,
+                const Hpro::TMatrix< value_t > &  M )
+{
+    using namespace hlr::matrix;
+    
+    if ( is_blocked( M ) )
+    {
+        auto        B       = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+        const auto  row_ofs = M.row_is( op_M ).first();
+        const auto  col_ofs = M.col_is( op_M ).first();
+        flops_t     flops   = 0;
+    
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                auto  B_ij = B->block( i, j );
+            
+                if ( ! is_null( B_ij ) )
+                    flops += mul_vec_flops( op_M, *B_ij );
+            }// for
+        }// for
+
+        return flops;
+    }// if
+    else if ( matrix::is_lowrank( M ) )
+    {
+        const auto  nrows = M.nrows( op_M );
+        const auto  ncols = M.ncols( op_M );
+        const auto  rank  = cptrcast( &M, matrix::lrmatrix< value_t > )->rank();
+        
+        // t :=     V^H x
+        // y := y + α·U·t
+        return FMULS_GEMV( ncols, rank ) + FMULS_GEMV( nrows, rank );
+    }// if
+    else if ( matrix::is_dense( M ) )
+    {
+        const auto  nrows = M.nrows( op_M );
+        const auto  ncols = M.ncols( op_M );
+        
+        return FMULS_GEMV( nrows, ncols );
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix type: " + M.typestr() );
+
+    return 0;
 }
 
 }// namespace hlr

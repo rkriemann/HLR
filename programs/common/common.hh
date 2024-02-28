@@ -126,7 +126,7 @@ std::string
 format_flops ( const double  f,
                const double  t )
 {
-    return str( boost::format( "%.0f / %.2f GFlops" ) % f % ( f / ( 1e9 * t ) ) );
+    return str( boost::format( "%.1f GFlop / %.2f GFlop/s" ) % ( f / 1e9 ) % ( f / ( 1e9 * t ) ) );
 }
 
 inline

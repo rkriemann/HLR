@@ -180,6 +180,27 @@ mul_vec2 ( const value_t                              alpha,
 }
 
 //
+// return FLOPs needed for computing y = y + α op( M ) x
+// (implicit vectors)
+//
+template < typename value_t,
+           typename cluster_basis_t >
+flops_t
+mul_vec_flops ( const Hpro::matop_t               op_M,
+                const Hpro::TMatrix< value_t > &  M,
+                const cluster_basis_t &           rowcb,
+                const cluster_basis_t &           colcb )
+{
+    flops_t  flops = 0;
+
+    flops += detail::scalar_to_uniform_flops( ( op_M == apply_normal ? colcb : rowcb ) );
+    flops += detail::mul_vec_flops( op_M, M );
+    flops += detail::add_uniform_to_scalar_flops( ( op_M == apply_normal ? rowcb : colcb ) );
+
+    return flops;
+}
+
+//
 // matrix multiplication (eager version)
 //
 template < typename value_t,
