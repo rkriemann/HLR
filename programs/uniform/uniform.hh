@@ -402,10 +402,10 @@ program_main ()
     const auto  bytes_uni = nmvm * hlr::uniform::mul_vec_datasize( apply_normal, *A_uni, *rowcb_uni, *colcb_uni );
     const auto  bytes_h2  = nmvm * hlr::h2::mul_vec_datasize( apply_normal, *A_h2, *rowcb_h2, *colcb_h2 );
 
-    std::cout << "  ops/byte " << std::endl;
-    std::cout << "    H    = " << flops_h   / bytes_h   << std::endl;
-    std::cout << "    UniH = " << flops_uni / bytes_uni << std::endl;
-    std::cout << "    H²   = " << flops_h2  / bytes_h2  << std::endl;
+    std::cout << "  " << term::bullet << term::bold << "FLOPs/byte " << term::reset << std::endl;
+    std::cout << "    H    = " << format_flops( flops_h   ) << ", " << flops_h   / bytes_h   << std::endl;
+    std::cout << "    UniH = " << format_flops( flops_uni ) << ", " << flops_uni / bytes_uni << std::endl;
+    std::cout << "    H²   = " << format_flops( flops_h2  ) << ", " << flops_h2  / bytes_h2  << std::endl;
     
     if ( true )
     {

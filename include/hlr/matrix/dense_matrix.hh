@@ -406,7 +406,11 @@ public:
     // return size of (floating point) data in bytes handled by this object
     virtual size_t data_byte_size () const
     {
-        // always return full data size
+        #if HLR_HAS_COMPRESSION == 1
+        if ( is_compressed() )
+            return hlr::compress::byte_size( _zM );
+        #endif
+        
         return sizeof( value_t ) * _row_is.size() * _col_is.size();
     }
     

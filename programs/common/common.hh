@@ -123,6 +123,13 @@ format_norm ( const double  e, const T... es )
 // return default formated string for FLOPs
 inline
 std::string
+format_flops ( const double  f )
+{
+    return str( boost::format( "%.2f MFlop" ) % ( f / 1e6 ) );
+}
+
+inline
+std::string
 format_flops ( const double  f,
                const double  t )
 {

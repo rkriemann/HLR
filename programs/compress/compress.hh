@@ -393,8 +393,14 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
-    const uint  nmvm      = 50;
-    const auto  flops_mvm = nmvm * hlr::mul_vec_flops( value_t(2), apply_normal, *A );
+    const uint  nmvm    = 50;
+    const auto  flops_h = nmvm * hlr::mul_vec_flops( apply_normal, *A );
+    const auto  bytes_h = nmvm * hlr::mul_vec_datasize( apply_normal, *A );
+    const auto  bytes_z = nmvm * hlr::mul_vec_datasize( apply_normal, *zA );
+    
+    std::cout << "  " << term::bullet << term::bold << "FLOPs/byte " << term::reset() << std::endl;
+    std::cout << "    H    = " << format_flops( flops_h ) << ", " << flops_h / bytes_h << std::endl;
+    std::cout << "    zH   = " << format_flops( flops_h ) << ", " << flops_h / bytes_z << std::endl;
     
     if ( nbench > 0 )
     {
@@ -442,7 +448,7 @@ program_main ()
 
             t_orig = min( runtime );
             
-            std::cout << "    flops  = " << format_flops( flops_mvm, t_orig ) << std::endl;
+            std::cout << "    flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
             
             y_ref = std::move( y );
         }
@@ -485,7 +491,7 @@ program_main ()
                           << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                           << std::endl;
             
-            std::cout << "    flops  = " << format_flops( flops_mvm, min( runtime ) ) << std::endl;
+            std::cout << "    flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
             
             auto  diff = y_ref->copy();
             
@@ -534,7 +540,7 @@ program_main ()
 
             std::cout << "    ratio  = " << boost::format( "%.02f" ) % ( t_compressed / t_orig ) << std::endl;
 
-            std::cout << "    flops  = " << format_flops( flops_mvm, min( runtime ) ) << std::endl;
+            std::cout << "    flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
             
             auto  diff = y_ref->copy();
 
@@ -587,7 +593,7 @@ program_main ()
 
             std::cout << "    ratio  = " << boost::format( "%.02f" ) % ( t_compressed / t_orig ) << std::endl;
 
-            std::cout << "    flops  = " << format_flops( flops_mvm, min( runtime ) ) << std::endl;
+            std::cout << "    flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
             
             auto  diff = y_ref->copy();
 
