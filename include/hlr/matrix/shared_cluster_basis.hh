@@ -373,6 +373,17 @@ public:
         return  n;
     }
 
+    // return size of (floating point) data in bytes handled by this object
+    size_t data_byte_size () const
+    {
+        auto  n = sizeof( value_t ) * _is.size() * rank();
+
+        for ( auto  son : _sons )
+            n += son->data_byte_size();
+
+        return  n;
+    }
+    
     // return depth of cluster basis
     size_t
     depth () const

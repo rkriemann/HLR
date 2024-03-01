@@ -583,6 +583,13 @@ public:
         return size;
     }
 
+    // return size of (floating point) data in bytes handled by this object
+    virtual size_t data_byte_size () const
+    {
+        // always return full data size
+        return sizeof( value_t ) * _rank * ( _row_is.size() + _col_is.size() );
+    }
+    
     // test data for invalid values, e.g. INF and NAN
     virtual void check_data () const
     {

@@ -210,6 +210,18 @@ mul_vec_flops ( const Hpro::matop_t               op_M,
     return 0;
 }
 
+//
+// return size of data involved in computing y = y + α op( M ) x
+//
+template < typename value_t >
+size_t
+mul_vec_datasize ( const Hpro::matop_t               op_M,
+                   const Hpro::TMatrix< value_t > &  M )
+{
+    // matrix and vector data
+    return M.data_byte_size() + 2 * sizeof( value_t ) * ( M.nrows() + M.ncols() );
+}
+
 }// namespace hlr
 
 #endif // __HLR_ARITH_MULVEC_HH

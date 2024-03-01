@@ -378,8 +378,11 @@ public:
     //
 
     // return size in bytes used by this object
-    virtual size_t byte_size  () const;
+    virtual size_t byte_size      () const;
 
+    // return size of (floating point) data in bytes handled by this object
+    virtual size_t data_byte_size () const;
+    
 protected:
     // remove compressed storage (standard storage not restored!)
     virtual void   remove_compressed ()
@@ -654,6 +657,16 @@ uniform_lrmatrix< value_t >::byte_size () const
     #endif
 
     return size;
+}
+
+//
+// return size of (floating point) data in bytes handled by this object
+//
+template < typename value_t >
+size_t
+uniform_lrmatrix< value_t >::data_byte_size () const
+{
+    return sizeof( value_t ) * row_rank() * col_rank();
 }
 
 //

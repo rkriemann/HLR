@@ -381,6 +381,31 @@ mul_vec_flops ( const Hpro::matop_t               op_M,
     return flops;
 }
 
+//
+// return size of data involved in computing y = y + α op( M ) x
+//
+template < typename value_t,
+           typename cluster_basis_t >
+flops_t
+mul_vec_datasize ( const Hpro::matop_t               op_M,
+                   const Hpro::TMatrix< value_t > &  M,
+                   const cluster_basis_t &           rowcb,
+                   const cluster_basis_t &           colcb )
+{
+    size_t  dsize = 0;
+
+    // scalar to uniform: cluster basis and vector
+    dsize += ( op_M == apply_normal ? colcb : rowcb ).data_byte_size() + sizeof( value_t ) * M.ncols( op_M );
+
+    // actual matvec: matrix size
+    dsize += M.data_byte_size();
+
+    // uniform to scalar: cluster basis and vector
+    dsize += ( op_M == apply_normal ? rowcb : colcb ).data_byte_size() + sizeof( value_t ) * M.nrows( op_M );
+
+    return dsize;
+}
+
 }}// namespace hlr::h2
 
 #endif // __HLR_ARITH_H2_HH

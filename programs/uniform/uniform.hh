@@ -393,9 +393,19 @@ program_main ()
     std::cout << term::bullet << term::bold << "mat-vec" << term::reset << std::endl;
 
     const uint  nmvm      = 50;
+    
     const auto  flops_h   = nmvm * hlr::mul_vec_flops( apply_normal, *A );
     const auto  flops_uni = nmvm * hlr::uniform::mul_vec_flops( apply_normal, *A_uni, *rowcb_uni, *colcb_uni );
     const auto  flops_h2  = nmvm * hlr::h2::mul_vec_flops( apply_normal, *A_h2, *rowcb_h2, *colcb_h2 );
+
+    const auto  bytes_h   = nmvm * hlr::mul_vec_datasize( apply_normal, *A );
+    const auto  bytes_uni = nmvm * hlr::uniform::mul_vec_datasize( apply_normal, *A_uni, *rowcb_uni, *colcb_uni );
+    const auto  bytes_h2  = nmvm * hlr::h2::mul_vec_datasize( apply_normal, *A_h2, *rowcb_h2, *colcb_h2 );
+
+    std::cout << "  ops/byte " << std::endl;
+    std::cout << "    H    = " << flops_h   / bytes_h   << std::endl;
+    std::cout << "    UniH = " << flops_uni / bytes_uni << std::endl;
+    std::cout << "    H²   = " << flops_h2  / bytes_h2  << std::endl;
     
     if ( true )
     {
