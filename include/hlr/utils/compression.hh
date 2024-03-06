@@ -665,6 +665,10 @@ is_compressed ( const T *  ptr )
 // define implementation for adaptive precision compression
 // for lowrank matrices
 //
+
+// ensure, it was not activated above
+#undef HLR_HAS_COMPRESSED_BLAS
+
 #if HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_MP
 
 #include <hlr/utils/detail/mixedprec.hh>

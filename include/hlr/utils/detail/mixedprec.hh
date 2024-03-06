@@ -123,14 +123,14 @@ constexpr double  mpprec3   = 3.9e-3;
 
 template < typename value_t >
 zarray
-compress_lr ( const blas::matrix< value_t > &                       U,
-              const blas::vector< Hpro::real_type_t< value_t > > &  S );
+compress_lr ( const hlr::blas::matrix< value_t > &                       U,
+              const hlr::blas::vector< Hpro::real_type_t< value_t > > &  S );
 
 template <>
 inline
 zarray
-compress_lr< float > ( const blas::matrix< float > &  U,
-                       const blas::vector< float > &  S )
+compress_lr< float > ( const hlr::blas::matrix< float > &  U,
+                       const hlr::blas::vector< float > &  S )
 {
     HLR_ERROR( "not supported" );
 }
@@ -138,8 +138,8 @@ compress_lr< float > ( const blas::matrix< float > &  U,
 template <>
 inline
 zarray
-compress_lr< double > ( const blas::matrix< double > &  U,
-                        const blas::vector< double > &  S )
+compress_lr< double > ( const hlr::blas::matrix< double > &  U,
+                        const hlr::blas::vector< double > &  S )
 {
     //
     // determine corresponding parts for MP1, MP2, MP3
@@ -235,8 +235,8 @@ compress_lr< double > ( const blas::matrix< double > &  U,
 template <>
 inline
 zarray
-compress_lr< std::complex< float > > ( const blas::matrix< std::complex< float > > &  U,
-                                       const blas::vector< float > &                  S )
+compress_lr< std::complex< float > > ( const hlr::blas::matrix< std::complex< float > > &  U,
+                                       const hlr::blas::vector< float > &                  S )
 {
     HLR_ERROR( "not supported" );
 }
@@ -244,8 +244,8 @@ compress_lr< std::complex< float > > ( const blas::matrix< std::complex< float >
 template <>
 inline
 zarray
-compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double > > &  U,
-                                        const blas::vector< double > &                  S )
+compress_lr< std::complex< double > > ( const hlr::blas::matrix< std::complex< double > > &  U,
+                                        const hlr::blas::vector< double > &                  S )
 {
     HLR_ERROR( "todo" );
 
@@ -323,14 +323,14 @@ compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double
 
 template < typename value_t >
 void
-decompress_lr ( const zarray &             zdata,
-                blas::matrix< value_t > &  U );
+decompress_lr ( const zarray &                  zdata,
+                hlr::blas::matrix< value_t > &  U );
 
 template <>
 inline
 void
-decompress_lr< float > ( const zarray &           zdata,
-                         blas::matrix< float > &  U )
+decompress_lr< float > ( const zarray &                zdata,
+                         hlr::blas::matrix< float > &  U )
 {
     HLR_ERROR( "not supported" );
 }
@@ -338,8 +338,8 @@ decompress_lr< float > ( const zarray &           zdata,
 template <>
 inline
 void
-decompress_lr< double > ( const zarray &            zdata,
-                          blas::matrix< double > &  U )
+decompress_lr< double > ( const zarray &                 zdata,
+                          hlr::blas::matrix< double > &  U )
 {
     const size_t    n     = U.nrows();
     const uint32_t  rank  = U.ncols();
@@ -394,8 +394,8 @@ decompress_lr< double > ( const zarray &            zdata,
 template <>
 inline
 void
-decompress_lr< std::complex< float > > ( const zarray &                           zdata,
-                                         blas::matrix< std::complex< float > > &  U )
+decompress_lr< std::complex< float > > ( const zarray &                                zdata,
+                                         hlr::blas::matrix< std::complex< float > > &  U )
 {
     HLR_ERROR( "not supported" );
 }
@@ -403,8 +403,8 @@ decompress_lr< std::complex< float > > ( const zarray &                         
 template <>
 inline
 void
-decompress_lr< std::complex< double > > ( const zarray &                           zdata,
-                                         blas::matrix< std::complex< double > > &  U )
+decompress_lr< std::complex< double > > ( const zarray &                                zdata,
+                                         hlr::blas::matrix< std::complex< double > > &  U )
 {
     HLR_ERROR( "todo" );
     
