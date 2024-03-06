@@ -105,7 +105,7 @@ public:
 
 private:
     std::vector< value_type >  data;
-    const size_type            dim0, dim1, dim2;
+    size_type                  dim0, dim1, dim2;
 
 public:
     tensor3 ( const size_type  adim0,
