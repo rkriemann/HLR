@@ -24,25 +24,10 @@ using byte_t = uint8_t;
 constexpr uint8_t  ES = 2;
 
 //
-// number of bits for given precision
+// return bitrate for given accuracy
 //
-inline
-uint8_t
-eps_to_nbits ( const double  eps )
-{
-    // |d_i - ~d_i| ≤ 2^(-m) ≤ ε with m = remaining mantissa length
-    return std::max< double >( 1, std::ceil( -std::log2( eps ) ) );
-}
-
-//
-// number of bits for tolerance in APLR
-//
-inline
-uint8_t
-tol_to_nbits ( const double  tol )
-{
-    return std::max< double >( 1, std::ceil( -std::log2( tol / 4.0 ) ) );
-}
+inline byte_t eps_to_rate      ( const double  eps ) { return std::max< double >( 1, std::ceil( -std::log2( eps ) ) ); }
+inline byte_t eps_to_rate_aplr ( const double  eps ) { return eps_to_rate( eps ) + 2; }
 
 //
 // compression configuration
@@ -59,7 +44,7 @@ using  zarray = std::vector< byte_t >;
 inline size_t  byte_size       ( const zarray &  v ) { return sizeof(zarray) + v.size(); }
 inline size_t  compressed_size ( const zarray &  v ) { return v.size(); }
 
-inline config  get_config ( const double  eps  ) { return config{ eps_to_nbits( eps ) }; }
+inline config  get_config ( const double  eps  ) { return config{ eps_to_rate( eps ) }; }
 
 //////////////////////////////////////////////////////////////////////
 //
@@ -678,7 +663,7 @@ compress_lr ( const blas::matrix< value_t > &                 U,
             vmax = std::max( vmax, std::abs( U(i,l) ) );
 
         s[l] = real_t(1) / vmax;
-        b[l] = 1 + ES + tol_to_nbits( S(l) ); // sign + exponent bits
+        b[l] = 1 + ES + eps_to_rate_aplr( S(l) ); // sign + exponent bits
 
         zsize += 1;                          // for nbits
         zsize += sizeof(real_t);             // for scaling factor

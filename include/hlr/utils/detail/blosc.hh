@@ -28,21 +28,12 @@ struct config
 };
 
 //
-// convert precision to bitrate
+// return bitrate for given accuracy
 //
-inline
-byte_t
-eps_to_rate ( const double eps )
-{
-    return byte_t( std::ceil( std::abs( std::log2( eps ) ) ) );
-}
-
-inline
-byte_t
-tol_to_rate ( const double  tol )
-{
-    return byte_t( std::max< double >( 1, -std::log2( tol ) + 1 ) );
-}
+//   |d_i - ~d_i| ≤ 2^(-m) ≤ ε with mantissa length m = ⌈-log₂ ε⌉
+//
+inline byte_t eps_to_rate      ( const double  eps ) { return std::max< double >( 1, std::ceil( -std::log2( eps ) ) ); }
+inline byte_t eps_to_rate_aplr ( const double  eps ) { return eps_to_rate( eps ); }
 
 //
 // define various compression modes
@@ -228,7 +219,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
 
     for ( uint  l = 0; l < k; ++l )
     {
-        auto  zconf = config{ tol_to_rate( S(l) ) };
+        auto  zconf = config{ eps_to_rate_aplr( S(l) ) };
         auto  z_i   = compress( zconf, U.data() + l * n, n );
 
         zsize += z_i.size();

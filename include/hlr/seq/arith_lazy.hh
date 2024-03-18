@@ -782,7 +782,7 @@ solve_lower_tri ( const eval_side_t                 side,
                   const Hpro::TTruncAcc &           acc,
                   const approx_t &                  approx )
 {
-    if ( is_blocked_all( L, M ) )
+    if ( hlr::is_blocked_all( L, M ) )
     {
         auto  BL = cptrcast( &L, Hpro::TBlockMatrix< value_t > );
         auto  BM =  ptrcast( &M, Hpro::TBlockMatrix< value_t > );
@@ -838,7 +838,7 @@ solve_upper_tri ( const eval_side_t                 side,
                   const Hpro::TTruncAcc &           acc,
                   const approx_t &                  approx )
 {
-    if ( is_blocked_all( U, M ) )
+    if ( hlr::is_blocked_all( U, M ) )
     {
         auto  BU = cptrcast( &U, Hpro::TBlockMatrix< value_t > );
         auto  BM =  ptrcast( &M, Hpro::TBlockMatrix< value_t > );

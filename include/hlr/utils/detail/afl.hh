@@ -63,21 +63,14 @@ inline size_t byte_pad ( size_t  n )
 {
     return ( n % 8 != 0 ) ? n + (8 - n%8) : n;
 }
-    
-inline
-byte_t
-eps_to_rate ( const double eps )
-{
-    // |d_i - ~d_i| ≤ 2^(-m) ≤ ε with m = remaining mantissa length
-    return std::max< double >( 1, std::ceil( -std::log2( eps ) ) );
-}
 
-inline
-uint32_t
-tol_to_rate ( const double  tol )
-{
-    return uint32_t( std::max< double >( 1, -std::log2( tol ) ) ) + 1;
-}
+//
+// return bitrate for given accuracy
+//
+//   |d_i - ~d_i| ≤ 2^(-m) ≤ ε with mantissa length m = ⌈-log₂ ε⌉
+//
+inline byte_t eps_to_rate      ( const double  eps ) { return std::max< double >( 1, std::ceil( -std::log2( eps ) ) ); }
+inline byte_t eps_to_rate_aplr ( const double  eps ) { return eps_to_rate( eps ) + 1; }
 
 struct config
 {
@@ -834,7 +827,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
 
         s[l] = real_t(1) / vmin;
         e[l] = uint32_t( std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ) );
-        m[l] = tol_to_rate( S(l) );
+        m[l] = eps_to_rate_aplr( S(l) );
 
         HLR_ASSERT( std::isfinite( s[l] ) );
         
@@ -920,7 +913,7 @@ compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double
 
         s[l] = real_t(1) / vmin;
         e[l] = uint32_t( std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ) );
-        m[l] = tol_to_rate( S(l) );
+        m[l] = eps_to_rate_aplr( S(l) );
 
         HLR_ASSERT( std::isfinite( s[l] ) );
 

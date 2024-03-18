@@ -84,20 +84,13 @@ constexpr uint64_t  fp64_exp_highbit = 0b10000000000;
 constexpr uint64_t  fp64_zero_val    = 0xffffffffffffffff;
 constexpr double    fp64_infinity    = std::numeric_limits< double >::infinity();
 
-inline
-byte_t
-eps_to_rate ( const double eps )
-{
-    // |d_i - ~d_i| ≤ 2^(-m) ≤ ε with m = remaining mantissa length
-    return std::max< double >( 1, std::ceil( -std::log2( eps ) ) );
-}
-
-inline
-uint32_t
-tol_to_rate ( const double  tol )
-{
-    return uint32_t( std::max< double >( 1, -std::log2( tol ) ) ) + 1;
-}
+//
+// return bitrate for given accuracy
+//
+//   |d_i - ~d_i| ≤ 2^(-m) ≤ ε with mantissa length m = ⌈-log₂ ε⌉
+//
+inline byte_t eps_to_rate      ( const double  eps ) { return std::max< double >( 1, std::ceil( -std::log2( eps ) ) ); }
+inline byte_t eps_to_rate_aplr ( const double  eps ) { return eps_to_rate( eps ) + 1; }
 
 struct config
 {
@@ -840,7 +833,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
 
         HLR_ASSERT( std::isfinite( s[l] ) );
 
-        const auto  nprecbits = tol_to_rate( S(l) );
+        const auto  nprecbits = eps_to_rate_aplr( S(l) );
         const auto  nbits     = 1 + e[l] + nprecbits;
 
         // increase mantissa bits such that sum is multiple of 8
@@ -932,7 +925,7 @@ compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double
 
         HLR_ASSERT( std::isfinite( s[l] ) );
 
-        const auto  nprecbits = tol_to_rate( S(l) );
+        const auto  nprecbits = eps_to_rate_aplr( S(l) );
         const auto  nbits     = 1 + e[l] + nprecbits;
 
         // increase mantissa bits such that sum is multiple of 8

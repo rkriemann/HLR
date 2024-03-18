@@ -38,13 +38,13 @@ constexpr uint64_t  fp64_exp_mask  = 0x7ff0000000000000;
 
 constexpr uint8_t   bfl_header_ofs = 1;
 
-inline
-byte_t
-eps_to_rate ( const double eps )
-{
-    // |d_i - ~d_i| ≤ 2^(-m) ≤ ε with m = remaining mantissa length
-    return std::max< double >( 1, std::ceil( -std::log2( eps ) ) );
-}
+//
+// return bitrate for given accuracy
+//
+//   |d_i - ~d_i| ≤ 2^(-m) ≤ ε with mantissa length m = ⌈-log₂ ε⌉
+//
+inline byte_t eps_to_rate      ( const double  eps ) { return std::max< double >( 1, std::ceil( -std::log2( eps ) ) ); }
+inline byte_t eps_to_rate_aplr ( const double  eps ) { return eps_to_rate( eps ); }
 
 struct config
 {
@@ -489,7 +489,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
 
     for ( uint32_t  l = 0; l < k; ++l )
     {
-        const auto      nprecbits = eps_to_rate( S(l) );
+        const auto      nprecbits = eps_to_rate_aplr( S(l) );
         const uint32_t  nbits     = byte_pad( 1 + 8 + nprecbits );
         const uint32_t  nbyte     = nbits / 8;
 
