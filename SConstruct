@@ -464,6 +464,7 @@ elif buildtype in [ 'release-debug', 'reldbg' ] :
 elif buildtype in [ 'release', 'rel' ] :
     OPTFLAGS  = RELFLAGS
     DEFINES   = DEFINES + ' NDEBUG'
+    LINKFLAGS = ''
 
 if warn :
     WARNFLAGS = readln( '%s --comp %s --warn' % ( CPUFLAGS, CXX ) )
