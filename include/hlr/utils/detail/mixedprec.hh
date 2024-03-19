@@ -20,8 +20,8 @@
 //
 //    double + single + half
 //
-// with half either float16 or bfloat16 (depending on compiler
-// support)
+// with half either float16 (depending on compiler support)
+// or bfloat16 (preferred)
 //
 ////////////////////////////////////////////////////////////
 
@@ -46,7 +46,7 @@ inline size_t  compressed_size ( const zarray &  v ) { return v.size(); }
 // check some of the default defines for this
 //
 #if defined(__FLT16_EPSILON__)
-#  define HLR_HAS_FLOAT16  1
+#  define HLR_HAS_FLOAT16  0 // prefer BF16 anyway because much faster
 #else
 #  define HLR_HAS_FLOAT16  0
 #endif
