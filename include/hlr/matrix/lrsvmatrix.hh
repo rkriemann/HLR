@@ -310,6 +310,20 @@ public:
         return size;
     }
 
+    // return size of (floating point) data in bytes handled by this object
+    virtual size_t data_byte_size () const
+    {
+        #if HLR_USE_APLR == 1
+
+        return sizeof(value_t) * _S.length() + compress::aplr::byte_size( _mpdata.zU ) + compress::aplr::byte_size( _mpdata.zV );
+
+        #else
+
+        return sizeof(value_t) * ( _S.length() + this->rank() * ( this->nrows() + this->ncols() ) );
+        
+        #endif
+    }
+    
     // test data for invalid values, e.g. INF and NAN
     virtual void check_data () const
     {
