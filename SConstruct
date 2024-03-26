@@ -80,6 +80,8 @@ UNIVERSAL_DIR = '/'
 blosc         = False
 BLOSC_DIR     = '/'
 
+zblas         = False
+
 # set of frameworks to use: seq, openmp, tbb, tf, hpx, mpi, gpi2 (or 'all')
 FRAMEWORKS   = [ 'seq',
                  'omp',
@@ -295,8 +297,10 @@ opts.Add( BoolVariable( 'universal',     'use universal number library',       u
 opts.Add( PathVariable( 'universal_dir', 'universal installation directory',   UNIVERSAL_DIR, PathVariable.PathIsDir ) )
 opts.Add( BoolVariable( 'blosc',         'use blosc compression library',      blosc ) )
 opts.Add( PathVariable( 'blosc_dir',     'blosc installation directory',       BLOSC_DIR, PathVariable.PathIsDir ) )
-opts.Add( EnumVariable( 'compressor',    'defined compressor',                 'none', allowed_values = COMPRESSORS,      ignorecase = 2 ) )
-opts.Add( EnumVariable( 'aplr',          'defined APLR compressor',            'none', allowed_values = APLR_COMPRESSORS, ignorecase = 2 ) )
+
+opts.Add( EnumVariable( 'compressor',    'defined compressor',                  'none', allowed_values = COMPRESSORS,      ignorecase = 2 ) )
+opts.Add( EnumVariable( 'aplr',          'defined APLR compressor',             'none', allowed_values = APLR_COMPRESSORS, ignorecase = 2 ) )
+opts.Add( BoolVariable( 'zblas',         'activate/deactivate compressed BLAS', zblas ) )
 
 opts.Add( BoolVariable( 'fullmsg',   'enable full command line output',           fullmsg ) )
 opts.Add( EnumVariable( 'buildtype', 'how to build the binaries (debug/release)', buildtype, allowed_values = BUILD_TYPES, ignorecase = 2 ) )
@@ -378,8 +382,10 @@ universal     = opt_env['universal']
 UNIVERSAL_DIR = opt_env['universal_dir']
 blosc         = opt_env['blosc']
 BLOSC_DIR     = opt_env['blosc_dir']
+
 compressor    = opt_env['compressor']
 aplr          = opt_env['aplr']
+zblas         = opt_env['zblas']
 
 buildtype     = opt_env['buildtype']
 fullmsg       = opt_env['fullmsg']
@@ -704,6 +710,11 @@ elif aplr == 'blosc'   :
     env.Append( LIBPATH    = os.path.join( BLOSC_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'blosc2' ] )
 
+if zblas :
+    env.Append( CPPDEFINES = 'HLR_USE_COMPRESSED_BLAS=1' )
+else :
+    env.Append( CPPDEFINES = 'HLR_USE_COMPRESSED_BLAS=0' )
+
 ######################################################################
 #
 # target 'help'
@@ -776,6 +787,8 @@ def show_help ( target, source, env ):
     print( ' ──────────────┼───────────────────────────────┼──────────' )
     print( '  {0}compressor{1}   │ compression method to use     │ {2}'.format( colors['bold'], colors['reset'], ', '.join( COMPRESSORS ) ) )
     print( '  {0}aplr{1}         │ AP compression method to use  │ {2}'.format( colors['bold'], colors['reset'], ', '.join( APLR_COMPRESSORS ) ) )
+    print( '  {0}zblas{1}        │ use compressed BLAS           │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( ' ──────────────┼───────────────────────────────┼──────────' )
     print( '  {0}zfp{1}          │ use ZFP compression library   │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}sz{1}           │ use SZ compression library    │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}sz3{1}          │ use SZ3 compression library   │'.format( colors['bold'], colors['reset'] ), '0/1' )
@@ -853,6 +866,8 @@ def show_options ( target, source, env ):
     print( ' ──────────────┼───────────────────────────────┼──────────' )
     print( '  {0}compressor{1}   │ compression method to use     │ {2}'.format( colors['bold'], colors['reset'], compressor ) )
     print( '  {0}aplr{1}         │ AP compression method to use  │ {2}'.format( colors['bold'], colors['reset'], aplr ) )
+    print( '  {0}zblas{1}        │ use compressed BLAS           │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zblas ] ) )
+    print( ' ──────────────┼───────────────────────────────┼──────────' )
     print( '  {0}zfp{1}          │ use ZFP compression library   │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zfp ] ),        pathstr( ZFP_DIR       if zfp       else '' ) )
     print( '  {0}sz{1}           │ use SZ compression library    │ {2}'.format( colors['bold'], colors['reset'], bool_str[ sz ] ),         pathstr( SZ_DIR        if sz        else '' ) )
     print( '  {0}sz3{1}          │ use SZ3 compression library   │ {2}'.format( colors['bold'], colors['reset'], bool_str[ sz3 ] ),        pathstr( SZ3_DIR       if sz3       else '' ) )

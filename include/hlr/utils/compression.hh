@@ -666,9 +666,6 @@ is_compressed ( const T *  ptr )
 // for lowrank matrices
 //
 
-// ensure, it was not activated above
-#undef HLR_HAS_COMPRESSED_BLAS
-
 #if HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_MP
 
 #include <hlr/utils/detail/mixedprec.hh>
@@ -897,6 +894,14 @@ static const char provider[] = "mixedprec";
 
 }// namespace hlr::compress::aplr
 
+#endif
+
+//
+// deactivate if requested by user
+//
+
+#if HLR_USE_COMPRESSED_BLAS == 0
+#  undef HLR_HAS_COMPRESSED_BLAS
 #endif
 
 }} // namespace hlr::compress
