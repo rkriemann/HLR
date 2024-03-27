@@ -2,7 +2,7 @@
 #define __HLR_UTILS_DETAIL_AFL_HH
 //
 // Project     : HLR
-// Module      : utils/detail/afl
+// Module      : compress/afl
 // Description : functions for adaptive floating points
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.

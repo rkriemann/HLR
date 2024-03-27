@@ -1,31 +1,35 @@
-#ifndef __HLR_UTILS_DETAIL_BF24_HH
-#define __HLR_UTILS_DETAIL_BF24_HH
+#ifndef __HLR_UTILS_DETAIL_FP16_HH
+#define __HLR_UTILS_DETAIL_FP16_HH
 //
 // Project     : HLR
-// Module      : utils/detail/bf24
-// Description : BF24 related functions
+// Module      : compress/fp16
+// Description : FP16 related functions
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 ////////////////////////////////////////////////////////////
 //
-// compression using BF24
-// - only fixed compression size (1+8+15 bits)
+// compression using FP16 via half library
+// - only fixed compression size (1+5+10 bits)
 //
 ////////////////////////////////////////////////////////////
 
-namespace hlr { namespace compress { namespace bf24 {
+#if defined(HLR_HAS_HALF)
 
-using byte_t = unsigned char;
+#include <half.hpp>
+
+namespace hlr { namespace compress { namespace fp16 {
+
+using half = half_float::half;
 
 struct config
 {};
 
 // holds compressed data
-using  zarray = std::vector< byte_t >;
+using  zarray = std::vector< half >;
 
-inline size_t  byte_size  ( const zarray &  v   ) { return v.size(); }
+inline size_t  byte_size  ( const zarray &  v   ) { return v.size() * sizeof(half); }
 inline config  get_config ( const double    eps ) { return config{}; }
 
 template < typename value_t >
@@ -48,18 +52,10 @@ compress< float > ( const config &   config,
                     const size_t     dim3 )
 {
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
-    zarray        zdata( nsize * 3 );
+    zarray        zdata( nsize );
 
     for ( size_t  i = 0; i < nsize; ++i )
-    {
-        // reduce mantissa size by 8 bits
-        const uint    ival = (*reinterpret_cast< const uint * >( & data[i] ) ) >> 8;
-        const size_t  zpos = 3*i;
-
-        zdata[zpos+2] = (ival & 0xff0000) >> 16;
-        zdata[zpos+1] = (ival & 0x00ff00) >> 8;
-        zdata[zpos]   = (ival & 0x0000ff);
-    }// for
+        zdata[i] = half(data[i]);
 
     return zdata;
 }
@@ -75,19 +71,10 @@ compress< double > ( const config &   config,
                      const size_t     dim3 )
 {
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
-    zarray        zdata( nsize * 3 );
+    zarray        zdata( nsize );
 
     for ( size_t  i = 0; i < nsize; ++i )
-    {
-        // convert to float, reduce mantissa size by 8 bits
-        const float   fval = data[i];
-        const uint    ival = (*reinterpret_cast< const uint * >( & fval ) ) >> 8;
-        const size_t  zpos = 3*i;
-
-        zdata[zpos+2] = (ival & 0xff0000) >> 16;
-        zdata[zpos+1] = (ival & 0x00ff00) >> 8;
-        zdata[zpos]   = (ival & 0x0000ff);
-    }// for
+        zdata[i] = half(data[i]);
 
     return zdata;
 }
@@ -116,12 +103,7 @@ decompress< float > ( const zarray &  zdata,
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
     
     for ( size_t  i = 0; i < nsize; ++i )
-    {
-        const size_t  zpos = 3*i;
-        const uint    ival = (zdata[zpos+2] << 24) | (zdata[zpos+1] << 16) | (zdata[zpos] << 8);
-        
-        dest[i] = * reinterpret_cast< const float * >( & ival );
-    }// for
+        dest[i] = float( zdata[i] );
 }
 
 template <>
@@ -138,15 +120,11 @@ decompress< double > ( const zarray &  zdata,
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
     
     for ( size_t  i = 0; i < nsize; ++i )
-    {
-        const size_t  zpos = 3*i;
-        const uint    ival = (zdata[zpos+2] << 24) | (zdata[zpos+1] << 16) | (zdata[zpos] << 8);
-        const float   fval = * reinterpret_cast< const float * >( & ival );
-        
-        dest[i] = double( fval );
-    }// for
+        dest[i] = double( zdata[i] );
 }
 
-}}}// namespace hlr::compress::bf24
+}}}// namespace hlr::compress::fp16
 
-#endif // __HLR_UTILS_DETAIL_BF24_HH
+#endif // HLR_HAS_HALF
+
+#endif // __HLR_UTILS_DETAIL_FP16_HH

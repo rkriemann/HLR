@@ -1,35 +1,79 @@
-#ifndef __HLR_UTILS_DETAIL_FP16_HH
-#define __HLR_UTILS_DETAIL_FP16_HH
+#ifndef __HLR_UTILS_DETAIL_TF32_HH
+#define __HLR_UTILS_DETAIL_TF32_HH
 //
 // Project     : HLR
-// Module      : utils/detail/fp16
-// Description : FP16 related functions
+// Module      : compress/tf32
+// Description : TF32 related functions
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 ////////////////////////////////////////////////////////////
 //
-// compression using FP16 via half library
-// - only fixed compression size (1+5+10 bits)
+// compression using TF32
+// - only fixed compression size (1+8+10 bits)
 //
 ////////////////////////////////////////////////////////////
 
-#if defined(HLR_HAS_HALF)
+namespace hlr { namespace compress { namespace tf32 {
 
-#include <half.hpp>
+struct tensorfloat32
+{
+    unsigned char  data[3];
+    
+public:
+    tensorfloat32 ()
+            : data{ 0, 0, 0 }
+    {}
+    
+    tensorfloat32 ( const float f )
+    {
+        *this = f;
+    }
+    
+    // cast to float
+    operator float () const
+    {
+        unsigned int  proc = (data[2] << 24) | (data[1] << 16) | (data[0] << 8);
 
-namespace hlr { namespace compress { namespace fp16 {
+        return * reinterpret_cast< float* >( & proc );
+    }
+    
+    // cast to tensorfloat32
+    tensorfloat32 &
+    operator = ( float  float_val )
+    {
+        unsigned int  uf = (*reinterpret_cast< unsigned int * >( & float_val ) ) >> 8;
 
-using half = half_float::half;
+        data[2] = (uf & 0xff0000) >> 16;
+        data[1] = (uf & 0xff00) >> 8;
+        data[0] = (uf & 0xe0);
+        
+        return *this;
+    }
+
+    tensorfloat32 operator + ( tensorfloat32  f ) { return float(*this) + float(f); }
+    tensorfloat32 operator - ( tensorfloat32  f ) { return float(*this) - float(f); }
+    tensorfloat32 operator * ( tensorfloat32  f ) { return float(*this) * float(f); }
+    tensorfloat32 operator / ( tensorfloat32  f ) { return float(*this) / float(f); }
+};
 
 struct config
 {};
 
 // holds compressed data
-using  zarray = std::vector< half >;
+using  zarray = std::vector< tensorfloat32 >;
 
-inline size_t  byte_size  ( const zarray &  v   ) { return v.size() * sizeof(half); }
+// assume 19 bits (1+8+10) storage
+inline
+size_t
+byte_size  ( const zarray &  v   )
+{
+    const auto  bitsize = v.size() * 19;
+
+    return bitsize / 8 + (bitsize % 8 == 0 ? 0 : 1);
+}
+
 inline config  get_config ( const double    eps ) { return config{}; }
 
 template < typename value_t >
@@ -55,7 +99,7 @@ compress< float > ( const config &   config,
     zarray        zdata( nsize );
 
     for ( size_t  i = 0; i < nsize; ++i )
-        zdata[i] = half(data[i]);
+        zdata[i] = tensorfloat32(data[i]);
 
     return zdata;
 }
@@ -74,7 +118,7 @@ compress< double > ( const config &   config,
     zarray        zdata( nsize );
 
     for ( size_t  i = 0; i < nsize; ++i )
-        zdata[i] = half(data[i]);
+        zdata[i] = tensorfloat32(data[i]);
 
     return zdata;
 }
@@ -123,8 +167,6 @@ decompress< double > ( const zarray &  zdata,
         dest[i] = double( zdata[i] );
 }
 
-}}}// namespace hlr::compress::fp16
+}}}// namespace hlr::compress::tf32
 
-#endif // HLR_HAS_HALF
-
-#endif // __HLR_UTILS_DETAIL_FP16_HH
+#endif // __HLR_UTILS_DETAIL_TF32_HH

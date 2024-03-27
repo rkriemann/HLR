@@ -2,7 +2,7 @@
 #define __HLR_UTILS_DETAIL_BF16_HH
 //
 // Project     : HLR
-// Module      : utils/detail/bf16
+// Module      : compress/bf16
 // Description : BF16 related functions
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.

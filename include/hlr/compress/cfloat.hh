@@ -2,7 +2,7 @@
 #define __HLR_UTILS_DETAIL_CFLOAT_HH
 //
 // Project     : HLR
-// Module      : utils/detail/cfloat
+// Module      : compress/cfloat
 // Description : compression functions based on universal::cfloat
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
@@ -14,7 +14,7 @@
 #if defined(HLR_HAS_UNIVERSAL)
 
 #include <universal/number/cfloat/cfloat.hpp>
-#include <hlr/utils/detail/byte_n.hh>
+#include <hlr/compress/byte_n.hh>
 
 ////////////////////////////////////////////////////////////
 //

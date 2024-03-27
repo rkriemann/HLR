@@ -1,49 +1,26 @@
-#ifndef __HLR_UTILS_COMPRESSION_HH
-#define __HLR_UTILS_COMPRESSION_HH
+#ifndef __HLR_COMPRESS_DIRECT_HH
+#define __HLR_COMPRESS_DIRECT_HH
 //
 // Project     : HLR
-// Module      : utils/compression
-// Description : compression related functions and types
+// Module      : compress/direct
+// Description : direct compression related functions and types
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <hlr/utils/log.hh>
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/tensor.hh>
-
-// different compressor types
-#define HLR_COMPRESSOR_AFL      1
-#define HLR_COMPRESSOR_AFLP     2
-#define HLR_COMPRESSOR_BFL      3
-#define HLR_COMPRESSOR_DFL      4
-#define HLR_COMPRESSOR_ZFP      5
-#define HLR_COMPRESSOR_SZ       6
-#define HLR_COMPRESSOR_SZ3      7
-#define HLR_COMPRESSOR_MGARD    8
-#define HLR_COMPRESSOR_LZ4      9
-#define HLR_COMPRESSOR_ZLIB     10
-#define HLR_COMPRESSOR_ZSTD     11
-#define HLR_COMPRESSOR_POSITS   12
-#define HLR_COMPRESSOR_FP32     13
-#define HLR_COMPRESSOR_FP16     14
-#define HLR_COMPRESSOR_BF16     15
-#define HLR_COMPRESSOR_TF32     16
-#define HLR_COMPRESSOR_BF24     17
-#define HLR_COMPRESSOR_MP       18
-#define HLR_COMPRESSOR_CFLOAT   19
-#define HLR_COMPRESSOR_BLOSC    20
+#include <hlr/compress/ztypes.hh>
 
 #if defined(HLR_COMPRESSOR)
-
-#  define HLR_HAS_COMPRESSION  1
 
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
 #if HLR_COMPRESSOR == HLR_COMPRESSOR_FP32
 
-#include <hlr/utils/detail/fp32.hh>
+#include <hlr/compress/fp32.hh>
 
 namespace hlr { namespace compress {
 
@@ -68,7 +45,7 @@ using hlr::compress::fp32::byte_size;
 #    error "half library not available"
 #  endif
 
-#include <hlr/utils/detail/fp16.hh>
+#include <hlr/compress/fp16.hh>
 
 namespace hlr { namespace compress {
 
@@ -93,7 +70,7 @@ using hlr::compress::fp16::byte_size;
 #    error "ZFP library not available"
 #  endif
 
-#include <hlr/utils/detail/zfp.hh>
+#include <hlr/compress/zfp.hh>
 
 namespace hlr { namespace compress {
 
@@ -119,7 +96,7 @@ using hlr::compress::zfp::compressed_size;
 #    error "Universal library not available"
 #  endif
 
-#include <hlr/utils/detail/posits.hh>
+#include <hlr/compress/posits.hh>
 
 namespace hlr { namespace compress {
 
@@ -145,7 +122,7 @@ using hlr::compress::posits::compressed_size;
 #    error "Universal library not available"
 #  endif
 
-#include <hlr/utils/detail/cfloat.hh>
+#include <hlr/compress/cfloat.hh>
 
 namespace hlr { namespace compress {
 
@@ -166,7 +143,7 @@ using hlr::compress::cfloat::byte_size;
 
 #elif HLR_COMPRESSOR == HLR_COMPRESSOR_BLOSC
 
-#include <hlr/utils/detail/blosc.hh>
+#include <hlr/compress/blosc.hh>
 
 namespace hlr { namespace compress {
 
@@ -192,7 +169,7 @@ using hlr::compress::blosc::compressed_size;
 #    error "SZ library not available"
 #  endif
 
-#include <hlr/utils/detail/sz.hh>
+#include <hlr/compress/sz.hh>
 
 namespace hlr { namespace compress {
 
@@ -217,7 +194,7 @@ using hlr::compress::sz::byte_size;
 #    error "SZ3 library not available"
 #  endif
 
-#include <hlr/utils/detail/sz3.hh>
+#include <hlr/compress/sz3.hh>
 
 namespace hlr { namespace compress {
 
@@ -242,7 +219,7 @@ using hlr::compress::sz3::byte_size;
 #    error "LZ4 library not available"
 #  endif
 
-#include <hlr/utils/detail/lz4.hh>
+#include <hlr/compress/lz4.hh>
 
 namespace hlr { namespace compress {
 
@@ -267,7 +244,7 @@ using hlr::compress::lz4::byte_size;
 #    error "ZLIB library not available"
 #  endif
 
-#include <hlr/utils/detail/zlib.hh>
+#include <hlr/compress/zlib.hh>
 
 namespace hlr { namespace compress {
 
@@ -292,7 +269,7 @@ using hlr::compress::zlib::byte_size;
 #    error "ZSTD library not available"
 #  endif
 
-#include <hlr/utils/detail/zstd.hh>
+#include <hlr/compress/zstd.hh>
 
 namespace hlr { namespace compress {
 
@@ -313,7 +290,7 @@ using hlr::compress::zstd::byte_size;
 
 #elif HLR_COMPRESSOR == HLR_COMPRESSOR_BF16
 
-#include <hlr/utils/detail/bf16.hh>
+#include <hlr/compress/bf16.hh>
 
 namespace hlr { namespace compress {
 
@@ -334,7 +311,7 @@ using hlr::compress::bf16::byte_size;
 
 #elif HLR_COMPRESSOR == HLR_COMPRESSOR_TF32
 
-#include <hlr/utils/detail/tf32.hh>
+#include <hlr/compress/tf32.hh>
 
 namespace hlr { namespace compress {
 
@@ -355,7 +332,7 @@ using hlr::compress::tf32::byte_size;
 
 #elif HLR_COMPRESSOR == HLR_COMPRESSOR_BF24
 
-#include <hlr/utils/detail/bf24.hh>
+#include <hlr/compress/bf24.hh>
 
 namespace hlr { namespace compress {
 
@@ -376,7 +353,7 @@ using hlr::compress::bf24::byte_size;
 
 #elif HLR_COMPRESSOR == HLR_COMPRESSOR_AFL
 
-#include <hlr/utils/detail/afl.hh>
+#include <hlr/compress/afl.hh>
 
 namespace hlr { namespace compress {
 
@@ -398,7 +375,7 @@ using hlr::compress::afl::compressed_size;
 
 #elif HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP
 
-#include <hlr/utils/detail/aflp.hh>
+#include <hlr/compress/aflp.hh>
 
 namespace hlr { namespace compress {
 
@@ -413,7 +390,7 @@ using hlr::compress::aflp::get_config;
 using hlr::compress::aflp::byte_size;
 using hlr::compress::aflp::compressed_size;
 
-namespace blas { using hlr::compress::aflp::mulvec; }
+namespace zblas { using hlr::compress::aflp::mulvec; }
 
 }} // namespace hlr::compress
 
@@ -422,7 +399,7 @@ namespace blas { using hlr::compress::aflp::mulvec; }
 
 #elif HLR_COMPRESSOR == HLR_COMPRESSOR_BFL
 
-#include <hlr/utils/detail/bfl.hh>
+#include <hlr/compress/bfl.hh>
 
 namespace hlr { namespace compress {
 
@@ -437,7 +414,7 @@ using hlr::compress::bfl::get_config;
 using hlr::compress::bfl::byte_size;
 using hlr::compress::bfl::compressed_size;
 
-namespace blas { using hlr::compress::bfl::mulvec; }
+namespace zblas { using hlr::compress::bfl::mulvec; }
 
 }} // namespace hlr::compress
 
@@ -446,7 +423,7 @@ namespace blas { using hlr::compress::bfl::mulvec; }
 
 #elif HLR_COMPRESSOR == HLR_COMPRESSOR_DFL
 
-#include <hlr/utils/detail/dfl.hh>
+#include <hlr/compress/dfl.hh>
 
 namespace hlr { namespace compress {
 
@@ -461,7 +438,7 @@ using hlr::compress::dfl::get_config;
 using hlr::compress::dfl::byte_size;
 using hlr::compress::dfl::compressed_size;
 
-namespace blas { using hlr::compress::dfl::mulvec; }
+namespace zblas { using hlr::compress::dfl::mulvec; }
 
 }} // namespace hlr::compress
 
@@ -470,7 +447,7 @@ namespace blas { using hlr::compress::dfl::mulvec; }
 
 #elif HLR_COMPRESSOR == HLR_COMPRESSOR_MGARD
 
-#include <hlr/utils/detail/mgard.hh>
+#include <hlr/compress/mgard.hh>
 
 namespace hlr { namespace compress {
 
@@ -497,16 +474,37 @@ using hlr::compress::mgard::byte_size;
 
 namespace hlr { namespace compress {
 
-#  undef  HLR_HAS_COMPRESSION
-#  define HLR_HAS_COMPRESSION  0
-
 static const char provider[] = "none";
 
 struct zconfig_t {};
 struct zarray    {};
 
-inline zconfig_t  get_config ( double /* eps */ ) { return zconfig_t{}; }
-inline size_t     byte_size  ( const zarray &   ) { return SIZE_MAX; } // ensures maximal memory size
+template < typename value_t >
+zarray
+compress ( const zconfig_t &   config,
+           value_t *           data,
+           const size_t        dim0,
+           const size_t        dim1 = 0,
+           const size_t        dim2 = 0,
+           const size_t        dim3 = 0 )
+{
+    return zarray();
+}
+
+template < typename value_t >
+void
+decompress ( const zarray &  zdata,
+             value_t *       dest,
+             const size_t    dim0,
+             const size_t    dim1 = 0,
+             const size_t    dim2 = 0,
+             const size_t    dim3 = 0,
+             const size_t    dim4 = 0 )
+{}
+
+inline zconfig_t  get_config      ( double /* eps */ ) { return zconfig_t{}; }
+inline size_t     byte_size       ( const zarray &   ) { return SIZE_MAX; } // ensures maximal memory size
+inline size_t     compressed_size ( const zarray &   ) { return SIZE_MAX; }
 
 }} // namespace hlr::compress
 
@@ -524,8 +522,6 @@ inline size_t     byte_size  ( const zarray &   ) { return SIZE_MAX; } // ensure
 
 #else // HLR_COMPRESSOR not defined
 
-#  define HLR_HAS_COMPRESSION  0
-
 namespace hlr { namespace compress {
 
 static const char provider[] = "none";
@@ -533,8 +529,32 @@ static const char provider[] = "none";
 struct zconfig_t {};
 struct zarray    {};
 
-inline zconfig_t  get_config ( double /* eps */ ) { return zconfig_t{}; }
-inline size_t     byte_size  ( const zarray &   ) { return SIZE_MAX; } // ensures maximal memory size
+template < typename value_t >
+zarray
+compress ( const zconfig_t &   config,
+           value_t *           data,
+           const size_t        dim0,
+           const size_t        dim1 = 0,
+           const size_t        dim2 = 0,
+           const size_t        dim3 = 0 )
+{
+    return zarray();
+}
+
+template < typename value_t >
+void
+decompress ( const zarray &  zdata,
+             value_t *       dest,
+             const size_t    dim0,
+             const size_t    dim1 = 0,
+             const size_t    dim2 = 0,
+             const size_t    dim3 = 0,
+             const size_t    dim4 = 0 )
+{}
+
+inline zconfig_t  get_config      ( double /* eps */ ) { return zconfig_t{}; }
+inline size_t     byte_size       ( const zarray &   ) { return SIZE_MAX; } // ensures maximal memory size
+inline size_t     compressed_size ( const zarray &   ) { return SIZE_MAX; }
 
 }} // namespace hlr::compress
     
@@ -550,7 +570,7 @@ namespace hlr { namespace compress {
 //
 template < typename value_t >
 zarray
-compress ( const zconfig_t &                 config,
+compress ( const zconfig_t &                      config,
            const hlr::blas::tensor3< value_t > &  T )
 {
     return compress< value_t >( config, T.data(), T.size(0), T.size(1), T.size(2) );
@@ -558,7 +578,7 @@ compress ( const zconfig_t &                 config,
 
 template < typename value_t >
 zarray
-compress ( const zconfig_t &                config,
+compress ( const zconfig_t &                     config,
            const hlr::blas::matrix< value_t > &  M )
 {
     return compress< value_t >( config, M.data(), M.nrows(), M.ncols() );
@@ -566,7 +586,7 @@ compress ( const zconfig_t &                config,
 
 template < typename value_t >
 zarray
-compress ( const zconfig_t &                config,
+compress ( const zconfig_t &                     config,
            const hlr::blas::vector< value_t > &  v )
 {
     return compress< value_t >( config, v.data(), v.length() );
@@ -574,7 +594,7 @@ compress ( const zconfig_t &                config,
 
 template < typename value_t >
 void
-decompress ( const zarray &              zdata,
+decompress ( const zarray &                   zdata,
              hlr::blas::tensor3< value_t > &  T )
 {
     return decompress< value_t >( zdata, T.data(), T.size(0), T.size(1), T.size(2) );
@@ -582,7 +602,7 @@ decompress ( const zarray &              zdata,
 
 template < typename value_t >
 void
-decompress ( const zarray &             zdata,
+decompress ( const zarray &                  zdata,
              hlr::blas::matrix< value_t > &  M )
 {
     return decompress< value_t >( zdata, M.data(), M.nrows(), M.ncols() );
@@ -590,320 +610,23 @@ decompress ( const zarray &             zdata,
 
 template < typename value_t >
 void
-decompress ( const zarray &             zdata,
+decompress ( const zarray &                  zdata,
              hlr::blas::vector< value_t > &  v )
 {
     return decompress< value_t >( zdata, v.data(), v.length() );
 }
 
-//
-// general interface for compressible objects
-//
-struct compressible
-{
-public:
-    //
-    // compression interface
-    //
-
-    // compress internal data
-    // - may result in non-compression if storage does not decrease
-    virtual void   compress      ( const compress::zconfig_t &  zconfig ) = 0;
-
-    // compress data based on given accuracy
-    virtual void   compress      ( const Hpro::TTruncAcc &  acc ) = 0;
-
-    // decompress internal data
-    virtual void   decompress    () = 0;
-
-    // return true if data is compressed
-    virtual bool   is_compressed () const = 0;
-};
-
-//
-// test functions
-//
-template < typename T >
-bool
-is_compressible ( const T &  ref )
-{
-    const auto  C = dynamic_cast< const compressible * >( &ref );
-    
-    return ! is_null( C );
-}
-
-template < typename T >
-bool
-is_compressible ( const T *  ptr )
-{
-    const auto  C = dynamic_cast< const compressible * >( ptr );
-
-    return ! is_null( C );
-}
-
-template < typename T >
-bool
-is_compressed ( const T &  ref )
-{
-    const auto  C = dynamic_cast< const compressible * >( &ref );
-    
-    return ! is_null( C ) && C->is_compressed();
-}
-
-template < typename T >
-bool
-is_compressed ( const T *  ptr )
-{
-    const auto  C = dynamic_cast< const compressible * >( ptr );
-    
-    return ! is_null( C ) && C->is_compressed();
-}
-
 }}// namespace hlr::compress
 
-//
-// define implementation for adaptive precision compression
-// for lowrank matrices
-//
-
-#if HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_MP
-
-#include <hlr/utils/detail/mixedprec.hh>
-
-namespace hlr { namespace compress { namespace aplr {
-
-using zarray = hlr::compress::mixedprec::zarray;
-using hlr::compress::mixedprec::compress_lr;
-using hlr::compress::mixedprec::decompress_lr;
-using hlr::compress::mixedprec::byte_size;
-using hlr::compress::mixedprec::compressed_size;
-
-static const char provider[] = "mixedprec";
-
-}// namespace hlr::compress::aplr
-
-#elif HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_ZFP
-
-#include <hlr/utils/detail/zfp.hh>
-
-namespace hlr { namespace compress { namespace aplr {
-
-using zarray = hlr::compress::zfp::zarray;
-using hlr::compress::zfp::compress_lr;
-using hlr::compress::zfp::decompress_lr;
-using hlr::compress::zfp::byte_size;
-using hlr::compress::zfp::compressed_size;
-
-static const char provider[] = "zfp";
-
-}// namespace hlr::compress::aplr
-
-#elif HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_SZ3
-
-#include <hlr/utils/detail/sz3.hh>
-
-namespace hlr { namespace compress { namespace aplr {
-
-using zarray = hlr::compress::sz3::zarray;
-using hlr::compress::sz3::compress_lr;
-using hlr::compress::sz3::decompress_lr;
-using hlr::compress::sz3::byte_size;
-
-static const char provider[] = "sz3";
-
-}// namespace hlr::compress::aplr
-
-#elif HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_MGARD
-
-#include <hlr/utils/detail/mgard.hh>
-
-namespace hlr { namespace compress { namespace aplr {
-
-using zarray = hlr::compress::mgard::zarray;
-using hlr::compress::mgard::compress_lr;
-using hlr::compress::mgard::decompress_lr;
-using hlr::compress::mgard::byte_size;
-
-static const char provider[] = "mgard";
-
-}// namespace hlr::compress::aplr
-
-#elif HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_BFL
-
-#include <hlr/utils/detail/bfl.hh>
-
-namespace hlr { namespace compress { namespace aplr {
-
-using zarray = hlr::compress::bfl::zarray;
-using hlr::compress::bfl::compress_lr;
-using hlr::compress::bfl::decompress_lr;
-using hlr::compress::bfl::byte_size;
-using hlr::compress::bfl::compressed_size;
-
-static const char provider[] = "bfl";
-
-namespace blas
-{
-
-template < typename value_t >
-void
-mulvec ( const size_t     nrows,
-         const size_t     ncols,
-         const matop_t    op_A,
-         const value_t    alpha,
-         const zarray &   zA,
-         const value_t *  x,
-         value_t *        y )
-{
-    hlr::compress::bfl::mulvec_lr( nrows, ncols, op_A, alpha, zA, x, y );
-}
-
-}// namespace blas
-
-}// namespace hlr::compress::aplr
-
-#elif HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_DFL
-
-#include <hlr/utils/detail/dfl.hh>
-
-namespace hlr { namespace compress { namespace aplr {
-
-using zarray = hlr::compress::dfl::zarray;
-using hlr::compress::dfl::compress_lr;
-using hlr::compress::dfl::decompress_lr;
-using hlr::compress::dfl::byte_size;
-using hlr::compress::dfl::compressed_size;
-
-static const char provider[] = "dfl";
-
-namespace blas
-{
-
-template < typename value_t >
-void
-mulvec ( const size_t     nrows,
-         const size_t     ncols,
-         const matop_t    op_A,
-         const value_t    alpha,
-         const zarray &   zA,
-         const value_t *  x,
-         value_t *        y )
-{
-    hlr::compress::dfl::mulvec_lr( nrows, ncols, op_A, alpha, zA, x, y );
-}
-
-}// namespace blas
-
-}// namespace hlr::compress::aplr
-
-#elif HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_AFLP
-
-#include <hlr/utils/detail/aflp.hh>
-
-namespace hlr { namespace compress { namespace aplr {
-
-using zarray = hlr::compress::aflp::zarray;
-using hlr::compress::aflp::compress_lr;
-using hlr::compress::aflp::decompress_lr;
-using hlr::compress::aflp::byte_size;
-using hlr::compress::aflp::compressed_size;
-
-static const char provider[] = "aflp";
-
-namespace blas
-{
-
-template < typename value_t >
-void
-mulvec ( const size_t     nrows,
-         const size_t     ncols,
-         const matop_t    op_A,
-         const value_t    alpha,
-         const zarray &   zA,
-         const value_t *  x,
-         value_t *        y )
-{
-    hlr::compress::aflp::mulvec_lr( nrows, ncols, op_A, alpha, zA, x, y );
-}
-
-}// namespace blas
-
-}// namespace hlr::compress::aplr
-
-#elif HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_AFL
-
-#include <hlr/utils/detail/afl.hh>
-
-namespace hlr { namespace compress { namespace aplr {
-
-using zarray = hlr::compress::afl::zarray;
-using hlr::compress::afl::compress_lr;
-using hlr::compress::afl::decompress_lr;
-using hlr::compress::afl::byte_size;
-using hlr::compress::afl::compressed_size;
-
-static const char provider[] = "afl";
-
-}// namespace hlr::compress::aplr
-
-#elif HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_POSITS
-
-#include <hlr/utils/detail/posits.hh>
-
-namespace hlr { namespace compress { namespace aplr {
-
-using zarray = hlr::compress::posits::zarray;
-using hlr::compress::posits::compress_lr;
-using hlr::compress::posits::decompress_lr;
-using hlr::compress::posits::byte_size;
-using hlr::compress::posits::compressed_size;
-
-static const char provider[] = "posits";
-
-}// namespace hlr::compress::aplr
-
-#elif HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_BLOSC
-
-#include <hlr/utils/detail/blosc.hh>
-
-namespace hlr { namespace compress { namespace aplr {
-
-using zarray = hlr::compress::blosc::zarray;
-using hlr::compress::blosc::compress_lr;
-using hlr::compress::blosc::decompress_lr;
-using hlr::compress::blosc::byte_size;
-using hlr::compress::blosc::compressed_size;
-
-static const char provider[] = "blosc";
-
-}// namespace hlr::compress::aplr
-
-#else
-
-#include <hlr/utils/detail/mixedprec.hh>
-
-namespace hlr { namespace compress { namespace aplr {
-
-using zarray = hlr::compress::mixedprec::zarray;
-using hlr::compress::mixedprec::compress_lr;
-using hlr::compress::mixedprec::decompress_lr;
-using hlr::compress::mixedprec::byte_size;
-using hlr::compress::mixedprec::compressed_size;
-
-static const char provider[] = "mixedprec";
-
-}// namespace hlr::compress::aplr
-
-#endif
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
 
 //
 // deactivate if requested by user
 //
 
-#if HLR_USE_COMPRESSED_BLAS == 0
-#  undef HLR_HAS_COMPRESSED_BLAS
+#if HLR_USE_ZBLAS == 0
+#  undef HLR_HAS_ZBLAS_DIRECT
 #endif
 
-}} // namespace hlr::compress
-
-#endif // __HLR_UTILS_COMPRESSION_HH
+#endif // __HLR_UTILS_DIRECT_HH

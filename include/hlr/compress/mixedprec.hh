@@ -2,7 +2,7 @@
 #define __HLR_UTILS_DETAIL_MIXEDPREC_HH
 //
 // Project     : HLR
-// Module      : utils/detail/mixedprec
+// Module      : compress/mixedprec
 // Description : functions for mixed precision representation of LR matrices
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
@@ -11,6 +11,11 @@
 #include <cstdint>
 
 #include <hlr/arith/blas.hh>
+
+//
+// signal availability of compressed BLAS
+//
+#define HLR_HAS_ZBLAS_APLR
 
 ////////////////////////////////////////////////////////////
 //
@@ -438,6 +443,151 @@ decompress_lr< std::complex< double > > ( const zarray &                        
     //     for ( uint32_t  i = 0; i < dU.nrows(); ++i, pos += 2 )
     //         dU(i,k) = s_k * value_t( _mpdata.U3[ pos ], _mpdata.U3[ pos+1 ] );
     // }// for
+}
+
+//////////////////////////////////////////////////////////////////////////////////////
+//
+// BLAS
+//
+//////////////////////////////////////////////////////////////////////////////////////
+
+namespace
+{
+
+template < typename value_t,
+           typename storage_t >
+void
+mulvec ( const size_t       nrows,
+         const size_t       ncols,
+         const matop_t      op_A,
+         const value_t      alpha,
+         const storage_t *  zA,
+         const value_t *    x,
+         value_t *          y )
+{
+    switch ( op_A )
+    {
+        case  apply_normal :
+        {
+            size_t  pos = 0;
+            
+            for ( size_t  j = 0; j < ncols; ++j )
+            {
+                const auto  x_j = x[j];
+                
+                for ( size_t  i = 0; i < nrows; ++i, pos++ )
+                    y[i] += value_t(zA[pos]) * x_j;
+            }// for
+        }// case
+        break;
+        
+        case  apply_adjoint :
+        {
+            size_t  pos = 0;
+            
+            for ( size_t  j = 0; j < ncols; ++j )
+            {
+                value_t  y_j = value_t(0);
+                
+                for ( size_t  i = 0; i < nrows; ++i, pos++ )
+                    y_j += value_t(zA[pos]) * x[i];
+
+                y[j] += y_j;
+            }// for
+        }// case
+        break;
+
+        default:
+            HLR_ERROR( "TODO" );
+    }// switch
+}
+
+}// namespace anonymous
+
+template < typename value_t >
+void
+mulvec_lr ( const size_t     nrows,
+            const size_t     ncols,
+            const matop_t    op_A,
+            const value_t    alpha,
+            const zarray &   zA,
+            const value_t *  x,
+            value_t *        y )
+{
+    const uint32_t  n_mp1 = reinterpret_cast< const uint32_t * >( zA.data() )[0];
+    const uint32_t  n_mp2 = reinterpret_cast< const uint32_t * >( zA.data() )[1];
+    const uint32_t  n_mp3 = reinterpret_cast< const uint32_t * >( zA.data() )[2];
+    size_t          zpos  = 3 * sizeof(uint32_t);
+    size_t          pos   = 0;
+
+    switch ( op_A )
+    {
+        case  apply_normal :
+        {
+            if ( n_mp1 > 0 )
+            {
+                auto  zptr = reinterpret_cast< const mptype1_t * >( zA.data() + zpos );
+                
+                mulvec< value_t, mptype1_t >( nrows, n_mp1, op_A, alpha, zptr, x + pos, y );
+                zpos += n_mp1 * ncols * sizeof(mptype1_t);
+                pos  += n_mp1;
+            }// if
+
+            if ( n_mp2 > 0 )
+            {
+                auto  zptr = reinterpret_cast< const mptype2_t * >( zA.data() + zpos );
+                
+                mulvec< value_t, mptype2_t >( nrows, n_mp2, op_A, alpha, zptr, x + pos, y );
+                zpos += n_mp2 * ncols * sizeof(mptype2_t);
+                pos  += n_mp2;
+            }// if
+
+            if ( n_mp3 > 0 )
+            {
+                auto  zptr = reinterpret_cast< const mptype3_t * >( zA.data() + zpos );
+                
+                mulvec< value_t, mptype3_t >( nrows, n_mp3, op_A, alpha, zptr, x + pos, y );
+                zpos += n_mp3 * ncols * sizeof(mptype3_t);
+                pos  += n_mp3;
+            }// if
+        }// case
+        break;
+        
+        case  apply_conjugate  : HLR_ERROR( "TODO" );
+            
+        case  apply_transposed : HLR_ERROR( "TODO" );
+
+        case  apply_adjoint :
+        {
+            if ( n_mp1 > 0 )
+            {
+                auto  zptr = reinterpret_cast< const mptype1_t * >( zA.data() + zpos );
+                
+                mulvec< value_t, mptype1_t >( nrows, n_mp1, op_A, alpha, zptr, x, y + pos );
+                zpos += n_mp1 * ncols * sizeof(mptype1_t);
+                pos  += n_mp1;
+            }// if
+
+            if ( n_mp2 > 0 )
+            {
+                auto  zptr = reinterpret_cast< const mptype2_t * >( zA.data() + zpos );
+                
+                mulvec< value_t, mptype2_t >( nrows, n_mp2, op_A, alpha, zptr, x, y + pos );
+                zpos += n_mp2 * ncols * sizeof(mptype2_t);
+                pos  += n_mp2;
+            }// if
+
+            if ( n_mp3 > 0 )
+            {
+                auto  zptr = reinterpret_cast< const mptype3_t * >( zA.data() + zpos );
+                
+                mulvec< value_t, mptype3_t >( nrows, n_mp3, op_A, alpha, zptr, x, y + pos );
+                zpos += n_mp3 * ncols * sizeof(mptype3_t);
+                pos  += n_mp3;
+            }// if
+        }// case
+        break;
+    }// switch
 }
 
 }}}// namespace hlr::compress::mixedprec

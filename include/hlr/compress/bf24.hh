@@ -1,79 +1,31 @@
-#ifndef __HLR_UTILS_DETAIL_TF32_HH
-#define __HLR_UTILS_DETAIL_TF32_HH
+#ifndef __HLR_UTILS_DETAIL_BF24_HH
+#define __HLR_UTILS_DETAIL_BF24_HH
 //
 // Project     : HLR
-// Module      : utils/detail/tf32
-// Description : TF32 related functions
+// Module      : compress/bf24
+// Description : BF24 related functions
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
 ////////////////////////////////////////////////////////////
 //
-// compression using TF32
-// - only fixed compression size (1+8+10 bits)
+// compression using BF24
+// - only fixed compression size (1+8+15 bits)
 //
 ////////////////////////////////////////////////////////////
 
-namespace hlr { namespace compress { namespace tf32 {
+namespace hlr { namespace compress { namespace bf24 {
 
-struct tensorfloat32
-{
-    unsigned char  data[3];
-    
-public:
-    tensorfloat32 ()
-            : data{ 0, 0, 0 }
-    {}
-    
-    tensorfloat32 ( const float f )
-    {
-        *this = f;
-    }
-    
-    // cast to float
-    operator float () const
-    {
-        unsigned int  proc = (data[2] << 24) | (data[1] << 16) | (data[0] << 8);
-
-        return * reinterpret_cast< float* >( & proc );
-    }
-    
-    // cast to tensorfloat32
-    tensorfloat32 &
-    operator = ( float  float_val )
-    {
-        unsigned int  uf = (*reinterpret_cast< unsigned int * >( & float_val ) ) >> 8;
-
-        data[2] = (uf & 0xff0000) >> 16;
-        data[1] = (uf & 0xff00) >> 8;
-        data[0] = (uf & 0xe0);
-        
-        return *this;
-    }
-
-    tensorfloat32 operator + ( tensorfloat32  f ) { return float(*this) + float(f); }
-    tensorfloat32 operator - ( tensorfloat32  f ) { return float(*this) - float(f); }
-    tensorfloat32 operator * ( tensorfloat32  f ) { return float(*this) * float(f); }
-    tensorfloat32 operator / ( tensorfloat32  f ) { return float(*this) / float(f); }
-};
+using byte_t = unsigned char;
 
 struct config
 {};
 
 // holds compressed data
-using  zarray = std::vector< tensorfloat32 >;
+using  zarray = std::vector< byte_t >;
 
-// assume 19 bits (1+8+10) storage
-inline
-size_t
-byte_size  ( const zarray &  v   )
-{
-    const auto  bitsize = v.size() * 19;
-
-    return bitsize / 8 + (bitsize % 8 == 0 ? 0 : 1);
-}
-
+inline size_t  byte_size  ( const zarray &  v   ) { return v.size(); }
 inline config  get_config ( const double    eps ) { return config{}; }
 
 template < typename value_t >
@@ -96,10 +48,18 @@ compress< float > ( const config &   config,
                     const size_t     dim3 )
 {
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
-    zarray        zdata( nsize );
+    zarray        zdata( nsize * 3 );
 
     for ( size_t  i = 0; i < nsize; ++i )
-        zdata[i] = tensorfloat32(data[i]);
+    {
+        // reduce mantissa size by 8 bits
+        const uint    ival = (*reinterpret_cast< const uint * >( & data[i] ) ) >> 8;
+        const size_t  zpos = 3*i;
+
+        zdata[zpos+2] = (ival & 0xff0000) >> 16;
+        zdata[zpos+1] = (ival & 0x00ff00) >> 8;
+        zdata[zpos]   = (ival & 0x0000ff);
+    }// for
 
     return zdata;
 }
@@ -115,10 +75,19 @@ compress< double > ( const config &   config,
                      const size_t     dim3 )
 {
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
-    zarray        zdata( nsize );
+    zarray        zdata( nsize * 3 );
 
     for ( size_t  i = 0; i < nsize; ++i )
-        zdata[i] = tensorfloat32(data[i]);
+    {
+        // convert to float, reduce mantissa size by 8 bits
+        const float   fval = data[i];
+        const uint    ival = (*reinterpret_cast< const uint * >( & fval ) ) >> 8;
+        const size_t  zpos = 3*i;
+
+        zdata[zpos+2] = (ival & 0xff0000) >> 16;
+        zdata[zpos+1] = (ival & 0x00ff00) >> 8;
+        zdata[zpos]   = (ival & 0x0000ff);
+    }// for
 
     return zdata;
 }
@@ -147,7 +116,12 @@ decompress< float > ( const zarray &  zdata,
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
     
     for ( size_t  i = 0; i < nsize; ++i )
-        dest[i] = float( zdata[i] );
+    {
+        const size_t  zpos = 3*i;
+        const uint    ival = (zdata[zpos+2] << 24) | (zdata[zpos+1] << 16) | (zdata[zpos] << 8);
+        
+        dest[i] = * reinterpret_cast< const float * >( & ival );
+    }// for
 }
 
 template <>
@@ -164,9 +138,15 @@ decompress< double > ( const zarray &  zdata,
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
     
     for ( size_t  i = 0; i < nsize; ++i )
-        dest[i] = double( zdata[i] );
+    {
+        const size_t  zpos = 3*i;
+        const uint    ival = (zdata[zpos+2] << 24) | (zdata[zpos+1] << 16) | (zdata[zpos] << 8);
+        const float   fval = * reinterpret_cast< const float * >( & ival );
+        
+        dest[i] = double( fval );
+    }// for
 }
 
-}}}// namespace hlr::compress::tf32
+}}}// namespace hlr::compress::bf24
 
-#endif // __HLR_UTILS_DETAIL_TF32_HH
+#endif // __HLR_UTILS_DETAIL_BF24_HH

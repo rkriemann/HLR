@@ -2,7 +2,7 @@
 #define __HLR_UTILS_DETAIL_BFL_HH
 //
 // Project     : HLR
-// Module      : utils/detail/bfl
+// Module      : compress/bfl
 // Description : bfl related functions
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
@@ -10,12 +10,13 @@
 
 #include <cstdint>
 
-#include <hlr/utils/detail/byte_n.hh>
+#include <hlr/compress/byte_n.hh>
 
 //
 // signal availability of compressed BLAS
 //
-#define HLR_HAS_COMPRESSED_BLAS
+#define HLR_HAS_ZBLAS_DIRECT
+#define HLR_HAS_ZBLAS_APLR
 
 ////////////////////////////////////////////////////////////
 //

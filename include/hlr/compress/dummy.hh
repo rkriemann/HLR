@@ -2,7 +2,7 @@
 #define __HLR_UTILS_DETAIL_DUMMY_HH
 //
 // Project     : HLR
-// Module      : utils/detail/dummy
+// Module      : compress/dummy
 // Description : functions for dummy compression
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.

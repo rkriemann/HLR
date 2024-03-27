@@ -2,7 +2,7 @@
 #define __HLR_UTILS_DETAIL_SZ_HH
 //
 // Project     : HLR
-// Module      : utils/detail/sz
+// Module      : compress/sz
 // Description : SZ related functions
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.

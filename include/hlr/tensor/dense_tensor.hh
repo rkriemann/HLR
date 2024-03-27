@@ -14,7 +14,7 @@
 #include <hlr/utils/log.hh>
 #include <hlr/utils/traits.hh>
 #include <hlr/utils/io.hh>
-#include <hlr/utils/compression.hh>
+#include <hlr/compress/direct.hh>
 
 #include <hlr/tensor/base_tensor.hh>
 

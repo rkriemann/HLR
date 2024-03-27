@@ -711,9 +711,9 @@ elif aplr == 'blosc'   :
     env.Append( LIBS       = [ 'blosc2' ] )
 
 if zblas :
-    env.Append( CPPDEFINES = 'HLR_USE_COMPRESSED_BLAS=1' )
+    env.Append( CPPDEFINES = 'HLR_USE_ZBLAS=1' )
 else :
-    env.Append( CPPDEFINES = 'HLR_USE_COMPRESSED_BLAS=0' )
+    env.Append( CPPDEFINES = 'HLR_USE_ZBLAS=0' )
 
 ######################################################################
 #

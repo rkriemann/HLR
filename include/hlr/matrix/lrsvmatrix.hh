@@ -13,7 +13,9 @@
 #include <hpro/matrix/TMatrix.hh>
 
 #include <hlr/arith/blas.hh>
-#include <hlr/utils/compression.hh>
+#include <hlr/compress/compressible.hh>
+#include <hlr/compress/direct.hh>
+#include <hlr/compress/aplr.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
 
@@ -666,7 +668,7 @@ lrsvmatrix< value_t >::apply_add ( const value_t                    alpha,
     HLR_ASSERT( x.length() == this->ncols( op ) );
     HLR_ASSERT( y.length() == this->nrows( op ) );
 
-    #if defined(HLR_HAS_COMPRESSED_BLAS)
+    #if defined(HLR_HAS_ZBLAS_APLR)
     if ( is_compressed() )
     {
         const auto  nrows = this->nrows();
@@ -677,14 +679,14 @@ lrsvmatrix< value_t >::apply_add ( const value_t                    alpha,
         if ( op == Hpro::apply_normal )
         {
             // t := V^H x
-            compress::aplr::blas::mulvec( ncols, k, apply_adjoint, value_t(1), _mpdata.zV, x.data(), t.data() );
+            compress::aplr::zblas::mulvec( ncols, k, apply_adjoint, value_t(1), _mpdata.zV, x.data(), t.data() );
 
             // t := α·t
             for ( uint  i = 0; i < k; ++i )
                 t(i) *= value_t(alpha) * _S(i);
         
             // y := y + U t
-            compress::aplr::blas::mulvec( nrows, k, apply_normal, value_t(1), _mpdata.zU, t.data(), y.data() );
+            compress::aplr::zblas::mulvec( nrows, k, apply_normal, value_t(1), _mpdata.zU, t.data(), y.data() );
         }// if
         else if ( op == Hpro::apply_transposed )
         {
@@ -693,14 +695,14 @@ lrsvmatrix< value_t >::apply_add ( const value_t                    alpha,
         else if ( op == Hpro::apply_adjoint )
         {
             // t := U^H x
-            compress::aplr::blas::mulvec( nrows, k, apply_adjoint, value_t(1), _mpdata.zU, x.data(), t.data() );
+            compress::aplr::zblas::mulvec( nrows, k, apply_adjoint, value_t(1), _mpdata.zU, x.data(), t.data() );
 
             // t := α·t
             for ( uint  i = 0; i < k; ++i )
                 t(i) *= value_t(alpha) * _S(i);
         
             // y := t + V t
-            compress::aplr::blas::mulvec( ncols, k, apply_normal, value_t(1), _mpdata.zV, t.data(), y.data() );
+            compress::aplr::zblas::mulvec( ncols, k, apply_normal, value_t(1), _mpdata.zV, t.data(), y.data() );
         }// if
     }// if
     else

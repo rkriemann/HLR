@@ -2,7 +2,7 @@
 #define __HLR_UTILS_DETAIL_LZ4_HH
 //
 // Project     : HLR
-// Module      : utils/detail/lz4
+// Module      : compress/lz4
 // Description : LZ4 related functions
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.

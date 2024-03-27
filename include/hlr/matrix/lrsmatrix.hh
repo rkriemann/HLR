@@ -12,7 +12,8 @@
 #include <hpro/vector/TScalarVector.hh>
 
 #include <hlr/arith/blas.hh>
-#include <hlr/utils/compression.hh>
+#include <hlr/compress/compressible.hh>
+#include <hlr/compress/direct.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
 

@@ -11,7 +11,9 @@
 #include <hpro/cluster/TCluster.hh>
 
 #include <hlr/arith/blas.hh>
-#include <hlr/utils/compression.hh>
+#include <hlr/compress/compressible.hh>
+#include <hlr/compress/direct.hh>
+#include <hlr/compress/aplr.hh>
 #include <hlr/utils/checks.hh>
 
 namespace hlr
@@ -28,8 +30,6 @@ DECLARE_TYPE( shared_cluster_basis );
 
 namespace matrix
 {
-
-#define HLR_USE_APLR_SHARED_CB  1
 
 //
 // represents cluster basis for single cluster with
@@ -57,22 +57,12 @@ private:
     // mutex for synchronised changes
     std::mutex               _mtx;
 
-    #if HLR_HAS_COMPRESSION == 1
-    #if HLR_USE_APLR_SHARED_CB == 1
     // stores compressed data
     compress::aplr::zarray   _zV;
 
     // also singular values assoc. with basis vectors
     // in case of adaptive precision compression
     blas::vector< real_t >   _sv;
-
-    #else
-        
-    // stores compressed data
-    compress::zarray         _zV;
-
-    #endif
-    #endif
     
 public:
     
@@ -83,14 +73,14 @@ public:
 
     // construct cluster basis corresponding to cluster <cl>
     // with basis defined by <V>
-    shared_cluster_basis ( const indexset &                      ais,
-                           const hlr::blas::matrix< value_t > &  V )
+    shared_cluster_basis ( const indexset &                 ais,
+                           const blas::matrix< value_t > &  V )
             : _is( ais )
             , _V( V )
     {}
 
-    shared_cluster_basis ( const indexset &                      ais,
-                           hlr::blas::matrix< value_t > &&       V )
+    shared_cluster_basis ( const indexset &                 ais,
+                           blas::matrix< value_t > &&       V )
             : _is( ais )
             , _V( std::move( V ) )
     {}
@@ -124,34 +114,22 @@ public:
     //
 
     // underlying indexset
-    const indexset &                      is     () const { return _is; }
+    const indexset &                 is     () const { return _is; }
     
     // return rank of cluster basis
-    uint                                  rank   () const { return _V.ncols(); }
+    uint                             rank   () const { return _V.ncols(); }
     
     // return local basis
-    hlr::blas::matrix< value_t >          basis  () const
+    blas::matrix< value_t >          basis  () const
     {
-        #if HLR_HAS_COMPRESSION == 1
-        
         if ( is_compressed() )
         {
             auto  V = blas::matrix< value_t >( _is.size(), rank() );
     
-            #if HLR_USE_APLR_SHARED_CB == 1
-
             compress::aplr::decompress_lr< value_t >( _zV, V );
-
-            #else
-            
-            compress::decompress< value_t >( _zV, V );
-
-            #endif
             
             return V;
         }// if
-
-        #endif
 
         return _V;
     }
@@ -179,12 +157,8 @@ public:
         if (( _V.nrows() == aV.nrows() ) && ( _V.ncols() == aV.ncols() )) blas::copy( aV, _V );
         else                                                              _V = std::move( blas::copy( aV ) );
 
-        #if HLR_HAS_COMPRESSION == 1 && HLR_USE_APLR_SHARED_CB == 1
-        
         if ( _sv.length() == asv.length() ) blas::copy( asv, _sv );
         else                                _sv = std::move( blas::copy( asv ) );
-
-        #endif
     }
     
     void
@@ -194,12 +168,8 @@ public:
         if (( _V.nrows() == aV.nrows() ) && ( _V.ncols() == aV.ncols() )) blas::copy( aV, _V );
         else                                                              _V = std::move( aV );
 
-        #if HLR_HAS_COMPRESSION == 1 && HLR_USE_APLR_SHARED_CB == 1
-        
         if ( _sv.length() == asv.length() ) blas::copy( asv, _sv );
         else                                _sv = std::move( asv );
-
-        #endif
     }
     
     ///////////////////////////////////////////////////////
@@ -212,38 +182,32 @@ public:
     // - return V^H · arg
     //
     
-    hlr::blas::vector< value_t >
-    transform_forward  ( const hlr::blas::vector< value_t > &  v ) const
+    blas::vector< value_t >
+    transform_forward  ( const blas::vector< value_t > &  v ) const
     {
-        #if defined(HLR_HAS_COMPRESSED_BLAS)
         if ( is_compressed() )
         {
             const auto  k = this->rank();
             auto        t = blas::vector< value_t >( k );
 
-            #if HLR_USE_APLR_SHARED_CB == 1
-            compress::aplr::blas::mulvec( _is.size(), k, apply_adjoint, value_t(1), _zV, v.data(), t.data() );
-            #else
-            compress::blas::mulvec( _is.size(), k, apply_adjoint, value_t(1), _zV, v.data(), t.data() );
-            #endif
+            compress::aplr::zblas::mulvec( _is.size(), k, apply_adjoint, value_t(1), _zV, v.data(), t.data() );
 
             return t;
         }// if
         else
-        #endif
         {
             auto  V = basis();
         
-            return blas::mulvec( hlr::blas::adjoint( V ), v );
+            return blas::mulvec( blas::adjoint( V ), v );
         }// else
     }
     
-    hlr::blas::matrix< value_t >
-    transform_forward  ( const hlr::blas::matrix< value_t > &  M ) const
+    blas::matrix< value_t >
+    transform_forward  ( const blas::matrix< value_t > &  M ) const
     {
         auto  V = basis();
         
-        return blas::prod( hlr::blas::adjoint( V ), M );
+        return blas::prod( blas::adjoint( V ), M );
     }
     
     //
@@ -251,62 +215,50 @@ public:
     // - return V · arg
     //
     
-    hlr::blas::vector< value_t >
-    transform_backward  ( const hlr::blas::vector< value_t > &  s ) const
+    blas::vector< value_t >
+    transform_backward  ( const blas::vector< value_t > &  s ) const
     {
-        #if defined(HLR_HAS_COMPRESSED_BLAS)
         if ( is_compressed() )
         {
             const auto  n = _is.size();
             auto        t = blas::vector< value_t >( n );
 
-            #if HLR_USE_APLR_SHARED_CB == 1
-            compress::aplr::blas::mulvec( n, this->rank(), apply_normal, value_t(1), _zV, s.data(), t.data() );
-            #else
-            compress::blas::mulvec( n, this->rank(), apply_normal, value_t(1), _zV, s.data(), t.data() );
-            #endif
+            compress::aplr::zblas::mulvec( n, this->rank(), apply_normal, value_t(1), _zV, s.data(), t.data() );
 
             return t;
         }// if
         else
-        #endif
         {
             auto  V = basis();
         
-            return hlr::blas::mulvec( V, s );
+            return blas::mulvec( V, s );
         }// else
     }
     
     void
-    transform_backward  ( const hlr::blas::vector< value_t > &  s,
-                          hlr::blas::vector< value_t > &        v ) const
+    transform_backward  ( const blas::vector< value_t > &  s,
+                          blas::vector< value_t > &        v ) const
     {
-        #if defined(HLR_HAS_COMPRESSED_BLAS)
         if ( is_compressed() )
         {
             HLR_ASSERT( v.length() == _is.size() );
             
-            #if HLR_USE_APLR_SHARED_CB == 1
-            compress::aplr::blas::mulvec( _is.size(), this->rank(), apply_normal, value_t(1), _zV, s.data(), v.data() );
-            #else
-            compress::blas::mulvec( _is.size(), this->rank(), apply_normal, value_t(1), _zV, s.data(), v.data() );
-            #endif
+            compress::aplr::zblas::mulvec( _is.size(), this->rank(), apply_normal, value_t(1), _zV, s.data(), v.data() );
         }// if
         else
-        #endif
         {
             auto  V = basis();
         
-            hlr::blas::mulvec( value_t(1), V, s, value_t(1), v );
+            blas::mulvec( value_t(1), V, s, value_t(1), v );
         }// else
     }
     
-    hlr::blas::matrix< value_t >
-    transform_backward  ( const hlr::blas::matrix< value_t > &  S ) const
+    blas::matrix< value_t >
+    transform_backward  ( const blas::matrix< value_t > &  S ) const
     {
         auto  V = basis();
         
-        return hlr::blas::prod( V, S );
+        return blas::prod( V, S );
     }
 
     ///////////////////////////////////////////////////////
@@ -320,16 +272,11 @@ public:
     {
         auto  cb = std::make_unique< shared_cluster_basis >( _is, std::move( blas::copy( _V ) ) );
 
-        #if HLR_HAS_COMPRESSION == 1
-        
         if ( is_compressed() )
             cb->_zV = _zV;
 
-        #if HLR_USE_APLR_SHARED_CB == 1
         cb->_sv = std::move( blas::copy( _sv ) );
-        #endif
-        #endif
-        
+
         cb->set_nsons( nsons() );
 
         for ( uint  i = 0; i < nsons(); ++i )
@@ -358,14 +305,8 @@ public:
     {
         size_t  n = ( sizeof(_is) + sizeof(self_t *) * _sons.size() + _V.byte_size() );
 
-        #if HLR_HAS_COMPRESSION == 1
-        #if HLR_USE_APLR_SHARED_CB  == 1
         n += compress::aplr::byte_size( _zV );
         n += _sv.byte_size();
-        #else
-        n += hlr::compress::byte_size( _zV );
-        #endif
-        #endif
         
         for ( auto  son : _sons )
             n += son->byte_size();
@@ -419,9 +360,7 @@ public:
     // return true if data is compressed
     virtual bool   is_compressed () const
     {
-        #if HLR_HAS_COMPRESSION == 1
         return _zV.size() > 0;
-        #endif
         
         return false;
     }
@@ -430,13 +369,7 @@ protected:
     // remove compressed storage (standard storage not restored!)
     virtual void   remove_compressed ()
     {
-        #if HLR_HAS_COMPRESSION == 1
-        #if HLR_USE_APLR_SHARED_CB  == 1
         _zV = compress::aplr::zarray();
-        #else
-        _zV = compress::zarray();
-        #endif
-        #endif
     }
 };
 
@@ -469,29 +402,21 @@ template < typename value_t >
 void
 shared_cluster_basis< value_t >::compress ( const compress::zconfig_t &  zconfig )
 {
-    #if HLR_HAS_COMPRESSION == 1
-        
     if ( is_compressed() )
         return;
 
     const size_t  mem_dense = sizeof(value_t) * _V.nrows() * _V.ncols();
 
-    #if HLR_USE_APLR_SHARED_CB == 1
-
     HLR_ASSERT( false );
     
-    #endif
-    
-    auto        zV   = compress::compress< value_t >( zconfig, _V );
-    const auto  zmem = compress::compressed_size( zV );
+    // auto        zV   = compress::compress< value_t >( zconfig, _V );
+    // const auto  zmem = compress::compressed_size( zV );
 
-    if (( zmem > 0 ) && ( zmem < mem_dense ))
-    {
-        _zV = std::move( zV );
-        _V  = std::move( blas::matrix< value_t >( 0, _V.ncols() ) ); // remember rank
-    }// if
-
-    #endif
+    // if (( zmem > 0 ) && ( zmem < mem_dense ))
+    // {
+    //     _zV = std::move( zV );
+    //     _V  = std::move( blas::matrix< value_t >( 0, _V.ncols() ) ); // remember rank
+    // }// if
 }
 
 template < typename value_t >
@@ -501,8 +426,6 @@ shared_cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     if ( is_compressed() )
         return;
 
-    #if HLR_HAS_COMPRESSION == 1
-        
     HLR_ASSERT( acc.rel_eps() == 0 );
 
     if ( _V.nrows() * _V.ncols() == 0 )
@@ -510,50 +433,26 @@ shared_cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
         
     const size_t  mem_dense = sizeof(value_t) * _V.nrows() * _V.ncols();
 
-    #if HLR_USE_APLR_SHARED_CB == 1
-
-    {
-        //
-        // use adaptive precision per basis vector
-        //
-
-        HLR_ASSERT( _sv.length() == _V.ncols() );
-
-        real_t  tol  = acc.abs_eps() * _sv(0);
-        auto    S    = blas::copy( _sv );
-
-        for ( uint  l = 0; l < S.length(); ++l )
-            S(l) = tol / S(l);
-
-        auto  zV   = compress::aplr::compress_lr< value_t >( _V, S );
-        auto  zmem = compress::aplr::compressed_size( zV );
-
-        if (( zmem > 0 ) && ( zmem < mem_dense ))
-        {
-            _zV = std::move( zV );
-            _V  = std::move( blas::matrix< value_t >( 0, _V.ncols() ) ); // remember rank
-        }// if
-
-        return;
-    }// if
-    
-    #endif
-
     //
-    // use standard compression
+    // use adaptive precision per basis vector
     //
-    
-    auto  zconfig = compress::get_config( acc.abs_eps() );
-    auto  zV      = compress::compress< value_t >( zconfig, _V );
-    auto  zmem    = compress::compressed_size( zV );
+
+    HLR_ASSERT( _sv.length() == _V.ncols() );
+
+    real_t  tol  = acc.abs_eps() * _sv(0);
+    auto    S    = blas::copy( _sv );
+
+    for ( uint  l = 0; l < S.length(); ++l )
+        S(l) = tol / S(l);
+
+    auto  zV   = compress::aplr::compress_lr< value_t >( _V, S );
+    auto  zmem = compress::aplr::compressed_size( zV );
 
     if (( zmem > 0 ) && ( zmem < mem_dense ))
     {
         _zV = std::move( zV );
         _V  = std::move( blas::matrix< value_t >( 0, _V.ncols() ) ); // remember rank
     }// if
-
-    #endif
 }
 
 //
@@ -563,16 +462,12 @@ template < typename value_t >
 void
 shared_cluster_basis< value_t >::decompress ()
 {
-    #if HLR_HAS_COMPRESSION == 1
-        
     if ( ! is_compressed() )
         return;
 
     _V = std::move( basis() );
 
     remove_compressed();
-
-    #endif
 }
 
 //
@@ -618,8 +513,6 @@ rank_info ( const shared_cluster_basis< value_t > &  cb )
 
     return { min_rank, uint( double(sum_rank) / double(nnodes) ), max_rank };
 }
-
-#undef HLR_USE_APLR_SHARED_CB
 
 }} // namespace hlr::matrix
 

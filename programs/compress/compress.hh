@@ -466,7 +466,7 @@ program_main ()
             std::cout << "  "
                       << term::bullet << term::bold
                       << "compressed"
-                      #if defined(HLR_HAS_COMPRESSED_BLAS)
+                      #if defined(HLR_HAS_ZBLAS_DIRECT)
                       << " (zblas)"
                       #endif
                       << term::reset << std::endl;

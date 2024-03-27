@@ -2,7 +2,7 @@
 #define __HLR_UTILS_DETAIL_MGARD_HH
 //
 // Project     : HLR
-// Module      : utils/detail/mgard
+// Module      : compress/mgard
 // Description : MGARD related functions
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.

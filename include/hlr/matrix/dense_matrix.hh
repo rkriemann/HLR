@@ -13,7 +13,8 @@
 #include <hpro/matrix/TMatrix.hh>
 
 #include <hlr/arith/blas.hh>
-#include <hlr/utils/compression.hh>
+#include <hlr/compress/compressible.hh>
+#include <hlr/compress/direct.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
 #include <hlr/utils/io.hh>
@@ -46,7 +47,7 @@ private:
     // low-rank factors
     blas::matrix< value_t >  _mat;
 
-    #if HLR_HAS_COMPRESSION == 1
+    #if HLR_HAS_DIRECT_COMPRESSION == 1
     // stores compressed data
     compress::zarray         _zM;
     #endif
@@ -100,7 +101,7 @@ public:
         this->set_ofs( _row_is.first(), _col_is.first() );
     }
 
-    #if HLR_HAS_COMPRESSION == 1
+    #if HLR_HAS_DIRECT_COMPRESSION == 1
     dense_matrix ( const indexset       arow_is,
                    const indexset       acol_is,
                    compress::zarray &&  azM )
@@ -118,7 +119,7 @@ public:
             , _row_is( aM.row_is() )
             , _col_is( aM.col_is() )
             , _mat( std::move( aM._mat ) )
-            #if HLR_HAS_COMPRESSION == 1
+            #if HLR_HAS_DIRECT_COMPRESSION == 1
             , _zM( std::move( aM._zM ) )
             #endif
     {
@@ -137,7 +138,7 @@ public:
 
     blas::matrix< value_t >  mat () const
     {
-        #if HLR_HAS_COMPRESSION == 1
+        #if HLR_HAS_DIRECT_COMPRESSION == 1
         if ( is_compressed() )
         {
             auto  dM = blas::matrix< value_t >( this->nrows(), this->ncols() );
@@ -295,7 +296,7 @@ public:
     // return true if data is compressed
     virtual bool   is_compressed () const
     {
-        #if HLR_HAS_COMPRESSION == 1
+        #if HLR_HAS_DIRECT_COMPRESSION == 1
         return ! is_null( _zM.data() );
         #else
         return false;
@@ -316,7 +317,7 @@ public:
     {
         auto  M = std::unique_ptr< dense_matrix< value_t > >();
 
-        #if HLR_HAS_COMPRESSION == 1
+        #if HLR_HAS_DIRECT_COMPRESSION == 1
         if ( is_compressed() )
         {
             auto  zM = compress::zarray( _zM.size() );
@@ -362,7 +363,7 @@ public:
         D->_col_is = _col_is;
         D->_mat    = std::move( blas::copy( this->_mat ) );
 
-        #if HLR_HAS_COMPRESSION == 1
+        #if HLR_HAS_DIRECT_COMPRESSION == 1
         if ( is_compressed() )
         {
             D->_zM = compress::zarray( _zM.size() );
@@ -396,7 +397,7 @@ public:
         size += sizeof(_row_is) + sizeof(_col_is);
         size += _mat.byte_size();
 
-        #if HLR_HAS_COMPRESSION == 1
+        #if HLR_HAS_DIRECT_COMPRESSION == 1
         size += hlr::compress::byte_size( _zM );
         #endif
         
@@ -406,7 +407,7 @@ public:
     // return size of (floating point) data in bytes handled by this object
     virtual size_t data_byte_size () const
     {
-        #if HLR_HAS_COMPRESSION == 1
+        #if HLR_HAS_DIRECT_COMPRESSION == 1
         if ( is_compressed() )
             return hlr::compress::byte_size( _zM );
         #endif
@@ -426,7 +427,7 @@ protected:
     // remove compressed storage (standard storage not restored!)
     virtual void   remove_compressed ()
     {
-        #if HLR_HAS_COMPRESSION == 1
+        #if HLR_HAS_DIRECT_COMPRESSION == 1
         _zM = compress::zarray();
         #endif
     }
@@ -488,10 +489,10 @@ dense_matrix< value_t >::apply_add   ( const value_t                    alpha,
     HLR_ASSERT( x.length() == this->ncols( op ) );
     HLR_ASSERT( y.length() == this->nrows( op ) );
 
-    #if defined(HLR_HAS_COMPRESSED_BLAS)
+    #if defined(HLR_HAS_ZBLAS_DIRECT)
     if ( is_compressed() )
     {
-        compress::blas::mulvec( nrows(), ncols(), op, alpha, _zM, x.data(), y.data() );
+        compress::zblas::mulvec( nrows(), ncols(), op, alpha, _zM, x.data(), y.data() );
     }// if
     else
     #endif
@@ -525,7 +526,7 @@ template < typename value_t >
 void
 dense_matrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
 {
-    #if HLR_HAS_COMPRESSION == 1
+    #if HLR_HAS_DIRECT_COMPRESSION == 1
         
     if ( is_compressed() )
         return;
@@ -566,7 +567,7 @@ template < typename value_t >
 void
 dense_matrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 {
-    #if HLR_HAS_COMPRESSION == 1
+    #if HLR_HAS_DIRECT_COMPRESSION == 1
         
     if ( this->nrows() * this->ncols() == 0 )
         return;
@@ -616,7 +617,7 @@ template < typename value_t >
 void
 dense_matrix< value_t >::decompress ()
 {
-    #if HLR_HAS_COMPRESSION == 1
+    #if HLR_HAS_DIRECT_COMPRESSION == 1
         
     if ( ! is_compressed() )
         return;

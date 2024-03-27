@@ -2,7 +2,7 @@
 #define __HLR_UTILS_DETAIL_SZ3_HH
 //
 // Project     : HLR
-// Module      : utils/detail/sz3
+// Module      : compress/sz3
 // Description : SZ3 related functions
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.

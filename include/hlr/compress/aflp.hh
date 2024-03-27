@@ -2,7 +2,7 @@
 #define __HLR_UTILS_DETAIL_AFLP_HH
 //
 // Project     : HLR
-// Module      : utils/detail/aflp
+// Module      : compress/aflp
 // Description : functions for adaptive padded floating points
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
@@ -12,12 +12,13 @@
 #include <cstdint>
 #include <limits>
 
-#include <hlr/utils/detail/byte_n.hh>
+#include <hlr/compress/byte_n.hh>
 
 //
 // signal availability of compressed BLAS
 //
-#define HLR_HAS_COMPRESSED_BLAS
+#define HLR_HAS_ZBLAS_DIRECT
+#define HLR_HAS_ZBLAS_APLR
 
 ////////////////////////////////////////////////////////////
 //

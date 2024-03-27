@@ -2,7 +2,7 @@
 #define __HLR_UTILS_DETAIL_BYTE_N_HH
 //
 // Project     : HLR
-// Module      : utils/detail/byte_n
+// Module      : compress/byte_n
 // Description : optimized types for multiple bytes
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.

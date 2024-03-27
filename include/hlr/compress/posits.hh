@@ -2,7 +2,7 @@
 #define __HLR_UTILS_DETAIL_POSITS_HH
 //
 // Project     : HLR
-// Module      : utils/detail/posits
+// Module      : compress/posits
 // Description : posits related functions
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
@@ -14,7 +14,7 @@
 
 #include <universal/number/posit/posit.hpp>
 
-#include <hlr/utils/detail/byte_n.hh>
+#include <hlr/compress/byte_n.hh>
 
 namespace hlr { namespace compress { namespace posits {
 

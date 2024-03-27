@@ -12,7 +12,7 @@
 
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/tensor.hh>
-#include <hlr/utils/compression.hh>
+#include <hlr/compress/direct.hh>
 
 #include <hlr/tensor/base_tensor.hh>
 
