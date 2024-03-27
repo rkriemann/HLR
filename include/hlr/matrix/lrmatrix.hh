@@ -44,7 +44,6 @@ public:
     using  real_t  = Hpro::real_type_t< value_t >;
     
 private:
-    #if HLR_HAS_DIRECT_COMPRESSION == 1
     //
     // compressed storage based on underlying floating point type
     //
@@ -52,7 +51,6 @@ private:
     {
         compress::zarray  U, V;
     };
-    #endif
 
 private:
     // local index set of matrix
@@ -64,10 +62,8 @@ private:
     // rank for simplified access and for compressed factors
     uint                     _rank;
     
-    #if HLR_HAS_DIRECT_COMPRESSION == 1
     // optional: stores compressed data
     zstorage                 _zdata;
-    #endif
 
 public:
     //
