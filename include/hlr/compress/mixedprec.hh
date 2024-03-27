@@ -346,7 +346,7 @@ void
 decompress_lr< double > ( const zarray &                 zdata,
                           hlr::blas::matrix< double > &  U )
 {
-    const size_t    n     = U.nrows();
+    const size_t    nrows = U.nrows();
     const uint32_t  rank  = U.ncols();
     const uint32_t  n_mp1 = reinterpret_cast< const uint32_t * >( zdata.data() )[0];
     const uint32_t  n_mp2 = reinterpret_cast< const uint32_t * >( zdata.data() )[1];
@@ -361,10 +361,10 @@ decompress_lr< double > ( const zarray &                 zdata,
 
         for ( uint32_t  l = 0; l < n_mp1; ++l, ++k )
         {
-            for ( size_t  i = 0; i < n; ++i, ++zpos )
+            for ( size_t  i = 0; i < nrows; ++i, ++zpos )
                 U(i,k) = zptr[zpos];
         }// for
-        pos += n_mp1 * n * sizeof(mptype1_t);
+        pos += n_mp1 * nrows * sizeof(mptype1_t);
     }// if
 
     if ( n_mp2 > 0 )
@@ -374,10 +374,10 @@ decompress_lr< double > ( const zarray &                 zdata,
 
         for ( uint32_t  l = 0; l < n_mp2; ++l, ++k )
         {
-            for ( size_t  i = 0; i < n; ++i, ++zpos )
+            for ( size_t  i = 0; i < nrows; ++i, ++zpos )
                 U(i,k) = zptr[zpos];
         }// for
-        pos += n_mp2 * n * sizeof(mptype2_t);
+        pos += n_mp2 * nrows * sizeof(mptype2_t);
     }// if
 
     if ( n_mp3 > 0 )
@@ -387,10 +387,10 @@ decompress_lr< double > ( const zarray &                 zdata,
 
         for ( uint32_t  l = 0; l < n_mp3; ++l, ++k )
         {
-            for ( size_t  i = 0; i < n; ++i, ++zpos )
+            for ( size_t  i = 0; i < nrows; ++i, ++zpos )
                 U(i,k) = zptr[zpos];
         }// for
-        pos += n_mp3 * n * sizeof(mptype3_t);
+        pos += n_mp3 * nrows * sizeof(mptype3_t);
     }// if
 
     HLR_ASSERT( k == rank );
@@ -529,7 +529,7 @@ mulvec_lr ( const size_t     nrows,
                 auto  zptr = reinterpret_cast< const mptype1_t * >( zA.data() + zpos );
                 
                 mulvec< value_t, mptype1_t >( nrows, n_mp1, op_A, alpha, zptr, x + pos, y );
-                zpos += n_mp1 * ncols * sizeof(mptype1_t);
+                zpos += n_mp1 * nrows * sizeof(mptype1_t);
                 pos  += n_mp1;
             }// if
 
@@ -538,7 +538,7 @@ mulvec_lr ( const size_t     nrows,
                 auto  zptr = reinterpret_cast< const mptype2_t * >( zA.data() + zpos );
                 
                 mulvec< value_t, mptype2_t >( nrows, n_mp2, op_A, alpha, zptr, x + pos, y );
-                zpos += n_mp2 * ncols * sizeof(mptype2_t);
+                zpos += n_mp2 * nrows * sizeof(mptype2_t);
                 pos  += n_mp2;
             }// if
 
@@ -547,7 +547,7 @@ mulvec_lr ( const size_t     nrows,
                 auto  zptr = reinterpret_cast< const mptype3_t * >( zA.data() + zpos );
                 
                 mulvec< value_t, mptype3_t >( nrows, n_mp3, op_A, alpha, zptr, x + pos, y );
-                zpos += n_mp3 * ncols * sizeof(mptype3_t);
+                zpos += n_mp3 * nrows * sizeof(mptype3_t);
                 pos  += n_mp3;
             }// if
         }// case
@@ -564,7 +564,7 @@ mulvec_lr ( const size_t     nrows,
                 auto  zptr = reinterpret_cast< const mptype1_t * >( zA.data() + zpos );
                 
                 mulvec< value_t, mptype1_t >( nrows, n_mp1, op_A, alpha, zptr, x, y + pos );
-                zpos += n_mp1 * ncols * sizeof(mptype1_t);
+                zpos += n_mp1 * nrows * sizeof(mptype1_t);
                 pos  += n_mp1;
             }// if
 
@@ -573,7 +573,7 @@ mulvec_lr ( const size_t     nrows,
                 auto  zptr = reinterpret_cast< const mptype2_t * >( zA.data() + zpos );
                 
                 mulvec< value_t, mptype2_t >( nrows, n_mp2, op_A, alpha, zptr, x, y + pos );
-                zpos += n_mp2 * ncols * sizeof(mptype2_t);
+                zpos += n_mp2 * nrows * sizeof(mptype2_t);
                 pos  += n_mp2;
             }// if
 
@@ -582,7 +582,7 @@ mulvec_lr ( const size_t     nrows,
                 auto  zptr = reinterpret_cast< const mptype3_t * >( zA.data() + zpos );
                 
                 mulvec< value_t, mptype3_t >( nrows, n_mp3, op_A, alpha, zptr, x, y + pos );
-                zpos += n_mp3 * ncols * sizeof(mptype3_t);
+                zpos += n_mp3 * nrows * sizeof(mptype3_t);
                 pos  += n_mp3;
             }// if
         }// case
