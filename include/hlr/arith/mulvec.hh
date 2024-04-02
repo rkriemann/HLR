@@ -82,7 +82,8 @@ mul_vec ( const value_t                             alpha,
 ////////////////////////////////////////////////////////////////////////////////
 
 //
-// just dummy implementation
+// cluster tree oriented version
+// (for just dummy seq. implementation)
 //
 
 template < typename value_t > using  matrix_list_t       = std::deque< const Hpro::TMatrix< value_t > * >;
@@ -154,6 +155,67 @@ setup_cluster_block_map ( const matop_t                     op_M,
     {
         blocks[ M.row_is( op_M ) ].push_back( & M );
     }// else
+}
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+//
+// build data structure with joined lowrank/dense blocks per row/column cluster
+//
+template < typename value_t >
+struct cluster_matrix_t
+{
+    // corresponding index set of cluster
+    indexset                           is;
+    
+    // joined low rank factors
+    blas::matrix< value_t >            U;
+
+    // joined dense matrices
+    blas::matrix< value_t >            D;
+
+    // son matrices (following cluster tree)
+    std::vector< cluster_matrix_t * >  sub_blocks;
+
+    //
+    // ctor
+    //
+    cluster_matrix_t ( const indexset &  ais )
+            : is( ais )
+    {}
+};
+
+//
+// 
+//
+template < typename value_t >
+std::pair< std::unique_ptr< cluster_matrix_t< value_t > >,
+           std::unique_ptr< cluster_matrix_t< value_t > > >
+build_cluster_matrix ( const matop_t                     op_M,
+                       const Hpro::TMatrix< value_t > &  M )
+{
+    //
+    // first collect blocks per cluster
+    //
+    
+    auto  row_map = cluster_block_map_t< value_t >();
+    auto  col_map = cluster_block_map_t< value_t >();
+
+    setup_cluster_block_map( apply_normal,  M, row_map );
+    setup_cluster_block_map( apply_adjoint, M, col_map );
+
+    //
+    // convert matrix into cluster matrix structur
+    //
+
+    auto  row_CM = std::make_unique< cluster_matrix_t< value_t > >( M.row_is( op_M ) );
+    auto  col_CM = std::make_unique< cluster_matrix_t< value_t > >( M.col_is( op_M ) );
+        
+    convert_to_cluster_matrix( row_map, row_CM );
+    convert_to_cluster_matrix( col_map, col_CM );
+
+    return { std::move( row_CM ), std::move( col_CM ) };
 }
 
 //
