@@ -266,9 +266,9 @@ opts.Add( PathVariable( 'jemalloc_dir',  'base directory of jemalloc',    JEMALL
 opts.Add( PathVariable( 'mimalloc_dir',  'base directory of mimalloc',    MIMALLOC_DIR, PathVariable.PathIsDir ) )
 opts.Add( PathVariable( 'tcmalloc_dir',  'base directory of tcmalloc',    TCMALLOC_DIR, PathVariable.PathIsDir ) )
 
-opts.Add( EnumVariable( 'lapack',        'lapack library to use',              'default', allowed_values = LAPACKLIBS, ignorecase = 2 ) )
+opts.Add( EnumVariable( 'lapack',        'lapack library to use',              'default', allowed_values = LAPACKLIBS + [ 'help' ] , ignorecase = 2 ) )
 opts.Add(               'lapackflags',   'user defined link flags for lapack', default = LAPACK_FLAGS )
-opts.Add( EnumVariable( 'malloc',        'malloc library to use',              'default', allowed_values = MALLOCS,    ignorecase = 2 ) )
+opts.Add( EnumVariable( 'malloc',        'malloc library to use',              'default', allowed_values = MALLOCS + [ 'help' ], ignorecase = 2 ) )
 opts.Add( BoolVariable( 'eigen',         'use Eigen library',                  eigen ) )
 opts.Add( PathVariable( 'eigen_dir',     'Eigen installation directory',       EIGEN_DIR, PathVariable.PathIsDir ) )
 opts.Add( BoolVariable( 'hdf5',          'use HDF5 library',                   hdf5 ) )
@@ -298,8 +298,8 @@ opts.Add( PathVariable( 'universal_dir', 'universal installation directory',   U
 opts.Add( BoolVariable( 'blosc',         'use blosc compression library',      blosc ) )
 opts.Add( PathVariable( 'blosc_dir',     'blosc installation directory',       BLOSC_DIR, PathVariable.PathIsDir ) )
 
-opts.Add( EnumVariable( 'compressor',    'defined compressor',                  'none', allowed_values = COMPRESSORS,      ignorecase = 2 ) )
-opts.Add( EnumVariable( 'aplr',          'defined APLR compressor',             'none', allowed_values = APLR_COMPRESSORS, ignorecase = 2 ) )
+opts.Add( EnumVariable( 'compressor',    'defined compressor',                  'none', allowed_values = COMPRESSORS + [ 'help' ],      ignorecase = 2 ) )
+opts.Add( EnumVariable( 'aplr',          'defined APLR compressor',             'none', allowed_values = APLR_COMPRESSORS + [ 'help' ], ignorecase = 2 ) )
 opts.Add( BoolVariable( 'zblas',         'activate/deactivate compressed BLAS', zblas ) )
 
 opts.Add( BoolVariable( 'fullmsg',   'enable full command line output',           fullmsg ) )
@@ -397,6 +397,27 @@ del opt_env['addprograms']
 del opt_env['remprograms']
 del opt_env['addframeworks']
 del opt_env['remframeworks']
+
+# handle 'help' requests to avoid saving
+if 'help' in frameworks :
+    print( "framework options: ", ', '.join( FRAMEWORKS ) )
+    sys.exit( 1 )
+    
+if lapack == 'help' :
+    print( "lapack options: ", ', '.join( LAPACKLIBS ) )
+    sys.exit( 1 )
+    
+if malloc == 'help' :
+    print( 'malloc options: ', ', '.join( MALLOCS ) )
+    sys.exit( 1 )
+
+if compressor == 'help' :
+    print( 'compress options: ', ', '.join( COMPRESSORS ) )
+    sys.exit( 1 )
+
+if aplr == 'help' :
+    print( 'aplr options: ', ', '.join( COMPRESSORS ) )
+    sys.exit( 1 )
 
 opts.Save( opts_file, opt_env )
 
