@@ -61,14 +61,16 @@ template <>
 struct fp_info< float >
 {
     constexpr static uint32_t  n_mant_bits = 23;
-    constexpr static float     infinity    = std::numeric_limits< float >::infinity();
+    // constexpr static float     infinity    = std::numeric_limits< float >::infinity();
+    constexpr static float     maximum     = std::numeric_limits< float >::max();
 };
     
 template <>
 struct fp_info< double >
 {
     constexpr static uint32_t  n_mant_bits = 52;
-    constexpr static double    infinity    = std::numeric_limits< double >::infinity();
+    // constexpr static double    infinity    = std::numeric_limits< double >::infinity();
+    constexpr static double    maximum     = std::numeric_limits< double >::max();
 };
     
 constexpr uint8_t   fp32_mant_bits   = 23;
@@ -76,14 +78,14 @@ constexpr uint8_t   fp32_exp_bits    = 8;
 constexpr uint8_t   fp32_sign_bit    = 31;
 constexpr uint32_t  fp32_exp_highbit = 0b10000000;
 constexpr uint32_t  fp32_zero_val    = 0xffffffff;
-constexpr float     fp32_infinity    = std::numeric_limits< float >::infinity();
+// constexpr float     fp32_infinity    = fp_info< float >::infinity;
 
 constexpr uint8_t   fp64_mant_bits   = 52;
 constexpr uint8_t   fp64_exp_bits    = 11;
 constexpr uint8_t   fp64_sign_bit    = 63;
 constexpr uint64_t  fp64_exp_highbit = 0b10000000000;
 constexpr uint64_t  fp64_zero_val    = 0xffffffffffffffff;
-constexpr double    fp64_infinity    = std::numeric_limits< double >::infinity();
+// constexpr double    fp64_infinity    = fp_info< double >::infinity;
 
 //
 // return bitrate for given accuracy
@@ -641,13 +643,13 @@ compress ( const config &   config,
     // look for min/max value (> 0!)
     //
     
-    auto  vmin = fp_info< real_t >::infinity;
+    auto  vmin = fp_info< real_t >::maximum;
     auto  vmax = real_t(0);
 
     for ( size_t  i = 0; i < nsize; ++i )
     {
         const auto  d_i = std::abs( data[i] );
-        const auto  val = ( d_i == real_t(0) ? fp_info< real_t >::infinity : d_i );
+        const auto  val = ( d_i == real_t(0) ? fp_info< real_t >::maximum : d_i );
 
         vmin = std::min( vmin, val );
         vmax = std::max( vmax, d_i );
@@ -655,7 +657,7 @@ compress ( const config &   config,
 
     HLR_ASSERT( vmin > real_t(0) );
     
-    if ( vmin == fp_info< real_t >::infinity )
+    if ( vmin == fp_info< real_t >::maximum )
     {
         //
         // in case of zero data, return special data
@@ -676,7 +678,8 @@ compress ( const config &   config,
     const uint8_t  prec_bits = nbits - 1 - exp_bits;                                                        // actual number of precision bits
     auto           zdata     = std::vector< byte_t >( sizeof(real_t) + 1 + 1 + nsize * nbyte );             // array storing compressed data
 
-    HLR_ASSERT( std::isfinite( scale ) );
+    HLR_DBG_ASSERT( std::isfinite( scale ) );
+    
     HLR_ASSERT( nbits     <= sizeof(real_t) * 8 );
     HLR_ASSERT( prec_bits <= fp_info< real_t >::n_mant_bits );
 
@@ -802,7 +805,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
 {
     using  real_t = Hpro::real_type_t< value_t >;
     
-    constexpr real_t  fp_infinity = std::numeric_limits< real_t >::infinity();
+    constexpr real_t  fp_maximum = fp_info< real_t >::maximum;
     
     //
     // first, determine exponent bits and mantissa bits for all columns
@@ -817,13 +820,13 @@ compress_lr ( const blas::matrix< value_t > &                       U,
 
     for ( uint32_t  l = 0; l < k; ++l )
     {
-        auto  vmin = fp_infinity;
+        auto  vmin = fp_maximum;
         auto  vmax = real_t(0);
 
         for ( size_t  i = 0; i < n; ++i )
         {
             const auto  u_il = std::abs( U(i,l) );
-            const auto  val  = ( u_il == real_t(0) ? fp_infinity : u_il );
+            const auto  val  = ( u_il == real_t(0) ? fp_maximum : u_il );
             
             vmin = std::min( vmin, val );
             vmax = std::max( vmax, u_il );
@@ -890,7 +893,7 @@ compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double
 {
     using  real_t = double;
     
-    constexpr real_t  fp_infinity = std::numeric_limits< real_t >::infinity();
+    constexpr real_t  fp_maximum = fp_info< real_t >::maximum;
     
     //
     // first, determine exponent bits and mantissa bits for all columns
@@ -906,7 +909,7 @@ compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double
 
     for ( uint32_t  l = 0; l < k; ++l )
     {
-        auto  vmin = fp_infinity;
+        auto  vmin = fp_maximum;
         auto  vmax = real_t(0);
 
         for ( size_t  i = 0; i < n; ++i )
@@ -914,8 +917,8 @@ compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double
             const auto  u_il   = U(i,l);
             const auto  u_re   = std::abs( std::real( u_il ) );
             const auto  u_im   = std::abs( std::imag( u_il ) );
-            const auto  val_re = ( u_re == real_t(0) ? fp_infinity : u_re );
-            const auto  val_im = ( u_im == real_t(0) ? fp_infinity : u_im );
+            const auto  val_re = ( u_re == real_t(0) ? fp_maximum : u_re );
+            const auto  val_im = ( u_im == real_t(0) ? fp_maximum : u_im );
             
             vmin = std::min( vmin, std::min( val_re, val_im ) );
             vmax = std::max( vmax, std::max( u_re, u_im ) );
@@ -924,7 +927,7 @@ compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double
         s[l] = real_t(1) / vmin;
         e[l] = uint32_t( std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ) );
 
-        HLR_ASSERT( std::isfinite( s[l] ) );
+        HLR_DBG_ASSERT( std::isfinite( s[l] ) );
 
         const auto  nprecbits = eps_to_rate_aplr( S(l) );
         const auto  nbits     = 1 + e[l] + nprecbits;
