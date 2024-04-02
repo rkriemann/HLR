@@ -95,7 +95,7 @@ program_main ()
     //     auto  tic     = timer::now();
     //     auto  toc     = timer::since( tic );
         
-    //     size_t  n = 4;
+    //     size_t  n = 6;
     //     size_t  k = 4;
     //     auto    M = blas::matrix< value_t >( n, k );
 
@@ -108,11 +108,12 @@ program_main ()
     //             std::cout << M(i,j) << ", ";
     //         std::cout << std::endl;
     //     }// for
-        
-    //     auto  x  = blas::vector< value_t >( M.ncols() );
-    //     auto  y1 = blas::vector< value_t >( M.nrows() );
-    //     auto  y2 = blas::vector< value_t >( M.nrows() );
-    //     auto  y3 = blas::vector< value_t >( M.nrows() );
+
+    //     auto  op = apply_adjoint;
+    //     auto  x  = blas::vector< value_t >( op == apply_normal ? M.ncols() : M.nrows() );
+    //     auto  y1 = blas::vector< value_t >( op == apply_normal ? M.nrows() : M.ncols() );
+    //     auto  y2 = blas::vector< value_t >( op == apply_normal ? M.nrows() : M.ncols() );
+    //     auto  y3 = blas::vector< value_t >( op == apply_normal ? M.nrows() : M.ncols() );
 
     //     for ( int i = 0; i < x.length(); ++i )
     //         x(i) = i+1;
@@ -124,16 +125,16 @@ program_main ()
     //     S(2) = 1e-6;
     //     S(3) = 1e-5;
         
-    //     auto  zM   = compress::aflp::compress_lr( M, S );
+    //     auto  zM   = compress::aplr::compress_lr( M, S );
 
-    //     blas::mulvec( value_t(1), blas::adjoint( M ), x, value_t(1), y1 );
+    //     blas::mulvec( value_t(1), blas::mat_view( op, M ), x, value_t(1), y1 );
 
     //     // for ( uint  i = 0; i < k; ++i )
     //     //     y1(i) *= S(i);
         
     //     std::cout << y1(0) << " / " << y1(1) << " / " << y1(2) << std::endl;
         
-    //     compress::aplr::blas::mulvec( M.nrows(), M.ncols(), apply_adjoint, 1.0, zM, x.data(), y2.data() );
+    //     compress::aplr::zblas::mulvec( M.nrows(), M.ncols(), op, 1.0, zM, x.data(), y2.data() );
 
     //     // for ( uint  i = 0; i < k; ++i )
     //     //     y2(i) *= S(i);
