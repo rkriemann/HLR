@@ -314,9 +314,8 @@ program_main ()
         std::cout << "    H    = " << format_flops( flops_h ) << ", " << flops_h / bytes_h << std::endl;
         std::cout << "    zH   = " << format_flops( flops_h ) << ", " << flops_h / bytes_z << std::endl;
     
-        double  t_orig       = 0.0;
-        double  t_compressed = 0.0;
-        auto    y_ref        = std::unique_ptr< vector::scalar_vector< value_t > >();
+        double  t_ref = 0.0;
+        auto    y_ref = std::unique_ptr< vector::scalar_vector< value_t > >();
 
         //
         // uncompressed
@@ -338,8 +337,8 @@ program_main ()
             {
                 tic = timer::now();
     
-                for ( int j = 0; j < 50; ++j )
-                    impl::mul_vec< value_t >( 2.0, Hpro::apply_normal, *A, *x, *y );
+                for ( int j = 0; j < nmvm; ++j )
+                    impl::mul_vec< value_t >( value_t(2), apply_normal, *A, *x, *y );
 
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
@@ -355,7 +354,7 @@ program_main ()
                           << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                           << std::endl;
 
-            t_orig = min( runtime );
+            t_ref = min( runtime );
             
             std::cout << "    flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
             
@@ -385,8 +384,8 @@ program_main ()
             {
                 tic = timer::now();
     
-                for ( int j = 0; j < 50; ++j )
-                    impl::mul_vec< value_t >( 2.0, Hpro::apply_normal, *zA, *x, *y );
+                for ( int j = 0; j < nmvm; ++j )
+                    impl::mul_vec< value_t >( value_t(2), apply_normal, *zA, *x, *y );
 
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
@@ -402,9 +401,7 @@ program_main ()
                           << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                           << std::endl;
         
-            t_compressed = min( runtime );
-
-            std::cout << "    ratio  = " << boost::format( "%.02f" ) % ( t_compressed / t_orig ) << std::endl;
+            std::cout << "    ratio  = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
             std::cout << "    flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
             
             auto  diff = y_ref->copy();
@@ -441,8 +438,8 @@ program_main ()
             {
                 tic = timer::now();
     
-                for ( int j = 0; j < 50; ++j )
-                    impl::mul_vec< value_t >( 2.0, Hpro::apply_normal, *A, *x, *y );
+                for ( int j = 0; j < nmvm; ++j )
+                    impl::mul_vec< value_t >( value_t(2), apply_normal, *A, *x, *y );
 
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
@@ -458,11 +455,67 @@ program_main ()
                           << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                           << std::endl;
 
-            t_orig = min( runtime );
-            
+            std::cout << "    ratio  = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
             std::cout << "    flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
             
-            y_ref = std::move( y );
+            auto  diff = y_ref->copy();
+
+            diff->axpy( value_t(-1), y.get() );
+
+            const auto  error = diff->norm2();
+            
+            std::cout << "    error  = " << format_error( error, error / y_ref->norm2() ) << std::endl;
+        }
+
+        {
+            runtime.clear();
+            
+            std::cout << "  "
+                      << term::bullet << term::bold
+                      << "uncompressed (cl v2)"
+                      << term::reset << std::endl;
+        
+            auto  x = std::make_unique< vector::scalar_vector< value_t > >( A->col_is() );
+            auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
+
+            x->fill( 1 );
+
+            auto  blocks = impl::build_cluster_blocks< value_t >( apply_normal, *A );
+            
+            for ( int i = 0; i < nbench; ++i )
+            {
+                tic = timer::now();
+    
+                for ( int j = 0; j < nmvm; ++j )
+                    impl::mul_vec_cl< value_t >( value_t(2), apply_normal, *blocks, *x, *y );
+
+                toc = timer::since( tic );
+                runtime.push_back( toc.seconds() );
+        
+                std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+
+                if ( i < nbench-1 )
+                    y->fill( 1 );
+            }// for
+        
+            if ( nbench > 1 )
+                std::cout << "  runtime  = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                          << std::endl;
+
+            std::cout << "    ratio  = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
+            std::cout << "    flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
+
+            io::matlab::write( *y_ref, "y1" );
+            io::matlab::write( *y, "y2" );
+            
+            auto  diff = y_ref->copy();
+
+            diff->axpy( value_t(-1), y.get() );
+
+            const auto  error = diff->norm2();
+            
+            std::cout << "    error  = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
         //
@@ -475,7 +528,9 @@ program_main ()
                       << term::bullet << term::bold
                       << "compressed"
                       #if defined(HLR_HAS_ZBLAS_APLR)
-                      << " (zblas)"
+                      << " (cl v2, zblas)"
+                      #else
+                      << " (cl v2)"
                       #endif
                       << term::reset << std::endl;
         
@@ -484,12 +539,14 @@ program_main ()
 
             x->fill( 1 );
 
+            auto  blocks = impl::build_cluster_blocks< value_t >( apply_normal, *zA );
+            
             for ( int i = 0; i < nbench; ++i )
             {
                 tic = timer::now();
     
-                for ( int j = 0; j < 50; ++j )
-                    impl::mul_vec< value_t >( 2.0, Hpro::apply_normal, *zA, *x, *y );
+                for ( int j = 0; j < nmvm; ++j )
+                    impl::mul_vec_cl< value_t >( value_t(2), apply_normal, *blocks, *x, *y );
 
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
@@ -505,9 +562,7 @@ program_main ()
                           << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                           << std::endl;
         
-            t_compressed = min( runtime );
-
-            std::cout << "    ratio  = " << boost::format( "%.02f" ) % ( t_compressed / t_orig ) << std::endl;
+            std::cout << "    ratio  = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
             std::cout << "    flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
             
             auto  diff = y_ref->copy();

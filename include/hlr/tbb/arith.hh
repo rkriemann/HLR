@@ -96,6 +96,7 @@ mul_vec_row ( const value_t                             alpha,
 // holding list of all matrix blocks per cluster
 //
 template < typename value_t > using  cluster_block_map_t = detail::cluster_block_map_t< value_t >;
+template < typename value_t > using  cluster_blocks_t    = hlr::cluster_blocks_t< value_t >;
 
 template < typename value_t >
 void
@@ -109,7 +110,19 @@ mul_vec_cl ( const value_t                             alpha,
     detail::mul_vec_cl( alpha, op_M, M, blocks, x, y );
 }
 
+template < typename value_t >
+void
+mul_vec_cl ( const value_t                             alpha,
+             const matop_t                             op_M,
+             const cluster_blocks_t< value_t > &       cb,
+             const vector::scalar_vector< value_t > &  x,
+             vector::scalar_vector< value_t > &        y )
+{
+    detail::mul_vec_cl( alpha, op_M, cb, x, y );
+}
+
 using hlr::setup_cluster_block_map;
+using hlr::build_cluster_blocks;
 
 //
 // pure local sub multiplication and summation of sub results

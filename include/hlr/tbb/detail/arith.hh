@@ -491,6 +491,57 @@ mul_vec_cl ( const value_t                             alpha,
     blas::add( alpha, yt, y_j );
 }
 
+template < typename value_t >
+void
+mul_vec_cl ( const value_t                             alpha,
+             const matop_t                             op_M,
+             const cluster_blocks_t< value_t > &       cb,
+             const vector::scalar_vector< value_t > &  x,
+             vector::scalar_vector< value_t > &        y )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    //
+    // compute update with all block in current block row
+    //
+
+    auto  y_j = blas::vector< value_t >( blas::vec( y ), cb.is - y.ofs() );
+    auto  yt  = blas::vector< value_t >( y_j.length() );
+    
+    for ( auto  M : cb.D )
+    {
+        auto  D   = M; // cptrcast( M, matrix::dense_matrix< value_t > );
+        auto  x_i = blas::vector< value_t >( blas::vec( x ), D->col_is( op_M ) - x.ofs() );
+            
+        D->apply_add( 1, x_i, yt, op_M );
+    }// for
+
+    for ( auto  M : cb.R )
+    {
+        auto  D   = M; // cptrcast( M, matrix::dense_matrix< value_t > );
+        auto  x_i = blas::vector< value_t >( blas::vec( x ), D->col_is( op_M ) - x.ofs() );
+            
+        D->apply_add( 1, x_i, yt, op_M );
+    }// for
+
+    blas::add( alpha, yt, y_j );
+
+    //
+    // recurse
+    //
+
+    if ( cb.sub_blocks.size() > 0 )
+    {
+        ::tbb::parallel_for< uint >(
+            0, cb.sub_blocks.size(),
+            [alpha,op_M,&cb,&x,&y] ( const uint  i )
+            {
+                hlr::tbb::detail::mul_vec_cl( alpha, op_M, *cb.sub_blocks[i], x, y );
+            } );
+    }// if
+}
+
 ///////////////////////////////////////////////////////////////////////
 //
 // matrix-vector with reductions
