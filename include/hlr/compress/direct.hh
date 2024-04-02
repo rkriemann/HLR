@@ -625,7 +625,7 @@ decompress ( const zarray &                  zdata,
 // deactivate if requested by user
 //
 
-#if HLR_USE_ZBLAS == 0
+#if HLR_USE_ZBLAS == 0 && defined(HLR_HAS_ZBLAS_DIRECT)
 #  undef HLR_HAS_ZBLAS_DIRECT
 #endif
 

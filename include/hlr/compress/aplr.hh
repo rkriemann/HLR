@@ -308,8 +308,8 @@ static const char provider[] = "mixedprec";
 // deactivate if requested by user
 //
 
-#if HLR_USE_ZBLAS == 0
-#  define HLR_HAS_ZBLAS_APLR    0
+#if HLR_USE_ZBLAS == 0 && defined(HLR_HAS_ZBLAS_APLR)
+#  undef HLR_HAS_ZBLAS_APLR
 #endif
 
 #endif // defined(HLR_APLR_COMPRESSOR)
