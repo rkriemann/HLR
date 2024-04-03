@@ -32,8 +32,6 @@ DECLARE_TYPE( lrsvmatrix );
 namespace matrix
 {
 
-#define HLR_USE_APLR  1
-
 //
 // Represents a low-rank matrix in factorised form: U·S·V^H
 // with orthogonal U/V and diagonal S, i.e., its singular
@@ -52,9 +50,7 @@ private:
     //
     struct mp_storage
     {
-        #if HLR_USE_APLR == 1
-        compress::aplr::zarray      zU, zV;
-        #endif
+        compress::aplr::zarray  zU, zV;
     };
 
 private:
@@ -281,11 +277,7 @@ public:
     // return true if data is compressed
     virtual bool   is_compressed () const
     {
-        #if HLR_USE_APLR == 1
         return _mpdata.zU.size() > 0;
-        #else
-        return false;
-        #endif
     }
 
     // access multiprecision data
@@ -301,13 +293,8 @@ public:
         size_t  size = Hpro::TRkMatrix< value_t >::byte_size();
 
         size += _S.byte_size();
-
-        #if HLR_USE_APLR == 1
-
         size += compress::aplr::byte_size( _mpdata.zU );
         size += compress::aplr::byte_size( _mpdata.zV );
-        
-        #endif
         
         return size;
     }
@@ -315,15 +302,7 @@ public:
     // return size of (floating point) data in bytes handled by this object
     virtual size_t data_byte_size () const
     {
-        #if HLR_USE_APLR == 1
-
         return sizeof(value_t) * _S.length() + compress::aplr::byte_size( _mpdata.zU ) + compress::aplr::byte_size( _mpdata.zV );
-
-        #else
-
-        return sizeof(value_t) * ( _S.length() + this->rank() * ( this->nrows() + this->ncols() ) );
-        
-        #endif
     }
     
     // test data for invalid values, e.g. INF and NAN
@@ -348,12 +327,8 @@ protected:
     // remove compressed storage (standard storage not restored!)
     virtual void   remove_compressed ()
     {
-        #if HLR_USE_APLR == 1
-
         _mpdata.zU = compress::aplr::zarray();
         _mpdata.zV = compress::aplr::zarray();
-        
-        #endif
     }
 };
 
@@ -390,8 +365,6 @@ lrsvmatrix< value_t >::U () const
         auto  dU = blas::matrix< value_t >( this->nrows(), this->rank() );
         uint  k  = 0;
 
-        #if HLR_USE_APLR == 1
-            
         compress::aplr::decompress_lr( _mpdata.zU, dU );
 
         // for ( uint  l = 0; l < dU.ncols(); ++l )
@@ -400,8 +373,6 @@ lrsvmatrix< value_t >::U () const
 
         //     blas::scale( _S(l), u_l );
         // }// for
-            
-        #endif
             
         return dU;
     }// if
@@ -417,13 +388,9 @@ lrsvmatrix< value_t >::V () const
 {
     if ( is_compressed() )
     {
-        auto        dV  = blas::matrix< value_t >( this->ncols(), this->rank() );
+        auto  dV = blas::matrix< value_t >( this->ncols(), this->rank() );
 
-        #if HLR_USE_APLR == 1
-            
         compress::aplr::decompress_lr( _mpdata.zV, dV );
-            
-        #endif
             
         return dV;
     }// if
@@ -740,15 +707,11 @@ lrsvmatrix< value_t >::copy () const
 
     if ( is_compressed() )
     {
-        #if HLR_USE_APLR == 1
-
         R->_mpdata.zU = compress::aplr::zarray( _mpdata.zU.size() );
         R->_mpdata.zV = compress::aplr::zarray( _mpdata.zV.size() );
             
         std::copy( _mpdata.zU.begin(), _mpdata.zU.end(), R->_mpdata.zU.begin() );
         std::copy( _mpdata.zV.begin(), _mpdata.zV.end(), R->_mpdata.zV.begin() );
-            
-        #endif
     }// if
 
     return M;
@@ -773,15 +736,11 @@ lrsvmatrix< value_t >::copy_to ( Hpro::TMatrix< value_t > *  A ) const
             
     if ( is_compressed() )
     {
-        #if HLR_USE_APLR == 1
-
         R->_mpdata.zU = compress::aplr::zarray( _mpdata.zU.size() );
         R->_mpdata.zV = compress::aplr::zarray( _mpdata.zV.size() );
             
         std::copy( _mpdata.zU.begin(), _mpdata.zU.end(), R->_mpdata.zU.begin() );
         std::copy( _mpdata.zV.begin(), _mpdata.zV.end(), R->_mpdata.zV.begin() );
-            
-        #endif
     }// if
 }
 
@@ -832,8 +791,6 @@ lrsvmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     }// if
         
     const auto  k = this->rank();
-
-    #if HLR_USE_APLR == 1
 
     //
     // we aim for σ_i ≈ δ u_i and hence choose u_i = δ / σ_i
@@ -917,8 +874,6 @@ lrsvmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     // auto  n2 = blas::norm_F( M2 );
 
     // std::cout << "R: " << boost::format( "%.4e" ) % n1 << " / " << boost::format( "%.4e" ) % n2 << " / " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
-
-    #endif
 }
 
 // decompress internal data
