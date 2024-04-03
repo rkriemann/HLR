@@ -37,7 +37,7 @@ constexpr uint8_t   fp64_mant_bits = 52;
 constexpr uint64_t  fp64_mant_mask = 0x000fffffffffffff;
 constexpr uint64_t  fp64_exp_mask  = 0x7ff0000000000000;
 
-constexpr uint8_t   bfl_header_ofs = 1;
+constexpr uint8_t   bfl_header_ofs = 4;
 
 //
 // return bitrate for given accuracy

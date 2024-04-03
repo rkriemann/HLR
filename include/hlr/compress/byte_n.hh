@@ -16,9 +16,9 @@ namespace hlr { namespace compress {
 using byte_t = unsigned char;
 
 // return byte padded value of <n>
-inline size_t byte_pad ( size_t  n )
+constexpr size_t byte_pad ( const size_t  n )
 {
-    return ( n % 8 != 0 ) ? n + (8 - n%8) : n;
+    return ( n % 8 != 0 ) ? n + (8 - n % 8) : n;
 }
 
 ////////////////////////////////////////////////////////////

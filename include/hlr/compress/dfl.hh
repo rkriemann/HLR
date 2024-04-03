@@ -27,7 +27,7 @@
 namespace hlr { namespace compress { namespace dfl {
 
 constexpr uint8_t  fp64_mant_bits = 52;
-constexpr uint8_t  dfl_header_ofs = 1;
+constexpr uint8_t  dfl_header_ofs = 8;
 
 //
 // return bitrate for given accuracy
