@@ -44,6 +44,7 @@ using hlr::cluster_blocks_t;
 using hlr::mul_vec_cl;
 using hlr::setup_cluster_block_map;
 using hlr::build_cluster_blocks;
+using hlr::build_cluster_matrix;
 
 //
 // compute C = C + α · A

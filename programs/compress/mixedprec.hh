@@ -320,13 +320,13 @@ program_main ()
         //
         // uncompressed
         //
+
+        std::cout << "  " << term::bullet << term::bold << "uncompressed" << term::reset << std::endl;
+        
         {
             runtime.clear();
             
-            std::cout << "  "
-                      << term::bullet << term::bold
-                      << "uncompressed"
-                      << term::reset << std::endl;
+            std::cout << "    " << term::bullet << term::bold << "standard" << term::reset << std::endl;
         
             auto  x = std::make_unique< vector::scalar_vector< value_t > >( A->col_is() );
             auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
@@ -343,86 +343,28 @@ program_main ()
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
         
-                std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+                std::cout << "      mvm in   " << format_time( toc ) << std::endl;
 
                 if ( i < nbench-1 )
                     y->fill( 1 );
             }// for
         
             if ( nbench > 1 )
-                std::cout << "  runtime  = "
+                std::cout << "    runtime  = "
                           << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                           << std::endl;
 
             t_ref = min( runtime );
             
-            std::cout << "    flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
+            std::cout << "      flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
             
             y_ref = std::move( y );
         }
 
-        //
-        // compressed
-        //
         {
             runtime.clear();
             
-            std::cout << "  "
-                      << term::bullet << term::bold
-                      << "compressed"
-                      #if defined(HLR_HAS_ZBLAS_APLR)
-                      << " (zblas)"
-                      #endif
-                      << term::reset << std::endl;
-        
-            auto  x = std::make_unique< vector::scalar_vector< value_t > >( zA->col_is() );
-            auto  y = std::make_unique< vector::scalar_vector< value_t > >( zA->row_is() );
-
-            x->fill( 1 );
-
-            for ( int i = 0; i < nbench; ++i )
-            {
-                tic = timer::now();
-    
-                for ( int j = 0; j < nmvm; ++j )
-                    impl::mul_vec< value_t >( value_t(2), apply_normal, *zA, *x, *y );
-
-                toc = timer::since( tic );
-                runtime.push_back( toc.seconds() );
-        
-                std::cout << "    mvm in   " << format_time( toc ) << std::endl;
-
-                if ( i < nbench-1 )
-                    y->fill( 1 );
-            }// for
-        
-            if ( nbench > 1 )
-                std::cout << "  runtime  = "
-                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                          << std::endl;
-        
-            std::cout << "    ratio  = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
-            std::cout << "    flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
-            
-            auto  diff = y_ref->copy();
-
-            diff->axpy( value_t(-1), y.get() );
-
-            const auto  error = diff->norm2();
-            
-            std::cout << "    error  = " << format_error( error, error / y_ref->norm2() ) << std::endl;
-        }
-
-        //
-        // uncompressed
-        //
-        {
-            runtime.clear();
-            
-            std::cout << "  "
-                      << term::bullet << term::bold
-                      << "uncompressed (cl)"
-                      << term::reset << std::endl;
+            std::cout << "    " << term::bullet << term::bold << "row cluster map" << term::reset << std::endl;
         
             auto  x = std::make_unique< vector::scalar_vector< value_t > >( A->col_is() );
             auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
@@ -439,24 +381,24 @@ program_main ()
                 tic = timer::now();
     
                 for ( int j = 0; j < nmvm; ++j )
-                    impl::mul_vec< value_t >( value_t(2), apply_normal, *A, *x, *y );
+                    impl::mul_vec_cl< value_t >( value_t(2), apply_normal, *A, block_map, *x, *y );
 
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
         
-                std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+                std::cout << "      mvm in   " << format_time( toc ) << std::endl;
 
                 if ( i < nbench-1 )
                     y->fill( 1 );
             }// for
         
             if ( nbench > 1 )
-                std::cout << "  runtime  = "
+                std::cout << "    runtime  = "
                           << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                           << std::endl;
 
-            std::cout << "    ratio  = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
-            std::cout << "    flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
+            std::cout << "      ratio  = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
+            std::cout << "      flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
             
             auto  diff = y_ref->copy();
 
@@ -464,16 +406,13 @@ program_main ()
 
             const auto  error = diff->norm2();
             
-            std::cout << "    error  = " << format_error( error, error / y_ref->norm2() ) << std::endl;
+            std::cout << "      error  = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
         {
             runtime.clear();
             
-            std::cout << "  "
-                      << term::bullet << term::bold
-                      << "uncompressed (cl v2)"
-                      << term::reset << std::endl;
+            std::cout << "    " << term::bullet << term::bold << "row cluster lists" << term::reset << std::endl;
         
             auto  x = std::make_unique< vector::scalar_vector< value_t > >( A->col_is() );
             auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
@@ -492,22 +431,117 @@ program_main ()
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
         
-                std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+                std::cout << "      mvm in   " << format_time( toc ) << std::endl;
 
                 if ( i < nbench-1 )
                     y->fill( 1 );
             }// for
         
             if ( nbench > 1 )
-                std::cout << "  runtime  = "
+                std::cout << "    runtime  = "
                           << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                           << std::endl;
 
-            std::cout << "    ratio  = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
-            std::cout << "    flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
+            std::cout << "      ratio  = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
+            std::cout << "      flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
 
-            io::matlab::write( *y_ref, "y1" );
-            io::matlab::write( *y, "y2" );
+            auto  diff = y_ref->copy();
+
+            diff->axpy( value_t(-1), y.get() );
+
+            const auto  error = diff->norm2();
+            
+            std::cout << "      error  = " << format_error( error, error / y_ref->norm2() ) << std::endl;
+        }
+
+        {
+            runtime.clear();
+            
+            std::cout << "    " << term::bullet << term::bold << "joined lowrank blocks" << term::reset << std::endl;
+        
+            auto  x = std::make_unique< vector::scalar_vector< value_t > >( A->col_is() );
+            auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
+
+            x->fill( 1 );
+
+            auto  blocks = impl::build_cluster_matrix< value_t >( apply_normal, *A );
+            
+            for ( int i = 0; i < nbench; ++i )
+            {
+                tic = timer::now();
+    
+                for ( int j = 0; j < nmvm; ++j )
+                    impl::mul_vec_cl< value_t >( value_t(2), apply_normal, *blocks, *x, *y );
+
+                toc = timer::since( tic );
+                runtime.push_back( toc.seconds() );
+        
+                std::cout << "      mvm in   " << format_time( toc ) << std::endl;
+
+                if ( i < nbench-1 )
+                    y->fill( 1 );
+            }// for
+        
+            if ( nbench > 1 )
+                std::cout << "    runtime  = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                          << std::endl;
+
+            std::cout << "      ratio  = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
+            std::cout << "      flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
+
+            auto  diff = y_ref->copy();
+
+            diff->axpy( value_t(-1), y.get() );
+
+            const auto  error = diff->norm2();
+            
+            std::cout << "      error  = " << format_error( error, error / y_ref->norm2() ) << std::endl;
+        }
+
+        //
+        // compressed
+        //
+        std::cout << "  " << term::bullet << term::bold << "compressed"
+                  #if defined(HLR_HAS_ZBLAS_APLR)
+                  << " (zblas)"
+                  #endif
+                  << term::reset << std::endl;
+        
+
+        {
+            runtime.clear();
+            
+            std::cout << "    " << term::bullet << term::bold << "standard" << term::reset << std::endl;
+        
+            auto  x = std::make_unique< vector::scalar_vector< value_t > >( zA->col_is() );
+            auto  y = std::make_unique< vector::scalar_vector< value_t > >( zA->row_is() );
+
+            x->fill( 1 );
+
+            for ( int i = 0; i < nbench; ++i )
+            {
+                tic = timer::now();
+    
+                for ( int j = 0; j < nmvm; ++j )
+                    impl::mul_vec< value_t >( value_t(2), apply_normal, *zA, *x, *y );
+
+                toc = timer::since( tic );
+                runtime.push_back( toc.seconds() );
+        
+                std::cout << "      mvm in   " << format_time( toc ) << std::endl;
+
+                if ( i < nbench-1 )
+                    y->fill( 1 );
+            }// for
+        
+            if ( nbench > 1 )
+                std::cout << "    runtime  = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                          << std::endl;
+        
+            std::cout << "      ratio  = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
+            std::cout << "      flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
             
             auto  diff = y_ref->copy();
 
@@ -515,24 +549,60 @@ program_main ()
 
             const auto  error = diff->norm2();
             
-            std::cout << "    error  = " << format_error( error, error / y_ref->norm2() ) << std::endl;
+            std::cout << "      error  = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
-        //
-        // compressed
-        //
         {
             runtime.clear();
             
-            std::cout << "  "
-                      << term::bullet << term::bold
-                      << "compressed"
-                      #if defined(HLR_HAS_ZBLAS_APLR)
-                      << " (cl v2, zblas)"
-                      #else
-                      << " (cl v2)"
-                      #endif
-                      << term::reset << std::endl;
+            std::cout << "    " << term::bullet << term::bold << "row cluster map" << term::reset << std::endl;
+        
+            auto  x = std::make_unique< vector::scalar_vector< value_t > >( A->col_is() );
+            auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
+
+            x->fill( 1 );
+
+            auto  block_map = impl::cluster_block_map_t< value_t >();
+
+            impl::setup_cluster_block_map( apply_normal, *zA, block_map );
+            
+            for ( int i = 0; i < nbench; ++i )
+            {
+                tic = timer::now();
+    
+                for ( int j = 0; j < nmvm; ++j )
+                    impl::mul_vec_cl< value_t >( value_t(2), apply_normal, *zA, block_map, *x, *y );
+
+                toc = timer::since( tic );
+                runtime.push_back( toc.seconds() );
+        
+                std::cout << "      mvm in   " << format_time( toc ) << std::endl;
+
+                if ( i < nbench-1 )
+                    y->fill( 1 );
+            }// for
+        
+            if ( nbench > 1 )
+                std::cout << "    runtime  = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                          << std::endl;
+
+            std::cout << "      ratio  = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
+            std::cout << "      flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
+            
+            auto  diff = y_ref->copy();
+
+            diff->axpy( value_t(-1), y.get() );
+
+            const auto  error = diff->norm2();
+            
+            std::cout << "      error  = " << format_error( error, error / y_ref->norm2() ) << std::endl;
+        }
+
+        {
+            runtime.clear();
+            
+            std::cout << "    " << term::bullet << term::bold << "row cluster lists" << term::reset << std::endl;
         
             auto  x = std::make_unique< vector::scalar_vector< value_t > >( zA->col_is() );
             auto  y = std::make_unique< vector::scalar_vector< value_t > >( zA->row_is() );
@@ -551,19 +621,19 @@ program_main ()
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
         
-                std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+                std::cout << "      mvm in   " << format_time( toc ) << std::endl;
 
                 if ( i < nbench-1 )
                     y->fill( 1 );
             }// for
         
             if ( nbench > 1 )
-                std::cout << "  runtime  = "
+                std::cout << "    runtime  = "
                           << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                           << std::endl;
         
-            std::cout << "    ratio  = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
-            std::cout << "    flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
+            std::cout << "      ratio  = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
+            std::cout << "      flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
             
             auto  diff = y_ref->copy();
 
@@ -571,7 +641,7 @@ program_main ()
 
             const auto  error = diff->norm2();
             
-            std::cout << "    error  = " << format_error( error, error / y_ref->norm2() ) << std::endl;
+            std::cout << "      error  = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
     }// if
 }

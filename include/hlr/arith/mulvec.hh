@@ -166,11 +166,8 @@ struct cluster_blocks_t
     // corresponding index set of cluster
     indexset                           is;
     
-    // list of dense blocks
-    std::list< const matrix * >        D;
-
-    // list of lowrank matrices
-    std::list< const matrix * >        R;
+    // list of associated matrices
+    std::list< const matrix * >        M;
 
     // son matrices (following cluster tree)
     std::vector< cluster_blocks_t * >  sub_blocks;
@@ -221,20 +218,10 @@ build_cluster_blocks ( const matop_t                     op_M,
             }// for
         }// for
     }// if
-    else if ( matrix::is_lowrank( M ) )
-    {
-        cb.R.push_back( &M );
-    }// if
-    else if ( matrix::is_lowrank_sv( M ) )
-    {
-        cb.R.push_back( &M );
-    }// if
-    else if ( matrix::is_dense( M ) )
-    {
-        cb.D.push_back( &M );
-    }// if
     else
-        HLR_ERROR( "unsupported matrix type: " + M.typestr() );
+    {
+        cb.M.push_back( &M );
+    }// else
 }
 
 }// namespace detail
@@ -244,9 +231,6 @@ std::unique_ptr< cluster_blocks_t< value_t > >
 build_cluster_blocks ( const matop_t                     op_M,
                        const Hpro::TMatrix< value_t > &  M )
 {
-    // first collect blocks per cluster
-    //
-    
     auto  cb = std::make_unique< cluster_blocks_t< value_t > >( M.row_is( op_M ) );
 
     detail::build_cluster_blocks( op_M, M, *cb );
@@ -269,25 +253,16 @@ mul_vec_cl ( const value_t                             alpha,
     // compute update with all block in current block row
     //
 
-    if ( ! cb.D.empty() || ! cb.R.empty() )
+    if ( ! cb.M.empty() )
     {
         auto  y_j = blas::vector< value_t >( blas::vec( y ), cb.is - y.ofs() );
         auto  yt  = blas::vector< value_t >( y_j.length() );
     
-        for ( auto  M : cb.D )
+        for ( auto  M : cb.M )
         {
-            auto  D   = M; // cptrcast( M, matrix::dense_matrix< value_t > );
-            auto  x_i = blas::vector< value_t >( blas::vec( x ), D->col_is( op_M ) - x.ofs() );
+            auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
             
-            D->apply_add( 1, x_i, yt, op_M );
-        }// for
-        
-        for ( auto  M : cb.R )
-        {
-            auto  D   = M; // cptrcast( M, matrix::dense_matrix< value_t > );
-            auto  x_i = blas::vector< value_t >( blas::vec( x ), D->col_is( op_M ) - x.ofs() );
-            
-            D->apply_add( 1, x_i, yt, op_M );
+            M->apply_add( 1, x_i, yt, op_M );
         }// for
 
         blas::add( alpha, yt, y_j );
@@ -310,56 +285,201 @@ mul_vec_cl ( const value_t                             alpha,
 template < typename value_t >
 struct cluster_matrix_t
 {
+    using matrix = Hpro::TMatrix< value_t >;
+
     // corresponding index set of cluster
     indexset                           is;
     
     // joined low rank factors
     blas::matrix< value_t >            U;
 
-    // joined dense matrices
-    blas::matrix< value_t >            D;
+    // list of dense matrices
+    std::list< const matrix * >        D;
+
+    // list of lowrank matrices
+    std::list< const matrix * >        R;
 
     // son matrices (following cluster tree)
     std::vector< cluster_matrix_t * >  sub_blocks;
 
-    //
     // ctor
-    //
     cluster_matrix_t ( const indexset &  ais )
             : is( ais )
     {}
+
+    // dtor
+    ~cluster_matrix_t ()
+    {
+        for ( auto  cm : sub_blocks )
+            delete cm;
+    }
 };
 
-//
-// 
-//
+namespace detail
+{ 
+
 template < typename value_t >
-std::pair< std::unique_ptr< cluster_matrix_t< value_t > >,
-           std::unique_ptr< cluster_matrix_t< value_t > > >
+void
+build_cluster_matrix ( const matop_t                     op_M,
+                       const Hpro::TMatrix< value_t > &  M,
+                       cluster_matrix_t< value_t > &     cb )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  B = cptrcast( & M, Hpro::TBlockMatrix< value_t > );
+
+        if ( cb.sub_blocks.size() == 0 )
+            cb.sub_blocks.resize( B->nblock_rows( op_M ) );
+        
+        for ( uint  i = 0; i < B->nblock_rows( op_M ); ++i )
+        {
+            HLR_ASSERT( ! is_null( B->block( i, 0, op_M ) ) );
+
+            if ( is_null( cb.sub_blocks[i] ) )
+                cb.sub_blocks[i] = new cluster_matrix_t< value_t >( B->block( i, 0, op_M )->row_is( op_M ) );
+        }// for
+                
+        for ( uint  i = 0; i < B->nblock_rows( op_M ); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols( op_M ); ++j )
+            {
+                if ( B->block( i, j, op_M ) != nullptr )
+                    build_cluster_matrix( op_M, * B->block( i, j, op_M ), * cb.sub_blocks[i] );
+            }// for
+        }// for
+    }// if
+    else if ( matrix::is_lowrank_sv( M ) )
+    {
+        cb.R.push_back( &M );
+    }// if
+    else if ( matrix::is_lowrank( M ) )
+    {
+        cb.R.push_back( &M );
+    }// if
+    else if ( matrix::is_dense( M ) )
+    {
+        cb.D.push_back( &M );
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix type: " + M.typestr() );
+}
+
+template < typename value_t >
+void
+build_joined_matrix ( const matop_t                  op_M,
+                      cluster_matrix_t< value_t > &  cm )
+{
+    if ( ! cm.R.empty() )
+    {
+        //
+        // determine joined rank
+        //
+
+        uint  k = 0;
+        
+        for ( auto  M : cm.R )
+            k += cptrcast( M, matrix::lrmatrix< value_t > )->rank();
+
+        //
+        // build joined U factor
+        //
+
+        auto  nrows = cm.is.size();
+        auto  U     = blas::matrix< value_t >( nrows, k );
+        uint  pos   = 0;
+
+        for ( auto  M : cm.R )
+        {
+            auto  R   = cptrcast( M, matrix::lrmatrix< value_t > );
+            auto  UR  = R->U( op_M );
+            auto  k_i = R->rank();
+            auto  U_i = blas::matrix< value_t >( U, blas::range::all, blas::range( pos, pos + k_i - 1 ) );
+
+            blas::copy( UR, U_i );
+            pos += k_i;
+        }// for
+
+        cm.U = std::move( U );
+    }// if
+
+    for ( auto  sub : cm.sub_blocks )
+        build_joined_matrix( op_M, *sub );
+}
+
+}// namespace detail
+
+template < typename value_t >
+std::unique_ptr< cluster_matrix_t< value_t > >
 build_cluster_matrix ( const matop_t                     op_M,
                        const Hpro::TMatrix< value_t > &  M )
 {
+    auto  cm = std::make_unique< cluster_matrix_t< value_t > >( M.row_is( op_M ) );
+
+    detail::build_cluster_matrix( op_M, M, *cm );
+    detail::build_joined_matrix( op_M, *cm );
+    
+    return cm;
+}
+
+template < typename value_t >
+void
+mul_vec_cl ( const value_t                             alpha,
+             const matop_t                             op_M,
+             const cluster_matrix_t< value_t > &       cm,
+             const vector::scalar_vector< value_t > &  x,
+             vector::scalar_vector< value_t > &        y )
+{
+    if ( alpha == value_t(0) )
+        return;
+
     //
-    // first collect blocks per cluster
+    // compute update with all block in current block row
+    //
+
+    if ( ! cm.D.empty() || ! cm.R.empty() )
+    {
+        auto  y_j = blas::vector< value_t >( blas::vec( y ), cm.is - y.ofs() );
+        auto  yt  = blas::vector< value_t >( y_j.length() );
+    
+        if ( ! cm.D.empty() )
+        {
+            for ( auto  M : cm.D )
+            {
+                auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
+                
+                M->apply_add( 1, x_i, yt, op_M );
+            }// for
+        }// if
+
+        if ( ! cm.R.empty() )
+        {
+            auto  t   = blas::vector< value_t >( cm.U.ncols() );
+            uint  pos = 0;
+            
+            for ( auto  M : cm.R )
+            {
+                auto  R   = cptrcast( M, matrix::lrmatrix< value_t > );
+                auto  VR  = R->V( op_M );
+                auto  k_i = R->rank();
+                auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
+                auto  t_i = blas::vector< value_t >( t, blas::range( pos, pos + k_i - 1 )  );
+
+                blas::mulvec( blas::adjoint( VR ), x_i, t_i );
+                pos += k_i;
+            }// for
+
+            blas::mulvec( value_t(1), cm.U, t, value_t(1), yt );
+        }// if
+
+        blas::add( alpha, yt, y_j );
+    }// if
+
+    //
+    // recurse
     //
     
-    auto  row_map = cluster_block_map_t< value_t >();
-    auto  col_map = cluster_block_map_t< value_t >();
-
-    setup_cluster_block_map( apply_normal,  M, row_map );
-    setup_cluster_block_map( apply_adjoint, M, col_map );
-
-    //
-    // convert matrix into cluster matrix structur
-    //
-
-    auto  row_CM = std::make_unique< cluster_matrix_t< value_t > >( M.row_is( op_M ) );
-    auto  col_CM = std::make_unique< cluster_matrix_t< value_t > >( M.col_is( op_M ) );
-        
-    convert_to_cluster_matrix( row_map, row_CM );
-    convert_to_cluster_matrix( col_map, col_CM );
-
-    return { std::move( row_CM ), std::move( col_CM ) };
+    for ( auto  sub : cm.sub_blocks )
+        mul_vec_cl( alpha, op_M, *sub, x, y );
 }
 
 //

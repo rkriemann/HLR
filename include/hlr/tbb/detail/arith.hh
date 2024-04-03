@@ -37,9 +37,6 @@ mul_vec_simple ( const value_t                    alpha,
                  const size_t                     ofs_cols,
                  std::mutex &                     mtx )
 {
-    if ( alpha == value_t(0) )
-        return;
-
     if ( is_blocked( M ) )
     {
         auto  B = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
@@ -142,9 +139,6 @@ mul_vec_chunk ( const value_t                    alpha,
 {
     // assert( M->ncols( op_M ) == x.length() );
     // assert( M->nrows( op_M ) == y.length() );
-
-    if ( alpha == value_t(0) )
-        return;
 
     if ( is_blocked( M ) )
     {
@@ -276,9 +270,6 @@ mul_vec_row ( const value_t                     alpha,
               const scalar_vector< value_t > &  sx,
               scalar_vector< value_t > &        sy )
 {
-    if ( alpha == value_t(0) )
-        return;
-
     if ( is_blocked( M ) )
     {
         auto  B = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
@@ -445,9 +436,6 @@ mul_vec_cl ( const value_t                             alpha,
              const vector::scalar_vector< value_t > &  sx,
              vector::scalar_vector< value_t > &        sy )
 {
-    if ( alpha == value_t(0) )
-        return;
-
     if ( is_blocked( M ) )
     {
         auto  B = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
@@ -499,33 +487,24 @@ mul_vec_cl ( const value_t                             alpha,
              const vector::scalar_vector< value_t > &  x,
              vector::scalar_vector< value_t > &        y )
 {
-    if ( alpha == value_t(0) )
-        return;
-
     //
     // compute update with all block in current block row
     //
 
-    auto  y_j = blas::vector< value_t >( blas::vec( y ), cb.is - y.ofs() );
-    auto  yt  = blas::vector< value_t >( y_j.length() );
+    if ( ! cb.M.empty() )
+    {
+        auto  y_j = blas::vector< value_t >( blas::vec( y ), cb.is - y.ofs() );
+        auto  yt  = blas::vector< value_t >( y_j.length() );
     
-    for ( auto  M : cb.D )
-    {
-        auto  D   = M; // cptrcast( M, matrix::dense_matrix< value_t > );
-        auto  x_i = blas::vector< value_t >( blas::vec( x ), D->col_is( op_M ) - x.ofs() );
+        for ( auto  M : cb.M )
+        {
+            auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
             
-        D->apply_add( 1, x_i, yt, op_M );
-    }// for
-
-    for ( auto  M : cb.R )
-    {
-        auto  D   = M; // cptrcast( M, matrix::dense_matrix< value_t > );
-        auto  x_i = blas::vector< value_t >( blas::vec( x ), D->col_is( op_M ) - x.ofs() );
-            
-        D->apply_add( 1, x_i, yt, op_M );
-    }// for
-
-    blas::add( alpha, yt, y_j );
+            M->apply_add( 1, x_i, yt, op_M );
+        }// for
+        
+        blas::add( alpha, yt, y_j );
+    }// if
 
     //
     // recurse
@@ -538,6 +517,116 @@ mul_vec_cl ( const value_t                             alpha,
             [alpha,op_M,&cb,&x,&y] ( const uint  i )
             {
                 hlr::tbb::detail::mul_vec_cl( alpha, op_M, *cb.sub_blocks[i], x, y );
+            } );
+    }// if
+}
+
+template < typename value_t >
+void
+build_joined_matrix ( const matop_t                  op_M,
+                      cluster_matrix_t< value_t > &  cm )
+{
+    if ( ! cm.R.empty() )
+    {
+        //
+        // determine joined rank
+        //
+
+        uint  k = 0;
+        
+        for ( auto  M : cm.R )
+            k += cptrcast( M, matrix::lrmatrix< value_t > )->rank();
+
+        //
+        // build joined U factor
+        //
+
+        auto  nrows = cm.is.size();
+        auto  U     = blas::matrix< value_t >( nrows, k );
+        uint  pos   = 0;
+
+        for ( auto  M : cm.R )
+        {
+            auto  R   = cptrcast( M, matrix::lrmatrix< value_t > );
+            auto  UR  = R->U( op_M );
+            auto  k_i = R->rank();
+            auto  U_i = blas::matrix< value_t >( U, blas::range::all, blas::range( pos, pos + k_i - 1 ) );
+
+            blas::copy( UR, U_i );
+            pos += k_i;
+        }// for
+
+        cm.U = std::move( U );
+    }// if
+
+    for ( auto  sub : cm.sub_blocks )
+        build_joined_matrix( op_M, *sub );
+}
+
+template < typename value_t >
+void
+mul_vec_cl ( const value_t                             alpha,
+             const matop_t                             op_M,
+             const cluster_matrix_t< value_t > &       cm,
+             const vector::scalar_vector< value_t > &  x,
+             vector::scalar_vector< value_t > &        y )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    //
+    // compute update with all block in current block row
+    //
+
+    if ( ! cm.D.empty() || ! cm.R.empty() )
+    {
+        auto  y_j = blas::vector< value_t >( blas::vec( y ), cm.is - y.ofs() );
+        auto  yt  = blas::vector< value_t >( y_j.length() );
+    
+        if ( ! cm.D.empty() )
+        {
+            for ( auto  M : cm.D )
+            {
+                auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
+                
+                M->apply_add( 1, x_i, yt, op_M );
+            }// for
+        }// if
+
+        if ( ! cm.R.empty() )
+        {
+            auto  t   = blas::vector< value_t >( cm.U.ncols() );
+            uint  pos = 0;
+            
+            for ( auto  M : cm.R )
+            {
+                auto  R   = cptrcast( M, matrix::lrmatrix< value_t > );
+                auto  VR  = R->V( op_M );
+                auto  k_i = R->rank();
+                auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
+                auto  t_i = blas::vector< value_t >( t, blas::range( pos, pos + k_i - 1 )  );
+
+                blas::mulvec( blas::adjoint( VR ), x_i, t_i );
+                pos += k_i;
+            }// for
+
+            blas::mulvec( value_t(1), cm.U, t, value_t(1), yt );
+        }// if
+
+        blas::add( alpha, yt, y_j );
+    }// if
+
+    //
+    // recurse
+    //
+    
+    if ( cm.sub_blocks.size() > 0 )
+    {
+        ::tbb::parallel_for< uint >(
+            0, cm.sub_blocks.size(),
+            [alpha,op_M,&cm,&x,&y] ( const uint  i )
+            {
+                hlr::tbb::detail::mul_vec_cl( alpha, op_M, *cm.sub_blocks[i], x, y );
             } );
     }// if
 }

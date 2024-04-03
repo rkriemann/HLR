@@ -50,6 +50,9 @@ mul_vec ( const value_t                     alpha,
           const blas::vector< value_t > &   x,
           blas::vector< value_t > &         y )
 {
+    if ( alpha == value_t(0) )
+        return;
+    
     // auto  mtx = std::mutex();
     
     // detail::mul_vec_simple( alpha, op_M, M, x, y, M.row_is( op_M ).first(), M.col_is( op_M ).first(), mtx );
@@ -74,6 +77,9 @@ mul_vec_chunk ( const value_t                             alpha,
                 const vector::scalar_vector< value_t > &  x,
                 vector::scalar_vector< value_t > &        y )
 {
+    if ( alpha == value_t(0) )
+        return;
+    
     mul_vec( alpha, op_M, M, blas::vec( x ), blas::vec( y ) );
 }
 
@@ -88,6 +94,9 @@ mul_vec_row ( const value_t                             alpha,
               const vector::scalar_vector< value_t > &  x,
               vector::scalar_vector< value_t > &        y )
 {
+    if ( alpha == value_t(0) )
+        return;
+    
     detail::mul_vec_row( alpha, op_M, M, x, y );
 }
 
@@ -97,6 +106,7 @@ mul_vec_row ( const value_t                             alpha,
 //
 template < typename value_t > using  cluster_block_map_t = detail::cluster_block_map_t< value_t >;
 template < typename value_t > using  cluster_blocks_t    = hlr::cluster_blocks_t< value_t >;
+template < typename value_t > using  cluster_matrix_t    = hlr::cluster_matrix_t< value_t >;
 
 template < typename value_t >
 void
@@ -107,6 +117,9 @@ mul_vec_cl ( const value_t                             alpha,
              const vector::scalar_vector< value_t > &  x,
              vector::scalar_vector< value_t > &        y )
 {
+    if ( alpha == value_t(0) )
+        return;
+
     detail::mul_vec_cl( alpha, op_M, M, blocks, x, y );
 }
 
@@ -118,11 +131,41 @@ mul_vec_cl ( const value_t                             alpha,
              const vector::scalar_vector< value_t > &  x,
              vector::scalar_vector< value_t > &        y )
 {
+    if ( alpha == value_t(0) )
+        return;
+
     detail::mul_vec_cl( alpha, op_M, cb, x, y );
+}
+
+template < typename value_t >
+void
+mul_vec_cl ( const value_t                             alpha,
+             const matop_t                             op_M,
+             const cluster_matrix_t< value_t > &       cm,
+             const vector::scalar_vector< value_t > &  x,
+             vector::scalar_vector< value_t > &        y )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    detail::mul_vec_cl( alpha, op_M, cm, x, y );
 }
 
 using hlr::setup_cluster_block_map;
 using hlr::build_cluster_blocks;
+
+template < typename value_t >
+std::unique_ptr< cluster_matrix_t< value_t > >
+build_cluster_matrix ( const matop_t                     op_M,
+                       const Hpro::TMatrix< value_t > &  M )
+{
+    auto  cm = std::make_unique< cluster_matrix_t< value_t > >( M.row_is( op_M ) );
+
+    hlr::detail::build_cluster_matrix( op_M, M, *cm );
+    hlr::tbb::detail::build_joined_matrix( op_M, *cm );
+    
+    return cm;
+}
 
 //
 // pure local sub multiplication and summation of sub results

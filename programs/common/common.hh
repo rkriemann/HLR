@@ -133,7 +133,7 @@ std::string
 format_flops ( const double  f,
                const double  t )
 {
-    return str( boost::format( "%.2f MFlop / %.2f MFlop/s" ) % ( f / 1e6 ) % ( f / ( 1e6 * t ) ) );
+    return str( boost::format( "%.2f MFlop/s" ) % ( f / ( 1e6 * t ) ) );
 }
 
 inline
