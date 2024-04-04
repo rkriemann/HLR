@@ -105,6 +105,8 @@ std::string  reverse      ( const std::string &  text ) { return reverse()      
 #if defined(WINDOWS) || defined(_WIN32) || defined(_WIN64)
 
 const char *  reset        () { return "";  }
+const char *  rollback     () { return "";  }
+const char *  clearline    () { return "";  }
 
 const char *  black        () { return ""; }
 const char *  red          () { return ""; }
@@ -151,6 +153,8 @@ const char *  reverse      () { return "";  }
 #else
 
 const char *  reset        () { return ( use_colors ? "\033[0m" : "" ); }
+const char *  rollback     () { return "\r"; }
+const char *  clearline    () { return "\033[K"; }
 
 const char *  black        () { return ( use_colors ? "\033[30m" : "" ); }
 const char *  red          () { return ( use_colors ? "\033[31m" : "" ); }
@@ -203,6 +207,9 @@ const char *  reverse      () { return ( use_colors ? "\033[7m" : "" ); }
 #define IS_TTY( stream, color )  if ( supports_color( stream ) ) { return stream << color(); } else { return stream; }
 
 std::ostream &  reset        ( std::ostream &  os ) { IS_TTY( os, reset ); }
+std::ostream &  flush        ( std::ostream &  os ) { if ( supports_color( os ) ) { return os << std::flush; } else { return os << std::endl; } }
+std::ostream &  rollback     ( std::ostream &  os ) { IS_TTY( os, rollback ); }
+std::ostream &  clearline    ( std::ostream &  os ) { IS_TTY( os, clearline ); }
 
 std::ostream &  black        ( std::ostream &  os ) { IS_TTY( os, black ); }
 std::ostream &  red          ( std::ostream &  os ) { IS_TTY( os, red ); }
@@ -254,6 +261,16 @@ std::ostream &  alert        ( std::ostream &  os )
 std::ostream &  bullet       ( std::ostream &  os )
 {
     return os << yellow << bold << "∙ " << reset;
+}
+
+std::ostream &  triangle     ( std::ostream &  os )
+{
+    return os << yellow << bold << "▸ " << reset;
+}
+
+std::ostream &  dash         ( std::ostream &  os )
+{
+    return os << yellow << bold << "━ " << reset;
 }
 
 }// namespace term
