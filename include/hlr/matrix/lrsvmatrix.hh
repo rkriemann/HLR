@@ -45,20 +45,11 @@ public:
     using  real_t  = Hpro::real_type_t< value_t >;
     
 private:
-    //
-    // compressed storage based on underlying floating point type
-    //
-    struct mp_storage
-    {
-        compress::aplr::zarray  zU, zV;
-    };
-
-private:
     // singular values
     blas::vector< real_t >  _S;
 
     // compressed storage
-    mp_storage              _mpdata;
+    compress::aplr::zarray  _zU, _zV;
 
 public:
     //
@@ -277,11 +268,12 @@ public:
     // return true if data is compressed
     virtual bool   is_compressed () const
     {
-        return _mpdata.zU.size() > 0;
+        return _zU.size() > 0;
     }
 
     // access multiprecision data
-    const mp_storage &  mp_data () const { return _mpdata; }
+    const compress::aplr::zarray  zU () const { return _zU; }
+    const compress::aplr::zarray  zV () const { return _zV; }
     
     //
     // misc.
@@ -293,8 +285,8 @@ public:
         size_t  size = Hpro::TRkMatrix< value_t >::byte_size();
 
         size += _S.byte_size();
-        size += compress::aplr::byte_size( _mpdata.zU );
-        size += compress::aplr::byte_size( _mpdata.zV );
+        size += compress::aplr::byte_size( _zU );
+        size += compress::aplr::byte_size( _zV );
         
         return size;
     }
@@ -302,7 +294,7 @@ public:
     // return size of (floating point) data in bytes handled by this object
     virtual size_t data_byte_size () const
     {
-        return sizeof(value_t) * _S.length() + compress::aplr::byte_size( _mpdata.zU ) + compress::aplr::byte_size( _mpdata.zV );
+        return sizeof(value_t) * _S.length() + compress::aplr::byte_size( _zU ) + compress::aplr::byte_size( _zV );
     }
     
     // test data for invalid values, e.g. INF and NAN
@@ -327,8 +319,8 @@ protected:
     // remove compressed storage (standard storage not restored!)
     virtual void   remove_compressed ()
     {
-        _mpdata.zU = compress::aplr::zarray();
-        _mpdata.zV = compress::aplr::zarray();
+        _zU = compress::aplr::zarray();
+        _zV = compress::aplr::zarray();
     }
 };
 
@@ -365,7 +357,7 @@ lrsvmatrix< value_t >::U () const
         auto  dU = blas::matrix< value_t >( this->nrows(), this->rank() );
         uint  k  = 0;
 
-        compress::aplr::decompress_lr( _mpdata.zU, dU );
+        compress::aplr::decompress_lr( _zU, dU );
 
         // for ( uint  l = 0; l < dU.ncols(); ++l )
         // {
@@ -390,7 +382,7 @@ lrsvmatrix< value_t >::V () const
     {
         auto  dV = blas::matrix< value_t >( this->ncols(), this->rank() );
 
-        compress::aplr::decompress_lr( _mpdata.zV, dV );
+        compress::aplr::decompress_lr( _zV, dV );
             
         return dV;
     }// if
@@ -646,14 +638,14 @@ lrsvmatrix< value_t >::apply_add ( const value_t                    alpha,
         if ( op == Hpro::apply_normal )
         {
             // t := V^H x
-            compress::aplr::zblas::mulvec( ncols, k, apply_adjoint, value_t(1), _mpdata.zV, x.data(), t.data() );
+            compress::aplr::zblas::mulvec( ncols, k, apply_adjoint, value_t(1), _zV, x.data(), t.data() );
 
             // t := α·t
             for ( uint  i = 0; i < k; ++i )
-                t(i) *= value_t(alpha) * _S(i);
+                t(i) *= alpha * _S(i);
         
             // y := y + U t
-            compress::aplr::zblas::mulvec( nrows, k, apply_normal, value_t(1), _mpdata.zU, t.data(), y.data() );
+            compress::aplr::zblas::mulvec( nrows, k, apply_normal, value_t(1), _zU, t.data(), y.data() );
         }// if
         else if ( op == Hpro::apply_transposed )
         {
@@ -662,14 +654,14 @@ lrsvmatrix< value_t >::apply_add ( const value_t                    alpha,
         else if ( op == Hpro::apply_adjoint )
         {
             // t := U^H x
-            compress::aplr::zblas::mulvec( nrows, k, apply_adjoint, value_t(1), _mpdata.zU, x.data(), t.data() );
+            compress::aplr::zblas::mulvec( nrows, k, apply_adjoint, value_t(1), _zU, x.data(), t.data() );
 
             // t := α·t
             for ( uint  i = 0; i < k; ++i )
-                t(i) *= value_t(alpha) * _S(i);
+                t(i) *= alpha * _S(i);
         
             // y := t + V t
-            compress::aplr::zblas::mulvec( ncols, k, apply_normal, value_t(1), _mpdata.zV, t.data(), y.data() );
+            compress::aplr::zblas::mulvec( ncols, k, apply_normal, value_t(1), _zV, t.data(), y.data() );
         }// if
     }// if
     else
@@ -707,11 +699,11 @@ lrsvmatrix< value_t >::copy () const
 
     if ( is_compressed() )
     {
-        R->_mpdata.zU = compress::aplr::zarray( _mpdata.zU.size() );
-        R->_mpdata.zV = compress::aplr::zarray( _mpdata.zV.size() );
+        R->_zU = compress::aplr::zarray( _zU.size() );
+        R->_zV = compress::aplr::zarray( _zV.size() );
             
-        std::copy( _mpdata.zU.begin(), _mpdata.zU.end(), R->_mpdata.zU.begin() );
-        std::copy( _mpdata.zV.begin(), _mpdata.zV.end(), R->_mpdata.zV.begin() );
+        std::copy( _zU.begin(), _zU.end(), R->_zU.begin() );
+        std::copy( _zV.begin(), _zV.end(), R->_zV.begin() );
     }// if
 
     return M;
@@ -736,11 +728,11 @@ lrsvmatrix< value_t >::copy_to ( Hpro::TMatrix< value_t > *  A ) const
             
     if ( is_compressed() )
     {
-        R->_mpdata.zU = compress::aplr::zarray( _mpdata.zU.size() );
-        R->_mpdata.zV = compress::aplr::zarray( _mpdata.zV.size() );
+        R->_zU = compress::aplr::zarray( _zU.size() );
+        R->_zV = compress::aplr::zarray( _zV.size() );
             
-        std::copy( _mpdata.zU.begin(), _mpdata.zU.end(), R->_mpdata.zU.begin() );
-        std::copy( _mpdata.zV.begin(), _mpdata.zV.end(), R->_mpdata.zV.begin() );
+        std::copy( _zU.begin(), _zU.end(), R->_zU.begin() );
+        std::copy( _zV.begin(), _zV.end(), R->_zV.begin() );
     }// if
 }
 
@@ -855,8 +847,8 @@ lrsvmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     
     if ( mem_mp < mem_lr )
     {
-        _mpdata.zU = std::move( zU );
-        _mpdata.zV = std::move( zV );
+        _zU = std::move( zU );
+        _zV = std::move( zV );
     
         this->_mat_A = std::move( blas::matrix< value_t >( 0, 0 ) );
         this->_mat_B = std::move( blas::matrix< value_t >( 0, 0 ) );

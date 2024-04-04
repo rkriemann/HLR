@@ -282,16 +282,25 @@ mul_vec_cl ( const value_t                             alpha,
 //
 // build data structure with joined lowrank/dense blocks per row/column cluster
 //
-template < typename value_t >
+template < typename T_value >
 struct cluster_matrix_t
 {
-    using matrix = Hpro::TMatrix< value_t >;
+    using  value_t = T_value;
+    using  real_t  = Hpro::real_type_t< value_t >;
+    using  matrix  = Hpro::TMatrix< value_t >;
 
     // corresponding index set of cluster
     indexset                           is;
+
+    // signal APLR compression
+    bool                               compressed;
     
     // joined low rank factors
     blas::matrix< value_t >            U;
+
+    // compressed storage
+    compress::aplr::zarray             zU;
+    blas::vector< real_t >             S;
 
     // list of dense matrices
     std::list< const matrix * >        D;
@@ -369,37 +378,113 @@ void
 build_joined_matrix ( const matop_t                  op_M,
                       cluster_matrix_t< value_t > &  cm )
 {
+    using  real_t = Hpro::real_type_t< value_t >;
+    
     if ( ! cm.R.empty() )
     {
         //
-        // determine joined rank
+        // check if compression is to be used
         //
 
-        uint  k = 0;
+        bool  has_lr   = false;
+        bool  has_lrsv = false;
         
         for ( auto  M : cm.R )
-            k += cptrcast( M, matrix::lrmatrix< value_t > )->rank();
-
-        //
-        // build joined U factor
-        //
-
-        auto  nrows = cm.is.size();
-        auto  U     = blas::matrix< value_t >( nrows, k );
-        uint  pos   = 0;
-
-        for ( auto  M : cm.R )
         {
-            auto  R   = cptrcast( M, matrix::lrmatrix< value_t > );
-            auto  UR  = R->U( op_M );
-            auto  k_i = R->rank();
-            auto  U_i = blas::matrix< value_t >( U, blas::range::all, blas::range( pos, pos + k_i - 1 ) );
-
-            blas::copy( UR, U_i );
-            pos += k_i;
+            if      ( matrix::is_lowrank(    M ) ) has_lr   = true;
+            else if ( matrix::is_lowrank_sv( M ) ) has_lrsv = true;
         }// for
 
-        cm.U = std::move( U );
+        if ( has_lr && has_lrsv )
+            HLR_ERROR( "only either lrmatrix or lrsvmatrix supported" );
+
+        if ( has_lr )
+        {
+            //
+            // determine joined rank
+            //
+
+            uint  k = 0;
+        
+            for ( auto  M : cm.R )
+                k += cptrcast( M, matrix::lrmatrix< value_t > )->rank();
+
+            //
+            // build joined U factor
+            //
+
+            auto  nrows = cm.is.size();
+            auto  U     = blas::matrix< value_t >( nrows, k );
+            uint  pos   = 0;
+
+            for ( auto  M : cm.R )
+            {
+                auto  R   = cptrcast( M, matrix::lrmatrix< value_t > );
+                auto  UR  = R->U( op_M );
+                auto  k_i = R->rank();
+                auto  U_i = blas::matrix< value_t >( U, blas::range::all, blas::range( pos, pos + k_i - 1 ) );
+
+                blas::copy( UR, U_i );
+                pos += k_i;
+            }// for
+
+            cm.U = std::move( U );
+
+            cm.compressed = false;
+        }// if
+        else
+        {
+            HLR_ASSERT( has_lrsv );
+            
+            //
+            // determine joined rank and compressed size
+            //
+
+            uint    k     = 0;
+            size_t  zsize = 0;
+        
+            for ( auto  M : cm.R )
+            {
+                auto  R = cptrcast( M, matrix::lrsvmatrix< value_t > );
+                
+                k += R->rank();
+
+                if ( op_M == apply_normal ) zsize += R->zU().size();
+                else                        zsize += R->zV().size();
+            }// for
+
+            //
+            // build joined U factor
+            //
+
+            uint    kpos = 0;
+            size_t  zpos = 0;
+
+            cm.S = blas::vector< real_t >( k );
+            cm.zU.resize( zsize );
+            
+            for ( auto  M : cm.R )
+            {
+                auto  R   = cptrcast( M, matrix::lrsvmatrix< value_t > );
+                auto  UR  = R->U( op_M );
+                auto  k_i = R->rank();
+                auto  S_i = blas::vector< value_t >( cm.S, blas::range( kpos, kpos + k_i - 1 ) );
+
+                blas::copy( R->S(), S_i );
+                kpos += k_i;
+
+                auto  zsize_i = ( op_M == apply_normal ? R->zU().size() : R->zV().size() );
+                
+                if ( op_M == apply_normal ) memcpy( cm.zU.data() + zpos, R->zU().data(), zsize_i );
+                else                        memcpy( cm.zU.data() + zpos, R->zV().data(), zsize_i );
+
+                zpos += zsize_i;
+            }// for
+
+            HLR_ASSERT( zpos == zsize );
+            
+            cm.compressed = true;
+        }// else
     }// if
 
     for ( auto  sub : cm.sub_blocks )
@@ -453,22 +538,59 @@ mul_vec_cl ( const value_t                             alpha,
 
         if ( ! cm.R.empty() )
         {
-            auto  t   = blas::vector< value_t >( cm.U.ncols() );
-            uint  pos = 0;
-            
-            for ( auto  M : cm.R )
+            if ( cm.compressed )
             {
-                auto  R   = cptrcast( M, matrix::lrmatrix< value_t > );
-                auto  VR  = R->V( op_M );
-                auto  k_i = R->rank();
-                auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
-                auto  t_i = blas::vector< value_t >( t, blas::range( pos, pos + k_i - 1 )  );
+                const auto  k   = cm.S.length();
+                auto        t   = blas::vector< value_t >( k );
+                uint        pos = 0;
+            
+                for ( auto  M : cm.R )
+                {
+                    auto  R   = cptrcast( M, matrix::lrsvmatrix< value_t > );
+                    auto  k_i = R->rank();
+                    auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
+                    auto  t_i = blas::vector< value_t >( t, blas::range( pos, pos + k_i - 1 )  );
+                    
+                    #if defined(HLR_HAS_ZBLAS_APLR)
+                    if ( op_M == apply_normal )
+                        compress::aplr::zblas::mulvec( R->ncols(), k_i, apply_adjoint, value_t(1), R->zV(), x_i.data(), t_i.data() );
+                    else
+                        compress::aplr::zblas::mulvec( R->nrows(), k_i, apply_adjoint, value_t(1), R->zU(), x_i.data(), t_i.data() );
+                    #else
+                    HLR_ERROR( "TODO" );
+                    #endif
 
-                blas::mulvec( blas::adjoint( VR ), x_i, t_i );
-                pos += k_i;
-            }// for
+                    pos += k_i;
+                }// for
 
-            blas::mulvec( value_t(1), cm.U, t, value_t(1), yt );
+                for ( uint  i = 0; i < k; ++i )
+                    t(i) *= cm.S(i);
+
+                #if defined(HLR_HAS_ZBLAS_APLR)
+                compress::aplr::zblas::mulvec( yt.length(), k, apply_normal, value_t(1), cm.zU, t.data(), yt.data() );
+                #else
+                HLR_ERROR( "TODO" );
+                #endif
+            }// if
+            else
+            {
+                auto  t   = blas::vector< value_t >( cm.U.ncols() );
+                uint  pos = 0;
+            
+                for ( auto  M : cm.R )
+                {
+                    auto  R   = cptrcast( M, matrix::lrmatrix< value_t > );
+                    auto  VR  = R->V( op_M );
+                    auto  k_i = R->rank();
+                    auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
+                    auto  t_i = blas::vector< value_t >( t, blas::range( pos, pos + k_i - 1 )  );
+
+                    blas::mulvec( blas::adjoint( VR ), x_i, t_i );
+                    pos += k_i;
+                }// for
+
+                blas::mulvec( value_t(1), cm.U, t, value_t(1), yt );
+            }// else
         }// if
 
         blas::add( alpha, yt, y_j );

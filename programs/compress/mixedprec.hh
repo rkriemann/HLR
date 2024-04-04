@@ -237,8 +237,8 @@ program_main ()
 
         if ( nbench > 1 )
             std::cout << term::rollback << term::clearline << "    runtime = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                      << std::endl;
+                      << format_time( min( runtime ), median( runtime ), max( runtime ) );
+        std::cout << std::endl;
     }
 
     const auto  mem_zA = zA->byte_size();
@@ -285,8 +285,8 @@ program_main ()
         
         if ( nbench > 1 )
             std::cout << term::rollback << term::clearline << "    runtime = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                      << std::endl;
+                      << format_time( min( runtime ), median( runtime ), max( runtime ) );
+        std::cout << std::endl;
 
         auto  error = impl::norm::frobenius( 1, *A, -1, *zB );
         
@@ -351,8 +351,8 @@ program_main ()
         
             if ( nbench > 1 )
                 std::cout << term::rollback << term::clearline << "      runtime = "
-                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                          << std::endl;
+                          << format_time( min( runtime ), median( runtime ), max( runtime ) );
+            std::cout << std::endl;
 
             t_ref = min( runtime );
             
@@ -361,6 +361,7 @@ program_main ()
             y_ref = std::move( y );
         }
 
+        if ( true )
         {
             runtime.clear();
             
@@ -394,8 +395,8 @@ program_main ()
         
             if ( nbench > 1 )
                 std::cout << term::rollback << term::clearline << "      runtime = "
-                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                          << std::endl;
+                          << format_time( min( runtime ), median( runtime ), max( runtime ) );
+            std::cout << std::endl;
 
             std::cout << "      ratio   = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
             std::cout << "      flops   = " << format_flops( flops_h, min( runtime ) ) << std::endl;
@@ -409,6 +410,7 @@ program_main ()
             std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
+        if ( true )
         {
             runtime.clear();
             
@@ -439,8 +441,8 @@ program_main ()
         
             if ( nbench > 1 )
                 std::cout << term::rollback << term::clearline << "      runtime = "
-                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                          << std::endl;
+                          << format_time( min( runtime ), median( runtime ), max( runtime ) );
+            std::cout << std::endl;
 
             std::cout << "      ratio   = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
             std::cout << "      flops   = " << format_flops( flops_h, min( runtime ) ) << std::endl;
@@ -454,6 +456,7 @@ program_main ()
             std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
+        if ( true )
         {
             runtime.clear();
             
@@ -484,8 +487,8 @@ program_main ()
         
             if ( nbench > 1 )
                 std::cout << term::rollback << term::clearline << "      runtime = "
-                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                          << std::endl;
+                          << format_time( min( runtime ), median( runtime ), max( runtime ) );
+            std::cout << std::endl;
 
             std::cout << "      ratio   = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
             std::cout << "      flops   = " << format_flops( flops_h, min( runtime ) ) << std::endl;
@@ -509,6 +512,7 @@ program_main ()
                   << term::reset << std::endl;
         
 
+        if ( true )
         {
             runtime.clear();
             
@@ -537,8 +541,8 @@ program_main ()
         
             if ( nbench > 1 )
                 std::cout << term::rollback << term::clearline << "      runtime = "
-                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                          << std::endl;
+                          << format_time( min( runtime ), median( runtime ), max( runtime ) );
+            std::cout << std::endl;
         
             std::cout << "      ratio   = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
             std::cout << "      flops   = " << format_flops( flops_h, min( runtime ) ) << std::endl;
@@ -552,6 +556,7 @@ program_main ()
             std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
+        if ( true )
         {
             runtime.clear();
             
@@ -584,8 +589,8 @@ program_main ()
         
             if ( nbench > 1 )
                 std::cout << term::rollback << term::clearline << "      runtime = "
-                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                          << std::endl;
+                          << format_time( min( runtime ), median( runtime ), max( runtime ) );
+            std::cout << std::endl;
 
             std::cout << "      ratio   = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
             std::cout << "      flops   = " << format_flops( flops_h, min( runtime ) ) << std::endl;
@@ -599,6 +604,7 @@ program_main ()
             std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
+        if ( true )
         {
             runtime.clear();
             
@@ -629,12 +635,58 @@ program_main ()
         
             if ( nbench > 1 )
                 std::cout << term::rollback << term::clearline << "      runtime = "
-                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                          << std::endl;
+                          << format_time( min( runtime ), median( runtime ), max( runtime ) );
+            std::cout << std::endl;
         
             std::cout << "      ratio   = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
             std::cout << "      flops   = " << format_flops( flops_h, min( runtime ) ) << std::endl;
             
+            auto  diff = y_ref->copy();
+
+            diff->axpy( value_t(-1), y.get() );
+
+            const auto  error = diff->norm2();
+            
+            std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
+        }
+
+        if ( true )
+        {
+            runtime.clear();
+            
+            std::cout << "    " << term::bullet << term::bold << "joined lowrank blocks" << term::reset << std::endl;
+        
+            auto  x = std::make_unique< vector::scalar_vector< value_t > >( zA->col_is() );
+            auto  y = std::make_unique< vector::scalar_vector< value_t > >( zA->row_is() );
+
+            x->fill( 1 );
+
+            auto  blocks = impl::build_cluster_matrix< value_t >( apply_normal, *zA );
+            
+            for ( int i = 0; i < nbench; ++i )
+            {
+                tic = timer::now();
+    
+                for ( int j = 0; j < nmvm; ++j )
+                    impl::mul_vec_cl< value_t >( value_t(2), apply_normal, *blocks, *x, *y );
+
+                toc = timer::since( tic );
+                runtime.push_back( toc.seconds() );
+        
+                std::cout << term::rollback << term::clearline << "      mvm in   " << format_time( toc ) << term::flush;
+
+                if ( i < nbench-1 )
+                    y->fill( 1 );
+            }// for
+        
+            if ( nbench > 1 )
+                std::cout << term::rollback << term::clearline << "      runtime = "
+                          << format_time( min( runtime ), median( runtime ), max( runtime ) );
+            std::cout << std::endl;
+
+            std::cout << "      ratio   = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
+            std::cout << "      flops   = " << format_flops( flops_h, min( runtime ) ) << std::endl;
+
             auto  diff = y_ref->copy();
 
             diff->axpy( value_t(-1), y.get() );
