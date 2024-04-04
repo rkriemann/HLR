@@ -226,7 +226,7 @@ program_main ()
 
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
-            std::cout << "      compressed in   " << format_time( toc ) << std::endl;
+            std::cout << "\r      compressed in   " << format_time( toc ) << "    " << std::flush;
 
             if ( i < niter-1 )
             {
@@ -236,15 +236,15 @@ program_main ()
         }// for
 
         if ( nbench > 1 )
-            std::cout << "    runtime  = "
+            std::cout << "\r    runtime = "
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
     }
 
     const auto  mem_zA = zA->byte_size();
     
-    std::cout << "    mem   = " << format_mem( zA->byte_size() ) << std::endl;
-    std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_zA) / double(mem_A) ) << std::endl;
+    std::cout << "    mem     = " << format_mem( zA->byte_size() ) << std::endl;
+    std::cout << "        vs H  " << boost::format( "%.3f" ) % ( double(mem_zA) / double(mem_A) ) << std::endl;
 
     if ( verbose( 3 ) )
         matrix::print_eps( *zA, "zA", "noid,norank,nosize" );
@@ -252,7 +252,7 @@ program_main ()
     {
         auto  error = impl::norm::frobenius( 1, *A, -1, *zA );
 
-        std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
+        std::cout << "    error   = " << format_error( error, error / norm_A ) << std::endl;
     }
     
     std::cout << "  "
@@ -274,7 +274,7 @@ program_main ()
             
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
-            std::cout << "      decompressed in   " << format_time( toc ) << std::endl;
+            std::cout << "\r      decompressed in   " << format_time( toc ) << "    " << std::flush;
 
             if ( i < niter-1 )
             {
@@ -284,13 +284,13 @@ program_main ()
         }// for
         
         if ( nbench > 1 )
-            std::cout << "    runtime  = "
+            std::cout << "\r    runtime = "
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
 
         auto  error = impl::norm::frobenius( 1, *A, -1, *zB );
         
-        std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
+        std::cout << "    error   = " << format_error( error, error / norm_A ) << std::endl;
     }
 
     //////////////////////////////////////////////////////////////////////
@@ -343,20 +343,20 @@ program_main ()
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
         
-                std::cout << "      mvm in   " << format_time( toc ) << std::endl;
+                std::cout << "\r      mvm in   " << format_time( toc ) << "      " << std::flush;
 
                 if ( i < nbench-1 )
                     y->fill( 1 );
             }// for
         
             if ( nbench > 1 )
-                std::cout << "    runtime  = "
+                std::cout << "\r      runtime = "
                           << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                           << std::endl;
 
             t_ref = min( runtime );
             
-            std::cout << "      flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
+            std::cout << "      flops   = " << format_flops( flops_h, min( runtime ) ) << std::endl;
             
             y_ref = std::move( y );
         }
@@ -386,19 +386,19 @@ program_main ()
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
         
-                std::cout << "      mvm in   " << format_time( toc ) << std::endl;
+                std::cout << "\r      mvm in   " << format_time( toc ) << "      " << std::flush;
 
                 if ( i < nbench-1 )
                     y->fill( 1 );
             }// for
         
             if ( nbench > 1 )
-                std::cout << "    runtime  = "
+                std::cout << "\r      runtime = "
                           << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                           << std::endl;
 
-            std::cout << "      ratio  = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
-            std::cout << "      flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
+            std::cout << "      ratio   = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
+            std::cout << "      flops   = " << format_flops( flops_h, min( runtime ) ) << std::endl;
             
             auto  diff = y_ref->copy();
 
@@ -406,7 +406,7 @@ program_main ()
 
             const auto  error = diff->norm2();
             
-            std::cout << "      error  = " << format_error( error, error / y_ref->norm2() ) << std::endl;
+            std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
         {
@@ -431,19 +431,19 @@ program_main ()
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
         
-                std::cout << "      mvm in   " << format_time( toc ) << std::endl;
+                std::cout << "\r      mvm in   " << format_time( toc ) << "      " << std::flush;
 
                 if ( i < nbench-1 )
                     y->fill( 1 );
             }// for
         
             if ( nbench > 1 )
-                std::cout << "    runtime  = "
+                std::cout << "\r      runtime = "
                           << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                           << std::endl;
 
-            std::cout << "      ratio  = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
-            std::cout << "      flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
+            std::cout << "      ratio   = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
+            std::cout << "      flops   = " << format_flops( flops_h, min( runtime ) ) << std::endl;
 
             auto  diff = y_ref->copy();
 
@@ -451,7 +451,7 @@ program_main ()
 
             const auto  error = diff->norm2();
             
-            std::cout << "      error  = " << format_error( error, error / y_ref->norm2() ) << std::endl;
+            std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
         {
@@ -476,19 +476,19 @@ program_main ()
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
         
-                std::cout << "      mvm in   " << format_time( toc ) << std::endl;
+                std::cout << "\r      mvm in   " << format_time( toc ) << "      " << std::flush;
 
                 if ( i < nbench-1 )
                     y->fill( 1 );
             }// for
         
             if ( nbench > 1 )
-                std::cout << "    runtime  = "
+                std::cout << "\r      runtime = "
                           << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                           << std::endl;
 
-            std::cout << "      ratio  = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
-            std::cout << "      flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
+            std::cout << "      ratio   = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
+            std::cout << "      flops   = " << format_flops( flops_h, min( runtime ) ) << std::endl;
 
             auto  diff = y_ref->copy();
 
@@ -496,7 +496,7 @@ program_main ()
 
             const auto  error = diff->norm2();
             
-            std::cout << "      error  = " << format_error( error, error / y_ref->norm2() ) << std::endl;
+            std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
         //
@@ -529,19 +529,19 @@ program_main ()
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
         
-                std::cout << "      mvm in   " << format_time( toc ) << std::endl;
+                std::cout << "\r      mvm in   " << format_time( toc ) << "      " << std::flush;
 
                 if ( i < nbench-1 )
                     y->fill( 1 );
             }// for
         
             if ( nbench > 1 )
-                std::cout << "    runtime  = "
+                std::cout << "\r      runtime = "
                           << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                           << std::endl;
         
-            std::cout << "      ratio  = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
-            std::cout << "      flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
+            std::cout << "      ratio   = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
+            std::cout << "      flops   = " << format_flops( flops_h, min( runtime ) ) << std::endl;
             
             auto  diff = y_ref->copy();
 
@@ -549,7 +549,7 @@ program_main ()
 
             const auto  error = diff->norm2();
             
-            std::cout << "      error  = " << format_error( error, error / y_ref->norm2() ) << std::endl;
+            std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
         {
@@ -576,19 +576,19 @@ program_main ()
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
         
-                std::cout << "      mvm in   " << format_time( toc ) << std::endl;
+                std::cout << "\r      mvm in   " << format_time( toc ) << "      " << std::flush;
 
                 if ( i < nbench-1 )
                     y->fill( 1 );
             }// for
         
             if ( nbench > 1 )
-                std::cout << "    runtime  = "
+                std::cout << "\r      runtime = "
                           << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                           << std::endl;
 
-            std::cout << "      ratio  = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
-            std::cout << "      flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
+            std::cout << "      ratio   = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
+            std::cout << "      flops   = " << format_flops( flops_h, min( runtime ) ) << std::endl;
             
             auto  diff = y_ref->copy();
 
@@ -596,7 +596,7 @@ program_main ()
 
             const auto  error = diff->norm2();
             
-            std::cout << "      error  = " << format_error( error, error / y_ref->norm2() ) << std::endl;
+            std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
         {
@@ -621,19 +621,19 @@ program_main ()
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
         
-                std::cout << "      mvm in   " << format_time( toc ) << std::endl;
+                std::cout << "\r      mvm in   " << format_time( toc ) << "      " << std::flush;
 
                 if ( i < nbench-1 )
                     y->fill( 1 );
             }// for
         
             if ( nbench > 1 )
-                std::cout << "    runtime  = "
+                std::cout << "\r      runtime = "
                           << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                           << std::endl;
         
-            std::cout << "      ratio  = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
-            std::cout << "      flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
+            std::cout << "      ratio   = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
+            std::cout << "      flops   = " << format_flops( flops_h, min( runtime ) ) << std::endl;
             
             auto  diff = y_ref->copy();
 
@@ -641,7 +641,7 @@ program_main ()
 
             const auto  error = diff->norm2();
             
-            std::cout << "      error  = " << format_error( error, error / y_ref->norm2() ) << std::endl;
+            std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
     }// if
 }
