@@ -185,6 +185,7 @@ public:
     blas::vector< value_t >
     transform_forward  ( const blas::vector< value_t > &  v ) const
     {
+        #if defined(HLR_HAS_ZBLAS_APLR)
         if ( is_compressed() )
         {
             const auto  k = this->rank();
@@ -195,6 +196,7 @@ public:
             return t;
         }// if
         else
+        #endif
         {
             auto  V = basis();
         
@@ -218,6 +220,7 @@ public:
     blas::vector< value_t >
     transform_backward  ( const blas::vector< value_t > &  s ) const
     {
+        #if defined(HLR_HAS_ZBLAS_APLR)
         if ( is_compressed() )
         {
             const auto  n = _is.size();
@@ -228,6 +231,7 @@ public:
             return t;
         }// if
         else
+        #endif
         {
             auto  V = basis();
         
@@ -239,6 +243,7 @@ public:
     transform_backward  ( const blas::vector< value_t > &  s,
                           blas::vector< value_t > &        v ) const
     {
+        #if defined(HLR_HAS_ZBLAS_APLR)
         if ( is_compressed() )
         {
             HLR_ASSERT( v.length() == _is.size() );
@@ -246,6 +251,7 @@ public:
             compress::aplr::zblas::mulvec( _is.size(), this->rank(), apply_normal, value_t(1), _zV, s.data(), v.data() );
         }// if
         else
+        #endif
         {
             auto  V = basis();
         

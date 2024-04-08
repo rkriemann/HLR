@@ -58,10 +58,8 @@ private:
     // local coupling matrix
     blas::matrix< value_t >  _S;
     
-    #if HLR_HAS_COMPRESSION == 1
     // stores compressed data
     compress::zarray         _zS;
-    #endif
     
 public:
     //
@@ -123,7 +121,6 @@ public:
         this->set_ofs( _row_is.first(), _col_is.first() );
     }
 
-    #if HLR_HAS_COMPRESSION == 1
     h2_lrmatrix ( const indexset       arow_is,
                   const indexset       acol_is,
                   cluster_basis_t &    arow_cb,
@@ -138,7 +135,6 @@ public:
     {
         this->set_ofs( _row_is.first(), _col_is.first() );
     }
-    #endif
     
     // dtor
     virtual ~h2_lrmatrix ()
@@ -176,8 +172,6 @@ public:
     // return decompressed local coupling matrix
     hlr::blas::matrix< value_t >  coupling () const
     {
-        #if HLR_HAS_COMPRESSION == 1
-
         if ( is_compressed() )
         {
             auto  S = blas::matrix< value_t >( row_rank(), col_rank() );
@@ -186,8 +180,6 @@ public:
 
             return S;
         }// if
-
-        #endif
 
         return _S;
     }
@@ -252,9 +244,7 @@ public:
         _col_cb = & acol_cb;
     }
 
-    #if HLR_HAS_COMPRESSION == 1
     compress::zarray zcoupling () const { return _zS; }
-    #endif
 
     //
     // matrix data
@@ -320,11 +310,7 @@ public:
     // return true if data is compressed
     virtual bool   is_compressed () const
     {
-        #if HLR_HAS_COMPRESSION == 1
         return ! is_null( _zS.data() );
-        #else
-        return false;
-        #endif
     }
 
     //
@@ -372,9 +358,7 @@ protected:
     // remove compressed storage (standard storage not restored!)
     virtual void   remove_compressed ()
     {
-        #if HLR_HAS_COMPRESSION == 1
         _zS = compress::zarray();
-        #endif
     }
 };
 
@@ -476,8 +460,6 @@ template < typename value_t >
 void
 h2_lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
 {
-    #if HLR_HAS_COMPRESSION == 1
-        
     if ( is_compressed() )
         return;
 
@@ -489,24 +471,18 @@ h2_lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
         _zS = std::move( zS );
         _S  = std::move( blas::matrix< value_t >( 0, 0 ) );
     }// if
-
-    #endif
 }
 
 template < typename value_t >
 void
 h2_lrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 {
-    #if HLR_HAS_COMPRESSION == 1
-        
     HLR_ASSERT( acc.rel_eps() == 0 );
 
     if ( this->nrows() * this->ncols() == 0 )
         return;
         
     compress( compress::get_config( acc( this->row_is(), this->col_is() ).abs_eps() ) );
-
-    #endif
 }
 
 //
@@ -516,16 +492,12 @@ template < typename value_t >
 void
 h2_lrmatrix< value_t >::decompress ()
 {
-    #if HLR_HAS_COMPRESSION == 1
-        
     if ( ! is_compressed() )
         return;
 
     _S = std::move( coupling() );
 
     remove_compressed();
-
-    #endif
 }
 
 //
@@ -535,8 +507,6 @@ template < typename value_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
 h2_lrmatrix< value_t >::copy () const
 {
-    #if HLR_HAS_COMPRESSION == 1
-
     if ( is_compressed() )
     {
         auto  zM = compress::zarray( _zS.size() );
@@ -549,7 +519,6 @@ h2_lrmatrix< value_t >::copy () const
         return M;
     }// if
     else
-    #endif
     {
         auto  M = std::make_unique< h2_lrmatrix >( _row_is, _col_is, *_row_cb, *_col_cb, std::move( blas::copy( _S ) ) );
 
@@ -598,12 +567,8 @@ h2_lrmatrix< value_t >::copy_to ( Hpro::TMatrix< value_t > *  A ) const
     R->_col_cb = _col_cb;
     R->_S      = std::move( blas::copy( _S ) );
 
-    #if HLR_HAS_COMPRESSION == 1
-
     R->_zS = compress::zarray( _zS.size() );
     std::copy( _zS.begin(), _zS.end(), R->_zS.begin() );
-
-    #endif
 }
 
 //
@@ -630,12 +595,7 @@ h2_lrmatrix< value_t >::byte_size () const
     size += sizeof(_row_is) + sizeof(_col_is);
     size += sizeof(_row_cb) + sizeof(_col_cb);
     size += _S.byte_size();
-
-    #if HLR_HAS_COMPRESSION == 1
-
     size += compress::byte_size( _zS );
-
-    #endif
     
     return size;
 }
