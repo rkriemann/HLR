@@ -132,170 +132,153 @@ mul_vec ( const value_t                              alpha,
         HLR_ERROR( "unsupported matrix type : " + M.typestr() );
 }
 
-//
-// matvec version using special cluster tree like data structure 
-//
-template < typename value_t >
-struct cluster_blocks_t
-{
-    using dense_matrix = matrix::dense_matrix< value_t >;
-    using h2_lrmatrix  = matrix::h2_lrmatrix< value_t >;
-    using u_vector     = uniform_vector< cluster_basis_t >;
+// //
+// // matvec version using special cluster tree like data structure 
+// //
+// template < typename value_t >
+// struct cluster_blocks_t
+// {
+//     using dense_matrix = matrix::dense_matrix< value_t >;
+//     using h2_lrmatrix  = matrix::h2_lrmatrix< value_t >;
+//     using u_vector     = uniform_vector< matrix::nested_cluster_basis< value_t > >;
         
-    // corresponding index set of cluster
-    indexset                                    is;
+//     // corresponding index set of cluster
+//     indexset                                    is;
     
-    // list of associated matrices
-    std::list< const dense_matrix * >           D;
-    std::list< std::pair< const h2_lrmatrix *,
-                          const u_vector > >    U;
+//     // list of associated matrices
+//     std::list< const dense_matrix * >           D;
+//     std::list< std::pair< const h2_lrmatrix *,
+//                           const u_vector > >    U;
 
-    // son matrices (following cluster tree)
-    std::vector< cluster_blocks_t * >           sub_blocks;
+//     // son matrices (following cluster tree)
+//     std::vector< cluster_blocks_t * >           sub_blocks;
 
-    // ctor
-    cluster_blocks_t ( const indexset &  ais )
-            : is( ais )
-    {}
+//     // ctor
+//     cluster_blocks_t ( const indexset &  ais )
+//             : is( ais )
+//     {}
 
-    // dtor
-    ~cluster_blocks_t ()
-    {
-        for ( auto  cb : sub_blocks )
-            delete cb;
-    }
-};
+//     // dtor
+//     ~cluster_blocks_t ()
+//     {
+//         for ( auto  cb : sub_blocks )
+//             delete cb;
+//     }
+// };
 
-namespace detail
-{ 
+// template < typename value_t >
+// void
+// build_cluster_blocks ( const matop_t                              op_M,
+//                        const Hpro::TMatrix< value_t > &           M,
+//                        const uniform_vector< matrix::nested_cluster_basis< value_t > > &  x,
+//                        cluster_blocks_t< value_t > &              cb )
+// {
+//     if ( is_blocked( M ) )
+//     {
+//         auto  B = cptrcast( & M, Hpro::TBlockMatrix< value_t > );
 
-template < typename value_t >
-void
-build_cluster_blocks ( const matop_t                              op_M,
-                       const Hpro::TMatrix< value_t > &           M,
-                       const uniform_vector< cluster_basis_t > &  x,
-                       cluster_blocks_t< value_t > &              cb )
-{
-    if ( is_blocked( M ) )
-    {
-        auto  B = cptrcast( & M, Hpro::TBlockMatrix< value_t > );
-
-        if ( cb.sub_blocks.size() == 0 )
-            cb.sub_blocks.resize( B->nblock_rows( op_M ) );
+//         if ( cb.sub_blocks.size() == 0 )
+//             cb.sub_blocks.resize( B->nblock_rows( op_M ) );
         
-        for ( uint  i = 0; i < B->nblock_rows( op_M ); ++i )
-        {
-            HLR_ASSERT( ! is_null( B->block( i, 0, op_M ) ) );
+//         for ( uint  i = 0; i < B->nblock_rows( op_M ); ++i )
+//         {
+//             HLR_ASSERT( ! is_null( B->block( i, 0, op_M ) ) );
 
-            if ( is_null( cb.sub_blocks[i] ) )
-                cb.sub_blocks[i] = new cluster_blocks_t< value_t >( B->block( i, 0, op_M )->row_is( op_M ) );
-        }// for
+//             if ( is_null( cb.sub_blocks[i] ) )
+//                 cb.sub_blocks[i] = new cluster_blocks_t< value_t >( B->block( i, 0, op_M )->row_is( op_M ) );
+//         }// for
                 
-        for ( uint  i = 0; i < B->nblock_rows( op_M ); ++i )
-        {
-            for ( uint  j = 0; j < B->nblock_cols( op_M ); ++j )
-            {
-                if ( B->block( i, j, op_M ) != nullptr )
-                    build_cluster_blocks( op_M, * B->block( i, j, op_M ), & x.block( j ), * cb.sub_blocks[i] );
-            }// for
-        }// for
-    }// if
-    else if ( matrix::is_h2_lowrank( M ) )
-    {
-        cb.R.push_back( { cptrcast( &M, matrix::h2_lrmatrix< value_t > ), & x } );
-    }// if
-    else if ( matrix::is_dense( M ) )
-    {
-        cb.D.push_back( cptrcast( &M, matrix::dense_matrix< value_t > ) );
-    }// if
-    else
-        HLR_ERROR( "unsupported matrix type: " + M.typestr() );
-}
+//         for ( uint  i = 0; i < B->nblock_rows( op_M ); ++i )
+//         {
+//             for ( uint  j = 0; j < B->nblock_cols( op_M ); ++j )
+//             {
+//                 if ( B->block( i, j, op_M ) != nullptr )
+//                     build_cluster_blocks( op_M, * B->block( i, j, op_M ), & x.block( j ), * cb.sub_blocks[i] );
+//             }// for
+//         }// for
+//     }// if
+//     else if ( matrix::is_h2_lowrank( M ) )
+//     {
+//         cb.R.push_back( { cptrcast( &M, matrix::h2_lrmatrix< value_t > ), & x } );
+//     }// if
+//     else if ( matrix::is_dense( M ) )
+//     {
+//         cb.D.push_back( cptrcast( &M, matrix::dense_matrix< value_t > ) );
+//     }// if
+//     else
+//         HLR_ERROR( "unsupported matrix type: " + M.typestr() );
+// }
 
-}// namespace detail
+// template < typename value_t >
+// void
+// mul_vec_cl ( const value_t                              alpha,
+//              const matop_t                              op_M,
+//              const cluster_blocks_t< value_t > &        cb,
+//              const uniform_vector< matrix::nested_cluster_basis< value_t > > &  x,
+//              uniform_vector< matrix::nested_cluster_basis< value_t > > &        y,
+//              const vector::scalar_vector< value_t > &   sx,
+//              vector::scalar_vector< value_t > &         sy )
+// {
+//     if ( alpha == value_t(0) )
+//         return;
 
-template < typename value_t >
-std::unique_ptr< cluster_blocks_t< value_t > >
-build_cluster_blocks ( const matop_t                     op_M,
-                       const Hpro::TMatrix< value_t > &  M )
-{
-    auto  cb = std::make_unique< cluster_blocks_t< value_t > >( M.row_is( op_M ) );
+//     //
+//     // compute update with all block in current block row
+//     //
 
-    detail::build_cluster_blocks( op_M, M, *cb );
+//     if ( ! cb.R.empty() )
+//     {
+//         for ( auto  [ R, ux ] : cb.R )
+//         {
+//             #if defined(HLR_HAS_ZBLAS_DIRECT)
+//             if ( R->is_compressed() )
+//             {
+//                 switch ( op_M )
+//                 {
+//                     case apply_normal     : compress::zblas::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoupling(), ux.coeffs().data(), y.coeffs().data() ); break;
+//                     case apply_conjugate  : { HLR_ASSERT( false ); }
+//                     case apply_transposed : { HLR_ASSERT( false ); }
+//                     case apply_adjoint    : compress::zblas::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoupling(), ux.coeffs().data(), y.coeffs().data() ); break;
+//                     default               : HLR_ERROR( "unsupported matrix operator" );
+//                 }// switch
+//             }// if
+//             else
+//             #endif
+//             {
+//                 switch ( op_M )
+//                 {
+//                     case Hpro::apply_normal     : blas::mulvec( alpha, R->coupling(), ux.coeffs(), value_t(1), y.coeffs() ); break;
+//                     case Hpro::apply_conjugate  : HLR_ASSERT( false );
+//                     case Hpro::apply_transposed : HLR_ASSERT( false );
+//                     case Hpro::apply_adjoint    : blas::mulvec( alpha, blas::adjoint( R->coupling() ), ux.coeffs(), value_t(1), y.coeffs() ); break;
+//                     default                     : HLR_ERROR( "unsupported matrix operator" );
+//                 }// switch
+//             }// else
+//         }// for
+//     }// if
 
-    return cb;
-}
-
-template < typename value_t >
-void
-mul_vec_cl ( const value_t                              alpha,
-             const matop_t                              op_M,
-             const cluster_blocks_t< value_t > &        cb,
-             const uniform_vector< cluster_basis_t > &  x,
-             uniform_vector< cluster_basis_t > &        y,
-             const vector::scalar_vector< value_t > &   sx,
-             vector::scalar_vector< value_t > &         sy )
-{
-    if ( alpha == value_t(0) )
-        return;
-
-    //
-    // compute update with all block in current block row
-    //
-
-    if ( ! cb.R.empty() )
-    {
-        for ( auto  [ R, ux ] : cb.R )
-        {
-            #if defined(HLR_HAS_ZBLAS_DIRECT)
-            if ( R->is_compressed() )
-            {
-                switch ( op_M )
-                {
-                    case apply_normal     : compress::zblas::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoupling(), ux.coeffs().data(), y.coeffs().data() ); break;
-                    case apply_conjugate  : { HLR_ASSERT( false ); }
-                    case apply_transposed : { HLR_ASSERT( false ); }
-                    case apply_adjoint    : compress::zblas::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoupling(), ux.coeffs().data(), y.coeffs().data() ); break;
-                    default               : HLR_ERROR( "unsupported matrix operator" );
-                }// switch
-            }// if
-            else
-            #endif
-            {
-                switch ( op_M )
-                {
-                    case Hpro::apply_normal     : blas::mulvec( alpha, R->coupling(), ux.coeffs(), value_t(1), y.coeffs() ); break;
-                    case Hpro::apply_conjugate  : HLR_ASSERT( false );
-                    case Hpro::apply_transposed : HLR_ASSERT( false );
-                    case Hpro::apply_adjoint    : blas::mulvec( alpha, blas::adjoint( R->coupling() ), ux.coeffs(), value_t(1), y.coeffs() ); break;
-                    default                     : HLR_ERROR( "unsupported matrix operator" );
-                }// switch
-            }// else
-        }// for
-    }// if
-
-    if ( ! cb.D.empty() )
-    {
-        auto  y_j = blas::vector< value_t >( blas::vec( y ), cb.is - y.ofs() );
-        auto  yt  = blas::vector< value_t >( y_j.length() );
+//     if ( ! cb.D.empty() )
+//     {
+//         auto  y_j = blas::vector< value_t >( blas::vec( y ), cb.is - y.ofs() );
+//         auto  yt  = blas::vector< value_t >( y_j.length() );
     
-        for ( auto  M : cb.M )
-        {
-            auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
+//         for ( auto  M : cb.M )
+//         {
+//             auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
             
-            M->apply_add( 1, x_i, yt, op_M );
-        }// for
+//             M->apply_add( 1, x_i, yt, op_M );
+//         }// for
 
-        blas::add( alpha, yt, y_j );
-    }// if
+//         blas::add( alpha, yt, y_j );
+//     }// if
 
-    //
-    // recurse
-    //
+//     //
+//     // recurse
+//     //
     
-    for ( auto  sub : cb.sub_blocks )
-        mul_vec_cl( alpha, op_M, *sub, x, y );
-}
+//     for ( auto  sub : cb.sub_blocks )
+//         mul_vec_cl( alpha, op_M, *sub, x, y );
+// }
 
 //
 // copy given scalar vector into uniform vector format
@@ -526,6 +509,44 @@ mul_vec ( const value_t                             alpha,
     detail::mul_vec( alpha, op_M, M, *ux, *uy, x, y );
     detail::add_uniform_to_scalar( *uy, y, s );
 }
+
+// template < typename value_t >
+// std::unique_ptr< detail::cluster_blocks_t< value_t > >
+// build_cluster_blocks ( const matop_t                     op_M,
+//                        const Hpro::TMatrix< value_t > &  M )
+// {
+//     auto  cb = std::make_unique< cluster_blocks_t< value_t > >( M.row_is( op_M ) );
+
+//     detail::build_cluster_blocks( op_M, M, *cb );
+
+//     return cb;
+// }
+
+// template < typename value_t,
+//            typename cluster_basis_t >
+// void
+// mul_vec_cl ( const value_t                             alpha,
+//              const Hpro::matop_t                       op_M,
+//              const detail::cluster_blocks_t< value_t > &  cb,
+//              const vector::scalar_vector< value_t > &  x,
+//              vector::scalar_vector< value_t > &        y,
+//              cluster_basis_t &                         rowcb,
+//              cluster_basis_t &                         colcb )
+// {
+//     if ( alpha == value_t(0) )
+//         return;
+
+//     //
+//     // construct uniform representation of x and y
+//     //
+
+//     auto  ux = detail::scalar_to_uniform( ( op_M == Hpro::apply_normal ? colcb : rowcb ), x );
+//     auto  uy = hlr::vector::make_uniform< value_t, cluster_basis_t >( ( op_M == Hpro::apply_normal ? rowcb : colcb ) );
+//     auto  s  = blas::vector< value_t >();
+
+//     detail::mul_vec_cl( alpha, op_M, cb, *ux, *uy, x, y );
+//     detail::add_uniform_to_scalar( *uy, y, s );
+// }
 
 //
 // return FLOPs needed for computing y = y + α op( M ) x

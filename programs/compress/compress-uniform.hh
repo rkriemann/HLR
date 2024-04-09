@@ -147,7 +147,7 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
     
-    std::cout << term::bullet << term::bold << "uniform matrix" << term::reset << std::endl;
+    std::cout << term::bullet << term::bold << "uniform H-matrix" << term::reset << std::endl;
 
     auto  cbapx = approx::SVD< value_t >();
 
