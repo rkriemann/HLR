@@ -164,11 +164,12 @@ program_main ()
     
     std::cout << term::bullet << term::bold << "H²-matrix" << term::reset << std::endl;
 
+    auto  h2acc = ( cmdline::tohodlr ? fixed_prec( 0.1 * cmdline::eps ) : fixed_prec( 0.4 * cmdline::eps ) );
     auto  cbapx = approx::SVD< value_t >();
 
     tic = timer::now();
 
-    auto  [ rowcb, colcb, A ] = impl::matrix::build_h2_rec( *H, cbapx, acc );
+    auto  [ rowcb, colcb, A ] = impl::matrix::build_h2_rec( *H, cbapx, h2acc );
     
     toc = timer::since( tic );
 
