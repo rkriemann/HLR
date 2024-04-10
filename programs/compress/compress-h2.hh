@@ -18,8 +18,6 @@
 
 using namespace hlr;
 
-using indexset = Hpro::TIndexSet;
-
 //
 // main function
 //
@@ -231,7 +229,7 @@ program_main ()
 
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
-            std::cout << "      compressed in   " << format_time( toc ) << std::endl;
+            std::cout << term::rollback << term::clearline << "      compressed in   " << format_time( toc ) << term::flush;
 
             if ( i < niter-1 )
             {
@@ -248,9 +246,9 @@ program_main ()
         }// for
 
         if ( nbench > 1 )
-            std::cout << "    runtime  = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                      << std::endl;
+            std::cout << term::rollback << term::clearline << "    runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime );
+        std::cout << std::endl;
     }
 
     const auto  mem_zA   = zA->byte_size();
@@ -300,7 +298,7 @@ program_main ()
             
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
-            std::cout << "      decompressed in   " << format_time( toc ) << std::endl;
+            std::cout << term::rollback << term::clearline << "      decompressed in   " << format_time( toc ) << term::flush;
 
             if ( i < niter-1 )
             {
@@ -317,9 +315,9 @@ program_main ()
         }// for
         
         if ( nbench > 1 )
-            std::cout << "    runtime  = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                      << std::endl;
+            std::cout << term::rollback << term::clearline << "    runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime );
+        std::cout << std::endl;
 
         // auto  diffB = matrix::sum( value_t(1), *A, value_t(-1), *zA2 );
 
@@ -375,16 +373,16 @@ program_main ()
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
         
-                std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+                std::cout << term::rollback << term::clearline << "    mvm in   " << format_time( toc ) << term::flush;
 
                 if ( i < nbench-1 )
                     y->fill( 1 );
             }// for
         
             if ( nbench > 1 )
-                std::cout << "  runtime  = "
-                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                          << std::endl;
+                std::cout << term::rollback << term::clearline << "  runtime  = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime );
+            std::cout << std::endl;
 
             std::cout << "    flops  = " << format_flops( flops_h2, min( runtime ) ) << std::endl;
             
@@ -413,16 +411,16 @@ program_main ()
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
         
-                std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+                std::cout << term::rollback << term::clearline << "    mvm in   " << format_time( toc ) << term::flush;
 
                 if ( i < nbench-1 )
                     y->fill( 1 );
             }// for
         
             if ( nbench > 1 )
-                std::cout << "  runtime  = "
-                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                          << std::endl;
+                std::cout << term::rollback << term::clearline << "  runtime  = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime );
+            std::cout << std::endl;
         
             std::cout << "    ratio  = " << boost::format( "%.02f" ) % ( min( runtime ) / t_orig ) << std::endl;
             std::cout << "    flops  = " << format_flops( flops_h2, min( runtime ) ) << std::endl;

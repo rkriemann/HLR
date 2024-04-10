@@ -361,7 +361,7 @@ program_main ()
             y_ref = std::move( y );
         }
 
-        if ( true )
+        if ( false )
         {
             runtime.clear();
             
@@ -556,7 +556,7 @@ program_main ()
             std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
-        if ( true )
+        if ( false )
         {
             runtime.clear();
             

@@ -18,21 +18,6 @@
 
 using namespace hlr;
 
-using indexset = Hpro::TIndexSet;
-
-struct local_accuracy : public Hpro::TTruncAcc
-{
-    local_accuracy ( const double  abs_eps )
-            : Hpro::TTruncAcc( 0.0, abs_eps )
-    {}
-    
-    virtual const TTruncAcc  acc ( const indexset &  rowis,
-                                   const indexset &  colis ) const
-    {
-        return Hpro::absolute_prec( abs_eps() * std::sqrt( double(rowis.size() * colis.size()) ) );
-    }
-};
-
 //
 // main function
 //
@@ -214,7 +199,7 @@ program_main ()
 
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
-            std::cout << "      compressed in   " << format_time( toc ) << std::endl;
+            std::cout << term::rollback << term::clearline << "      compressed in   " << format_time( toc ) << term::flush;
 
             if ( i < niter-1 )
             {
@@ -231,9 +216,9 @@ program_main ()
         }// for
 
         if ( nbench > 1 )
-            std::cout << "    runtime  = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                      << std::endl;
+            std::cout << term::rollback << term::clearline << "    runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime );
+        std::cout << std::endl;
     }
 
     const auto  mem_zA   = zA->byte_size();
@@ -283,7 +268,7 @@ program_main ()
             
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
-            std::cout << "      decompressed in   " << format_time( toc ) << std::endl;
+            std::cout << term::rollback << term::clearline << "      decompressed in   " << format_time( toc ) << term::flush;
 
             if ( i < niter-1 )
             {
@@ -300,9 +285,9 @@ program_main ()
         }// for
         
         if ( nbench > 1 )
-            std::cout << "    runtime  = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                      << std::endl;
+            std::cout << term::rollback << term::clearline << "    runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime );
+        std::cout << std::endl;
 
         // auto  diffB = matrix::sum( value_t(1), *A, value_t(-1), *zA2 );
 
@@ -325,6 +310,15 @@ program_main ()
                   << "mat-vec"
                   << term::reset << std::endl;
 
+        const uint  nmvm     = 50;
+        const auto  flops_uh = nmvm * hlr::uniform::mul_vec_flops( apply_normal, *A, *rowcb, *colcb );
+        const auto  bytes_uh = nmvm * hlr::uniform::mul_vec_datasize( apply_normal, *A, *rowcb, *colcb );
+        const auto  bytes_zu = nmvm * hlr::uniform::mul_vec_datasize( apply_normal, *zA, *zrowcb, *zcolcb );
+    
+        std::cout << "  " << term::bullet << term::bold << "FLOPs/byte " << term::reset() << std::endl;
+        std::cout << "    Uni-H  = " << format_flops( flops_uh ) << ", " << flops_uh / bytes_uh << std::endl;
+        std::cout << "    zUni-H = " << format_flops( flops_uh ) << ", " << flops_uh / bytes_zu << std::endl;
+
         double  t_orig       = 0.0;
         double  t_compressed = 0.0;
         auto    y_ref        = std::unique_ptr< vector::scalar_vector< value_t > >();
@@ -332,10 +326,7 @@ program_main ()
         {
             runtime.clear();
             
-            std::cout << "  "
-                      << term::bullet << term::bold
-                      << "uncompressed"
-                      << term::reset << std::endl;
+            std::cout << "  " << term::bullet << term::bold << "uncompressed" << term::reset << std::endl;
         
             auto  x = std::make_unique< vector::scalar_vector< value_t > >( A->col_is() );
             auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
@@ -352,17 +343,19 @@ program_main ()
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
         
-                std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+                std::cout << term::rollback << term::clearline << "    mvm in   " << format_time( toc ) << term::flush;
 
                 if ( i < nbench-1 )
                     y->fill( 1 );
             }// for
         
             if ( nbench > 1 )
-                std::cout << "  runtime  = "
-                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                          << std::endl;
+                std::cout << term::rollback << term::clearline << "  runtime  = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime );
+            std::cout << std::endl;
 
+            std::cout << "    flops  = " << format_flops( flops_uh, min( runtime ) ) << std::endl;
+            
             t_orig = min( runtime );
             
             y_ref = std::move( y );
@@ -391,20 +384,19 @@ program_main ()
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
         
-                std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+                std::cout << term::rollback << term::clearline << "    mvm in   " << format_time( toc ) << term::flush;
 
                 if ( i < nbench-1 )
                     y->fill( 1 );
             }// for
         
             if ( nbench > 1 )
-                std::cout << "  runtime  = "
-                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                          << std::endl;
+                std::cout << term::rollback << term::clearline << "  runtime  = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime );
+            std::cout << std::endl;
         
-            t_compressed = min( runtime );
-
-            std::cout << "    ratio  = " << boost::format( "%.02f" ) % ( t_compressed / t_orig ) << std::endl;
+            std::cout << "    ratio  = " << boost::format( "%.02f" ) % ( min( runtime ) / t_orig ) << std::endl;
+            std::cout << "    flops  = " << format_flops( flops_uh, min( runtime ) ) << std::endl;
 
             auto  diff = y_ref->copy();
 
