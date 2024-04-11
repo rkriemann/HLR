@@ -242,10 +242,7 @@ program_main ()
         std::cout << "    error = " << format_error( error, error / norm_H ) << std::endl;
     }
 
-    std::cout << "  "
-              << term::bullet << term::bold
-              << "decompression "
-              << term::reset << std::endl;
+    std::cout << "  " << term::bullet << term::bold << "decompression " << term::reset << std::endl;
 
     {
         auto  niter = std::max( nbench, 1u );
@@ -306,9 +303,7 @@ program_main ()
 
     if ( nbench > 0 )
     {
-        std::cout << term::bullet << term::bold
-                  << "mat-vec"
-                  << term::reset << std::endl;
+        std::cout << term::bullet << term::bold << "mat-vec" << term::reset << std::endl;
 
         const uint  nmvm     = 50;
         const auto  flops_uh = nmvm * hlr::uniform::mul_vec_flops( apply_normal, *A, *rowcb, *colcb );
@@ -337,7 +332,7 @@ program_main ()
             {
                 tic = timer::now();
     
-                for ( int j = 0; j < 50; ++j )
+                for ( int j = 0; j < nmvm; ++j )
                     impl::uniform::mul_vec< value_t >( 2.0, Hpro::apply_normal, *A, *x, *y, *rowcb, *colcb );
 
                 toc = timer::since( tic );
@@ -364,10 +359,7 @@ program_main ()
         {
             runtime.clear();
             
-            std::cout << "  "
-                      << term::bullet << term::bold
-                      << "compressed"
-                      << term::reset << std::endl;
+            std::cout << "  " << term::bullet << term::bold << "compressed" << term::reset << std::endl;
         
             auto  x = std::make_unique< vector::scalar_vector< value_t > >( zA->col_is() );
             auto  y = std::make_unique< vector::scalar_vector< value_t > >( zA->row_is() );
@@ -378,7 +370,7 @@ program_main ()
             {
                 tic = timer::now();
     
-                for ( int j = 0; j < 50; ++j )
+                for ( int j = 0; j < nmvm; ++j )
                     impl::uniform::mul_vec< value_t >( 2.0, Hpro::apply_normal, *zA, *x, *y, *zrowcb, *zcolcb );
 
                 toc = timer::since( tic );

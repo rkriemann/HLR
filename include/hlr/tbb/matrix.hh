@@ -707,9 +707,6 @@ build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &    A,
     using value_t       = typename basisapx_t::value_t;
     using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
 
-    auto  tic = timer::now();
-    auto  toc = timer::since( tic );
-    
     //
     // mapping of index sets to lowrank matrices 
     //
@@ -725,13 +722,8 @@ build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &    A,
 
     #if 1
     
-    tic = timer::now();
-
     detail::init_cluster_bases( A, *rowcb, *colcb );
 
-    toc = timer::since( tic );
-    std::cout << "init cluster bases  " << toc << std::endl;
-    
     #endif
     
     auto  row_map = detail::lr_coupling_map_t< value_t >();
@@ -739,40 +731,22 @@ build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &    A,
     auto  row_mtx = std::mutex();
     auto  col_mtx = std::mutex();
 
-    tic = timer::now();
-
     detail::build_mat_map( A, *rowcb, *colcb, row_map, row_mtx, col_map, col_mtx );
-    
-    toc = timer::since( tic );
 
-    std::cout << "build_mat_map       " << toc << std::endl;
-    
     //
     // build cluster bases
     //
 
-    tic = timer::now();
-    
     ::tbb::parallel_invoke(
         [&] () { detail::build_cluster_basis( *rowcb, basisapx, acc, row_map, false ); },
         [&] () { detail::build_cluster_basis( *colcb, basisapx, acc, col_map, true );  }
     );
 
-    toc = timer::since( tic );
-    
-    std::cout << "build_cluster_basis " << toc << std::endl;
-
     //
     // construct uniform lowrank matrices with given cluster bases
     //
     
-    tic = timer::now();
-
     auto  M = detail::build_uniform( A, *rowcb, *colcb );
-    
-    toc = timer::since( tic );
-    
-    std::cout << "build_uniform       " << toc << std::endl;
 
     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
 }
@@ -789,9 +763,6 @@ build_h2_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
     using value_t       = typename basisapx_t::value_t;
     using cluster_basis = hlr::matrix::nested_cluster_basis< value_t >;
 
-    auto  tic = timer::now();
-    auto  toc = timer::since( tic );
-
     //
     // mapping of index sets to lowrank matrices 
     //
@@ -807,12 +778,7 @@ build_h2_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
     
     #if 1
 
-    tic = timer::now();
-    
     detail::init_cluster_bases( A, *rowcb, *colcb );
-
-    toc = timer::since( tic );
-    std::cout << "init cluster bases  " << toc << std::endl;
 
     #endif
     
@@ -823,15 +789,9 @@ build_h2_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
     auto  col_coupling = detail::coupling_map_t< value_t >();
     auto  col_mtx      = std::mutex();
     
-    tic = timer::now();
-     
     detail::build_mat_map( A, *rowcb, *colcb,
                            row_map, row_coupling, row_mtx,
                            col_map, col_coupling, col_mtx );
-    
-    toc = timer::since( tic );
-
-    std::cout << "build_mat_map       " << toc << std::endl;
     
     //
     // build cluster bases
@@ -839,28 +799,16 @@ build_h2_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
 
     auto  empty_list = detail::lr_mat_list_t< value_t >();
     
-    tic = timer::now();
-
     ::tbb::parallel_invoke (
         [&] () { detail::build_nested_cluster_basis( *rowcb, basisapx, acc, row_map, row_coupling, empty_list, false ); },
         [&] () { detail::build_nested_cluster_basis( *colcb, basisapx, acc, col_map, col_coupling, empty_list, true ); }
     );
-    
-    toc = timer::since( tic );
-    
-    std::cout << "build_cluster_basis " << toc << std::endl;
 
     //
     // construct uniform lowrank matrices with given cluster bases
     //
     
-    tic = timer::now();
-
     auto  M = detail::build_h2( A, *rowcb, *colcb );
-    
-    toc = timer::since( tic );
-    
-    std::cout << "build_h2            " << toc << std::endl;
     
     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
 }

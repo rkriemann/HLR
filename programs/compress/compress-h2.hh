@@ -368,7 +368,7 @@ program_main ()
             {
                 tic = timer::now();
     
-                for ( int j = 0; j < 50; ++j )
+                for ( int j = 0; j < nmvm; ++j )
                     impl::h2::mul_vec< value_t >( 2.0, apply_normal, *A, *x, *y, *rowcb, *colcb );
 
                 toc = timer::since( tic );
@@ -406,7 +406,7 @@ program_main ()
             {
                 tic = timer::now();
     
-                for ( int j = 0; j < 50; ++j )
+                for ( int j = 0; j < nmvm; ++j )
                     impl::h2::mul_vec< value_t >( 2.0, apply_normal, *zA, *x, *y, *zrowcb, *zcolcb );
 
                 toc = timer::since( tic );
