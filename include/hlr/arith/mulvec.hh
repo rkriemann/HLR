@@ -276,6 +276,17 @@ mul_vec_cl ( const value_t                             alpha,
         mul_vec_cl( alpha, op_M, *sub, x, y );
 }
 
+template < typename value_t >
+void
+mul_vec_cl2 ( const value_t                             alpha,
+              const matop_t                             op_M,
+              const cluster_blocks_t< value_t > &       cb,
+              const vector::scalar_vector< value_t > &  x,
+              vector::scalar_vector< value_t > &        y )
+{
+    mul_vec_cl( alpha, op_M, cb, x, y );
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 

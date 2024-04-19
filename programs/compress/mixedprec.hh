@@ -361,28 +361,25 @@ program_main ()
             y_ref = std::move( y );
         }
 
-        if ( false )
+        if ( true )
         {
             runtime.clear();
             
-            std::cout << "    " << term::bullet << term::bold << "row cluster map" << term::reset << std::endl;
+            std::cout << "    " << term::bullet << term::bold << "row cluster lists (TtB)" << term::reset << std::endl;
         
             auto  x = std::make_unique< vector::scalar_vector< value_t > >( A->col_is() );
             auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
 
             x->fill( 1 );
 
-            auto  block_map = impl::cluster_block_map_t< value_t >();
-
-            impl::setup_cluster_block_map( apply_normal, *A, block_map );
-
+            auto  blocks = impl::build_cluster_blocks< value_t >( apply_normal, *A );
             
             for ( int i = 0; i < nbench; ++i )
             {
                 tic = timer::now();
     
                 for ( int j = 0; j < nmvm; ++j )
-                    impl::mul_vec_cl< value_t >( value_t(2), apply_normal, *A, block_map, *x, *y );
+                    impl::mul_vec_cl< value_t >( value_t(2), apply_normal, *blocks, *x, *y );
 
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
@@ -400,7 +397,7 @@ program_main ()
 
             std::cout << "      ratio   = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
             std::cout << "      flops   = " << format_flops( flops_h, min( runtime ) ) << std::endl;
-            
+
             auto  diff = y_ref->copy();
 
             diff->axpy( value_t(-1), y.get() );
@@ -414,7 +411,7 @@ program_main ()
         {
             runtime.clear();
             
-            std::cout << "    " << term::bullet << term::bold << "row cluster lists" << term::reset << std::endl;
+            std::cout << "    " << term::bullet << term::bold << "row cluster lists (BtT)" << term::reset << std::endl;
         
             auto  x = std::make_unique< vector::scalar_vector< value_t > >( A->col_is() );
             auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
@@ -428,7 +425,7 @@ program_main ()
                 tic = timer::now();
     
                 for ( int j = 0; j < nmvm; ++j )
-                    impl::mul_vec_cl< value_t >( value_t(2), apply_normal, *blocks, *x, *y );
+                    impl::mul_vec_cl2< value_t >( value_t(2), apply_normal, *blocks, *x, *y );
 
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
@@ -556,27 +553,25 @@ program_main ()
             std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
-        if ( false )
+        if ( true )
         {
             runtime.clear();
             
-            std::cout << "    " << term::bullet << term::bold << "row cluster map" << term::reset << std::endl;
+            std::cout << "    " << term::bullet << term::bold << "row cluster lists (TtB)" << term::reset << std::endl;
         
-            auto  x = std::make_unique< vector::scalar_vector< value_t > >( A->col_is() );
-            auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
+            auto  x = std::make_unique< vector::scalar_vector< value_t > >( zA->col_is() );
+            auto  y = std::make_unique< vector::scalar_vector< value_t > >( zA->row_is() );
 
             x->fill( 1 );
 
-            auto  block_map = impl::cluster_block_map_t< value_t >();
-
-            impl::setup_cluster_block_map( apply_normal, *zA, block_map );
+            auto  blocks = impl::build_cluster_blocks< value_t >( apply_normal, *zA );
             
             for ( int i = 0; i < nbench; ++i )
             {
                 tic = timer::now();
     
                 for ( int j = 0; j < nmvm; ++j )
-                    impl::mul_vec_cl< value_t >( value_t(2), apply_normal, *zA, block_map, *x, *y );
+                    impl::mul_vec_cl< value_t >( value_t(2), apply_normal, *blocks, *x, *y );
 
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
@@ -591,7 +586,7 @@ program_main ()
                 std::cout << term::rollback << term::clearline << "      runtime = "
                           << format_time( min( runtime ), median( runtime ), max( runtime ) );
             std::cout << std::endl;
-
+        
             std::cout << "      ratio   = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
             std::cout << "      flops   = " << format_flops( flops_h, min( runtime ) ) << std::endl;
             
@@ -608,7 +603,7 @@ program_main ()
         {
             runtime.clear();
             
-            std::cout << "    " << term::bullet << term::bold << "row cluster lists" << term::reset << std::endl;
+            std::cout << "    " << term::bullet << term::bold << "row cluster lists (BtT)" << term::reset << std::endl;
         
             auto  x = std::make_unique< vector::scalar_vector< value_t > >( zA->col_is() );
             auto  y = std::make_unique< vector::scalar_vector< value_t > >( zA->row_is() );
@@ -622,7 +617,7 @@ program_main ()
                 tic = timer::now();
     
                 for ( int j = 0; j < nmvm; ++j )
-                    impl::mul_vec_cl< value_t >( value_t(2), apply_normal, *blocks, *x, *y );
+                    impl::mul_vec_cl2< value_t >( value_t(2), apply_normal, *blocks, *x, *y );
 
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );

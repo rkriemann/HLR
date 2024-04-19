@@ -139,6 +139,20 @@ mul_vec_cl ( const value_t                             alpha,
 
 template < typename value_t >
 void
+mul_vec_cl2 ( const value_t                             alpha,
+              const matop_t                             op_M,
+              const cluster_blocks_t< value_t > &       cb,
+              const vector::scalar_vector< value_t > &  x,
+              vector::scalar_vector< value_t > &        y )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    detail::mul_vec_cl2( alpha, op_M, cb, x, y );
+}
+
+template < typename value_t >
+void
 mul_vec_cl ( const value_t                             alpha,
              const matop_t                             op_M,
              const cluster_matrix_t< value_t > &       cm,
