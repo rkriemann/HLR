@@ -148,6 +148,7 @@ APLR_COMPRESSORS = [ 'none',
                      'bfl',
                      'dfl',
                      'mixedprec',
+                     'mixedprec2',
                      'posits',
                      'blosc' ]
 aplr = 'none'
@@ -655,11 +656,11 @@ elif compressor == 'posits' :
     env.Append( CPPDEFINES = 'HLR_HAS_UNIVERSAL' )
     env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
 elif compressor == 'cfloat' :
-    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=19' )
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=20' )
     env.Append( CPPDEFINES = 'HLR_HAS_UNIVERSAL' )
     env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
 elif compressor == 'blosc' :
-    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=20' )
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=21' )
     env.Append( CPPDEFINES = 'HLR_HAS_BLOSC' )
     env.Append( CPPPATH    = os.path.join( BLOSC_DIR, 'include' ) )
     env.Append( LIBPATH    = os.path.join( BLOSC_DIR, 'lib' ) )
@@ -688,6 +689,8 @@ if aplr == 'default'  :
     elif compressor == 'blosc'  : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=20' )
 elif aplr == 'mixedprec'  :
     env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=18' )
+elif aplr == 'mixedprec2'  :
+    env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=19' )
 elif aplr == 'afl'  :
     env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=1' )
 elif aplr == 'aflp' :
