@@ -522,12 +522,27 @@ inline size_t     compressed_size ( const zarray &   ) { return SIZE_MAX; }
 
 #else // HLR_COMPRESSOR not defined
 
+#include <hlr/compress/byte_n.hh>
+
 namespace hlr { namespace compress {
 
 static const char provider[] = "none";
 
 struct zconfig_t {};
-struct zarray    {};
+
+struct zarray
+{
+    zarray ()               {}
+    zarray ( const size_t ) {}
+    
+    byte_t *  data  ()       { return nullptr; }
+    byte_t *  data  () const { return nullptr; }
+
+    size_t    size  () const { return 0; }
+
+    byte_t *  begin () const { return nullptr; }
+    byte_t *  end   () const { return nullptr; }
+};
 
 template < typename value_t >
 zarray

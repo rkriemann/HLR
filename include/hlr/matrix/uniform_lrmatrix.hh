@@ -487,7 +487,7 @@ uniform_lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
 
     if (( zmem > 0 ) && ( zmem < mem_dense ))
     {
-        HLR_ASSERT( zS.data() != nullptr );
+        HLR_ASSERT( ( zS.size() == 0 ) || ( zS.data() != nullptr ) );
 
         _zS = std::move( zS );
         _S  = std::move( blas::matrix< value_t >( 0, 0 ) );

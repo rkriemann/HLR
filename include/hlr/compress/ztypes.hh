@@ -8,7 +8,12 @@
 // Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
+//
 // different compressor types
+//
+// - needs to be consistent with SConstruct file!
+//
+
 #define HLR_COMPRESSOR_AFL      1
 #define HLR_COMPRESSOR_AFLP     2
 #define HLR_COMPRESSOR_BFL      3
@@ -27,7 +32,8 @@
 #define HLR_COMPRESSOR_TF32     16
 #define HLR_COMPRESSOR_BF24     17
 #define HLR_COMPRESSOR_MP       18
-#define HLR_COMPRESSOR_CFLOAT   19
-#define HLR_COMPRESSOR_BLOSC    20
+#define HLR_COMPRESSOR_MP2      19
+#define HLR_COMPRESSOR_CFLOAT   20
+#define HLR_COMPRESSOR_BLOSC    21
 
 #endif // __HLR_COMPRESS_ZTYPES_HH

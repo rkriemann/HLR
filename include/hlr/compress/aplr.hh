@@ -58,6 +58,43 @@ mulvec ( const size_t     nrows,
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
+#elif HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_MP2
+
+#include <hlr/compress/mixedprec2.hh>
+
+namespace hlr { namespace compress { namespace aplr {
+
+using zarray = hlr::compress::mixedprec2::zarray;
+using hlr::compress::mixedprec2::compress_lr;
+using hlr::compress::mixedprec2::decompress_lr;
+using hlr::compress::mixedprec2::byte_size;
+using hlr::compress::mixedprec2::compressed_size;
+
+static const char provider[] = "mixedprec2";
+
+namespace zblas
+{
+
+template < typename value_t >
+void
+mulvec ( const size_t     nrows,
+         const size_t     ncols,
+         const matop_t    op_A,
+         const value_t    alpha,
+         const zarray &   zA,
+         const value_t *  x,
+         value_t *        y )
+{
+    hlr::compress::mixedprec2::mulvec_lr( nrows, ncols, op_A, alpha, zA, x, y );
+}
+
+}// namespace zblas
+
+}}}// namespace hlr::compress::aplr
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
 #elif HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_ZFP
 
 #include <hlr/compress/zfp.hh>
