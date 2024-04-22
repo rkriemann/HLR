@@ -80,7 +80,7 @@ UNIVERSAL_DIR = '/'
 blosc         = False
 BLOSC_DIR     = '/'
 
-zblas         = False
+zblas         = True
 
 # set of frameworks to use: seq, openmp, tbb, tf, hpx, mpi, gpi2 (or 'all')
 FRAMEWORKS   = [ 'seq',
@@ -136,7 +136,7 @@ COMPRESSORS   = [ 'none',
                   'blosc' ]
 compressor    = 'none'
 
-# supported and active adaptive precision lowrank compressor
+# supported and active APLR compressor
 APLR_COMPRESSORS = [ 'none',
                      'default',
                      'zfp',
