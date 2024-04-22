@@ -346,7 +346,7 @@ compress_lr< double > ( const blas::matrix< double > &  U,
         const uint8_t  nbyte     = nbits / 8;
 
         b[l]   = nbyte;
-        zsize += 1 + n * nbyte;
+        zsize += dfl_header_ofs + n * nbyte;
     }// for
 
     //
@@ -361,7 +361,7 @@ compress_lr< double > ( const blas::matrix< double > &  U,
         const uint8_t  nbyte = b[l];
 
         zdata[pos] = nbyte;
-        pos += 1;
+        pos       += dfl_header_ofs;
 
         switch ( nbyte )
         {
@@ -403,7 +403,7 @@ decompress_lr< double > ( const zarray &            zdata,
     {
         const uint8_t  nbyte = zdata[ pos ];
 
-        pos += 1;
+        pos += dfl_header_ofs;
 
         switch ( nbyte )
         {

@@ -289,10 +289,10 @@ compress< float > ( const config &   config,
                     const size_t     dim2,
                     const size_t     dim3 )
 {
-    const size_t    nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
-    const uint32_t  nbits = byte_pad( 1 + 8 + config.bitrate ); // total no. of bits per value
-    const uint32_t  nbyte = nbits / 8;
-    zarray          zdata( bfl_header_ofs + nbyte * nsize );
+    const size_t   nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
+    const uint8_t  nbits = byte_pad( 1 + 8 + config.bitrate ); // total no. of bits per value
+    const uint8_t  nbyte = nbits / 8;
+    zarray         zdata( bfl_header_ofs + nbyte * nsize );
 
     zdata[0] = nbyte;
 
@@ -317,10 +317,10 @@ compress< double > ( const config &   config,
                      const size_t     dim2,
                      const size_t     dim3 )
 {
-    const size_t    nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
-    const uint32_t  nbits = byte_pad( 1 + 8 + config.bitrate ); // total no. of bits per value
-    const uint32_t  nbyte = nbits / 8;
-    zarray          zdata( bfl_header_ofs + nbyte * nsize );
+    const size_t   nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
+    const uint8_t  nbits = byte_pad( 1 + 8 + config.bitrate ); // total no. of bits per value
+    const uint8_t  nbyte = nbits / 8;
+    zarray         zdata( bfl_header_ofs + nbyte * nsize );
 
     zdata[0] = nbyte;
 
@@ -495,7 +495,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
         const uint32_t  nbyte     = nbits / 8;
 
         b[l]   = nbyte;
-        zsize += 1 + nbyte * n;
+        zsize += bfl_header_ofs + nbyte * n;
     }// for
 
     //
@@ -510,7 +510,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
         const auto  nbyte = b[l];
 
         zdata[pos] = nbyte;
-        pos += 1;
+        pos       += bfl_header_ofs;
 
         if constexpr ( sizeof(real_t) == 4 )
         {
@@ -558,7 +558,7 @@ decompress_lr ( const zarray &             zdata,
     {
         const auto  nbyte = zdata[ pos ];
 
-        pos += 1;
+        pos += bfl_header_ofs;
 
         if constexpr ( sizeof(real_t) == 4 )
         {
