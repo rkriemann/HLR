@@ -11,8 +11,6 @@
 
 #include <hlr/bem/hca.hh>
 
-#include <half.hpp>
-
 #include "hlr/arith/norm.hh"
 #include "hlr/approx/accuracy.hh"
 #include "hlr/bem/aca.hh"
