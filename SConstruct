@@ -147,8 +147,8 @@ APLR_COMPRESSORS = [ 'none',
                      'aflp',
                      'bfl',
                      'dfl',
-                     'mixedprec',
-                     'mixedprec2',
+                     'mp2',
+                     'mp3',
                      'posits',
                      'blosc' ]
 aplr = 'none'
@@ -687,9 +687,9 @@ if aplr == 'default'  :
     elif compressor == 'mgard'  : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=8' )
     elif compressor == 'posits' : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=12' )
     elif compressor == 'blosc'  : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=20' )
-elif aplr == 'mixedprec'  :
+elif aplr == 'mp3'  :
     env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=18' )
-elif aplr == 'mixedprec2'  :
+elif aplr == 'mp2'  :
     env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=19' )
 elif aplr == 'afl'  :
     env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=1' )
