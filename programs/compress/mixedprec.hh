@@ -372,8 +372,6 @@ program_main ()
 
             auto  blocks = impl::build_cluster_blocks< value_t >( apply_normal, *A );
 
-            impl::realloc( *blocks );
-            
             for ( int i = 0; i < nbench; ++i )
             {
                 tic = timer::now();
@@ -419,8 +417,6 @@ program_main ()
             x->fill( 1 );
 
             auto  blocks = impl::build_cluster_blocks< value_t >( apply_normal, *A );
-            
-            impl::realloc( *blocks );
             
             for ( int i = 0; i < nbench; ++i )
             {
@@ -568,8 +564,6 @@ program_main ()
 
             auto  blocks = impl::build_cluster_blocks< value_t >( apply_normal, *zA );
             
-            impl::realloc( *blocks );
-            
             for ( int i = 0; i < nbench; ++i )
             {
                 tic = timer::now();
@@ -615,8 +609,6 @@ program_main ()
             x->fill( 1 );
 
             auto  blocks = impl::build_cluster_blocks< value_t >( apply_normal, *zA );
-            
-            impl::realloc( *blocks );
             
             for ( int i = 0; i < nbench; ++i )
             {
