@@ -275,6 +275,14 @@ public:
     const compress::aplr::zarray  zU () const { return _zU; }
     const compress::aplr::zarray  zV () const { return _zV; }
     
+    void  set_zlrmat  ( compress::aplr::zarray &&  azU,
+                        compress::aplr::zarray &&  azV )
+    {
+        // ASSUMPTION: compatible with S!!!
+        _zU = std::move( azU );
+        _zV = std::move( azV );
+    }
+    
     //
     // misc.
     //

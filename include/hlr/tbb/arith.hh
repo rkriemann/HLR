@@ -153,6 +153,78 @@ mul_vec_cl2 ( const value_t                             alpha,
 
 template < typename value_t >
 void
+realloc ( cluster_blocks_t< value_t > &  cb )
+{
+    if ( ! cb.M.empty() )
+    {
+        for ( auto  M : cb.M )
+        {
+            if ( matrix::is_lowrank( M ) )
+            {
+                auto  R = const_cast< matrix::lrmatrix< value_t > * >( cptrcast( M, matrix::lrmatrix< value_t > ) );
+
+                if ( R->is_compressed() )
+                {
+                    HLR_ERROR( "TODO" );
+                }// if
+                else
+                {
+                    auto  U = blas::copy( R->U() );
+                    auto  V = blas::copy( R->V() );
+
+                    R->set_lrmat( std::move( U ), std::move( V ) );
+                }// else
+            }// if
+            else if ( matrix::is_lowrank_sv( M ) )
+            {
+                auto  R = const_cast< matrix::lrsvmatrix< value_t > * >( cptrcast( M, matrix::lrsvmatrix< value_t > ) );
+
+                if ( R->is_compressed() )
+                {
+                    auto  zU = compress::aplr::zarray( R->zU() );
+                    auto  zV = compress::aplr::zarray( R->zV() );
+
+                    R->set_zlrmat( std::move( zU ), std::move( zV ) );
+                }// if
+                else
+                {
+                    HLR_ERROR( "TODO" );
+                }// else
+            }// if
+            else if ( matrix::is_dense( M ) )
+            {
+                auto  D = const_cast< matrix::dense_matrix< value_t > * >( cptrcast( M, matrix::dense_matrix< value_t > ) );
+
+                if ( D->is_compressed() )
+                {
+                    auto  zD = compress::zarray( D->zmat() );
+
+                    D->set_zmatrix( std::move( zD ) );
+                }// if
+                else
+                {
+                    auto  DM = blas::copy( D->mat() );
+
+                    D->set_matrix( std::move( DM ) );
+                }// else
+            }// if
+            else
+                HLR_ERROR( "unsupported matrix type : " + M->typestr() );
+        }// for
+    }// if
+
+    //
+    // recurse
+    //
+
+    if ( cb.sub_blocks.size() > 0 )
+    {
+        ::tbb::parallel_for< uint >( 0, cb.sub_blocks.size(), [&cb] ( const uint  i ) { hlr::tbb::realloc( *cb.sub_blocks[i] ); } );
+    }// if
+}
+
+template < typename value_t >
+void
 mul_vec_cl ( const value_t                             alpha,
              const matop_t                             op_M,
              const cluster_matrix_t< value_t > &       cm,
