@@ -601,7 +601,9 @@ if half :
     env.Append( CPPDEFINES = 'HLR_HAS_HALF' )
     env.Append( CPPPATH    = os.path.join( HALF_DIR, 'include' ) )
         
-if   compressor == 'afl' :
+if   compressor == 'none' :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=0' )
+elif   compressor == 'afl' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=1' )
 elif compressor == 'aflp' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=2' )
@@ -677,7 +679,8 @@ elif compressor == 'bf24' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=17' )
 
 if aplr == 'default'  :
-    if   compressor == 'afl'    : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=1' )
+    if   compressor == 'none'   : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=0' )
+    elif compressor == 'afl'    : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=1' )
     elif compressor == 'aflp'   : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=2' )
     elif compressor == 'bfl'    : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=3' )
     elif compressor == 'dfl'    : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=4' )
@@ -687,10 +690,8 @@ if aplr == 'default'  :
     elif compressor == 'mgard'  : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=8' )
     elif compressor == 'posits' : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=12' )
     elif compressor == 'blosc'  : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=20' )
-elif aplr == 'mixedprec'  :
-    env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=18' )
-elif aplr == 'mixedprec2'  :
-    env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=19' )
+elif aplr == 'none'  :
+    env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=0' )
 elif aplr == 'afl'  :
     env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=1' )
 elif aplr == 'aflp' :
@@ -727,6 +728,10 @@ elif aplr == 'posits'   :
     env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=12' )
     env.Append( CPPDEFINES = 'HLR_HAS_UNIVERSAL' )
     env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
+elif aplr == 'mixedprec'  :
+    env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=18' )
+elif aplr == 'mixedprec2'  :
+    env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=19' )
 elif aplr == 'blosc'   :
     env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=20' )
     env.Append( CPPDEFINES = 'HLR_HAS_BLOSC' )
