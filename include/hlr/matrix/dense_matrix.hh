@@ -128,8 +128,6 @@ public:
     // access internal data
     //
 
-    #if 1
-
     blas::matrix< value_t >  mat () const
     {
         if ( is_compressed() )
@@ -146,13 +144,6 @@ public:
 
     blas::matrix< value_t > &        mat_direct  ()       { HLR_ASSERT( ! is_compressed() ); return _mat; }
     const blas::matrix< value_t > &  mat_direct  () const { HLR_ASSERT( ! is_compressed() ); return _mat; }
-    
-    #else
-    
-    blas::matrix< value_t > &        mat  ()       { return _mat; }
-    const blas::matrix< value_t > &  mat  () const { return _mat; }
-
-    #endif
     
     void
     set_matrix ( const blas::matrix< value_t > &  aM )
@@ -529,7 +520,7 @@ dense_matrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
     //               << std::endl;
     // }
     
-    if (( zmem > 0 ) && ( zmem < mem_dense ))
+    if (( zmem != 0 ) && ( zmem < mem_dense ))
     {
         _zM  = std::move( zM );
         _mat = std::move( blas::matrix< value_t >( 0, 0 ) );

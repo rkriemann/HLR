@@ -454,7 +454,7 @@ shared_cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     auto  zV   = compress::aplr::compress_lr< value_t >( _V, S );
     auto  zmem = compress::aplr::compressed_size( zV );
 
-    if (( zmem > 0 ) && ( zmem < mem_dense ))
+    if (( zmem != 0 ) && ( zmem < mem_dense ))
     {
         _zV = std::move( zV );
         _V  = std::move( blas::matrix< value_t >( 0, _V.ncols() ) ); // remember rank

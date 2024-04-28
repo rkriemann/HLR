@@ -626,55 +626,78 @@ build_joined_matrix ( const matop_t                  op_M,
         else
         {
             HLR_ASSERT( has_lrsv );
-            
-            //
-            // determine joined rank and compressed size
-            //
 
-            uint    k     = 0;
-            size_t  zsize = 0;
-        
-            for ( auto  M : cm.R )
+            if ( ! cm.R.empty() )
             {
-                auto  R = cptrcast( M, matrix::lrsvmatrix< value_t > );
-                
-                k += R->rank();
-
-                if ( op_M == apply_normal ) zsize += R->zU().size();
-                else                        zsize += R->zV().size();
-            }// for
-
-            //
-            // build joined U factor
-            //
-
-            uint    kpos = 0;
-            size_t  zpos = 0;
-
-            cm.S = blas::vector< real_t >( k );
-            cm.zU.resize( zsize );
+                bool  all_compressed   = true;
+                bool  all_uncompressed = true;
             
-            for ( auto  M : cm.R )
-            {
-                auto  R   = cptrcast( M, matrix::lrsvmatrix< value_t > );
-                auto  UR  = R->U( op_M );
-                auto  k_i = R->rank();
-                auto  S_i = blas::vector< value_t >( cm.S, blas::range( kpos, kpos + k_i - 1 ) );
-
-                blas::copy( R->S(), S_i );
-                kpos += k_i;
-
-                auto  zsize_i = ( op_M == apply_normal ? R->zU().size() : R->zV().size() );
+                for ( auto  M : cm.R )
+                {
+                    auto  R = cptrcast( M, matrix::lrsvmatrix< value_t > );
+                    
+                    if ( R->is_compressed() ) all_uncompressed = false;
+                    else                      all_compressed   = false;
+                }// for
                 
-                if ( op_M == apply_normal ) memcpy( cm.zU.data() + zpos, R->zU().data(), zsize_i );
-                else                        memcpy( cm.zU.data() + zpos, R->zV().data(), zsize_i );
+                HLR_ASSERT( all_compressed != all_uncompressed );
 
-                zpos += zsize_i;
-            }// for
+                if ( all_compressed )
+                {
+                    //
+                    // determine joined rank and compressed size
+                    //
+                
+                    uint    k     = 0;
+                    size_t  zsize = 0;
+                
+                    for ( auto  M : cm.R )
+                    {
+                        auto  R = cptrcast( M, matrix::lrsvmatrix< value_t > );
+                    
+                        k += R->rank();
+                    
+                        if ( op_M == apply_normal ) zsize += R->zU().size();
+                        else                        zsize += R->zV().size();
+                    }// for
+                
+                    //
+                    // build joined U factor
+                    //
+                
+                    uint    kpos = 0;
+                    size_t  zpos = 0;
+                
+                    cm.S = blas::vector< real_t >( k );
+                    cm.zU.resize( zsize );
+                
+                    for ( auto  M : cm.R )
+                    {
+                        auto  R   = cptrcast( M, matrix::lrsvmatrix< value_t > );
+                        auto  UR  = R->U( op_M );
+                        auto  k_i = R->rank();
+                        auto  S_i = blas::vector< value_t >( cm.S, blas::range( kpos, kpos + k_i - 1 ) );
 
-            HLR_ASSERT( zpos == zsize );
+                        blas::copy( R->S(), S_i );
+                        kpos += k_i;
+
+                        auto  zsize_i = ( op_M == apply_normal ? R->zU().size() : R->zV().size() );
+                
+                        if ( op_M == apply_normal ) memcpy( cm.zU.data() + zpos, R->zU().data(), zsize_i );
+                        else                        memcpy( cm.zU.data() + zpos, R->zV().data(), zsize_i );
+
+                        zpos += zsize_i;
+                    }// for
+
+                    HLR_ASSERT( zpos == zsize );
             
-            cm.compressed = true;
+                    cm.compressed = true;
+                }// if
+                else
+                {
+                    HLR_ERROR( "TODO" );
+                }// else
+            }// if
         }// else
     }// if
 

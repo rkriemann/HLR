@@ -758,7 +758,7 @@ nested_cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
         //     std::cout << blas::norm_F( T ) << " / " << blas::norm_F( T ) / blas::norm_F( _V ) << std::endl;
         // }
         
-        if (( zmem > 0 ) && ( zmem < mem_dense ))
+        if (( zmem != 0 ) && ( zmem < mem_dense ))
         {
             _zV = std::move( zV );
             _V  = std::move( blas::matrix< value_t >( 0, _V.ncols() ) ); // remember rank
@@ -782,7 +782,7 @@ nested_cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
             mem_compr += compress::compressed_size( zE[i] );
         }// for
             
-        if (( mem_compr > 0 ) && ( mem_compr < mem_dense ))
+        if (( mem_compr != 0 ) && ( mem_compr < mem_dense ))
         {
             _zE = std::move( zE );
 

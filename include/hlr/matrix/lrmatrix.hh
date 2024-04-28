@@ -840,7 +840,7 @@ lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
     //               << std::endl;
     // }
     
-    if (( zmem_U > 0 ) && ( zmem_V > 0 ) && ( zmem_U + zmem_V < mem_lr ))
+    if (( zmem_U != 0 ) && ( zmem_V != 0 ) && ( zmem_U + zmem_V < mem_lr ))
     {
         _zU = std::move( zU );
         _zV = std::move( zV );

@@ -466,18 +466,33 @@ using hlr::compress::mgard::byte_size;
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#elif HLR_COMPRESSOR == HLR_COMPRESSOR_MP
+#elif  ( HLR_COMPRESSOR == HLR_COMPRESSOR_NONE ) || ( HLR_COMPRESSOR == HLR_COMPRESSOR_MP )
 
 //
-// special compressor only for lowrank
+// dummy compressor
 //
+
+#include <hlr/compress/byte_n.hh>
 
 namespace hlr { namespace compress {
 
 static const char provider[] = "none";
 
 struct zconfig_t {};
-struct zarray    {};
+
+struct zarray
+{
+    zarray ()               {}
+    zarray ( const size_t ) {}
+    
+    byte_t *  data  ()       { return nullptr; }
+    byte_t *  data  () const { return nullptr; }
+
+    size_t    size  () const { return 0; }
+
+    byte_t *  begin () const { return nullptr; }
+    byte_t *  end   () const { return nullptr; }
+};
 
 template < typename value_t >
 zarray
@@ -503,8 +518,8 @@ decompress ( const zarray &  zdata,
 {}
 
 inline zconfig_t  get_config      ( double /* eps */ ) { return zconfig_t{}; }
-inline size_t     byte_size       ( const zarray &   ) { return SIZE_MAX; } // ensures maximal memory size
-inline size_t     compressed_size ( const zarray &   ) { return SIZE_MAX; }
+inline size_t     byte_size       ( const zarray &   ) { return 0; } // signals failed compression
+inline size_t     compressed_size ( const zarray &   ) { return 0; }
 
 }} // namespace hlr::compress
 
@@ -568,8 +583,8 @@ decompress ( const zarray &  zdata,
 {}
 
 inline zconfig_t  get_config      ( double /* eps */ ) { return zconfig_t{}; }
-inline size_t     byte_size       ( const zarray &   ) { return SIZE_MAX; } // ensures maximal memory size
-inline size_t     compressed_size ( const zarray &   ) { return SIZE_MAX; }
+inline size_t     byte_size       ( const zarray &   ) { return 0; } // signals failed compression
+inline size_t     compressed_size ( const zarray &   ) { return 0; }
 
 }} // namespace hlr::compress
     

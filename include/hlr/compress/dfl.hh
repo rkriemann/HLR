@@ -142,7 +142,7 @@ compress< float > ( const config &   config,
                     const size_t     dim2,
                     const size_t     dim3 )
 {
-    return bfl::compress( bfl::config( config.bitrate ), data, dim0, dim1, dim2, dim3 );
+    return bfl::compress( bfl::config{ config.bitrate }, data, dim0, dim1, dim2, dim3 );
 }
 
 template <>

@@ -318,6 +318,51 @@ static const char provider[] = "blosc";
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
+#elif HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_NONE
+
+#include <hlr/compress/byte_n.hh>
+
+namespace hlr { namespace compress { namespace aplr {
+
+struct zconfig_t {};
+
+struct zarray
+{
+    zarray ()               {}
+    zarray ( const size_t ) {}
+    
+    byte_t *  data   ()       { return nullptr; }
+    byte_t *  data   () const { return nullptr; }
+
+    size_t    size   () const           { return 0; }
+    void      resize ( const size_t n ) {}
+
+    byte_t *  begin  () const { return nullptr; }
+    byte_t *  end    () const { return nullptr; }
+};
+
+template < typename value_t >
+zarray
+compress_lr ( const blas::matrix< value_t > & , const blas::vector< Hpro::real_type_t< value_t > > & )
+{
+    return zarray();
+}
+
+template < typename value_t >
+void
+decompress_lr ( const zarray & , blas::matrix< value_t > & )
+{}
+
+inline size_t  byte_size       ( const zarray & ) { return 0; } // signals failure
+inline size_t  compressed_size ( const zarray & ) { return 0; }
+
+static const char provider[] = "none";
+
+}}}// namespace hlr::compress::aplr
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
 #else
 
 #  define HLR_HAS_APLR_COMPRESSION  1

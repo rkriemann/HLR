@@ -14,6 +14,7 @@
 // - needs to be consistent with SConstruct file!
 //
 
+#define HLR_COMPRESSOR_NONE     0
 #define HLR_COMPRESSOR_AFL      1
 #define HLR_COMPRESSOR_AFLP     2
 #define HLR_COMPRESSOR_BFL      3

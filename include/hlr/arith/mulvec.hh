@@ -656,6 +656,16 @@ mul_vec_flops ( const Hpro::matop_t               op_M,
         // y := y + α·U·t
         return FMULS_GEMV( ncols, rank ) + FMULS_GEMV( nrows, rank );
     }// if
+    else if ( matrix::is_lowrank_sv( M ) )
+    {
+        const auto  nrows = M.nrows( op_M );
+        const auto  ncols = M.ncols( op_M );
+        const auto  rank  = cptrcast( &M, matrix::lrsvmatrix< value_t > )->rank();
+        
+        // t :=     V^H x
+        // y := y + α·U·t
+        return FMULS_GEMV( ncols, rank ) + FMULS_GEMV( nrows, rank );
+    }// if
     else if ( matrix::is_dense( M ) )
     {
         const auto  nrows = M.nrows( op_M );
