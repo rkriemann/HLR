@@ -147,8 +147,8 @@ APLR_COMPRESSORS = [ 'none',
                      'aflp',
                      'bfl',
                      'dfl',
-                     'mixedprec',
-                     'mixedprec2',
+                     'mp2',
+                     'mp3',
                      'posits',
                      'blosc' ]
 aplr = 'none'
@@ -728,9 +728,9 @@ elif aplr == 'posits'   :
     env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=12' )
     env.Append( CPPDEFINES = 'HLR_HAS_UNIVERSAL' )
     env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
-elif aplr == 'mixedprec'  :
+elif aplr == 'mp3'  :
     env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=18' )
-elif aplr == 'mixedprec2'  :
+elif aplr == 'mp2'  :
     env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=19' )
 elif aplr == 'blosc'   :
     env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=20' )

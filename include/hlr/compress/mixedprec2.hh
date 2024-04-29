@@ -321,90 +321,101 @@ mulvec_lr ( const size_t     nrows,
             const value_t *  x,
             value_t *        y )
 {
-    const uint32_t  n_fp64 = reinterpret_cast< const uint32_t * >( zA.data() )[0];
-    const uint32_t  n_fp32 = reinterpret_cast< const uint32_t * >( zA.data() )[1];
-    size_t          zpos   = 2 * sizeof(uint32_t);
-    size_t          pos    = 0;
+    const auto  zsize = zA.size();
+    size_t      zpos  = 0;
+    size_t      dpos  = 0;
 
-    switch ( op_A )
+    //
+    // in case of joined blocks, iterate over all
+    //
+    
+    while ( zpos < zsize )
     {
-        case  apply_normal :
+        const uint32_t  n_fp64 = reinterpret_cast< const uint32_t * >( zA.data() + zpos )[0];
+        const uint32_t  n_fp32 = reinterpret_cast< const uint32_t * >( zA.data() + zpos )[1];
+
+        zpos += 2 * sizeof(uint32_t);
+
+        switch ( op_A )
         {
-            if ( n_fp64 > 0 )
+            case  apply_normal :
             {
-                auto  zptr = reinterpret_cast< const fp64_t * >( zA.data() + zpos );
-                
-                if constexpr ( std::is_same_v< fp64_t, value_t > )
+                if ( n_fp64 > 0 )
                 {
-                    blas::gemv( 'N', nrows, n_fp64, alpha, zptr, nrows, x + pos, 1, fp64_t(1), y, 1 );
+                    auto  zptr = reinterpret_cast< const fp64_t * >( zA.data() + zpos );
+                
+                    if constexpr ( std::is_same_v< fp64_t, value_t > )
+                    {
+                        blas::gemv( 'N', nrows, n_fp64, alpha, zptr, nrows, x + dpos, 1, fp64_t(1), y, 1 );
+                    }// if
+                    else
+                    {
+                        mulvec< value_t, fp64_t >( nrows, n_fp64, op_A, alpha, zptr, x + dpos, y );
+                    }// else
+
+                    zpos += n_fp64 * nrows * sizeof(fp64_t);
+                    dpos += n_fp64;
                 }// if
-                else
+
+                if ( n_fp32 > 0 )
                 {
-                    mulvec< value_t, fp64_t >( nrows, n_fp64, op_A, alpha, zptr, x + pos, y );
-                }// else
-
-                zpos += n_fp64 * nrows * sizeof(fp64_t);
-                pos  += n_fp64;
-            }// if
-
-            if ( n_fp32 > 0 )
-            {
-                auto  zptr = reinterpret_cast< const fp32_t * >( zA.data() + zpos );
+                    auto  zptr = reinterpret_cast< const fp32_t * >( zA.data() + zpos );
                 
-                if constexpr ( std::is_same_v< fp64_t, value_t > )
-                {
-                    auto  tx = blas::vector< fp32_t >( n_fp32 );
-                    auto  ty = blas::vector< fp32_t >( nrows );
+                    if constexpr ( std::is_same_v< fp64_t, value_t > )
+                    {
+                        auto  tx = blas::vector< fp32_t >( n_fp32 );
+                        auto  ty = blas::vector< fp32_t >( nrows );
 
-                    for ( size_t  i = 0; i < n_fp32; ++i )
-                        tx(i) = *(x + pos + i);
+                        for ( size_t  i = 0; i < n_fp32; ++i )
+                            tx(i) = *(x + dpos + i);
                     
-                    blas::gemv( 'N', nrows, n_fp32, alpha, zptr, nrows, tx.data(), 1, fp32_t(0), ty.data(), 1 );
+                        blas::gemv( 'N', nrows, n_fp32, alpha, zptr, nrows, tx.data(), 1, fp32_t(0), ty.data(), 1 );
 
-                    for ( size_t  i = 0; i < nrows; ++i )
-                        y[i] += ty(i);
-                }// if
-                else if constexpr ( std::is_same_v< fp32_t, value_t > )
-                {
-                    blas::gemv( 'N', nrows, n_fp32, alpha, zptr, nrows, x + pos, 1, fp32_t(1), y, 1 );
-                }// if
-                else
-                {
-                    mulvec< value_t, fp32_t >( nrows, n_fp32, op_A, alpha, zptr, x + pos, y );
-                }// else
+                        for ( size_t  i = 0; i < nrows; ++i )
+                            y[i] += ty(i);
+                    }// if
+                    else if constexpr ( std::is_same_v< fp32_t, value_t > )
+                    {
+                        blas::gemv( 'N', nrows, n_fp32, alpha, zptr, nrows, x + dpos, 1, fp32_t(1), y, 1 );
+                    }// if
+                    else
+                    {
+                        mulvec< value_t, fp32_t >( nrows, n_fp32, op_A, alpha, zptr, x + dpos, y );
+                    }// else
                 
-                zpos += n_fp32 * nrows * sizeof(fp32_t);
-                pos  += n_fp32;
-            }// if
-        }// case
-        break;
+                    zpos += n_fp32 * nrows * sizeof(fp32_t);
+                    dpos += n_fp32;
+                }// if
+            }// case
+            break;
         
-        case  apply_conjugate  : HLR_ERROR( "TODO" );
+            case  apply_conjugate  : HLR_ERROR( "TODO" );
             
-        case  apply_transposed : HLR_ERROR( "TODO" );
+            case  apply_transposed : HLR_ERROR( "TODO" );
 
-        case  apply_adjoint :
-        {
-            if ( n_fp64 > 0 )
+            case  apply_adjoint :
             {
-                auto  zptr = reinterpret_cast< const fp64_t * >( zA.data() + zpos );
+                if ( n_fp64 > 0 )
+                {
+                    auto  zptr = reinterpret_cast< const fp64_t * >( zA.data() + zpos );
                 
-                mulvec< value_t, fp64_t >( nrows, n_fp64, op_A, alpha, zptr, x, y + pos );
-                zpos += n_fp64 * nrows * sizeof(fp64_t);
-                pos  += n_fp64;
-            }// if
+                    mulvec< value_t, fp64_t >( nrows, n_fp64, op_A, alpha, zptr, x, y + dpos );
+                    zpos += n_fp64 * nrows * sizeof(fp64_t);
+                    dpos += n_fp64;
+                }// if
 
-            if ( n_fp32 > 0 )
-            {
-                auto  zptr = reinterpret_cast< const fp32_t * >( zA.data() + zpos );
+                if ( n_fp32 > 0 )
+                {
+                    auto  zptr = reinterpret_cast< const fp32_t * >( zA.data() + zpos );
                 
-                mulvec< value_t, fp32_t >( nrows, n_fp32, op_A, alpha, zptr, x, y + pos );
-                zpos += n_fp32 * nrows * sizeof(fp32_t);
-                pos  += n_fp32;
-            }// if
-        }// case
-        break;
-    }// switch
+                    mulvec< value_t, fp32_t >( nrows, n_fp32, op_A, alpha, zptr, x, y + dpos );
+                    zpos += n_fp32 * nrows * sizeof(fp32_t);
+                    dpos += n_fp32;
+                }// if
+            }// case
+            break;
+        }// switch
+    }// while
 }
 
 }}}// namespace hlr::compress::mixedprec2

@@ -287,6 +287,13 @@ mul_vec_cl2 ( const value_t                             alpha,
     mul_vec_cl( alpha, op_M, cb, x, y );
 }
 
+template < typename value_t >
+void
+realloc ( cluster_blocks_t< value_t > & )
+{
+    // nothing to do
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 

@@ -282,6 +282,15 @@ public:
         return ! is_null( _zM.data() );
     }
 
+    // access compression data
+    const compress::zarray  zmat () const { return _zM; }
+    
+    void  set_zmatrix  ( compress::zarray &&  azM )
+    {
+        // ASSUMPTION: correct size!!!
+        _zM = std::move( azM );
+    }
+
     //
     // RTTI
     //

@@ -371,7 +371,7 @@ program_main ()
             x->fill( 1 );
 
             auto  blocks = impl::build_cluster_blocks< value_t >( apply_normal, *A );
-            
+
             for ( int i = 0; i < nbench; ++i )
             {
                 tic = timer::now();
