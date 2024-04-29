@@ -80,7 +80,7 @@ program_main ()
 
             auto  acalr = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
 
-            #if HLR_COMPRESSOR == HLR_COMPRESSOR_NONE
+            #if ( HLR_COMPRESSOR == HLR_COMPRESSOR_NONE ) && ( HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_NONE )
             A = impl::matrix::build( bct->root(), pcoeff, acalr, acc, nseq );
             #else
             A = impl::matrix::build_mixedprec( bct->root(), pcoeff, acalr, acc, nseq );
