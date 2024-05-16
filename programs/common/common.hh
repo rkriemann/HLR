@@ -240,19 +240,25 @@ gen_bct ( hpro::TClusterTree &  rowct,
 {
     hpro::TBCBuilder  bct_builder;
 
-    if ( hlr::cmdline::adm == "std" )
+    if (( hlr::cmdline::adm == "std" ) || ( hlr::cmdline::adm == "strong" ))
     {
         hpro::TStdGeomAdmCond  adm_cond( hlr::cmdline::eta, hpro::use_min_diam );
         
         return bct_builder.build( & rowct, & colct, & adm_cond );
     }// if
-    else if ( hlr::cmdline::adm == "weak" )
+    else if ( hlr::cmdline::adm == "angular" )
     {
         hpro::TWeakStdGeomAdmCond  adm_cond;
         
         return bct_builder.build( & rowct, & colct, & adm_cond );
     }// if
-    else if ( hlr::cmdline::adm == "hodlr" or hlr::cmdline::adm == "offdiag" )
+    else if ( hlr::cmdline::adm == "weak" )
+    {
+        hpro::TWeakGeomAdmCond  adm_cond;
+        
+        return bct_builder.build( & rowct, & colct, & adm_cond );
+    }// if
+    else if (( hlr::cmdline::adm == "hodlr" ) || ( hlr::cmdline::adm == "offdiag" ))
     {
         hpro::TOffDiagAdmCond  adm_cond;
         

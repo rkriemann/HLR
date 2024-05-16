@@ -89,6 +89,9 @@ lu_std ( const Hpro::TMatrix< value_t > &  A,
                   << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                   << std::endl;
 
+    if ( verbose( 3 ) )
+        io::eps::print( *C, "LU", "noid" );
+    
     auto  A_inv = matrix::luinv_eval( *C );
         
     std::cout << "      mem    = " << format_mem( C->byte_size() ) << std::endl;
@@ -418,8 +421,43 @@ program_main ()
     std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
     std::cout << "    mem    = " << format_mem( A->byte_size() ) << std::endl;
 
+    //////////////////////////////////////////////////////////////////////
+    //
+    // coarsen matrix
+    //
+    //////////////////////////////////////////////////////////////////////
+    
+    if ( cmdline::coarsen )
+    {
+        std::cout << term::bullet << term::bold << "coarsening" << term::reset << std::endl;
+        
+        auto  apx = approx::SVD< value_t >();
+
+        tic = timer::now();
+        
+        auto  Ac = impl::matrix::coarsen( *A, acc, apx );
+        
+        toc = timer::since( tic );
+
+        auto  mem_Ac = Ac->byte_size();
+        
+        std::cout << "    done in " << format_time( toc ) << std::endl;
+        std::cout << "    mem   = " << format_mem( mem_Ac ) << std::endl;
+        
+        if ( verbose( 3 ) )
+            matrix::print_eps( *Ac, "Ac", "noid,nosize" );
+
+        auto  diff   = matrix::sum( 1, *A, -1, *Ac );
+        auto  norm_A = impl::norm::spectral( *A );
+        auto  error  = impl::norm::spectral( *diff );
+
+        std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
+
+        A = std::move( Ac );
+    }// if
+  
     if ( verbose( 3 ) )
-        io::eps::print( *A, "A" );
+        io::eps::print( *A, "A", "noid" );
     
     //////////////////////////////////////////////////////////////////////
     //

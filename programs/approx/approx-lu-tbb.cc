@@ -11,6 +11,7 @@
 #include "hlr/tbb/arith_accu.hh"
 #include "hlr/tbb/arith_lazy.hh"
 #include "hlr/tbb/dag.hh"
+#include "hlr/tbb/norm.hh"
 
 namespace          impl      = hlr::tbb;
 const std::string  impl_name = "tbb";

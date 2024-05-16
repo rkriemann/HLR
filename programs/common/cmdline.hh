@@ -53,7 +53,7 @@ uint    nbench     = 1;            // perform computations <nbench> times (at mo
 double  tbench     = 1;            // minimal time for benchmark runs
 string  ref        = "";           // reference matrix, algorithm, etc.
 string  cluster    = "h";          // clustering technique (h,tlr,mblr,hodlr)
-string  adm        = "weak";       // admissibility (std,weak,hodlr)
+string  adm        = "strong";     // admissibility (strong,angular,weak,offdiagonal)
 double  eta        = 2.0;          // admissibility parameter
 string  capprox    = "default";    // construction low-rank approximation method (aca,hca,dense)
 string  aapprox    = "default";    // arithmetic low-rank approximation method (svd,rrqr,randsvd,randlr,aca,lanczos)
@@ -129,7 +129,7 @@ parse ( int argc, char ** argv )
         ;
 
     app_opts.add_options()
-        ( "adm",         value<string>(), ": admissibility (std,weak,offdiag,hodlr)" )
+        ( "adm",         value<string>(), ": admissibility (strong,angular,weak,offdiag)" )
         ( "app",         value<string>(), ": application type (logkernel,matern,laplaceslp,helmholtzslp,exp)" )
         ( "cluster",     value<string>(), ": clustering technique (tlr,blr,mblr(-n),tileh,bsp,h,sfc)" )
         ( "data",        value<string>(), ": data file to use" )
@@ -345,7 +345,8 @@ parse ( int argc, char ** argv )
     if ( adm == "help" )
     {
         std::cout << "Admissibility Conditions:" << std::endl
-                  << "  - std           : standard geometric admissibility min(diam(t),diam(s)) ≤ η dist(t,s)" << std::endl
+                  << "  - strong/std    : standard geometric admissibility min(diam(t),diam(s)) ≤ η dist(t,s)" << std::endl
+                  << "  - angular       : angular geometric admissibility" << std::endl
                   << "  - weak          : weak geometric admissibility" << std::endl
                   << "  - offdiag/hodlr : off-diagonal addmissibility" << std::endl
                   << "  - hilo          : Hi/Low frequency addmissibility" << std::endl
