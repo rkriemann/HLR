@@ -660,7 +660,8 @@ mulvec ( const size_t       nrows,
             for ( size_t  j = 0; j < ncols; ++j )
             {
                 const auto  x_j = alpha * x[j];
-                
+
+                #pragma GCC ivdep
                 for ( size_t  i = 0; i < nrows; ++i, pos++ )
                 {
                     const uint64_t  zval = zA[pos];

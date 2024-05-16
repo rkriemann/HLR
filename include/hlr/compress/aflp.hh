@@ -1218,13 +1218,16 @@ mulvec ( const size_t                        nrows,
          const uint8_t                       exp_bits,
          const uint8_t                       prec_bits )
 {
-    const uint8_t   nbits      = 1 + exp_bits + prec_bits;
-    const uint64_t  prec_mask  = ( 1ul << prec_bits ) - 1;
-    const uint8_t   prec_ofs   = FP64::mant_bits - prec_bits;
-    const uint64_t  exp_mask   = ( 1ul << exp_bits  ) - 1;
-    const uint32_t  sign_shift = exp_bits + prec_bits;
-    const uint64_t  zero_val   = FP64::zero_val & (( 1ul << nbits) - 1 );
-    const auto      scale      = alpha / zscale;
+    const uint8_t     nbits      = 1 + exp_bits + prec_bits;
+    const uint64_t    prec_mask  = ( 1ul << prec_bits ) - 1;
+    const uint8_t     prec_ofs   = FP64::mant_bits - prec_bits;
+    const uint64_t    exp_mask   = ( 1ul << exp_bits  ) - 1;
+    const uint32_t    sign_shift = exp_bits + prec_bits;
+    const uint64_t    zero_val   = FP64::zero_val & (( 1ul << nbits) - 1 );
+    const auto        scale      = alpha / zscale;
+    // constexpr size_t  nbuf       = 1;
+    // const size_t      nrows_buf  = (nrows / nbuf) * nbuf; // for <nbuf> step width 
+    // value_t           fcache[nbuf];
 
     switch ( op_A )
     {
@@ -1235,22 +1238,49 @@ mulvec ( const size_t                        nrows,
             for ( size_t  j = 0; j < ncols; ++j )
             {
                 const auto  x_j = scale * x[j];
+                fp64int_t   fival;
                 
-                for ( size_t  i = 0; i < nrows; ++i, pos++ )
+                // size_t      i   = 0;
+
+                // for ( ; i < nrows_buf; i += nbuf, pos += nbuf )
+                // {
+                //     #pragma GCC ivdep
+                //     for ( uint  ii = 0; ii < nbuf; ++ii )
+                //     {
+                //         const uint64_t  z_ij  = zA[pos+ii];
+                //         const uint64_t  mant  = z_ij & prec_mask;
+                //         const uint64_t  exp   = (z_ij >> prec_bits) & exp_mask;
+                //         const uint64_t  sign  = (z_ij >> sign_shift) << FP64::sign_bit;
+                //         fp64int_t       fival = { ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
+                        
+                //         fival.f  = ( fival.f - 1.0 );
+                //         fival.u |= sign;
+
+                //         fcache[ii] = fival.f;
+                //     }// for
+
+                //     #pragma GCC ivdep
+                //     for ( uint  ii = 0; ii < nbuf; ++ii )
+                //         y[i+ii] += fcache[ii] * x_j;
+                // }// for
+
+                for ( size_t  i = 0 ; i < nrows; ++i, pos++ )
                 {
-                    const uint64_t  z_ij  = zA[pos];
+                    const auto  z_ij = uint64_t( zA[pos] );
 
-                    if ( z_ij == zero_val )
-                        continue;
+                    if ( z_ij != zero_val )
+                    {
+                        const uint64_t  mant = z_ij & prec_mask;
+                        const uint64_t  exp  = (z_ij >> prec_bits) & exp_mask;
+                        const uint64_t  sign = (z_ij >> sign_shift) << FP64::sign_bit;
+
+                        fival.u  = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs);
+                        fival.f  = ( fival.f - 1.0 );
+                        fival.u |= sign;
+                    }// if
+                    else
+                        fival.f = double(0);
                     
-                    const uint64_t  mant  = z_ij & prec_mask;
-                    const uint64_t  exp   = (z_ij >> prec_bits) & exp_mask;
-                    const uint64_t  sign  = (z_ij >> sign_shift) << FP64::sign_bit;
-                    fp64int_t       fival = { ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
-
-                    fival.f  = ( fival.f - 1.0 );
-                    fival.u |= sign;
-
                     y[i] += fival.f * x_j;
                 }// for
             }// for
@@ -1263,23 +1293,48 @@ mulvec ( const size_t                        nrows,
             
             for ( size_t  j = 0; j < ncols; ++j )
             {
-                value_t  y_j = value_t(0);
-                
+                value_t    y_j = value_t(0);
+                fp64int_t  fival;
+                // size_t   i   = 0;
+
+                // for ( ; i < nrows_buf; i += nbuf, pos += nbuf )
+                // {
+                //     #pragma GCC ivdep
+                //     for ( uint  ii = 0; ii < nbuf; ++ii )
+                //     {
+                //         const uint64_t  z_ij  = zA[pos+ii];
+                //         const uint64_t  mant  = z_ij & prec_mask;
+                //         const uint64_t  exp   = (z_ij >> prec_bits) & exp_mask;
+                //         const uint64_t  sign  = (z_ij >> sign_shift) << FP64::sign_bit;
+                //         fp64int_t       fival = { ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
+                        
+                //         fival.f  = ( fival.f - 1.0 );
+                //         fival.u |= sign;
+
+                //         fcache[ii] = fival.f;
+                //     }// for
+                        
+                //     for ( uint  ii = 0; ii < nbuf; ++ii )
+                //         y_j += fcache[ii] * x[i+ii];
+                // }// for
+
                 for ( size_t  i = 0; i < nrows; ++i, pos++ )
                 {
-                    const uint64_t  z_ij  = zA[pos];
+                    const auto  z_ij = uint64_t( zA[pos] );
 
-                    if ( z_ij == zero_val )
-                        continue;
+                    if ( z_ij != zero_val )
+                    {
+                        const uint64_t  mant = z_ij & prec_mask;
+                        const uint64_t  exp  = (z_ij >> prec_bits) & exp_mask;
+                        const uint64_t  sign = (z_ij >> sign_shift) << FP64::sign_bit;
+                        
+                        fival.u  = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs);
+                        fival.f  = ( fival.f - 1.0 );
+                        fival.u |= sign;
+                    }// if
+                    else
+                        fival.f = double(0);
                     
-                    const uint64_t  mant  = z_ij & prec_mask;
-                    const uint64_t  exp   = (z_ij >> prec_bits) & exp_mask;
-                    const uint64_t  sign  = (z_ij >> sign_shift) << FP64::sign_bit;
-                    fp64int_t       fival = { ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
-
-                    fival.f  = ( fival.f - 1.0 );
-                    fival.u |= sign;
-
                     y_j += fival.f * x[i];
                 }// for
 
