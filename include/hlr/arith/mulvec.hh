@@ -661,7 +661,10 @@ mul_vec_flops ( const Hpro::matop_t               op_M,
         
         // t :=     V^H x
         // y := y + α·U·t
-        return FMULS_GEMV( ncols, rank ) + FMULS_GEMV( nrows, rank );
+        if constexpr ( Hpro::is_complex_type_v< value_t > )
+            return FLOPS_ZGEMV( ncols, rank ) + FLOPS_ZGEMV( nrows, rank );
+        else
+            return FLOPS_DGEMV( ncols, rank ) + FLOPS_DGEMV( nrows, rank );
     }// if
     else if ( matrix::is_lowrank_sv( M ) )
     {
@@ -671,14 +674,20 @@ mul_vec_flops ( const Hpro::matop_t               op_M,
         
         // t :=     V^H x
         // y := y + α·U·t
-        return FMULS_GEMV( ncols, rank ) + FMULS_GEMV( nrows, rank );
+        if constexpr ( Hpro::is_complex_type_v< value_t > )
+            return FLOPS_ZGEMV( ncols, rank ) + FLOPS_ZGEMV( nrows, rank );
+        else
+            return FLOPS_DGEMV( ncols, rank ) + FLOPS_DGEMV( nrows, rank );
     }// if
     else if ( matrix::is_dense( M ) )
     {
         const auto  nrows = M.nrows( op_M );
         const auto  ncols = M.ncols( op_M );
         
-        return FMULS_GEMV( nrows, ncols );
+        if constexpr ( Hpro::is_complex_type_v< value_t > )
+            return FLOPS_ZGEMV( nrows, ncols );
+        else
+            return FLOPS_DGEMV( nrows, ncols );
     }// if
     else
         HLR_ERROR( "unsupported matrix type: " + M.typestr() );

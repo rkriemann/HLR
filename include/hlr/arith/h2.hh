@@ -378,7 +378,10 @@ scalar_to_uniform_flops ( const cluster_basis_t &  cb )
     
     if ( cb.nsons() == 0 )
     {
-        flops += FMULS_GEMV( cb.rank(), cb.is().size() );
+        if constexpr ( Hpro::is_complex_type_v< Hpro::value_type_t< cluster_basis_t > > )
+            flops += FLOPS_ZGEMV( cb.rank(), cb.is().size() );
+        else
+            flops += FLOPS_DGEMV( cb.rank(), cb.is().size() );
     }// if
     else
     {
@@ -390,7 +393,10 @@ scalar_to_uniform_flops ( const cluster_basis_t &  cb )
             {
                 const auto  E_i = cb.transfer_mat(i);
                 
-                flops += FMULS_GEMV( E_i.ncols(), E_i.nrows() );
+                if constexpr ( Hpro::is_complex_type_v< Hpro::value_type_t< cluster_basis_t > > )
+                    flops += FLOPS_ZGEMV( E_i.ncols(), E_i.nrows() );
+                else
+                    flops += FLOPS_DGEMV( E_i.ncols(), E_i.nrows() );
             }// for
         }// for
     }// if
@@ -433,14 +439,20 @@ mul_vec_flops ( const Hpro::matop_t               op_M,
     {
         const auto  R = cptrcast( &M, matrix::h2_lrmatrix< value_t > );
         
-        return FMULS_GEMV( R->row_rank( op_M ), R->col_rank( op_M ) );
+        if constexpr ( Hpro::is_complex_type_v< value_t > )
+            return FLOPS_ZGEMV( R->row_rank( op_M ), R->col_rank( op_M ) );
+        else
+            return FLOPS_DGEMV( R->row_rank( op_M ), R->col_rank( op_M ) );
     }// if
     else if ( matrix::is_dense( M ) )
     {
         const auto  nrows = M.nrows( op_M );
         const auto  ncols = M.ncols( op_M );
         
-        return FMULS_GEMV( nrows, ncols );
+        if constexpr ( Hpro::is_complex_type_v< value_t > )
+            return FLOPS_ZGEMV( nrows, ncols );
+        else
+            return FLOPS_DGEMV( nrows, ncols );
     }// if
     else
         HLR_ERROR( "unsupported matrix type: " + M.typestr() );
@@ -459,7 +471,10 @@ add_uniform_to_scalar_flops ( const cluster_basis_t &  cb )
     
     if ( cb.nsons() == 0 )
     {
-        flops += FMULS_GEMV( cb.is().size(), cb.rank() );
+        if constexpr ( Hpro::is_complex_type_v< Hpro::value_type_t< cluster_basis_t > > )
+            flops += FLOPS_ZGEMV( cb.is().size(), cb.rank() );
+        else
+            flops += FLOPS_DGEMV( cb.is().size(), cb.rank() );
     }// if
     else
     {
@@ -469,7 +484,10 @@ add_uniform_to_scalar_flops ( const cluster_basis_t &  cb )
             {
                 const auto  E_i = cb.transfer_mat(i);
 
-                flops += FMULS_GEMV( E_i.nrows(), E_i.ncols() );
+                if constexpr ( Hpro::is_complex_type_v< Hpro::value_type_t< cluster_basis_t > > )
+                    flops += FLOPS_ZGEMV( E_i.nrows(), E_i.ncols() );
+                else
+                    flops += FLOPS_DGEMV( E_i.nrows(), E_i.ncols() );
             }// if
             
             flops += add_uniform_to_scalar_flops( *cb.son(i) );
