@@ -262,6 +262,38 @@ build_mixedprec ( const Hpro::TBlockCluster *  bct,
                 zR->compress( lacc );
                 M = std::move( zR );
             }// if
+            else if ( matrix::is_lowrank( *M ) )
+            {
+                auto  R  = ptrcast( M.get(), matrix::lrmatrix< value_t > );
+                auto  zR = std::make_unique< hlr::matrix::lrsvmatrix< value_t > >( rowis, colis, R->U(), R->V() );
+                
+                zR->compress( lacc );
+                M = std::move( zR );
+            }// if
+            else if ( matrix::is_lowrank_sv( *M ) )
+            {
+                auto  R = ptrcast( M.get(), matrix::lrsvmatrix< value_t > );
+
+                R->compress( lacc );
+            }// if
+            else if ( Hpro::is_dense( *M ) )
+            {
+                auto  D  = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
+                auto  zD = std::make_unique< matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) );
+
+                zD->compress( lacc );
+                M = std::move( zD );
+            }// if
+            else if ( matrix::is_dense( *M ) )
+            {
+                auto  D = ptrcast( M.get(), matrix::dense_matrix< value_t > );
+
+                D->compress( lacc );
+            }// if
+            else
+            {
+                HLR_LOG( 0, M->typestr() );
+            }// else
         }// if
         else
         {
@@ -270,11 +302,21 @@ build_mixedprec ( const Hpro::TBlockCluster *  bct,
             if ( Hpro::is_dense( *M ) )
             {
                 auto  D  = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
-                auto  zD = std::make_unique< hlr::matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) );
+                auto  zD = std::make_unique< matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) );
 
                 zD->compress( lacc );
                 M = std::move( zD );
             }// if
+            else if ( matrix::is_dense( *M ) )
+            {
+                auto  D = ptrcast( M.get(), matrix::dense_matrix< value_t > );
+
+                D->compress( lacc );
+            }// if
+            else
+            {
+                HLR_LOG( 0, M->typestr() );
+            }// else
         }// else
     }// if
     else
