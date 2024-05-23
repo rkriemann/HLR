@@ -480,6 +480,17 @@ print ( const Hpro::TCoordinate &  coord,
     vis.print( & coord, filename );
 }
 
+inline
+void
+print ( const Hpro::TCoordinate &    coord,
+        const std::vector< uint > &  label,
+        const std::string &          filename )
+{
+    Hpro::TVTKCoordVis  vis;
+
+    vis.print( & coord, label, filename );
+}
+
 //
 // print tensor
 //

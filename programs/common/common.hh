@@ -50,7 +50,7 @@ inline
 std::string
 mem_usage ()
 {
-    return hlr::term::yellow( " [" + hpro::Mem::to_string( hpro::Mem::usage() ) + "]" );
+    return hlr::term::yellow( " [" + Hpro::Mem::to_string( Hpro::Mem::usage() ) + "]" );
 }
 
 // return default formated memory string
@@ -58,7 +58,7 @@ inline
 std::string
 format_mem ( const size_t  m )
 {
-    return hlr::term::black( hpro::Mem::to_string( m ) ) + "\t" + mem_usage();
+    return hlr::term::black( Hpro::Mem::to_string( m ) ) + "\t" + mem_usage();
 }
 
 template < typename ... T_size >
@@ -66,7 +66,7 @@ std::string
 format_mem ( const size_t    m,
              const T_size... ms )
 {
-    return hlr::term::black( hpro::Mem::to_string( m ) ) + " / " + format_mem( ms... );
+    return hlr::term::black( Hpro::Mem::to_string( m ) ) + " / " + format_mem( ms... );
 }
 
 // return default formated timing string
@@ -168,11 +168,11 @@ median ( const std::vector< T > &  vec )
 // generate accuracy
 //
 inline
-hpro::TTruncAcc
+Hpro::TTruncAcc
 gen_accuracy ()
 {
-    if ( hlr::cmdline::eps < 0 ) return hpro::fixed_rank( hlr::cmdline::k );
-    else                         return hpro::fixed_prec( hlr::cmdline::eps );
+    if ( hlr::cmdline::eps < 0 ) return Hpro::fixed_rank( hlr::cmdline::k );
+    else                         return Hpro::fixed_prec( hlr::cmdline::eps );
 }
 
 //
@@ -182,14 +182,14 @@ inline
 bool
 verbose ( const int  lvl )
 {
-    return hpro::verbose( lvl );
+    return Hpro::verbose( lvl );
 }
 
 //
 // cluser given coordinate set
 //
-std::unique_ptr< hpro::TClusterTree >
-gen_ct ( hpro::TCoordinate &  coord )
+std::unique_ptr< Hpro::TClusterTree >
+gen_ct ( Hpro::TCoordinate &  coord )
 {
     using  hlr::cmdline::cluster;
     
@@ -234,45 +234,45 @@ gen_ct ( hpro::TCoordinate &  coord )
         HLR_ERROR( "unsupported clustering : " + cluster );
 }
 
-std::unique_ptr< hpro::TBlockClusterTree >
-gen_bct ( hpro::TClusterTree &  rowct,
-          hpro::TClusterTree &  colct )
+std::unique_ptr< Hpro::TBlockClusterTree >
+gen_bct ( Hpro::TClusterTree &  rowct,
+          Hpro::TClusterTree &  colct )
 {
-    hpro::TBCBuilder  bct_builder;
+    Hpro::TBCBuilder  bct_builder;
 
     if (( hlr::cmdline::adm == "std" ) || ( hlr::cmdline::adm == "strong" ))
     {
-        hpro::TStdGeomAdmCond  adm_cond( hlr::cmdline::eta, hpro::use_min_diam );
+        Hpro::TStdGeomAdmCond  adm_cond( hlr::cmdline::eta, Hpro::use_min_diam );
         
         return bct_builder.build( & rowct, & colct, & adm_cond );
     }// if
     else if ( hlr::cmdline::adm == "angular" )
     {
-        hpro::TWeakStdGeomAdmCond  adm_cond;
+        Hpro::TWeakStdGeomAdmCond  adm_cond;
         
         return bct_builder.build( & rowct, & colct, & adm_cond );
     }// if
     else if ( hlr::cmdline::adm == "weak" )
     {
-        hpro::TWeakGeomAdmCond  adm_cond;
+        Hpro::TWeakGeomAdmCond  adm_cond;
         
         return bct_builder.build( & rowct, & colct, & adm_cond );
     }// if
     else if (( hlr::cmdline::adm == "hodlr" ) || ( hlr::cmdline::adm == "offdiag" ))
     {
-        hpro::TOffDiagAdmCond  adm_cond;
+        Hpro::TOffDiagAdmCond  adm_cond;
         
         return bct_builder.build( & rowct, & colct, & adm_cond );
     }// if
     else if ( hlr::cmdline::adm == "hilo" )
     {
-        hpro::THiLoFreqGeomAdmCond  adm_cond( hlr::cmdline::kappa, 10 );
+        Hpro::THiLoFreqGeomAdmCond  adm_cond( hlr::cmdline::kappa, 10 );
         
         return bct_builder.build( & rowct, & colct, & adm_cond );
     }// if
     else if ( hlr::cmdline::adm == "none" )
     {
-        hpro::TStdGeomAdmCond  adm_cond( 0.0, hpro::use_min_diam );
+        Hpro::TStdGeomAdmCond  adm_cond( 0.0, Hpro::use_min_diam );
         
         return bct_builder.build( & rowct, & colct, & adm_cond );
     }// if
