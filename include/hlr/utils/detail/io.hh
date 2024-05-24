@@ -12,6 +12,8 @@
 #include <filesystem>
 #include <array>
 
+#include <hpro/cluster/TGeomCluster.hh>
+
 #include <hlr/tensor/structured_tensor.hh>
 #include <hlr/tensor/tucker_tensor.hh>
 #include <hlr/tensor/dense_tensor.hh>
@@ -327,10 +329,10 @@ vtk_print_cluster ( const Hpro::TCluster &  cl,
     auto  current  = std::list< const Hpro::TGeomCluster * >();
     uint  lvl      = 0;
 
-    HLR_ASSERT( Hpro::is_geom_cluster( son_i ) );
+    HLR_ASSERT( Hpro::is_geom_cluster( cl ) );
     
-    clusters.push_back( cptrcast( cl, Hpro::TGeomCluster ) );
-    current.push_back( cl );
+    clusters.push_back( cptrcast( &cl, Hpro::TGeomCluster ) );
+    current.push_back( cptrcast( &cl, Hpro::TGeomCluster ) );
     
     while ( lvl < nlvl )
     {
@@ -377,76 +379,44 @@ vtk_print_cluster ( const Hpro::TCluster &  cl,
         << "ASCII" << std::endl
         << "DATASET UNSTRUCTURED_GRID" << std::endl;
 
-    const size_t  nv = clusters.size() * 8;
+    const size_t  nc = clusters.size();
 
-    out << "POINTS " << nv << " FLOAT" << std::endl;
+    out << "POINTS " << 8*nc << " FLOAT" << std::endl;
 
     for ( auto  cluster : clusters )
     {
-        auto  bbmin = cluster->bbox()->min();
-        auto  bbmax = cluster->bbox()->max();
+        auto  bbmin = cluster->bbox().min();
+        auto  bbmax = cluster->bbox().max();
 
         HLR_ASSERT(( bbmin.dim() == 3 ) && ( bbmax.dim() == 3 ));
         
-        out << "8 "
-            << bbmin[0] << ' ' << bbmin[1] << ' ' << bbmin[2]
-            << "   "
-            << bbmax[0] << ' ' << bbmin[1] << ' ' << bbmin[2]
-            << "   "
-            << bbmin[0] << ' ' << bbmax[1] << ' ' << bbmin[2]
-            << "   "
-            << bbmax[0] << ' ' << bbmax[1] << ' ' << bbmin[2]
-            << "   "
-            << bbmin[0] << ' ' << bbmin[1] << ' ' << bbmax[2]
-            << "   "
-            << bbmax[0] << ' ' << bbmin[1] << ' ' << bbmax[2]
-            << "   "
-            << bbmin[0] << ' ' << bbmax[1] << ' ' << bbmax[2]
-            << "   "
-            << bbmax[0] << ' ' << bbmax[1] << ' ' << bbmax[2]
-            << std::endl;
+        out << bbmin[0] << ' ' << bbmin[1] << ' ' << bbmin[2] << std::endl
+            << bbmax[0] << ' ' << bbmin[1] << ' ' << bbmin[2] << std::endl
+            << bbmin[0] << ' ' << bbmax[1] << ' ' << bbmin[2] << std::endl
+            << bbmax[0] << ' ' << bbmax[1] << ' ' << bbmin[2] << std::endl
+            << bbmin[0] << ' ' << bbmin[1] << ' ' << bbmax[2] << std::endl
+            << bbmax[0] << ' ' << bbmin[1] << ' ' << bbmax[2] << std::endl
+            << bbmin[0] << ' ' << bbmax[1] << ' ' << bbmax[2] << std::endl
+            << bbmax[0] << ' ' << bbmax[1] << ' ' << bbmax[2] << std::endl;
     }// for
 
     out << "CELLS " << nc << ' ' << 9 * nc << std::endl;
 
-    for ( size_t  l = 0; l < t.size(2); ++l )
-        for ( size_t  j = 0; j < t.size(1); ++j )
-            for ( size_t  i = 0; i < t.size(0); ++i )
-                out << "8 "
-                    << ( l * nv1 + j ) * nv0 + i
-                    << ' '
-                    << ( l * nv1 + j ) * nv0 + (i + 1)
-                    << ' '
-                    << ( l * nv1 + (j+1) ) * nv0 + i
-                    << ' '
-                    << ( l * nv1 + (j+1) ) * nv0 + (i+1)
-                    << ' '
-                    << ( (l+1) * nv1 + j ) * nv0 + i
-                    << ' '
-                    << ( (l+1) * nv1 + j ) * nv0 + (i+1)
-                    << ' '
-                    << ( (l+1) * nv1 + (j+1) ) * nv0 + i
-                    << ' '
-                    << ( (l+1) * nv1 + (j+1) ) * nv0 + (i+1)
-                    << std::endl;
+    for ( size_t  i = 0; i < nc; ++i )
+        out << "8 "
+            << 8*i   << ' '
+            << 8*i+1 << ' '
+            << 8*i+2 << ' '
+            << 8*i+3 << ' '
+            << 8*i+4 << ' '
+            << 8*i+5 << ' '
+            << 8*i+6 << ' '
+            << 8*i+7 << std::endl;
         
     out << "CELL_TYPES " << nc << std::endl;
         
     for ( size_t  i = 0; i < nc; ++i )
         out << "11 ";
-    out << std::endl;
-
-    //
-    // associate entry in tensor with cell in grid
-    //
-
-    out << "CELL_DATA " << nc << std::endl
-        << "COLOR_SCALARS v" << " 1" << std::endl;
-        
-    for ( size_t  l = 0; l < t.size(2); ++l )
-        for ( size_t  j = 0; j < t.size(1); ++j )
-            for ( size_t  i = 0; i < t.size(0); ++i )
-                out << t( i, j, l ) << ' ';
     out << std::endl;
 }
 

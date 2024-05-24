@@ -501,7 +501,7 @@ print ( const Hpro::TCluster &  cl,
         const uint              lvl,
         const std::string &     filename )
 {
-    detail::vtk_print_cluster( t, filename );
+    detail::vtk_print_cluster( cl, lvl, filename );
 }
 
 //

@@ -57,6 +57,7 @@ program_main ()
     
     auto  ct  = cluster::sfc::cluster( hlr::cluster::sfc::blr, *coord, ntile );
 
+    if ( false )
     {
         auto  root  = ct->root();
         auto  label = std::vector< uint >( root->size() );
@@ -82,6 +83,7 @@ program_main ()
     {
         io::vtk::print( *coord, "coord" );
         io::eps::print( *ct->root(), "ct" );
+        io::vtk::print( *ct->root(), 1, "ct" );
         io::eps::print( *bct->root(), "bct" );
     }// if
     
@@ -127,15 +129,20 @@ program_main ()
     
     tic = timer::now();
     
-    auto  [ rowcb_uni, colcb_uni, A_uni ] = impl::matrix::build_uniform_rec( *A, apx, acc, nseq );
+    auto  [ rowcb, colcb, A_uni ] = impl::matrix::build_uniform_rec( *A, apx, acc, nseq );
 
     toc = timer::since( tic );
     std::cout << "    done in  " << format_time( toc ) << std::endl;
-    std::cout << "    mem    = " << format_mem( A_uni->byte_size(), rowcb_uni->byte_size(), colcb_uni->byte_size() ) << std::endl;
+
+    const auto  mem_uni = A_uni->byte_size();
+    const auto  mem_rcb = rowcb->byte_size();
+    const auto  mem_ccb = colcb->byte_size();
+    
+    std::cout << "    mem   = " << format_mem( mem_rcb, mem_ccb, mem_uni, mem_rcb + mem_ccb + mem_uni ) << std::endl;
 
     {
-        auto  [ row_min, row_avg, row_max ] = matrix::rank_info( *rowcb_uni );
-        auto  [ col_min, col_avg, col_max ] = matrix::rank_info( *colcb_uni );
+        auto  [ row_min, row_avg, row_max ] = matrix::rank_info( *rowcb );
+        auto  [ col_min, col_avg, col_max ] = matrix::rank_info( *colcb );
 
         std::cout << "    ranks  = "
                   << row_min << " … " << row_avg << " … " << row_max << " / "
@@ -145,8 +152,8 @@ program_main ()
     if ( hpro::verbose( 3 ) )
     {
         io::eps::print( *A_uni, "A_uni", "noid" );
-        io::eps::print( *rowcb_uni, "rowcb2" );
-        io::eps::print( *colcb_uni, "colcb2" );
+        io::eps::print( *rowcb, "rowcb2" );
+        io::eps::print( *colcb, "colcb2" );
     }// if
         
     {
@@ -177,10 +184,10 @@ program_main ()
         const uint  nmvm      = 50;
     
         const auto  flops_h   = nmvm * hlr::mul_vec_flops( apply_normal, *A );
-        const auto  flops_uni = nmvm * hlr::uniform::mul_vec_flops( apply_normal, *A_uni, *rowcb_uni, *colcb_uni );
+        const auto  flops_uni = nmvm * hlr::uniform::mul_vec_flops( apply_normal, *A_uni, *rowcb, *colcb );
 
         const auto  bytes_h   = nmvm * hlr::mul_vec_datasize( apply_normal, *A );
-        const auto  bytes_uni = nmvm * hlr::uniform::mul_vec_datasize( apply_normal, *A_uni, *rowcb_uni, *colcb_uni );
+        const auto  bytes_uni = nmvm * hlr::uniform::mul_vec_datasize( apply_normal, *A_uni, *rowcb, *colcb );
 
         std::cout << "  " << term::bullet << term::bold << "FLOPs/byte " << term::reset << std::endl;
         std::cout << "    H    = " << format_flops( flops_h   ) << ", " << flops_h   / bytes_h   << std::endl;
@@ -243,7 +250,7 @@ program_main ()
             {
                 auto  y = std::make_unique< vector::scalar_vector< value_t > >( A_uni->row_is() );
 
-                impl::uniform::mul_vec( value_t(2), hpro::apply_normal, *A_uni, *x_ref, *y, *rowcb_uni, *colcb_uni );
+                impl::uniform::mul_vec( value_t(2), hpro::apply_normal, *A_uni, *x_ref, *y, *rowcb, *colcb );
             
                 y->axpy( -1.0, y_ref.get() );
                 std::cout << "    error  = " << format_error( y->norm2() / y_ref->norm2() ) << std::endl;
@@ -259,7 +266,7 @@ program_main ()
                 tic = timer::now();
             
                 for ( int j = 0; j < nmvm; ++j )
-                    impl::uniform::mul_vec( value_t(2), hpro::apply_normal, *A_uni, *x, *y, *rowcb_uni, *colcb_uni );
+                    impl::uniform::mul_vec( value_t(2), hpro::apply_normal, *A_uni, *x, *y, *rowcb, *colcb );
             
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
