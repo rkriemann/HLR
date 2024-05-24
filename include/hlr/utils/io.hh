@@ -492,6 +492,19 @@ print ( const Hpro::TCoordinate &    coord,
 }
 
 //
+// print (bounding boxes of geometric) clusters
+// - up to <lvl> sub levels are printed
+//
+inline
+void
+print ( const Hpro::TCluster &  cl,
+        const uint              lvl,
+        const std::string &     filename )
+{
+    detail::vtk_print_cluster( t, filename );
+}
+
+//
 // print tensor
 //
 template < typename value_t >

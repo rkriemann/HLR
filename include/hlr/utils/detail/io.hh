@@ -313,6 +313,143 @@ h5_read_blas_tensor ( H5::H5File &         file,
 //
 //////////////////////////////////////////////////////////////////////
 
+inline
+void
+vtk_print_cluster ( const Hpro::TCluster &  cl,
+                    const uint              nlvl,
+                    const std::string &     filename )
+{
+    //
+    // collecting clusters for visualization
+    //
+
+    auto  clusters = std::list< const Hpro::TGeomCluster * >();
+    auto  current  = std::list< const Hpro::TGeomCluster * >();
+    uint  lvl      = 0;
+
+    HLR_ASSERT( Hpro::is_geom_cluster( son_i ) );
+    
+    clusters.push_back( cptrcast( cl, Hpro::TGeomCluster ) );
+    current.push_back( cl );
+    
+    while ( lvl < nlvl )
+    {
+        auto  sons = std::list< const Hpro::TGeomCluster * >();
+
+        for ( auto  cluster : clusters )
+        {
+            for ( uint  i = 0; i < cluster->nsons(); ++i )
+            {
+                auto  son_i = cluster->son(i);
+
+                if ( is_null( son_i ) )
+                    continue;
+
+                HLR_ASSERT( Hpro::is_geom_cluster( son_i ) );
+                    
+                clusters.push_back( cptrcast( son_i, Hpro::TGeomCluster ) );
+                sons.push_back( cptrcast( son_i, Hpro::TGeomCluster ) );
+            }// for
+        }// for
+
+        current = std::move( sons );
+        ++lvl;
+    }// while
+
+    //
+    // print bounding boxes
+    //
+    // vertex order:
+    //
+    //     6───────7
+    //    ╱│      ╱│
+    //   4─┼─────5 │
+    //   │ 2─────┼─3
+    //   │╱      │╱
+    //   0───────1
+    //
+    
+    auto  outname = std::filesystem::path( filename );
+    auto  out     = std::ofstream( outname.has_extension() ? filename : filename + ".vtk", std::ios::binary );
+    
+    out << "# vtk DataFile Version 2.0" << std::endl
+        << "HLR cluster tree" << std::endl
+        << "ASCII" << std::endl
+        << "DATASET UNSTRUCTURED_GRID" << std::endl;
+
+    const size_t  nv = clusters.size() * 8;
+
+    out << "POINTS " << nv << " FLOAT" << std::endl;
+
+    for ( auto  cluster : clusters )
+    {
+        auto  bbmin = cluster->bbox()->min();
+        auto  bbmax = cluster->bbox()->max();
+
+        HLR_ASSERT(( bbmin.dim() == 3 ) && ( bbmax.dim() == 3 ));
+        
+        out << "8 "
+            << bbmin[0] << ' ' << bbmin[1] << ' ' << bbmin[2]
+            << "   "
+            << bbmax[0] << ' ' << bbmin[1] << ' ' << bbmin[2]
+            << "   "
+            << bbmin[0] << ' ' << bbmax[1] << ' ' << bbmin[2]
+            << "   "
+            << bbmax[0] << ' ' << bbmax[1] << ' ' << bbmin[2]
+            << "   "
+            << bbmin[0] << ' ' << bbmin[1] << ' ' << bbmax[2]
+            << "   "
+            << bbmax[0] << ' ' << bbmin[1] << ' ' << bbmax[2]
+            << "   "
+            << bbmin[0] << ' ' << bbmax[1] << ' ' << bbmax[2]
+            << "   "
+            << bbmax[0] << ' ' << bbmax[1] << ' ' << bbmax[2]
+            << std::endl;
+    }// for
+
+    out << "CELLS " << nc << ' ' << 9 * nc << std::endl;
+
+    for ( size_t  l = 0; l < t.size(2); ++l )
+        for ( size_t  j = 0; j < t.size(1); ++j )
+            for ( size_t  i = 0; i < t.size(0); ++i )
+                out << "8 "
+                    << ( l * nv1 + j ) * nv0 + i
+                    << ' '
+                    << ( l * nv1 + j ) * nv0 + (i + 1)
+                    << ' '
+                    << ( l * nv1 + (j+1) ) * nv0 + i
+                    << ' '
+                    << ( l * nv1 + (j+1) ) * nv0 + (i+1)
+                    << ' '
+                    << ( (l+1) * nv1 + j ) * nv0 + i
+                    << ' '
+                    << ( (l+1) * nv1 + j ) * nv0 + (i+1)
+                    << ' '
+                    << ( (l+1) * nv1 + (j+1) ) * nv0 + i
+                    << ' '
+                    << ( (l+1) * nv1 + (j+1) ) * nv0 + (i+1)
+                    << std::endl;
+        
+    out << "CELL_TYPES " << nc << std::endl;
+        
+    for ( size_t  i = 0; i < nc; ++i )
+        out << "11 ";
+    out << std::endl;
+
+    //
+    // associate entry in tensor with cell in grid
+    //
+
+    out << "CELL_DATA " << nc << std::endl
+        << "COLOR_SCALARS v" << " 1" << std::endl;
+        
+    for ( size_t  l = 0; l < t.size(2); ++l )
+        for ( size_t  j = 0; j < t.size(1); ++j )
+            for ( size_t  i = 0; i < t.size(0); ++i )
+                out << t( i, j, l ) << ' ';
+    out << std::endl;
+}
+
 template < typename value_t >
 void
 vtk_print_full_tensor ( const blas::tensor3< value_t > &  t,
@@ -455,12 +592,12 @@ vtk_print_full_tensor ( const blas::tensor3< value_t > &  t,
                 out << i * h << ' ' << j * h << ' ' << l * h << std::endl;
 
     //
-    //     6-------7
-    //    /|      /|
-    //   4-------5 |
-    //   | 2-----|-3
-    //   |/      |/
-    //   0 ----- 1
+    //     6───────7
+    //    ╱│      ╱│
+    //   4─┼─────5 │
+    //   │ 2─────┼─3
+    //   │╱      │╱
+    //   0───────1
     //
             
     out << "CELLS " << nc << ' ' << 9 * nc << std::endl;
