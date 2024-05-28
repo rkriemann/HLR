@@ -385,6 +385,68 @@ make_uniform ( const cluster_basis_t &  cb )
     return u;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+//
+// level wise representation of uniform vector
+//
+
+//
+// represents hierarchy of shared cluster bases in a level wise way
+//
+template < typename T_value >
+class level_uniform_vector
+{
+public:
+
+    using  value_t          = T_value;
+    using  real_t           = Hpro::real_type_t< value_t >;
+    using  uniform_vector_t = uniform_vector< value_t >;
+    
+private:
+    // basis
+    std::vector< std::vector< uniform_vector_t * > >  _hier;
+    
+public:
+    
+    // construct cluster basis corresponding to cluster <cl>
+    level_uniform_vector ()
+    {}
+
+    // dtor: delete sons
+    ~level_uniform_vector ()
+    {
+        for ( auto  lvl : _hier )
+            for ( auto  vec : lvl )
+                delete vec;
+    }
+
+    //
+    // access sons
+    //
+
+    // return number of sons
+    uint  nlevel    () const           { return _hier.size(); }
+
+    // set number of sons
+    void  set_nlevel ( const uint  n ) { _hier.resize( n ); }
+
+    // access vector at level <lvl> and position <i>
+    uniform_vector_t *        vec  ( const uint  lvl,
+                                     const uint  i )       { return _hier[lvl][i]; }
+    const uniform_vector_t *  vec  ( const uint  lvl,
+                                     const uint  i ) const { return _hier[lvl][i]; }
+
+    void  set_cb   ( const uint          lvl,
+                     const uint          i,
+                     uniform_vector_t *  vec )
+    {
+        _hier[lvl][i] = vec;
+    }
+
+    // return full hierarchy
+    auto  hierarchy () const { return _hier; }
+};
+
 }}// namespace hlr::vector
 
 #endif // __HLR_VECTOR_UNIFORM_VECTOR_HH
