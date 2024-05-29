@@ -622,20 +622,45 @@ public:
 //
 template < typename value_t >
 std::unique_ptr< level_shared_cluster_basis< value_t > >
-build_level_hierarchy ( const shared_cluster_basis< value_t > &  cb )
+build_level_hierarchy ( const shared_cluster_basis< value_t > &  root_cb )
 {
     //
     // traverse in BFS style and construct each level
     //
 
-    auto  hier    = level_shared_cluster_basis< value_t >( cb->depth() );
+    auto  hier    = std::make_unique< level_shared_cluster_basis< value_t > >( root_cb->depth() );
     auto  current = std::list< const shared_cluster_basis< value_t > * >();
+    uint  lvl     = 0;
 
-    current.push_back( & cb );
+    current.push_back( & root_cb );
 
     while ( ! current.empty() )
     {
+        //
+        // add bases on current level to hierarchy
+        //
+
+        hier->hierarchy()[lvl].reserve( current.size() );
+
+        for ( auto  cb : current )
+            hier->hierarchy()[lvl].push_back( cb );
+
+        //
+        // collect bases on next level
+        //
+        
+        auto  sub = std::list< const shared_cluster_basis< value_t > * >();
+        
+        for ( auto  cb : current )
+            for ( uint  i = 0; i < cb->nsons(); ++i )
+                if ( ! is_null( cb->son(i) ) )
+                    sub.push_back( cb->son(i) );
+
+        lvl++;
+        current = std::move( sub );
     }// while
+
+    return hier;
 }
 
 //

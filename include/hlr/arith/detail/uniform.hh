@@ -167,33 +167,6 @@ scalar_to_uniform ( const shared_cluster_basis< value_t > &  cb,
 }
 
 //
-// copy given scalar vector into uniform vector format
-//
-template < typename value_t >
-std::unique_ptr< uniform_vector< shared_cluster_basis< value_t > > >
-scalar_to_uniform ( const shared_cluster_basis< value_t > &  cb,
-                    const scalar_vector< value_t > &         v )
-{
-    auto  u = std::make_unique< uniform_vector< shared_cluster_basis< value_t > > >( cb );
-
-    if ( cb.rank() > 0 )
-    {
-        auto  v_cb = blas::vector< value_t >( blas::vec( v ), cb.is() - v.ofs() );
-        auto  s    = cb.transform_forward( v_cb );
-
-        u->set_coeffs( std::move( s ) );
-    }// if
-
-    if ( cb.nsons() > 0 )
-    {
-        for ( uint  i = 0; i < cb.nsons(); ++i )
-            u->set_block( i, scalar_to_uniform( *cb.son(i), v ).release() );
-    }// if
-
-    return u;
-}
-
-//
 // add coefficients of uniform vector y to scalar vector y
 //
 template < typename value_t >
