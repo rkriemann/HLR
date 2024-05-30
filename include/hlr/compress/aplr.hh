@@ -379,6 +379,24 @@ using hlr::compress::mixedprec::compressed_size;
 
 static const char provider[] = "mixedprec";
 
+namespace zblas
+{
+
+template < typename value_t >
+void
+mulvec ( const size_t     nrows,
+         const size_t     ncols,
+         const matop_t    op_A,
+         const value_t    alpha,
+         const zarray &   zA,
+         const value_t *  x,
+         value_t *        y )
+{
+    hlr::compress::mixedprec::mulvec_lr( nrows, ncols, op_A, alpha, zA, x, y );
+}
+
+}// namespace zblas
+
 }}}// namespace hlr::compress::aplr
 
 //////////////////////////////////////////////////////////////////////
