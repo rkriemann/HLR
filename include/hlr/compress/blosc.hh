@@ -14,10 +14,15 @@
 #include <blosc2.h>
 
 #include <hlr/arith/blas.hh>
+#include <hlr/compress/byte_n.hh>
 
 namespace hlr { namespace compress { namespace blosc {
 
-using byte_t = uint8_t;
+//
+// signal availability of compressed BLAS
+//
+#define HLR_HAS_ZBLAS_DIRECT
+#define HLR_HAS_ZBLAS_APLR
 
 //
 // define compression mode
@@ -142,7 +147,7 @@ decompress ( const byte_t *  zdata,
     dparams.nthreads = 1;
 
     auto  dctx  = blosc2_create_dctx( dparams );
-    auto  dsize = blosc2_decompress_ctx( dctx, zdata, zsize, dest, nsize * sizeof(double) );
+    auto  dsize = blosc2_decompress_ctx( dctx, zdata, zsize, dest, nsize * sizeof(value_t) );
 
     blosc2_free_ctx( dctx );
     
@@ -262,6 +267,185 @@ decompress_lr ( const zarray &             zdata,
         decompress( zdata.data() + pos, s_i, U.data() + l*n, n );
         pos += s_i;
     }// for
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// compressed blas
+//
+////////////////////////////////////////////////////////////////////////////////
+
+namespace
+{
+
+template < typename value_t >
+void
+mulvec ( blosc2_context *  ctx,    // BLOSC decompression context
+         const void *      zdata,  // pointer to compressed data
+         const int32_t     zsize,  // size of compressed data
+         const int32_t     zofs,   // offset within compressed data
+         const size_t      nrows,
+         const size_t      ncols,
+         const matop_t     op_A,
+         const value_t     alpha,
+         const value_t *   x,
+         value_t *         y )
+{
+    const auto    nbuf      = std::min< size_t >( 256, nrows );
+    const size_t  nrows_buf = (nrows / nbuf) * nbuf; // for <nbuf> step width 
+    value_t       fcache[nbuf];
+    
+    switch ( op_A )
+    {
+        case  apply_normal :
+        {
+            size_t  pos = zofs;
+            
+            for ( size_t  j = 0; j < ncols; ++j )
+            {
+                const auto  x_j = alpha * x[j];
+                size_t      i   = 0;
+
+                for ( ; i < nrows_buf; i += nbuf, pos += nbuf )
+                {
+                    const auto  dsize = blosc2_getitem_ctx( ctx, zdata, zsize, pos, nbuf, fcache, nbuf * sizeof(value_t) );
+
+                    HLR_ASSERT( dsize == nbuf * sizeof(value_t) );
+                    
+                    #pragma GCC ivdep
+                    for ( uint  ii = 0; ii < nbuf; ++ii )
+                        y[i+ii] += fcache[ii] * x_j;
+                }// for
+
+                // handle remaining part
+                {
+                    const auto  nrest = nrows - i;
+                    const auto  dsize = blosc2_getitem_ctx( ctx, zdata, zsize, pos, nrest, fcache, nrest * sizeof(value_t) );
+
+                    HLR_ASSERT( dsize == nrest * sizeof(value_t) );
+                    
+                    #pragma GCC ivdep
+                    for ( uint  ii = 0; ii < nrest; ++ii )
+                        y[i+ii] += fcache[ii] * x_j;
+                }// for
+            }// for
+        }// case
+        break;
+        
+        case  apply_adjoint :
+        {
+            size_t  pos = zofs;
+            
+            for ( size_t  j = 0; j < ncols; ++j )
+            {
+                value_t  y_j = value_t(0);
+                size_t   i   = 0;
+
+                for ( ; i < nrows_buf; i += nbuf, pos += nbuf )
+                {
+                    const auto  dsize = blosc2_getitem_ctx( ctx, zdata, zsize, pos, nbuf, fcache, nbuf * sizeof(value_t) );
+                        
+                    HLR_ASSERT( dsize == nbuf * sizeof(value_t) );
+                    
+                    for ( uint  ii = 0; ii < nbuf; ++ii )
+                        y_j += fcache[ii] * x[i+ii];
+                }// for
+
+                // handle remaining part
+                {
+                    const auto  nrest = nrows - i;
+                    const auto  dsize = blosc2_getitem_ctx( ctx, zdata, zsize, pos, nrest, fcache, nrest * sizeof(value_t) );
+                    
+                    HLR_ASSERT( dsize == nrest * sizeof(value_t) );
+                    
+                    for ( uint  ii = 0; ii < nrest; ++ii )
+                        y_j += fcache[ii] * x[i+ii];
+                }
+
+                y[j] += alpha * y_j;
+            }// for
+        }// case
+        break;
+
+        default:
+            HLR_ERROR( "TODO" );
+    }// switch
+}
+
+}// namespace anonymous
+
+template < typename value_t >
+void
+mulvec ( const size_t     nrows,
+         const size_t     ncols,
+         const matop_t    op_A,
+         const value_t    alpha,
+         const zarray &   zA,
+         const value_t *  x,
+         value_t *        y )
+{
+    blosc2_dparams  dparams = BLOSC2_DPARAMS_DEFAULTS;
+    
+    dparams.nthreads = 1;
+    
+    auto  dctx = blosc2_create_dctx( dparams );
+
+    mulvec< value_t >( dctx, zA.data(), zA.size(), 0, nrows, ncols, op_A, alpha, x, y );
+
+    blosc2_free_ctx( dctx );
+}
+
+template < typename value_t >
+void
+mulvec_lr ( const size_t     nrows,
+            const size_t     ncols,
+            const matop_t    op_A,
+            const value_t    alpha,
+            const zarray &   zA,
+            const value_t *  x,
+            value_t *        y )
+{
+    blosc2_dparams  dparams = BLOSC2_DPARAMS_DEFAULTS;
+    
+    dparams.nthreads = 1;
+    
+    auto    dctx = blosc2_create_dctx( dparams );
+    size_t  pos  = 0;
+
+    switch ( op_A )
+    {
+        case  apply_normal :
+        {
+            for ( uint  l = 0; l < ncols; ++l )
+            {
+                auto  s_i = * reinterpret_cast< const size_t * >( zA.data() + pos );
+
+                pos += sizeof(size_t);
+                mulvec( dctx, zA.data() + pos, s_i, 0, nrows, 1, op_A, alpha, x+l, y );
+                pos += s_i;
+            }// for
+        }// case
+        break;
+        
+        case  apply_conjugate  : HLR_ERROR( "TODO" );
+            
+        case  apply_transposed : HLR_ERROR( "TODO" );
+
+        case  apply_adjoint :
+        {
+            for ( uint  l = 0; l < ncols; ++l )
+            {
+                auto  s_i = * reinterpret_cast< const size_t * >( zA.data() + pos );
+
+                pos += sizeof(size_t);
+                mulvec( dctx, zA.data() + pos, s_i, 0, nrows, 1, op_A, alpha, x, y+l );
+                pos += s_i;
+            }// for
+        }// case
+        break;
+    }// switch
+
+    blosc2_free_ctx( dctx );
 }
 
 }}}// namespace hlr::compress::blosc
