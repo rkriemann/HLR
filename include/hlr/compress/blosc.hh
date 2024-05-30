@@ -291,85 +291,177 @@ mulvec ( blosc2_context *  ctx,    // BLOSC decompression context
          const value_t *   x,
          value_t *         y )
 {
-    const auto    nbuf      = std::min< size_t >( 256, nrows );
-    const size_t  nrows_buf = (nrows / nbuf) * nbuf; // for <nbuf> step width 
-    value_t       fcache[nbuf];
+    //
+    // set up read-ahead buffer size as either multiple of nrows
+    // or less than nrows
     
-    switch ( op_A )
+    size_t  nbuf     = 16384; // size of read-ahead buffer
+    size_t  col_step = 1;
+
+    if ( nbuf > nrows )
     {
-        case  apply_normal :
-        {
-            size_t  pos = zofs;
-            
-            for ( size_t  j = 0; j < ncols; ++j )
-            {
-                const auto  x_j = alpha * x[j];
-                size_t      i   = 0;
+        // ensure full columns
+        col_step = std::min( nbuf / nrows, ncols );
+        nbuf     = col_step * nrows;
+    }// if
+    else
+        nbuf = std::min( nbuf, nrows );
+    
+    auto  fbuf = std::vector< value_t >( nbuf );
+    auto  fptr = fbuf.data();
 
-                for ( ; i < nrows_buf; i += nbuf, pos += nbuf )
-                {
-                    const auto  dsize = blosc2_getitem_ctx( ctx, zdata, zsize, pos, nbuf, fcache, nbuf * sizeof(value_t) );
-
-                    HLR_ASSERT( dsize == nbuf * sizeof(value_t) );
-                    
-                    #pragma GCC ivdep
-                    for ( uint  ii = 0; ii < nbuf; ++ii )
-                        y[i+ii] += fcache[ii] * x_j;
-                }// for
-
-                // handle remaining part
-                {
-                    const auto  nrest = nrows - i;
-                    const auto  dsize = blosc2_getitem_ctx( ctx, zdata, zsize, pos, nrest, fcache, nrest * sizeof(value_t) );
-
-                    HLR_ASSERT( dsize == nrest * sizeof(value_t) );
-                    
-                    #pragma GCC ivdep
-                    for ( uint  ii = 0; ii < nrest; ++ii )
-                        y[i+ii] += fcache[ii] * x_j;
-                }// for
-            }// for
-        }// case
-        break;
+    if ( col_step > 1 )
+    {
+        const size_t  ncols_buf = (ncols / col_step) * col_step; // upper limit of cols for <nbuf> step width
         
-        case  apply_adjoint :
+        switch ( op_A )
         {
-            size_t  pos = zofs;
-            
-            for ( size_t  j = 0; j < ncols; ++j )
+            case  apply_normal :
             {
-                value_t  y_j = value_t(0);
-                size_t   i   = 0;
-
-                for ( ; i < nrows_buf; i += nbuf, pos += nbuf )
+                size_t  pos = zofs;
+                size_t  j   = 0;
+                
+                for ( ; j < ncols_buf; j += col_step, pos += nbuf )
                 {
-                    const auto  dsize = blosc2_getitem_ctx( ctx, zdata, zsize, pos, nbuf, fcache, nbuf * sizeof(value_t) );
-                        
+                    // decompress multiple columns
+                    const auto  dsize = blosc2_getitem_ctx( ctx, zdata, zsize, pos, nbuf, fptr, nbuf * sizeof(value_t) );
+
                     HLR_ASSERT( dsize == nbuf * sizeof(value_t) );
-                    
-                    for ( uint  ii = 0; ii < nbuf; ++ii )
-                        y_j += fcache[ii] * x[i+ii];
+
+                    blas::gemv( 'N', nrows, col_step, alpha, fptr, nrows, x + j, 1, value_t(1), y, 1 );
                 }// for
 
-                // handle remaining part
+                if ( j < ncols )
                 {
-                    const auto  nrest = nrows - i;
-                    const auto  dsize = blosc2_getitem_ctx( ctx, zdata, zsize, pos, nrest, fcache, nrest * sizeof(value_t) );
+                    // handle remaining columns
+                    const auto  nrest_cols = ncols - j;
+                    const auto  nrest      = nrest_cols * nrows;
+                    const auto  dsize      = blosc2_getitem_ctx( ctx, zdata, zsize, pos, nrest, fptr, nrest * sizeof(value_t) );
                     
                     HLR_ASSERT( dsize == nrest * sizeof(value_t) );
                     
-                    for ( uint  ii = 0; ii < nrest; ++ii )
-                        y_j += fcache[ii] * x[i+ii];
-                }
+                    blas::gemv( 'N', nrows, nrest_cols, alpha, fptr, nrows, x + j, 1, value_t(1), y, 1 );
+                }// if
+            }// case
+            break;
+        
+            case  apply_adjoint :
+            {
+                size_t  pos = zofs;
+                size_t  j   = 0;
+                
+                for ( ; j < ncols_buf; j += col_step, pos += nbuf )
+                {
+                    // decompress multiple columns
+                    const auto  dsize = blosc2_getitem_ctx( ctx, zdata, zsize, pos, nbuf, fptr, nbuf * sizeof(value_t) );
 
-                y[j] += alpha * y_j;
-            }// for
-        }// case
-        break;
+                    HLR_ASSERT( dsize == nbuf * sizeof(value_t) );
 
-        default:
-            HLR_ERROR( "TODO" );
-    }// switch
+                    blas::gemv( 'C', nrows, col_step, alpha, fptr, nrows, x, 1, value_t(1), y + j, 1 );
+                }// for
+                
+                if ( j < ncols )
+                {
+                    // decompress multiple columns
+                    const auto  nrest_cols = ncols - j;
+                    const auto  nrest      = nrest_cols * nrows;
+                    const auto  dsize      = blosc2_getitem_ctx( ctx, zdata, zsize, pos, nrest, fptr, nrest * sizeof(value_t) );
+                    
+                    HLR_ASSERT( dsize == nrest * sizeof(value_t) );
+                    
+                    blas::gemv( 'C', nrows, nrest_cols, alpha, fptr, nrows, x, 1, value_t(1), y + j, 1 );
+                }// if
+            }// case
+            break;
+
+            default:
+                HLR_ERROR( "TODO" );
+        }// switch
+    }// if
+    else
+    {
+        const size_t  nrows_buf = (nrows / nbuf) * nbuf;         // upper limit of rows for <nbuf> step width
+        
+        switch ( op_A )
+        {
+            case  apply_normal :
+            {
+                size_t  pos = zofs;
+            
+                for ( size_t  j = 0; j < ncols; ++j )
+                {
+                    const auto  x_j = alpha * x[j];
+                    size_t      i   = 0;
+
+                    for ( ; i < nrows_buf; i += nbuf, pos += nbuf )
+                    {
+                        const auto  dsize = blosc2_getitem_ctx( ctx, zdata, zsize, pos, nbuf, fptr, nbuf * sizeof(value_t) );
+
+                        HLR_ASSERT( dsize == nbuf * sizeof(value_t) );
+                    
+                        blas::axpy( nbuf, x_j, fptr, 1, y + i, 1 );
+                        
+                        // #pragma GCC ivdep
+                        // for ( uint  ii = 0; ii < nbuf; ++ii )
+                        //     y[i+ii] += fptr[ii] * x_j;
+                    }// for
+
+                    // handle remaining part
+                    {
+                        const auto  nrest = nrows - i;
+                        const auto  dsize = blosc2_getitem_ctx( ctx, zdata, zsize, pos, nrest, fptr, nrest * sizeof(value_t) );
+
+                        HLR_ASSERT( dsize == nrest * sizeof(value_t) );
+                    
+                        blas::axpy( nrest, x_j, fptr, 1, y + i, 1 );
+                        
+                        // #pragma GCC ivdep
+                        // for ( uint  ii = 0; ii < nrest; ++ii )
+                        //     y[i+ii] += fptr[ii] * x_j;
+                    }// for
+                }// for
+            }// case
+            break;
+        
+            case  apply_adjoint :
+            {
+                size_t  pos = zofs;
+            
+                for ( size_t  j = 0; j < ncols; ++j )
+                {
+                    value_t  y_j = value_t(0);
+                    size_t   i   = 0;
+
+                    for ( ; i < nrows_buf; i += nbuf, pos += nbuf )
+                    {
+                        const auto  dsize = blosc2_getitem_ctx( ctx, zdata, zsize, pos, nbuf, fptr, nbuf * sizeof(value_t) );
+                        
+                        HLR_ASSERT( dsize == nbuf * sizeof(value_t) );
+                    
+                        for ( uint  ii = 0; ii < nbuf; ++ii )
+                            y_j += fptr[ii] * x[i+ii];
+                    }// for
+
+                    // handle remaining part
+                    {
+                        const auto  nrest = nrows - i;
+                        const auto  dsize = blosc2_getitem_ctx( ctx, zdata, zsize, pos, nrest, fptr, nrest * sizeof(value_t) );
+                    
+                        HLR_ASSERT( dsize == nrest * sizeof(value_t) );
+                    
+                        for ( uint  ii = 0; ii < nrest; ++ii )
+                            y_j += fptr[ii] * x[i+ii];
+                    }
+
+                    y[j] += alpha * y_j;
+                }// for
+            }// case
+            break;
+
+            default:
+                HLR_ERROR( "TODO" );
+        }// switch
+    }// if
 }
 
 }// namespace anonymous
