@@ -172,7 +172,6 @@ public:
 
     blas::matrix< value_t >  U  () const
     {
-        #if HLR_HAS_DIRECT_COMPRESSION == 1
         if ( is_compressed() )
         {
             auto  dU = blas::matrix< value_t >( this->nrows(), this->rank() );
@@ -181,14 +180,12 @@ public:
 
             return dU;
         }// if
-        #endif
         
         return _U;
     }
     
     blas::matrix< value_t >  V  () const
     {
-        #if HLR_HAS_DIRECT_COMPRESSION == 1
         if ( is_compressed() )
         {
             auto  dV = blas::matrix< value_t >( this->ncols(), this->rank() );
@@ -197,7 +194,6 @@ public:
 
             return dV;
         }// if
-        #endif
 
         return _V;
     }
@@ -307,7 +303,6 @@ public:
     {
         HLR_ASSERT(( this->nrows() == aU.nrows() ) && ( aU.ncols() == this->rank() ));
 
-        #if HLR_HAS_DIRECT_COMPRESSION == 1
         if ( is_compressed() )
         {
             // as this is just an update, compress without memory size test
@@ -316,7 +311,6 @@ public:
             _zU = std::move( compress::compress< value_t >( zconfig, aU ) );
         }// if
         else
-        #endif
         {
             blas::copy( aU, _U );
         }// else
@@ -328,7 +322,6 @@ public:
     {
         HLR_ASSERT(( this->nrows() == aU.nrows() ) && ( aU.ncols() == this->rank() ));
 
-        #if HLR_HAS_DIRECT_COMPRESSION == 1
         if ( is_compressed() )
         {
             // as this is just an update, compress without memory size test
@@ -337,7 +330,6 @@ public:
             _zU = std::move( compress::compress< value_t >( zconfig, aU ) );
         }// if
         else
-        #endif
         {
             _U = std::move( aU );
         }// else
@@ -350,7 +342,6 @@ public:
     {
         HLR_ASSERT(( this->ncols() == aV.nrows() ) && ( aV.ncols() == this->rank() ));
 
-        #if HLR_HAS_DIRECT_COMPRESSION == 1
         if ( is_compressed() )
         {
             // as this is just an update, compress without memory size test
@@ -359,7 +350,6 @@ public:
             _zV = std::move( compress::compress< value_t >( zconfig, aV ) );
         }// if
         else
-        #endif
         {
             blas::copy( aV, _V );
         }// else
@@ -371,7 +361,6 @@ public:
     {
         HLR_ASSERT(( this->ncols() == aV.nrows() ) && ( aV.ncols() == this->rank() ));
 
-        #if HLR_HAS_DIRECT_COMPRESSION == 1
         if ( is_compressed() )
         {
             // as this is just an update, compress without memory size test
@@ -380,7 +369,6 @@ public:
             _zV = std::move( compress::compress< value_t >( zconfig, aV ) );
         }// if
         else
-        #endif
         {
             _V = std::move( aV );
         }// else
@@ -460,7 +448,6 @@ public:
         R->copy_struct_from( this );
         R->_rank = _rank;
         
-        #if HLR_HAS_DIRECT_COMPRESSION == 1
         if ( is_compressed() )
         {
             R->_zU = compress::zarray( _zU.size() );
@@ -470,7 +457,6 @@ public:
             std::copy( _zV.begin(), _zV.end(), R->_zV.begin() );
         }// if
         else
-        #endif
         {
             R->_U = std::move( blas::copy( _U ) );
             R->_V = std::move( blas::copy( _V ) );
@@ -507,7 +493,6 @@ public:
         R->_V      = std::move( blas::copy( _V ) );
         R->_rank   = _rank;
             
-        #if HLR_HAS_DIRECT_COMPRESSION == 1
         if ( is_compressed() )
         {
             R->_zU = compress::zarray( _zU.size() );
@@ -521,7 +506,6 @@ public:
             R->_zU = compress::zarray();
             R->_zV = compress::zarray();
         }// else
-        #endif
     }
         
 
@@ -548,11 +532,7 @@ public:
     // return true if data is compressed
     virtual bool   is_compressed () const
     {
-        #if HLR_HAS_DIRECT_COMPRESSION == 1
         return ! is_null( _zU.data() );
-        #else
-        return false;
-        #endif
     }
 
     // return compression config based on given accuracy
@@ -572,10 +552,8 @@ public:
         size += _U.byte_size();
         size += _V.byte_size();
         
-        #if HLR_HAS_DIRECT_COMPRESSION == 1
         size += hlr::compress::byte_size( _zU );
         size += hlr::compress::byte_size( _zV );
-        #endif
         
         return size;
     }
@@ -583,12 +561,10 @@ public:
     // return size of (floating point) data in bytes handled by this object
     virtual size_t data_byte_size () const
     {
-        #if HLR_HAS_DIRECT_COMPRESSION == 1
         if ( is_compressed() )
             return hlr::compress::byte_size( _zU ) + hlr::compress::byte_size( _zV );
-        #endif
-        
-        return sizeof( value_t ) * _rank * ( _row_is.size() + _col_is.size() );
+        else
+            return sizeof( value_t ) * _rank * ( _row_is.size() + _col_is.size() );
     }
     
     // test data for invalid values, e.g. INF and NAN
@@ -605,10 +581,8 @@ protected:
     // remove compressed storage (standard storage not restored!)
     virtual void   remove_compressed ()
     {
-        #if HLR_HAS_DIRECT_COMPRESSION == 1
         _zU = compress::zarray();
         _zV = compress::zarray();
-        #endif
     }
 };
 
@@ -791,8 +765,6 @@ template < typename value_t >
 void
 lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
 {
-    #if HLR_HAS_DIRECT_COMPRESSION == 1
-        
     if ( is_compressed() )
         return;
                  
@@ -847,8 +819,6 @@ lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
         _U  = std::move( blas::matrix< value_t >( 0, 0 ) );
         _V  = std::move( blas::matrix< value_t >( 0, 0 ) );
     }// if
-
-    #endif
 }
 
 template < typename value_t >
@@ -886,8 +856,6 @@ template < typename value_t >
 void
 lrmatrix< value_t >::decompress ()
 {
-    #if HLR_HAS_DIRECT_COMPRESSION == 1
-        
     if ( ! is_compressed() )
         return;
 
@@ -895,8 +863,6 @@ lrmatrix< value_t >::decompress ()
     _V = std::move( V() );
 
     remove_compressed();
-        
-    #endif
 }
 
 //

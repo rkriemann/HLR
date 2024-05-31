@@ -302,7 +302,10 @@ public:
     // return size of (floating point) data in bytes handled by this object
     virtual size_t data_byte_size () const
     {
-        return sizeof(value_t) * _S.length() + compress::aplr::byte_size( _zU ) + compress::aplr::byte_size( _zV );
+        if ( is_compressed() )
+            return sizeof(value_t) * _S.length() + compress::aplr::byte_size( _zU ) + compress::aplr::byte_size( _zV );
+        else
+            return Hpro::TRkMatrix< value_t >::data_byte_size();
     }
     
     // test data for invalid values, e.g. INF and NAN
