@@ -970,6 +970,8 @@ libhlr = env.StaticLibrary( 'hlr', sources )
 
 Default( None )
 
+program_list = []
+
 #
 # default sequential environment
 #
@@ -982,7 +984,7 @@ if 'seq' in frameworks :
         source = path( program, name + '.cc' )
 
         if os.path.exists( source ) and os.path.isfile( source ) :
-            Default( seq.Program( path( program, name ), [ source ] ) )
+            program_list.append( seq.Program( path( program, name ), [ source ] ) )
 
 #
 # OpenMP
@@ -998,7 +1000,7 @@ if 'omp' in frameworks :
         source = path( program, name + '.cc' )
 
         if os.path.exists( source ) and os.path.isfile( source ) :
-            Default( omp.Program( path( program, name ), [ source, 'src/omp/dag.cc' ] ) )
+            program_list.append( omp.Program( path( program, name ), [ source, 'src/omp/dag.cc' ] ) )
 
 #
 # TBB
@@ -1017,7 +1019,7 @@ if 'tbb' in frameworks :
         source = path( program, name + '.cc' )
 
         if os.path.exists( source ) and os.path.isfile( source ) :
-            Default( tbb.Program( path( program, name ), [ source, 'src/tbb/dag.cc' ] ) )
+            program_list.append( tbb.Program( path( program, name ), [ source, 'src/tbb/dag.cc' ] ) )
 
 #
 # TaskFlow
@@ -1039,9 +1041,9 @@ if 'tf' in frameworks :
             continue
         
         if os.path.exists( source ) and os.path.isfile( source ) :
-            Default( tf.Program( path( program, name ), [ source, 'src/tf/dag.cc' ] ) )
+            program_list.append( tf.Program( path( program, name ), [ source, 'src/tf/dag.cc' ] ) )
             
-    # Default( tf.Program( 'programs/magma', [ 'programs/magma.cc' ] ) )
+    # program_list.append( tf.Program( 'programs/magma', [ 'programs/magma.cc' ] ) )
 
 #
 # HPX
@@ -1058,7 +1060,7 @@ if 'hpx' in frameworks :
         source = path( program, name + '.cc' )
 
         if os.path.exists( source ) and os.path.isfile( source ) :
-            Default( hpx.Program( path( program, name ), [ source, 'src/hpx/dag.cc' ] ) )
+            program_list.append( hpx.Program( path( program, name ), [ source, 'src/hpx/dag.cc' ] ) )
 
 #
 # MPI
@@ -1070,13 +1072,13 @@ if 'mpi' in frameworks :
     mpi.ParseConfig( 'mpic++ --showme:link' )
     
     if 'tlr'   in programs :
-        Default( mpi.Program( path( 'tlr', 'tlr-mpi-bcast.cc'  ) ) )
-        Default( mpi.Program( path( 'tlr', 'tlr-mpi-ibcast.cc' ) ) )
-        Default( mpi.Program( path( 'tlr', 'tlr-mpi-rdma.cc'   ) ) )
+        program_list.append( mpi.Program( path( 'tlr', 'tlr-mpi-bcast.cc'  ) ) )
+        program_list.append( mpi.Program( path( 'tlr', 'tlr-mpi-ibcast.cc' ) ) )
+        program_list.append( mpi.Program( path( 'tlr', 'tlr-mpi-rdma.cc'   ) ) )
     
     if 'tileh' in programs and 'tbb' in frameworks :
-        Default( mpi.Program( path( 'tileh', 'tileh-mpi-bcast'  ), [ path( 'tileh', 'tileh-mpi-bcast.cc'  ), 'src/tbb/dag.o' ] ) )
-        Default( mpi.Program( path( 'tileh', 'tileh-mpi-ibcast' ), [ path( 'tileh', 'tileh-mpi-ibcast.cc' ), 'src/tbb/dag.o' ] ) )
+        program_list.append( mpi.Program( path( 'tileh', 'tileh-mpi-bcast'  ), [ path( 'tileh', 'tileh-mpi-bcast.cc'  ), 'src/tbb/dag.o' ] ) )
+        program_list.append( mpi.Program( path( 'tileh', 'tileh-mpi-ibcast' ), [ path( 'tileh', 'tileh-mpi-ibcast.cc' ), 'src/tbb/dag.o' ] ) )
 
 #
 # GASPI
@@ -1088,4 +1090,10 @@ if 'gpi2' in frameworks :
     gpi.ParseConfig( 'PKG_CONFIG_PATH=%s pkg-config --libs   GPI2' % ( os.path.join( GPI2_DIR, 'lib64', 'pkgconfig' ) ) )
     gpi.Append( LIBS = [ 'pthread' ] )
     
-    if 'tlr' in programs : Default( gpi.Program( path( 'tlr', 'tlr-gaspi.cc' ) ) )
+    if 'tlr' in programs : program_list.append( gpi.Program( path( 'tlr', 'tlr-gaspi.cc' ) ) )
+
+#
+# finally set programs to be built
+#
+
+Default( program_list )
