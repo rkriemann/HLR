@@ -763,8 +763,8 @@ lrsvmatrix< value_t >::copy () const
 
     if ( is_compressed() )
     {
-        R->_zU = compress::zarray( _zU.size() );
-        R->_zV = compress::zarray( _zV.size() );
+        R->_zU = compress::aplr::zarray( _zU.size() );
+        R->_zV = compress::aplr::zarray( _zV.size() );
 
         std::copy( _zU.begin(), _zU.end(), R->_zU.begin() );
         std::copy( _zV.begin(), _zV.end(), R->_zV.begin() );
