@@ -27,7 +27,7 @@ public:
     using  value_t = double;
 
     // signal support for HCA based construction
-    static constexpr bool supports_hca = false;
+    static constexpr bool supports_hca = true;
 
     // function space
     using  fnspace_t = Hpro::TConstFnSpace< double >;
