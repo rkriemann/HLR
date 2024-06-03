@@ -38,40 +38,69 @@ namespace matrix
 // values.
 //
 template < typename T_value >
-class lrsvmatrix : public Hpro::TRkMatrix< T_value >, public compress::compressible
+class lrsvmatrix : public Hpro::TMatrix< T_value >, public compress::compressible
 {
 public:
     using  value_t = T_value;
     using  real_t  = Hpro::real_type_t< value_t >;
     
 private:
+private:
+    // local index set of matrix
+    indexset                 _row_is, _col_is;
+    
+    // low-rank factors
+    blas::matrix< value_t >  _U, _V;
+
     // singular values
-    blas::vector< real_t >  _S;
+    blas::vector< real_t >   _S;
 
     // compressed storage
-    compress::aplr::zarray  _zU, _zV;
+    compress::aplr::zarray   _zU, _zV;
 
+    // rank for simplified access and for compressed factors
+    uint                     _rank;
+    
 public:
     //
     // ctors
     //
 
     lrsvmatrix ()
-            : Hpro::TRkMatrix< value_t >()
+            : Hpro::TMatrix< value_t >()
+            , _row_is( 0, 0 )
+            , _col_is( 0, 0 )
+            , _rank( 0 )
     {}
     
     lrsvmatrix ( const indexset  arow_is,
                  const indexset  acol_is )
-            : Hpro::TRkMatrix< value_t >( arow_is, acol_is )
-    {}
+            : Hpro::TMatrix< value_t >()
+            , _row_is( arow_is )
+            , _col_is( acol_is )
+            , _U( _row_is.size(), 0 ) // to avoid issues with nrows/ncols
+            , _V( _col_is.size(), 0 )
+            , _rank( 0 )
+    {
+        this->set_ofs( _row_is.first(), _col_is.first() );
+    }
 
     lrsvmatrix ( const indexset              arow_is,
                  const indexset              acol_is,
                  blas::matrix< value_t > &   aU,
                  blas::vector< real_t > &    aS,
                  blas::matrix< value_t > &   aV )
-            : Hpro::TRkMatrix< value_t >( arow_is, acol_is )
+            : Hpro::TMatrix< value_t >()
+            , _row_is( arow_is )
+            , _col_is( acol_is )
+            , _rank( 0 )
     {
+        HLR_ASSERT(( arow_is.size() == aU.nrows() ) &&
+                   ( acol_is.size() == aV.nrows() ) &&
+                   ( aU.ncols()     == aV.ncols() ) &&
+                   ( aU.ncols()     == aS.length() ));
+        
+        this->set_ofs( _row_is.first(), _col_is.first() );
         set_lrmat( aU, aS, aV );
     }
 
@@ -80,8 +109,17 @@ public:
                  blas::matrix< value_t > &&  aU,
                  blas::vector< real_t > &&   aS,
                  blas::matrix< value_t > &&  aV )
-            : Hpro::TRkMatrix< value_t >( arow_is, acol_is )
+            : Hpro::TMatrix< value_t >()
+            , _row_is( arow_is )
+            , _col_is( acol_is )
+            , _rank( 0 )
     {
+        HLR_ASSERT(( arow_is.size() == aU.nrows() ) &&
+                   ( acol_is.size() == aV.nrows() ) &&
+                   ( aU.ncols()     == aV.ncols() ) &&
+                   ( aU.ncols()     == aS.length() ));
+
+        this->set_ofs( _row_is.first(), _col_is.first() );
         set_lrmat( std::move( aU ), std::move( aS ), std::move( aV ) );
     }
 
@@ -89,8 +127,16 @@ public:
                  const indexset              acol_is,
                  blas::matrix< value_t > &   aU,
                  blas::matrix< value_t > &   aV )
-            : Hpro::TRkMatrix< value_t >( arow_is, acol_is )
+            : Hpro::TMatrix< value_t >()
+            , _row_is( arow_is )
+            , _col_is( acol_is )
+            , _rank( 0 )
     {
+        HLR_ASSERT(( arow_is.size() == aU.nrows() ) &&
+                   ( acol_is.size() == aV.nrows() ) &&
+                   ( aU.ncols()     == aV.ncols() ));
+
+        this->set_ofs( _row_is.first(), _col_is.first() );
         set_lrmat( aU, aV );
     }
 
@@ -98,14 +144,48 @@ public:
                  const indexset              acol_is,
                  blas::matrix< value_t > &&  aU,
                  blas::matrix< value_t > &&  aV )
-            : Hpro::TRkMatrix< value_t >( arow_is, acol_is )
+            : Hpro::TMatrix< value_t >()
+            , _row_is( arow_is )
+            , _col_is( acol_is )
+            , _rank( 0 )
     {
+        HLR_ASSERT(( arow_is.size() == aU.nrows() ) &&
+                   ( acol_is.size() == aV.nrows() ) &&
+                   ( aU.ncols()     == aV.ncols() ));
+
+        this->set_ofs( _row_is.first(), _col_is.first() );
         set_lrmat( std::move( aU ), std::move( aV ) );
     }
 
     // dtor
     virtual ~lrsvmatrix ()
     {}
+    
+    //
+    // matrix data
+    //
+    
+    virtual size_t  nrows     () const { return _row_is.size(); }
+    virtual size_t  ncols     () const { return _col_is.size(); }
+
+    virtual size_t  rows      () const { return nrows(); }
+    virtual size_t  cols      () const { return ncols(); }
+
+    // use "op" versions from TMatrix
+    using Hpro::TMatrix< value_t >::nrows;
+    using Hpro::TMatrix< value_t >::ncols;
+    
+    uint  rank  () const { return _rank; }
+    
+    // return true, if matrix is zero
+    virtual bool    is_zero   () const { return ( rank() == 0 ); }
+    
+    virtual void    set_size  ( const size_t  anrows,
+                                const size_t  ancols )
+    {
+        // change of dimensions not supported
+        HLR_ASSERT(( anrows == nrows() ) && ( ancols == ncols() ));
+    }
     
     //
     // access low-rank factors
@@ -158,23 +238,6 @@ public:
                        const accuracy &                 acc );
         
     //
-    // matrix data
-    //
-    
-    virtual void  set_size  ( const size_t  anrows,
-                              const size_t  ancols )
-    {
-        if ( is_compressed() )
-        {
-            HLR_ERROR( "TODO" );
-        }// if
-        else
-        {
-            Hpro::TRkMatrix< value_t >::set_size( anrows, ancols );
-        }// else
-    }
-    
-    //
     // algebra routines
     //
 
@@ -203,21 +266,16 @@ public:
     // scale matrix by alpha
     virtual void scale    ( const value_t  alpha )
     {
-        if ( is_compressed() )
-        {
-            HLR_ERROR( "todo" );
-        }// if
-        else
-        {
-            Hpro::TRkMatrix< value_t >::scale( alpha );
-        }// else
+        // TODO: may lead to loss in accuracy during compression (!!!)
+        std::cout << "TODO" << std::endl;
+        blas::scale( alpha, _S );
     }
 
     //
     // RTTI
     //
 
-    HPRO_RTTI_DERIVED( lrsvmatrix, Hpro::TRkMatrix< value_t > )
+    HPRO_RTTI_DERIVED( lrsvmatrix, Hpro::TMatrix< value_t > )
 
     //
     // virtual constructor
@@ -239,7 +297,7 @@ public:
     // return structural copy of matrix
     virtual auto   copy_struct  () const -> std::unique_ptr< Hpro::TMatrix< value_t > >
     {
-        return std::make_unique< lrsvmatrix< value_t > >( this->row_is(), this->col_is() );
+        return std::make_unique< lrsvmatrix< value_t > >( _row_is, _col_is );
     }
 
     // copy matrix data to A
@@ -290,8 +348,12 @@ public:
     // return size in bytes used by this object
     virtual size_t byte_size  () const
     {
-        size_t  size = Hpro::TRkMatrix< value_t >::byte_size();
+        size_t  size = Hpro::TMatrix< value_t >::byte_size();
 
+        size += sizeof(_row_is) + sizeof(_col_is) + sizeof(_rank);
+        
+        size += _U.byte_size();
+        size += _V.byte_size();
         size += _S.byte_size();
         size += compress::aplr::byte_size( _zU );
         size += compress::aplr::byte_size( _zV );
@@ -303,9 +365,9 @@ public:
     virtual size_t data_byte_size () const
     {
         if ( is_compressed() )
-            return sizeof(value_t) * _S.length() + compress::aplr::byte_size( _zU ) + compress::aplr::byte_size( _zV );
+            return sizeof(value_t) * _rank + compress::aplr::byte_size( _zU ) + compress::aplr::byte_size( _zV );
         else
-            return Hpro::TRkMatrix< value_t >::data_byte_size();
+            return sizeof(value_t) * ( _rank + _rank * ( _row_is.size() + _col_is.size() ) );
     }
     
     // test data for invalid values, e.g. INF and NAN
@@ -365,7 +427,7 @@ lrsvmatrix< value_t >::U () const
 {
     if ( is_compressed() )
     {
-        auto  dU = blas::matrix< value_t >( this->nrows(), this->rank() );
+        auto  dU = blas::matrix< value_t >( this->nrows(), _rank );
         uint  k  = 0;
 
         compress::aplr::decompress_lr( _zU, dU );
@@ -381,7 +443,7 @@ lrsvmatrix< value_t >::U () const
     }// if
     else
     {
-        return this->blas_mat_A();
+        return _U;
     }// else
 }
     
@@ -391,7 +453,7 @@ lrsvmatrix< value_t >::V () const
 {
     if ( is_compressed() )
     {
-        auto  dV = blas::matrix< value_t >( this->ncols(), this->rank() );
+        auto  dV = blas::matrix< value_t >( this->ncols(), _rank );
 
         compress::aplr::decompress_lr( _zV, dV );
             
@@ -399,7 +461,7 @@ lrsvmatrix< value_t >::V () const
     }// if
     else
     {
-        return this->blas_mat_B();
+        return _V;
     }// else
 }
 
@@ -427,9 +489,8 @@ lrsvmatrix< value_t >::set_lrmat ( const blas::matrix< value_t > &  aU,
     auto  R             = blas::prod( RU, blas::adjoint(RV) );
     auto  [ Us, S, Vs ] = blas::svd( R );
 
-    this->_mat_A = std::move( blas::prod( QU, Us ) );
-    this->_mat_B = std::move( blas::prod( QV, Vs ) );
-
+    _U = std::move( blas::prod( QU, Us ) );
+    _V = std::move( blas::prod( QV, Vs ) );
     _S = std::move( S );
 
     this->_rank = QU.ncols();
@@ -461,9 +522,8 @@ lrsvmatrix< value_t >::set_lrmat ( blas::matrix< value_t > &&  aU,
     auto  R             = blas::prod( RU, blas::adjoint(RV) );
     auto  [ Us, S, Vs ] = blas::svd( R );
 
-    this->_mat_A = std::move( blas::prod( aU, Us ) );
-    this->_mat_B = std::move( blas::prod( aV, Vs ) );
-
+    _U = std::move( blas::prod( aU, Us ) );
+    _V = std::move( blas::prod( aV, Vs ) );
     _S = std::move( S );
 
     this->_rank = aU.ncols();
@@ -483,10 +543,10 @@ lrsvmatrix< value_t >::set_lrmat ( const blas::matrix< value_t > &  aU,
     if ( is_compressed() )
         remove_compressed();
 
-    this->_mat_A = std::move( blas::copy( aU ) );
-    _S           = std::move( blas::copy( aS ) );
-    this->_mat_B = std::move( blas::copy( aV ) );
-    this->_rank  = _S.length();
+    _U    = std::move( blas::copy( aU ) );
+    _S    = std::move( blas::copy( aS ) );
+    _V    = std::move( blas::copy( aV ) );
+    _rank = _S.length();
 }
     
 template < typename value_t >
@@ -503,10 +563,10 @@ lrsvmatrix< value_t >::set_lrmat ( blas::matrix< value_t > &&  aU,
     if ( is_compressed() )
         remove_compressed();
 
-    this->_mat_A = std::move( aU );
-    _S           = std::move( aS );
-    this->_mat_B = std::move( aV );
-    this->_rank  = _S.length();
+    _U    = std::move( aU );
+    _S    = std::move( aS );
+    _V    = std::move( aV );
+    _rank = _S.length();
 }
 
 template < typename value_t >
@@ -694,30 +754,28 @@ template < typename value_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
 lrsvmatrix< value_t >::copy () const
 {
-    auto  M = Hpro::TMatrix< value_t >::copy();
-    
-    HLR_ASSERT( IS_TYPE( M.get(), lrsvmatrix ) );
+    auto  R = std::make_unique< lrsvmatrix< value_t > >( _row_is, _col_is );
 
-    auto  R = ptrcast( M.get(), lrsvmatrix< value_t > );
+    R->copy_struct_from( this );
+    R->_rank = _rank;
 
-    if ( this->cluster() != nullptr )
-        R->set_cluster( this->cluster() );
-
-    R->_rank  = this->_rank;
-    R->_mat_A = std::move( blas::copy( this->_mat_A ) );
-    R->_mat_B = std::move( blas::copy( this->_mat_B ) );
-    R->_S     = std::move( blas::copy( _S ) );
+    R->_S = std::move( blas::copy( _S ) );
 
     if ( is_compressed() )
     {
-        R->_zU = compress::aplr::zarray( _zU.size() );
-        R->_zV = compress::aplr::zarray( _zV.size() );
-            
+        R->_zU = compress::zarray( _zU.size() );
+        R->_zV = compress::zarray( _zV.size() );
+
         std::copy( _zU.begin(), _zU.end(), R->_zU.begin() );
         std::copy( _zV.begin(), _zV.end(), R->_zV.begin() );
     }// if
+    else
+    {
+        R->_U = std::move( blas::copy( _U ) );
+        R->_V = std::move( blas::copy( _V ) );
+    }// else
 
-    return M;
+    return R;
 }
 
 template < typename value_t >
@@ -730,12 +788,12 @@ lrsvmatrix< value_t >::copy_to ( Hpro::TMatrix< value_t > *  A ) const
     
     auto  R = ptrcast( A, lrsvmatrix< value_t > );
 
-    R->_rows  = this->_rows;
-    R->_cols  = this->_cols;
-    R->_rank  = this->_rank;
-    R->_mat_A = std::move( blas::copy( this->blas_mat_A() ) );
-    R->_mat_B = std::move( blas::copy( this->blas_mat_B() ) );
-    R->_S     = std::move( blas::copy( _S ) );
+    R->_row_is = this->_row_is;
+    R->_col_is = this->_col_is;
+    R->_rank   = this->_rank;
+    R->_U      = std::move( blas::copy( _U ) );
+    R->_V      = std::move( blas::copy( _V ) );
+    R->_S      = std::move( blas::copy( _S ) );
             
     if ( is_compressed() )
     {
@@ -769,8 +827,8 @@ lrsvmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     //                              ptrcast( R1.get(), lrsvmatrix< value_t > )->S() );
     // auto  M1  = blas::prod( US1, blas::adjoint( ptrcast( R1.get(), lrsvmatrix< value_t > )->V() ) );
     
-    auto  oU = this->_mat_A;
-    auto  oV = this->_mat_B;
+    auto  oU = _U;
+    auto  oV = _V;
     
     //
     // compute Frobenius norm and set tolerance
@@ -862,8 +920,8 @@ lrsvmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
         _zU = std::move( zU );
         _zV = std::move( zV );
     
-        this->_mat_A = std::move( blas::matrix< value_t >( 0, 0 ) );
-        this->_mat_B = std::move( blas::matrix< value_t >( 0, 0 ) );
+        _U = std::move( blas::matrix< value_t >( 0, 0 ) );
+        _V = std::move( blas::matrix< value_t >( 0, 0 ) );
     }// if
 
     // // DEBUG
@@ -888,8 +946,8 @@ lrsvmatrix< value_t >::decompress ()
     if ( ! is_compressed() )
         return;
 
-    this->_mat_A = std::move( U() );
-    this->_mat_B = std::move( V() );
+    _U = std::move( U() );
+    _V = std::move( V() );
 
     remove_compressed();
 }
