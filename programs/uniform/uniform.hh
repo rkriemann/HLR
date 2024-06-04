@@ -17,6 +17,7 @@
 #include <hlr/matrix/print.hh>
 #include <hlr/matrix/sum.hh>
 #include <hlr/matrix/info.hh>
+#include <hlr/matrix/level_hierarchy.hh>
 #include <hlr/bem/aca.hh>
 #include <hlr/approx/randsvd.hh>
 
@@ -424,6 +425,54 @@ program_main ()
         {
             std::cout << "  " << term::bullet << term::bold << "uniform H-matrix (v2)" << term::reset << std::endl;
 
+            {
+                auto  y = std::make_unique< vector::scalar_vector< value_t > >( A_uni->row_is() );
+
+                impl::uniform::mul_vec( value_t(2), hpro::apply_normal, *A_uni, *x_ref, *y, *rowcb_uni, *colcb_uni );
+            
+                y->axpy( -1.0, y_ref.get() );
+                std::cout << "    error  = " << format_error( y->norm2() / y_ref->norm2() ) << std::endl;
+            }
+            
+            auto  x = std::make_unique< vector::scalar_vector< value_t > >( A_uni->col_is() );
+            auto  y = std::make_unique< vector::scalar_vector< value_t > >( A_uni->row_is() );
+
+            x->fill( 1 );
+            
+            for ( int i = 0; i < nbench; ++i )
+            {
+                tic = timer::now();
+            
+                for ( int j = 0; j < nmvm; ++j )
+                    impl::uniform::mul_vec( value_t(2), hpro::apply_normal, *A_uni, *x, *y, *rowcb_uni, *colcb_uni );
+            
+                toc = timer::since( tic );
+                runtime.push_back( toc.seconds() );
+            
+                std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+            
+                if ( i < nbench-1 )
+                    y->fill( 1 );
+            }// for
+        
+            if ( nbench > 1 )
+                std::cout << "  runtime  = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                          << std::endl;
+
+            std::cout << "    flops  = " << format_flops( flops_uni, min( runtime ) ) << std::endl;
+        
+            runtime.clear();
+        }// if
+    
+        if ( true )
+        {
+            std::cout << "  " << term::bullet << term::bold << "uniform H-matrix (lvl)" << term::reset << std::endl;
+
+            auto  A_hier = matrix::build_level_hierarchy( *A_uni );
+
+            matrix::print_level_hierarchy( A_hier );
+            
             {
                 auto  y = std::make_unique< vector::scalar_vector< value_t > >( A_uni->row_is() );
 

@@ -565,7 +565,7 @@ public:
     //
 
     // return number of sons
-    uint  nlevel    () const           { return _hier.size(); }
+    uint  nlevel     () const          { return _hier.size(); }
 
     // set number of sons
     void  set_nlevel ( const uint  n ) { _hier.resize( n ); }
