@@ -469,14 +469,18 @@ program_main ()
         {
             std::cout << "  " << term::bullet << term::bold << "uniform H-matrix (lvl)" << term::reset << std::endl;
 
-            auto  A_hier = matrix::build_level_hierarchy( *A_uni );
+            auto  A_hier   = matrix::build_level_hierarchy( *A_uni );
+            auto  rcb_hier = matrix::build_level_hierarchy( *rowcb_uni );
+            auto  ccb_hier = matrix::build_level_hierarchy( *colcb_uni );
 
-            matrix::print_level_hierarchy( A_hier );
+            // matrix::print( A_hier );
+            // matrix::print( rcb_hier );
+            // matrix::print( ccb_hier );
             
             {
                 auto  y = std::make_unique< vector::scalar_vector< value_t > >( A_uni->row_is() );
 
-                impl::uniform::mul_vec( value_t(2), hpro::apply_normal, *A_uni, *x_ref, *y, *rowcb_uni, *colcb_uni );
+                impl::uniform::mul_vec_hier( value_t(2), hpro::apply_normal, A_hier, *x_ref, *y, rcb_hier, ccb_hier );
             
                 y->axpy( -1.0, y_ref.get() );
                 std::cout << "    error  = " << format_error( y->norm2() / y_ref->norm2() ) << std::endl;

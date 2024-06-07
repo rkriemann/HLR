@@ -529,7 +529,7 @@ rank_info ( const shared_cluster_basis< value_t > &  cb )
 // represents hierarchy of shared cluster bases in a level wise way
 //
 template < typename T_value >
-class level_shared_cluster_basis : public compress::compressible
+class shared_cluster_basis_hierarchy
 {
 public:
 
@@ -544,20 +544,24 @@ private:
 public:
     
     // ctor
-    level_shared_cluster_basis ()
+    shared_cluster_basis_hierarchy ()
     {}
 
     // ctor with predefined level number
-    level_shared_cluster_basis ( const uint  nlvl )
+    shared_cluster_basis_hierarchy ( const uint  nlvl )
             : _hier( nlvl )
     {}
 
+    shared_cluster_basis_hierarchy ( shared_cluster_basis_hierarchy &&  hier )
+            : _hier( std::move( hier._hier ) )
+    {}
+
     // dtor: delete sons
-    ~level_shared_cluster_basis ()
+    ~shared_cluster_basis_hierarchy ()
     {
-        for ( auto  lvl : _hier )
-            for ( auto  cb : lvl )
-                delete cb;
+        // for ( auto  lvl : _hier )
+        //     for ( auto  cb : lvl )
+        //         delete cb;
     }
 
     //
@@ -584,8 +588,8 @@ public:
     }
 
     // return full hierarchy
-    auto  hierarchy ()       { return _hier; }
-    auto  hierarchy () const { return _hier; }
+    auto &        hierarchy ()       { return _hier; }
+    const auto &  hierarchy () const { return _hier; }
     
     //
     // compression
@@ -621,15 +625,15 @@ public:
 // create level wise hierarchy out of tree bases shared cluster basis
 //
 template < typename value_t >
-std::unique_ptr< level_shared_cluster_basis< value_t > >
-build_level_hierarchy ( const shared_cluster_basis< value_t > &  root_cb )
+shared_cluster_basis_hierarchy< value_t >
+build_level_hierarchy ( shared_cluster_basis< value_t > &  root_cb )
 {
     //
     // traverse in BFS style and construct each level
     //
 
-    auto  hier    = std::make_unique< level_shared_cluster_basis< value_t > >( root_cb->depth() );
-    auto  current = std::list< const shared_cluster_basis< value_t > * >();
+    auto  hier    = shared_cluster_basis_hierarchy< value_t >( root_cb.depth() );
+    auto  current = std::list< shared_cluster_basis< value_t > * >();
     uint  lvl     = 0;
 
     current.push_back( & root_cb );
@@ -640,27 +644,44 @@ build_level_hierarchy ( const shared_cluster_basis< value_t > &  root_cb )
         // add bases on current level to hierarchy
         //
 
-        hier->hierarchy()[lvl].reserve( current.size() );
+        hier.hierarchy()[lvl].reserve( current.size() );
 
         for ( auto  cb : current )
-            hier->hierarchy()[lvl].push_back( cb );
+            hier.hierarchy()[lvl].push_back( cb );
 
         //
         // collect bases on next level
         //
         
-        auto  sub = std::list< const shared_cluster_basis< value_t > * >();
+        auto  sub = std::list< shared_cluster_basis< value_t > * >();
         
         for ( auto  cb : current )
             for ( uint  i = 0; i < cb->nsons(); ++i )
                 if ( ! is_null( cb->son(i) ) )
                     sub.push_back( cb->son(i) );
 
-        lvl++;
         current = std::move( sub );
+        lvl++;
     }// while
 
     return hier;
+}
+
+template < typename value_t >
+void
+print ( const shared_cluster_basis_hierarchy< value_t > &  hier )
+{
+    uint  lvl_idx = 0;
+    
+    for ( auto lvl : hier.hierarchy() )
+    {
+        uint  idx = 0;
+        
+        std::cout << lvl_idx++ << std::endl;
+        
+        for ( auto cb : lvl )
+            std::cout << "    " << idx++ << " : " << cb->is() << std::endl;
+    }// for
 }
 
 //
@@ -668,7 +689,7 @@ build_level_hierarchy ( const shared_cluster_basis< value_t > &  root_cb )
 //
 template < typename value_t >
 std::tuple< uint, uint, uint >
-rank_info ( const level_shared_cluster_basis< value_t > &  cb_hier )
+rank_info ( const shared_cluster_basis_hierarchy< value_t > &  cb_hier )
 {
     uint    min_rank = 0;
     uint    max_rank = 0;

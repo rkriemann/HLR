@@ -393,14 +393,15 @@ make_uniform ( const cluster_basis_t &  cb )
 //
 // represents hierarchy of shared cluster bases in a level wise way
 //
-template < typename T_value >
-class level_uniform_vector
+template < typename T_clusterbasis >
+class uniform_vector_hierarchy
 {
 public:
 
-    using  value_t          = T_value;
+    using  cluster_basis_t  = T_clusterbasis;
+    using  value_t          = typename cluster_basis_t::value_t;
     using  real_t           = Hpro::real_type_t< value_t >;
-    using  uniform_vector_t = uniform_vector< value_t >;
+    using  uniform_vector_t = uniform_vector< cluster_basis_t >;
     
 private:
     // basis
@@ -409,11 +410,11 @@ private:
 public:
     
     // construct cluster basis corresponding to cluster <cl>
-    level_uniform_vector ()
+    uniform_vector_hierarchy ()
     {}
 
     // dtor: delete sons
-    ~level_uniform_vector ()
+    ~uniform_vector_hierarchy ()
     {
         for ( auto  lvl : _hier )
             for ( auto  vec : lvl )
@@ -444,7 +445,8 @@ public:
     }
 
     // return full hierarchy
-    auto  hierarchy () const { return _hier; }
+    auto &        hierarchy ()       { return _hier; }
+    const auto &  hierarchy () const { return _hier; }
 };
 
 }}// namespace hlr::vector

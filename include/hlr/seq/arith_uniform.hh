@@ -13,6 +13,7 @@
 namespace hlr { namespace seq { namespace uniform {
 
 using hlr::uniform::mul_vec;
+using hlr::uniform::mul_vec_hier;
 using hlr::uniform::multiply;
 using hlr::uniform::lu;
 
