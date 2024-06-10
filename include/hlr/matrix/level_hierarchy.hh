@@ -15,163 +15,229 @@
 namespace hlr { namespace matrix {
 
 //
-// level wise representation of an H-matrix
+// level wise representation of the leaf blocks in an H-matrix
 //
 template < typename T_value >
 struct level_hierarchy
 {
     using  value_t = T_value;
 
-    //
-    // per level, a list of leaf blocks for each cluster is stored
-    //
-    // access:  [ level ][ cluster idx ] -> list of blocks with shared row/column cluster
-    //
+    // CRS style row-wise storage
+    std::vector< std::vector< idx_t > >                             row_ptr;
+    std::vector< std::vector< idx_t > >                             col_idx;
+    std::vector< std::vector< const Hpro::TMatrix< value_t > * > >  row_mat;
     
-    std::deque< std::deque< std::list< const Hpro::TMatrix< value_t > * > > >  row_hier;
-    std::deque< std::deque< std::list< const Hpro::TMatrix< value_t > * > > >  col_hier;
+    // std::deque< std::vector< idx_t > >                             row_idx;
+    // std::deque< std::vector< const Hpro::TMatrix< value_t > * > >  col_hier;
 
+    //
+    // ctor
+    //
+
+    level_hierarchy ( const uint  nlvl )
+            : row_ptr( nlvl )
+            , col_idx( nlvl )
+            , row_mat( nlvl )
+    {}
+    
     // return number of level in hierarchy
-    uint  nlevel () const { return row_hier.size(); }
+    uint  nlevel () const { return row_ptr.size()-1; }
 };
 
 template < typename value_t >
 level_hierarchy< value_t >
 build_level_hierarchy ( const Hpro::TMatrix< value_t > &  M )
 {
-    auto  hier        = level_hierarchy< value_t >();
-    auto  row_current = std::deque< std::list< const Hpro::TMatrix< value_t > * > >();
-    auto  col_current = std::deque< std::list< const Hpro::TMatrix< value_t > * > >();
-    uint  lvl         = 0;
+    using  matrix_t = const Hpro::TMatrix< value_t >;
+    
+    const auto  nlvl    = Hpro::get_nlevel( M );
+    auto        hier    = level_hierarchy< value_t >( nlvl );
+    auto        row_ptr = std::vector< idx_t >();       // CRS data including structured matrices
+    auto        col_idx = std::vector< idx_t >();
+    auto        row_mat = std::vector< matrix_t * >();
+    uint        lvl     = 0;
+    uint        nleaves = 0;
 
     if ( is_blocked( M ) )
     {
-        row_current.push_back( { & M } );
-        col_current.push_back( { & M } );
+        row_ptr.resize( 2 );
+        col_idx.resize( 1 );
+        row_mat.resize( 1 );
+
+        row_ptr[0] = 0;
+        row_ptr[1] = 1;
+        col_idx[0] = 0;
+        row_mat[0] = & M;
     }// if
     else
     {
-        hier.row_hier.resize( 1 );
-        hier.row_hier[0].push_back( { & M } );
-        hier.col_hier.resize( 1 );
-        hier.col_hier[0].push_back( { & M } );
-    }// else
-
-    while ( row_current.size() + col_current.size() > 0 )
-    {
-        auto    row_next = std::deque< std::list< const Hpro::TMatrix< value_t > * > >();
-        auto    col_next = std::deque< std::list< const Hpro::TMatrix< value_t > * > >();
-        size_t  row_idx  = 0;
-        size_t  col_idx  = 0;
-
-        for ( auto  mat_list : row_current )
-        {
-            //
-            // <mat_list> is list of matrices for single row indexset
-            //
-
-            uint  inc = 0;
-            
-            for ( auto  mat : mat_list )
-            {
-                if ( is_blocked( mat ) )
-                {
-                    auto  B = cptrcast( mat, Hpro::TBlockMatrix< value_t > );
-
-                    for ( uint  i = 0; i < B->nblock_rows(); ++i )
-                    {
-                        for ( uint  j = 0; j < B->nblock_cols(); ++j )
-                        {
-                            auto  B_ij = B->block( i, j );
-                            
-                            if ( ! is_null( B_ij ) )
-                            {
-                                if ( is_blocked( B_ij ) )
-                                {
-                                    if ( row_idx+i >= row_next.size() )
-                                        row_next.resize( row_idx+i+1 );
-                                    
-                                    row_next[row_idx+i].push_back( B_ij );
-                                }// if
-                                else
-                                {
-                                    if ( lvl >= hier.row_hier.size() )
-                                        hier.row_hier.resize( lvl+1 );
-
-                                    if ( row_idx+i >= hier.row_hier[lvl].size() )
-                                        hier.row_hier[lvl].resize( row_idx+i+1 );
-                                        
-                                    hier.row_hier[lvl][row_idx+i].push_back( B_ij );
-                                }// else
-                                
-                                inc = std::max< uint >( inc, i );
-                            }// if
-                        }// for
-                    }// for
-                }// if
-            }// for
-
-            row_idx += inc + 1;
-        }// for
-
-        row_current = std::move( row_next );
-
         //
-        // same for columns
+        // single level, single block data
         //
         
-        for ( auto  mat_list : col_current )
-        {
-            //
-            // <mat_list> is list of matrices for single row indexset
-            //
+        hier.row_ptr[0].resize( 2 );
+        hier.row_ptr[0][0] = 0;
+        hier.row_ptr[0][1] = 1;
+        
+        hier.col_idx[0].resize( 1 );
+        hier.col_idx[0][0] = 0;
+        
+        hier.row_mat[0].resize( 1 );
+        hier.row_mat[0][0] = & M;
+        
+        // hier.col_hier.resize( 1 );
+        // hier.col_hier[0].push_back( { & M } );
+    }// else
 
-            uint  inc = 0;
+    while ( row_mat.size() > 0 )
+    {
+        //
+        // store leaves and count matrices for next level
+        //
+
+        idx_t   pos   = 0;
+        size_t  nnext = 0;
+        uint    nrows = 0;
+        
+        hier.row_ptr[lvl].resize( row_ptr.size() );
+        hier.col_idx[lvl].resize( nleaves );
+        hier.row_mat[lvl].resize( nleaves );
+
+        hier.row_ptr[lvl][0] = 0;
+        
+        for ( uint  i = 0; i < row_ptr.size()-1; ++i )
+        {
+            const auto  lb       = row_ptr[i];
+            const auto  ub       = row_ptr[i+1];
+            uint        nsubrows = 0;
             
-            for ( auto  mat : mat_list )
+            for ( uint  j = lb; j < ub; ++j )
             {
-                if ( is_blocked( mat ) )
+                auto  mat = row_mat[j];
+                
+                if ( ! is_blocked( mat ) )
+                {
+                    hier.col_idx[lvl][pos] = col_idx[j];
+                    hier.row_mat[lvl][pos] = mat;
+                    ++pos;
+                }// if
+                else
                 {
                     auto  B = cptrcast( mat, Hpro::TBlockMatrix< value_t > );
 
-                    for ( uint  j = 0; j < B->nblock_cols(); ++j )
+                    HLR_ASSERT( B->nblock_rows() == 2 );
+                    HLR_ASSERT( B->nblock_cols() == 2 );
+                                                       
+                    nsubrows = std::max( nsubrows, B->nblock_rows() );
+                    
+                    for ( uint  ii = 0; ii < B->nblock_rows(); ++ii )
+                        for ( uint  jj = 0; jj < B->nblock_cols(); ++jj )
+                            if ( ! is_null( B->block( ii, jj ) ) )
+                                nnext++;
+                }// else
+            }// for
+
+            nrows += nsubrows;
+            hier.row_ptr[lvl][i+1] = pos;
+        }// for
+
+        //
+        // set up data for next level
+        //
+        
+        auto  next_row_ptr = std::vector< idx_t >();       // CRS data including structured matrices
+        auto  next_col_idx = std::vector< idx_t >();
+        auto  next_row_mat = std::vector< matrix_t * >();
+        uint  row_idx      = 0;
+
+        next_row_ptr.resize( nrows + 1 );
+        next_col_idx.resize( nnext );
+        next_row_mat.resize( nnext );
+
+        // count entries per block row
+        for ( uint  i = 0; i < row_ptr.size()-1; ++i )
+        {
+            const auto  lb = row_ptr[i];
+            const auto  ub = row_ptr[i+1];
+            uint        nsubrows = 0;
+
+            for ( uint  j = lb; j < ub; ++j )
+            {
+                auto  mat = row_mat[j];
+                
+                if ( is_blocked( mat ) )
+                {
+                    auto  B = cptrcast( mat, Hpro::TBlockMatrix< value_t > );
+                    
+                    nsubrows = std::max( nsubrows, B->nblock_rows() );
+                    
+                    for ( uint  ii = 0; ii < B->nblock_rows(); ++ii )
+                        for ( uint  jj = 0; jj < B->nblock_cols(); ++jj )
+                            if ( ! is_null( B->block( ii, jj ) ) )
+                                next_row_ptr[ row_idx+ii ]++;
+                }// else
+            }// for
+
+            row_idx += nsubrows;
+        }// for
+
+        pos = 0;
+
+        // sum up actual row_ptr data
+        for ( uint  i = 0; i < next_row_ptr.size()-1; ++i )
+        {
+            const auto  tmp = next_row_ptr[i];
+
+            next_row_ptr[i] = pos;
+            pos            += pos + tmp;
+        }// for
+        next_row_ptr[ nrows ] = pos;
+
+        auto  rowpos = std::vector< idx_t >( nrows );
+
+        // fill column indices and matrices
+        for ( uint  i = 0; i < row_ptr.size()-1; ++i )
+        {
+            const auto  lb = row_ptr[i];
+            const auto  ub = row_ptr[i+1];
+            uint        nsubrows = 0;
+
+            for ( uint  j = lb; j < ub; ++j )
+            {
+                auto  mat = row_mat[j];
+                
+                if ( is_blocked( mat ) )
+                {
+                    auto        B   = cptrcast( mat, Hpro::TBlockMatrix< value_t > );
+                    const auto  col = col_idx[j];
+                    
+                    nsubrows = std::max( nsubrows, B->nblock_rows() );
+                    
+                    for ( uint  ii = 0; ii < B->nblock_rows(); ++ii )
                     {
-                        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+                        for ( uint  jj = 0; jj < B->nblock_cols(); ++jj )
                         {
-                            auto  B_ij = B->block( i, j );
+                            auto  B_ij = B->block( ii, jj );
                             
                             if ( ! is_null( B_ij ) )
                             {
-                                if ( is_blocked( B_ij ) )
-                                {
-                                    if ( col_idx+j >= col_next.size() )
-                                        col_next.resize( col_idx+j+1 );
+                                const idx_t  idx = next_row_ptr[ row_idx+ii ] + rowpos[ row_idx+ii ];
                                     
-                                    col_next[col_idx+j].push_back( B_ij );
-                                }// if
-                                else
-                                {
-                                    if ( lvl >= hier.col_hier.size() )
-                                        hier.col_hier.resize( lvl+1 );
-
-                                    if ( col_idx+j >= hier.col_hier[lvl].size() )
-                                        hier.col_hier[lvl].resize( col_idx+j+1 );
-                                        
-                                    hier.col_hier[lvl][col_idx+j].push_back( B_ij );
-                                }// else
-                                
-                                inc = std::max< uint >( inc, i );
+                                next_col_idx[ idx ] = 2 * col + jj; // assumes 2x2 block structure !!!
+                                next_row_mat[ idx ] = mat;
+                                rowpos[ row_idx+ii ]++;
                             }// if
                         }// for
                     }// for
-                }// if
+                }// else
             }// for
 
-            col_idx += inc + 1;
+            row_idx += nsubrows;
         }// for
 
-        col_current = std::move( col_next );
-
+        row_ptr = std::move( next_row_ptr );
+        col_idx = std::move( next_col_idx );
+        row_mat = std::move( next_row_mat );
         lvl++;
     }// while
 
@@ -184,23 +250,27 @@ print ( const level_hierarchy< value_t > &  H )
 {
     uint  lvl_idx = 0;
     
-    for ( auto lvl : H.row_hier )
+    for ( uint  lvl = 0; lvl < H.nlevel(); ++lvl )
     {
-        uint  row_idx = 0;
-        
         std::cout << lvl_idx++ << std::endl;
-        
-        for ( auto row : lvl )
+
+        for ( uint  row = 0; row < H.row_ptr[lvl].size()-1; ++row )
         {
+            const auto  lb = H.row_ptr[lvl][row];
+            const auto  ub = H.row_ptr[lvl][row+1];
+
+            std::cout << "  " << row << std::endl;
+
             bool      first = true;
             indexset  rowis;
-            
-            std::cout << "  " << row_idx++ << std::endl;
 
-            std::cout << "    (" << row.size() << ") ";
-            for ( auto mat : row )
+            std::cout << "    ";
+            
+            for ( uint  j = lb; j < ub; ++j )
             {
-                auto  T = mat->typestr()[0];
+                auto  col_idx = H.col_idx[lvl][j];
+                auto  mat     = H.row_mat[lvl][j];
+                auto  T       = mat->typestr()[0];
                 
                 if ( first )
                 {
@@ -220,49 +290,6 @@ print ( const level_hierarchy< value_t > &  H )
                         std::cout << term::red() << 'D' << mat->col_is().to_string() << term::reset() << ", ";
                     else
                         std::cout << term::green() << 'U' << mat->col_is().to_string() << term::reset() << ", ";
-                }// else
-            }// for
-            std::cout << std::endl;
-        }// for
-    }// for
-
-    lvl_idx = 0;
-    
-    for ( auto lvl : H.col_hier )
-    {
-        uint  col_idx = 0;
-        
-        std::cout << lvl_idx++ << std::endl;
-        
-        for ( auto col : lvl )
-        {
-            bool      first = true;
-            indexset  colis;
-            
-            std::cout << "  " << col_idx++ << " (" << col.size() << ") " << std::endl;
-            
-            for ( auto mat : col )
-            {
-                auto  T = mat->typestr()[0];
-
-                if ( first )
-                {
-                    colis = mat->col_is();
-                    first = false;
-
-                    if ( T == 'd' )
-                        std::cout << colis.to_string() << " × " << term::red() << 'D' << mat->row_is().to_string() << term::reset() << ", ";
-                    else
-                        std::cout << colis.to_string() << " × " << term::green() << 'U' << mat->row_is().to_string() << term::reset() << ", ";
-                }// if
-                else
-                {
-                    HLR_ASSERT( mat->col_is() == colis );
-                    
-                    if ( T == 'd' )
-                        std::cout << term::red() << 'D' << mat->row_is().to_string() << term::reset() << ", ";
-                    else
-                        std::cout << term::green() << 'U' << mat->row_is().to_string() << term::reset() << ", ";
                 }// else
             }// for
             std::cout << std::endl;

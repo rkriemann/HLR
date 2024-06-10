@@ -346,16 +346,16 @@ program_main ()
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
         
-                std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+                std::cout << term::rollback << term::clearline << "    mvm in   " << format_time( toc ) << term::flush;
 
                 if ( i < nbench-1 )
                     y->fill( 1 );
             }// for
         
             if ( nbench > 1 )
-                std::cout << "  runtime  = "
-                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                          << std::endl;
+                std::cout << term::rollback << term::clearline << "      runtime = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime );
+            std::cout << std::endl;
         
             std::cout << "    flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
         
@@ -405,16 +405,16 @@ program_main ()
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
             
-                std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+                std::cout << term::rollback << term::clearline << "    mvm in   " << format_time( toc ) << term::flush;
             
                 if ( i < nbench-1 )
                     y->fill( 1 );
             }// for
         
             if ( nbench > 1 )
-                std::cout << "  runtime  = "
-                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                          << std::endl;
+                std::cout << term::rollback << term::clearline << "      runtime = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime );
+            std::cout << std::endl;
 
             std::cout << "    flops  = " << format_flops( flops_uni, min( runtime ) ) << std::endl;
         
@@ -449,16 +449,16 @@ program_main ()
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
             
-                std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+                std::cout << term::rollback << term::clearline << "    mvm in   " << format_time( toc ) << term::flush;
             
                 if ( i < nbench-1 )
                     y->fill( 1 );
             }// for
         
             if ( nbench > 1 )
-                std::cout << "  runtime  = "
-                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                          << std::endl;
+                std::cout << term::rollback << term::clearline << "      runtime = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime );
+            std::cout << std::endl;
 
             std::cout << "    flops  = " << format_flops( flops_uni, min( runtime ) ) << std::endl;
         
@@ -473,9 +473,9 @@ program_main ()
             auto  rcb_hier = matrix::build_level_hierarchy( *rowcb_uni );
             auto  ccb_hier = matrix::build_level_hierarchy( *colcb_uni );
 
-            // matrix::print( A_hier );
-            // matrix::print( rcb_hier );
-            // matrix::print( ccb_hier );
+            matrix::print( A_hier );
+            matrix::print( rcb_hier );
+            matrix::print( ccb_hier );
             
             {
                 auto  y = std::make_unique< vector::scalar_vector< value_t > >( A_uni->row_is() );
@@ -501,16 +501,16 @@ program_main ()
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
             
-                std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+                std::cout << term::rollback << term::clearline << "    mvm in   " << format_time( toc ) << term::flush;
             
                 if ( i < nbench-1 )
                     y->fill( 1 );
             }// for
         
             if ( nbench > 1 )
-                std::cout << "  runtime  = "
-                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                          << std::endl;
+                std::cout << term::rollback << term::clearline << "      runtime = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime );
+            std::cout << std::endl;
 
             std::cout << "    flops  = " << format_flops( flops_uni, min( runtime ) ) << std::endl;
         
@@ -552,16 +552,16 @@ program_main ()
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
         
-                std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+                std::cout << term::rollback << term::clearline << "    mvm in   " << format_time( toc ) << term::flush;
             
                 if ( i < nbench-1 )
                     y->fill( 1 );
             }// for
         
             if ( nbench > 1 )
-                std::cout << "  runtime  = "
-                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                          << std::endl;
+                std::cout << term::rollback << term::clearline << "      runtime = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime );
+            std::cout << std::endl;
         
             std::cout << "    flops  = " << format_flops( flops_h2, min( runtime ) ) << std::endl;
         

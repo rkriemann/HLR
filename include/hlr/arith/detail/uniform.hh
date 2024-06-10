@@ -170,41 +170,6 @@ scalar_to_uniform ( const shared_cluster_basis< value_t > &  cb,
     }// if
 }
 
-template < typename value_t >
-std::unique_ptr< uniform_vector_hierarchy< shared_cluster_basis< value_t > > >
-scalar_to_uniform ( const shared_cluster_basis_hierarchy< value_t > &  cb,
-                    const scalar_vector< value_t > &                   v )
-{
-    auto        hier = std::make_unique< uniform_vector_hierarchy< shared_cluster_basis< value_t > > >();
-    const auto  nlvl = cb.hierarchy().size();
-    
-    hier->set_nlevel( nlvl );
-
-    for ( uint  lvl = 0; lvl < nlvl; ++lvl )
-    {
-        const auto  ncb = cb.hierarchy()[lvl].size();
-        
-        hier->hierarchy()[lvl].resize( ncb );
-
-        for ( uint  i = 0; i < ncb; ++i )
-        {
-            auto  cb_i = cb.hierarchy()[lvl][i];
-
-            if ( ! is_null( cb_i ) )
-            {
-                auto  u_i  = std::make_unique< uniform_vector< shared_cluster_basis< value_t > > >( *cb_i );
-                auto  v_cb = blas::vector< value_t >( blas::vec( v ), cb_i->is() - v.ofs() );
-                auto  s    = cb_i->transform_forward( v_cb );
-
-                u_i->set_coeffs( std::move( s ) );
-                hier->hierarchy()[lvl][i] = u_i.release();
-            }// if
-        }// for
-    }// for
-    
-    return hier;
-}
-
 //
 // add coefficients of uniform vector y to scalar vector y
 //
@@ -324,6 +289,41 @@ mul_vec2 ( const value_t                         alpha,
 // For dense blocks of M, the actual result is directly updated.
 //
 template < typename value_t >
+std::unique_ptr< uniform_vector_hierarchy< shared_cluster_basis< value_t > > >
+scalar_to_uniform ( const shared_cluster_basis_hierarchy< value_t > &  cb,
+                    const scalar_vector< value_t > &                   v )
+{
+    auto        hier = std::make_unique< uniform_vector_hierarchy< shared_cluster_basis< value_t > > >();
+    const auto  nlvl = cb.hierarchy().size();
+    
+    hier->set_nlevel( nlvl );
+
+    for ( uint  lvl = 0; lvl < nlvl; ++lvl )
+    {
+        const auto  ncb = cb.hierarchy()[lvl].size();
+        
+        hier->hierarchy()[lvl].resize( ncb );
+
+        for ( uint  i = 0; i < ncb; ++i )
+        {
+            auto  cb_i = cb.hierarchy()[lvl][i];
+
+            if ( ! is_null( cb_i ) && ( cb_i->rank() > 0 ))
+            {
+                auto  u_i  = std::make_unique< uniform_vector< shared_cluster_basis< value_t > > >( *cb_i );
+                auto  v_cb = blas::vector< value_t >( blas::vec( v ), cb_i->is() - v.ofs() );
+                auto  s    = cb_i->transform_forward( v_cb );
+
+                u_i->set_coeffs( std::move( s ) );
+                hier->hierarchy()[lvl][i] = u_i.release();
+            }// if
+        }// for
+    }// for
+    
+    return hier;
+}
+
+template < typename value_t >
 void
 mul_vec_hier ( const value_t                                                        alpha,
                const Hpro::matop_t                                                  op_M,
@@ -335,69 +335,69 @@ mul_vec_hier ( const value_t                                                    
 {
     HLR_ASSERT( op_M == apply_normal );
     
-    const auto  nlvl = M.nlevel();
+    // const auto  nlvl = M.nlevel();
 
-    for ( uint  lvl = 0; lvl < nlvl; ++lvl )
-    {
-        const auto  ncl = M.row_hier[lvl].size();
+    // for ( uint  lvl = 0; lvl < nlvl; ++lvl )
+    // {
+    //     const auto  ncl = M.row_hier[lvl].size();
 
-        for ( uint  i = 0; i < ncl; ++i )
-        {
-            //
-            // go over list of matrices with shared cluster and perform multiplication
-            //
+    //     for ( uint  i = 0; i < ncl; ++i )
+    //     {
+    //         //
+    //         // go over list of matrices with shared cluster and perform multiplication
+    //         //
 
-            shared_cluster_basis< value_t > *  ycb = nullptr;
+    //         shared_cluster_basis< value_t > *  ycb = nullptr;
             
-            auto  s     = blas::vector< value_t >();
-            bool  first = true;
-            uint  xidx  = 0;
-            auto  y_j   = blas::vector< value_t >();
+    //         auto  s     = blas::vector< value_t >();
+    //         bool  first = true;
+    //         uint  xidx  = 0;
+    //         auto  y_j   = blas::vector< value_t >();
 
-            for ( auto  mat : M.row_hier[lvl][i] )
-            {
-                if ( matrix::is_uniform_lowrank( mat ) )
-                {
-                    auto  R  = cptrcast( mat, uniform_lrmatrix< value_t > );
-                    auto  ux = x.hierarchy()[lvl][xidx];
+    //         for ( auto  mat : M.row_hier[lvl][i] )
+    //         {
+    //             if ( matrix::is_uniform_lowrank( mat ) )
+    //             {
+    //                 auto  R  = cptrcast( mat, uniform_lrmatrix< value_t > );
+    //                 auto  ux = x.hierarchy()[lvl][xidx];
                     
-                    if ( first )
-                    {
-                        ycb   = rowcb.hierarchy()[lvl][i];
-                        s     = blas::vector< value_t >( ycb->rank() );
-                        first = false;
+    //                 if ( first )
+    //                 {
+    //                     ycb   = rowcb.hierarchy()[lvl][i];
+    //                     s     = blas::vector< value_t >( ycb->rank() );
+    //                     first = false;
 
-                        if ( y_j.length() == 0 )
-                            y_j = blas::vector< value_t >( blas::vec( sy ), mat->row_is( op_M ) - sy.ofs() );
-                    }// if
+    //                     if ( y_j.length() == 0 )
+    //                         y_j = blas::vector< value_t >( blas::vec( sy ), mat->row_is( op_M ) - sy.ofs() );
+    //                 }// if
 
-                    blas::mulvec( alpha, R->coupling(), ux->coeffs(), value_t(1), s );                        
-                }// if
-                else if ( matrix::is_dense( mat ) )
-                {
-                    auto  x_i = blas::vector< value_t >( blas::vec( sx ), mat->col_is( op_M ) - sx.ofs() );
+    //                 blas::mulvec( alpha, R->coupling(), ux->coeffs(), value_t(1), s );                        
+    //             }// if
+    //             else if ( matrix::is_dense( mat ) )
+    //             {
+    //                 auto  x_i = blas::vector< value_t >( blas::vec( sx ), mat->col_is( op_M ) - sx.ofs() );
 
-                    if ( y_j.length() == 0 )
-                        y_j = blas::vector< value_t >( blas::vec( sy ), mat->row_is( op_M ) - sy.ofs() );
+    //                 if ( y_j.length() == 0 )
+    //                     y_j = blas::vector< value_t >( blas::vec( sy ), mat->row_is( op_M ) - sy.ofs() );
         
-                    mat->apply_add( alpha, x_i, y_j, op_M );
-                }// if
-                else
-                    HLR_ERROR( "unsupported matrix type : " + mat->typestr() );
+    //                 mat->apply_add( alpha, x_i, y_j, op_M );
+    //             }// if
+    //             else
+    //                 HLR_ERROR( "unsupported matrix type : " + mat->typestr() );
 
-                xidx++;
-            }// for
+    //             xidx++;
+    //         }// for
 
-            //
-            // add uniform part to y
-            //
+    //         //
+    //         // add uniform part to y
+    //         //
 
-            if ( ! first )
-            {
-                ycb->transform_backward( s, y_j );
-            }// if
-        }// for
-    }// for
+    //         if ( ! first )
+    //         {
+    //             ycb->transform_backward( s, y_j );
+    //         }// if
+    //     }// for
+    // }// for
     
     // else if ( matrix::is_dense( M ) )
     // {
