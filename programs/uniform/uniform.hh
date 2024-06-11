@@ -496,7 +496,7 @@ program_main ()
                 tic = timer::now();
             
                 for ( int j = 0; j < nmvm; ++j )
-                    impl::uniform::mul_vec( value_t(2), hpro::apply_normal, *A_uni, *x, *y, *rowcb_uni, *colcb_uni );
+                    impl::uniform::mul_vec_hier( value_t(2), hpro::apply_normal, A_hier, *x_ref, *y, rcb_hier, ccb_hier );
             
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );

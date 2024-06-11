@@ -368,7 +368,30 @@ mul_vec_hier ( const value_t                                                    
                         s   = blas::vector< value_t >( ycb->rank() );
                     }// if
 
-                    blas::mulvec( alpha, R->coupling(), ux->coeffs(), value_t(1), s );                        
+                    #if defined(HLR_HAS_ZBLAS_DIRECT)
+                    if ( R->is_compressed() )
+                    {
+                        switch ( op_M )
+                        {
+                            case apply_normal     : compress::zblas::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoeff(), ux->coeffs().data(), s.data() ); break;
+                            case apply_conjugate  : { HLR_ASSERT( false ); }
+                            case apply_transposed : { HLR_ASSERT( false ); }
+                            case apply_adjoint    : compress::zblas::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoeff(), ux->coeffs().data(), s.data() ); break;
+                            default               : HLR_ERROR( "unsupported matrix operator" );
+                        }// switch
+                    }// if
+                    else
+                    #endif
+                    {
+                        switch ( op_M )
+                        {
+                            case apply_normal     : blas::mulvec( alpha, R->coupling(), ux->coeffs(), value_t(1), s ); break;
+                            case apply_conjugate  : HLR_ASSERT( false );
+                            case apply_transposed : HLR_ASSERT( false );
+                            case apply_adjoint    : blas::mulvec( alpha, blas::adjoint( R->coupling() ), ux->coeffs(), value_t(1), s ); break;
+                            default               : HLR_ERROR( "unsupported matrix operator" );
+                        }// switch
+                    }// else
                 }// if
                 else if ( matrix::is_dense( mat ) )
                 {
