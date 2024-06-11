@@ -473,9 +473,9 @@ program_main ()
             auto  rcb_hier = matrix::build_level_hierarchy( *rowcb_uni );
             auto  ccb_hier = matrix::build_level_hierarchy( *colcb_uni );
 
-            matrix::print( A_hier );
-            matrix::print( rcb_hier );
-            matrix::print( ccb_hier );
+            // matrix::print( A_hier );
+            // matrix::print( rcb_hier );
+            // matrix::print( ccb_hier );
             
             {
                 auto  y = std::make_unique< vector::scalar_vector< value_t > >( A_uni->row_is() );

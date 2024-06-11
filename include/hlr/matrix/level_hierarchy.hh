@@ -41,7 +41,7 @@ struct level_hierarchy
     {}
     
     // return number of level in hierarchy
-    uint  nlevel () const { return row_ptr.size()-1; }
+    uint  nlevel () const { return row_ptr.size(); }
 };
 
 template < typename value_t >
@@ -268,13 +268,11 @@ print ( const level_hierarchy< value_t > &  H )
             const auto  lb = H.row_ptr[lvl][row];
             const auto  ub = H.row_ptr[lvl][row+1];
 
-            std::cout << "  " << row << std::endl;
+            std::cout << "  " << row << " : ";
 
             bool      first = true;
             indexset  rowis;
 
-            std::cout << "    ";
-            
             for ( uint  j = lb; j < ub; ++j )
             {
                 auto  col_idx = H.col_idx[lvl][j];
@@ -287,18 +285,18 @@ print ( const level_hierarchy< value_t > &  H )
                     first = false;
 
                     if ( T == 'd' )
-                        std::cout << rowis.to_string() << " × " << term::red() << 'D' << mat->col_is().to_string() << term::reset() << ", ";
+                        std::cout << rowis.to_string() << " × " << term::red() << col_idx << " D" << mat->col_is().to_string() << term::reset() << ", ";
                     else
-                        std::cout << rowis.to_string() << " × " << term::green() << 'U' << mat->col_is().to_string() << term::reset() << ", ";
+                        std::cout << rowis.to_string() << " × " << term::green() << col_idx << " U" << mat->col_is().to_string() << term::reset() << ", ";
                 }// if
                 else
                 {
                     HLR_ASSERT( mat->row_is() == rowis );
                     
                     if ( T == 'd' )
-                        std::cout << term::red() << 'D' << mat->col_is().to_string() << term::reset() << ", ";
+                        std::cout << term::red() << col_idx << " D" << mat->col_is().to_string() << term::reset() << ", ";
                     else
-                        std::cout << term::green() << 'U' << mat->col_is().to_string() << term::reset() << ", ";
+                        std::cout << term::green() << col_idx << " U" << mat->col_is().to_string() << term::reset() << ", ";
                 }// else
             }// for
             std::cout << std::endl;
