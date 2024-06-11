@@ -43,6 +43,7 @@ using hlr::cluster_block_map_t;
 using hlr::cluster_blocks_t;
 using hlr::mul_vec_cl;
 using hlr::mul_vec_cl2;
+using hlr::mul_vec_hier;
 using hlr::realloc;
 using hlr::setup_cluster_block_map;
 using hlr::build_cluster_blocks;

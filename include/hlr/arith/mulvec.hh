@@ -12,6 +12,7 @@
 #include <hlr/arith/h2.hh>
 #include <hlr/matrix/lrmatrix.hh>
 #include <hlr/matrix/lrsvmatrix.hh>
+#include <hlr/matrix/level_hierarchy.hh>
 #include <hlr/vector/scalar_vector.hh>
 #include <hlr/utils/log.hh>
 #include <hlr/utils/hash.hh>
@@ -285,6 +286,45 @@ mul_vec_cl2 ( const value_t                             alpha,
               vector::scalar_vector< value_t > &        y )
 {
     mul_vec_cl( alpha, op_M, cb, x, y );
+}
+
+template < typename value_t >
+void
+mul_vec_hier ( const value_t                               alpha,
+               const hpro::matop_t                         op_M,
+               const matrix::level_hierarchy< value_t > &  M,
+               const vector::scalar_vector< value_t > &    x,
+               vector::scalar_vector< value_t > &          y )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    HLR_ASSERT( op_M == apply_normal );
+    
+    const auto  nlvl = M.nlevel();
+
+    for ( uint  lvl = 0; lvl < nlvl; ++lvl )
+    {
+        for ( uint  row = 0; row < M.row_ptr[lvl].size()-1; ++row )
+        {
+            const auto  lb = M.row_ptr[lvl][row];
+            const auto  ub = M.row_ptr[lvl][row+1];
+
+            if ( lb == ub )
+                continue;
+            
+            auto  y_j = blas::vector< value_t >( blas::vec( y ), M.row_mat[lvl][lb]->row_is( op_M ) - y.ofs() );
+
+            for ( uint  j = lb; j < ub; ++j )
+            {
+                auto  col_idx = M.col_idx[lvl][j];
+                auto  mat     = M.row_mat[lvl][j];
+                auto  x_i     = blas::vector< value_t >( blas::vec( x ), mat->col_is( op_M ) - x.ofs() );
+
+                mat->apply_add( 1, x_i, y_j, op_M );
+            }// for
+        }// for
+    }// for
 }
 
 template < typename value_t >

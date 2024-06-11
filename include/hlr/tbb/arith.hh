@@ -153,6 +153,20 @@ mul_vec_cl2 ( const value_t                             alpha,
 
 template < typename value_t >
 void
+mul_vec_hier ( const value_t                               alpha,
+               const hpro::matop_t                         op_M,
+               const matrix::level_hierarchy< value_t > &  M,
+               const vector::scalar_vector< value_t > &    x,
+               vector::scalar_vector< value_t > &          y )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    detail::mul_vec_hier( alpha, op_M, M, x, y );
+}
+
+template < typename value_t >
+void
 realloc ( cluster_blocks_t< value_t > &  cb )
 {
     if ( ! cb.M.empty() )

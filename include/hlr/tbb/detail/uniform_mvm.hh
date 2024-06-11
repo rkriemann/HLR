@@ -428,14 +428,6 @@ mul_vec_hier ( const value_t                                                    
                 blas::add( 1, t_j, y_j );
             } );
     }// for
-
-    // else if ( matrix::is_uniform_lowrank( M ) )
-    // {
-    //     auto  R = cptrcast( &M, uniform_lrmatrix< value_t > );
-
-    // }// if
-    // else
-    //     HLR_ERROR( "unsupported matrix type : " + M.typestr() );
 }
 
 }}}}// namespace hlr::tbb::uniform::detail
