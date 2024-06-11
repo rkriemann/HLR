@@ -141,6 +141,9 @@ build_level_hierarchy ( const Hpro::TMatrix< value_t > &  M )
             hier.row_ptr[lvl][i+1] = pos;
         }// for
 
+        if ( nnext == 0 )
+            break;
+        
         //
         // set up data for next level
         //
@@ -189,12 +192,15 @@ build_level_hierarchy ( const Hpro::TMatrix< value_t > &  M )
             const auto  tmp = next_row_ptr[i];
 
             next_row_ptr[i] = pos;
-            pos            += pos + tmp;
+            pos            += tmp;
         }// for
         next_row_ptr[ nrows ] = pos;
 
         auto  rowpos = std::vector< idx_t >( nrows );
 
+        row_idx = 0;
+        nleaves = 0;
+        
         // fill column indices and matrices
         for ( uint  i = 0; i < row_ptr.size()-1; ++i )
         {
@@ -224,8 +230,11 @@ build_level_hierarchy ( const Hpro::TMatrix< value_t > &  M )
                                 const idx_t  idx = next_row_ptr[ row_idx+ii ] + rowpos[ row_idx+ii ];
                                     
                                 next_col_idx[ idx ] = 2 * col + jj; // assumes 2x2 block structure !!!
-                                next_row_mat[ idx ] = mat;
+                                next_row_mat[ idx ] = B_ij;
                                 rowpos[ row_idx+ii ]++;
+
+                                if ( ! is_blocked( B_ij ) )
+                                    nleaves++;
                             }// if
                         }// for
                     }// for
