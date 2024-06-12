@@ -50,30 +50,45 @@ init_cluster_bases ( const Hpro::TBlockCluster *        bct,
         //
         
         {
-            // auto  lock = std::scoped_lock( rowcb.mutex(), colcb.mutex() );
-            
             for ( uint  i = 0; i < bct->nrows(); ++i )
             {
                 auto  rowcb_i = rowcb.son( i );
             
                 for ( uint  j = 0; j < bct->ncols(); ++j )
                 {
-                    auto  colcb_j = colcb.son( j );
-                
-                    if ( ! is_null( bct->son( i, j ) ) )
+                    auto  bc_ij = bct->son( i, j );
+                    
+                    if ( ! is_null( bc_ij ) )
                     {
                         if ( is_null( rowcb_i ) )
                         {
-                            rowcb_i = new shared_cluster_basis< value_t >( bct->son( i, j )->is().row_is() );
-                            rowcb_i->set_nsons( bct->son( i, j )->rowcl()->nsons() );
+                            rowcb_i = new shared_cluster_basis< value_t >( bc_ij->is().row_is() );
                             rowcb.set_son( i, rowcb_i );
+
+                            rowcb_i->set_nsons( bc_ij->rowcl()->nsons() );
                         }// if
+                    }// if
+                }// for
+            }// for
+        }
+
+        {
+            for ( uint  j = 0; j < bct->ncols(); ++j )
+            {
+                auto  colcb_j = colcb.son( j );
+                
+                for ( uint  i = 0; i < bct->nrows(); ++i )
+                {
+                    auto  bc_ij = bct->son( i, j );
                     
+                    if ( ! is_null( bc_ij ) )
+                    {
                         if ( is_null( colcb_j ) )
                         {
-                            colcb_j = new shared_cluster_basis< value_t >( bct->son( i, j )->is().col_is() );
-                            colcb_j->set_nsons( bct->son( i, j )->colcl()->nsons() );
+                            colcb_j = new shared_cluster_basis< value_t >( bc_ij->is().col_is() );
                             colcb.set_son( j, colcb_j );
+
+                            colcb_j->set_nsons( bc_ij->colcl()->nsons() );
                         }// if
                     }// if
                 }// for
@@ -242,7 +257,7 @@ build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
     //
     // local function to set up hierarchy (parent <-> M)
     //
-    auto  insert_hier = [&] ( const Hpro::TBlockCluster *         node,
+    auto  insert_hier = [&] ( const Hpro::TBlockCluster *                    node,
                               std::unique_ptr< Hpro::TMatrix< value_t > > &  M )
     {
         if ( is_null( node->parent() ) )
@@ -252,7 +267,7 @@ build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
         else
         {
             auto  parent   = node->parent();
-            auto  M_parent = bmat_map_t::mapped_type( nullptr );
+            auto  M_parent = typename bmat_map_t::mapped_type( nullptr );
 
             {
                 auto  lock = std::scoped_lock( bmtx );
@@ -374,6 +389,8 @@ build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
                                 rowmap[ M->row_is() ].push_back( R );
                                 colmap[ M->col_is() ].push_back( R );
                             }// if
+                            else
+                                HLR_ERROR( "unsupported matrix type : " + M->typestr() );
                                 
                             // store always to maintain affinity
                             lrmat.push_back( M.get() );
@@ -386,7 +403,22 @@ build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
                         // create_cb( node );
                     }// if
                     else
+                    {
                         M = coeff.build( node->is().row_is(), node->is().col_is() );
+                        
+                        if ( hlr::matrix::is_dense( *M ) )
+                        {
+                            // all is good
+                        }// if
+                        else if ( Hpro::is_dense( *M ) )
+                        {
+                            auto  D = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
+
+                            M = std::move( std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( D->blas_mat() ) ) );
+                        }// if
+                        else
+                            HLR_ERROR( "unsupported matrix type : " + M->typestr() );
+                    }// else
                 }// if
                 else
                 {
@@ -408,9 +440,6 @@ build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
                     if (( B->nblock_rows() != node->nrows() ) ||
                         ( B->nblock_cols() != node->ncols() ))
                         B->set_block_struct( node->nrows(), node->ncols() );
-
-                    // make value type consistent in block matrix and sub blocks
-                    B->adjust_value_type();
 
                     // remember all block matrices for setting up hierarchy
                     {

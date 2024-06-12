@@ -97,10 +97,25 @@ build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
                         colmap[ M->col_is() ].push_back( R );
                         lrmat.push_back( R );
                     }// if
+                    else
+                        HLR_ERROR( "unsupported matrix type : " + M->typestr() );
                 }// if
                 else
                 {
                     M = coeff.build( node->is().row_is(), node->is().col_is() );
+                        
+                    if ( hlr::matrix::is_dense( *M ) )
+                    {
+                        // all is good
+                    }// if
+                    else if ( Hpro::is_dense( *M ) )
+                    {
+                        auto  D = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
+
+                        M = std::move( std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( D->blas_mat() ) ) );
+                    }// if
+                    else
+                        HLR_ERROR( "unsupported matrix type : " + M->typestr() );
                 }// else
             }// if
             else
@@ -119,9 +134,6 @@ build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
                 if (( B->nblock_rows() != node->nrows() ) ||
                     ( B->nblock_cols() != node->ncols() ))
                     B->set_block_struct( node->nrows(), node->ncols() );
-
-                // make value type consistent in block matrix and sub blocks
-                B->adjust_value_type();
 
                 // remember all block matrices for setting up hierarchy
                 bmat_map[ node->id() ] = B;
@@ -916,7 +928,7 @@ build_uniform_rec ( const Hpro::TBlockCluster *                          bct,
     // decide upon cluster type, how to construct matrix
     //
 
-    std::unique_ptr< Hpro::TMatrix< value_t > >  M;
+    auto  M = std::unique_ptr< Hpro::TMatrix< value_t > >();
     
     if ( bct->is_leaf() )
     {
@@ -924,15 +936,13 @@ build_uniform_rec ( const Hpro::TBlockCluster *                          bct,
         {
             M = std::unique_ptr< Hpro::TMatrix< value_t > >( lrapx.build( bct, acc ) );
 
-            HLR_ASSERT( ! hlr::matrix::is_lowrank( *M ) );
-            
-            if ( Hpro::is_lowrank( *M ) )
+            if ( hlr::matrix::is_lowrank( *M ) )
             {
                 //
                 // form U·V' = W·T·X' with orthogonal W/X
                 //
 
-                auto  R  = ptrcast( M.get(), Hpro::TRkMatrix< value_t > );
+                auto  R  = ptrcast( M.get(), hlr::matrix::lrmatrix< value_t > );
                 auto  W  = R->U();
                 auto  X  = R->V();
                 auto  Rw = blas::matrix< value_t >();
@@ -990,20 +1000,25 @@ build_uniform_rec ( const Hpro::TBlockCluster *                          bct,
                 
                 M = std::move( RU );
             }// if
+            else
+                HLR_ERROR( "unsupported matrix type : " + M->typestr() );
         }// if
         else
         {
             M = coeff.build( bct->is().row_is(), bct->is().col_is() );
 
-            HLR_ASSERT( ! hlr::matrix::is_dense( *M ) );
-            
-            if ( Hpro::is_dense( *M ) )
+            if ( hlr::matrix::is_dense( *M ) )
             {
-                auto  D  = cptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
-                auto  DD = blas::copy( D.blas_mat() );
-
-                M = std::move( std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) ) );
+                // all is good
             }// if
+            else if ( Hpro::is_dense( *M ) )
+            {
+                auto  D = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
+
+                M = std::move( std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( D->blas_mat() ) ) );
+            }// if
+            else
+                HLR_ERROR( "unsupported matrix type : " + M->typestr() );
         }// else
     }// if
     else

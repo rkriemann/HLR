@@ -397,7 +397,7 @@ tucker_tensor3< value_t >::decompress ()
 // type tests
 //
 bool
-is_tucker ( const with_value_type auto &  t )
+is_tucker ( const has_value_type auto &  t )
 {
     using type_t  = std::remove_cv_t< std::remove_reference_t< decltype( t ) > >;
     using value_t = typename type_t::value_t;

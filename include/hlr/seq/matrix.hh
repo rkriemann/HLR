@@ -18,6 +18,7 @@
 
 #include <hlr/arith/blas.hh>
 #include <hlr/approx/traits.hh>
+#include <hlr/bem/traits.hh>
 #include <hlr/matrix/lrmatrix.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
 #include <hlr/matrix/h2_lrmatrix.hh>
@@ -666,12 +667,12 @@ build_sparse ( const Hpro::TBlockCluster &             bct,
 // - low-rank blocks are converted to uniform low-rank matrices and
 //   shared bases are constructed on-the-fly
 //
-template < typename coeff_t,
-           typename lrapx_t,
-           typename basisapx_t >
-std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename coeff_t::value_t > >,
-            std::unique_ptr< hlr::matrix::shared_cluster_basis< typename coeff_t::value_t > >,
-            std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > > >
+template < coefficient_function_type coeff_t,
+           lowrank_approx_type lrapx_t,
+           approx::approximation_type basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
+            std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
+            std::unique_ptr< Hpro::TMatrix< Hpro::value_type_t< coeff_t > > > >
 build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
                     const coeff_t &              coeff,
                     const lrapx_t &              lrapx,
@@ -716,12 +717,12 @@ build_uniform_lvl ( const Hpro::TMatrix< typename basisapx_t::value_t > &    A,
 // - low-rank blocks are converted to uniform low-rank matrices and
 //   shared bases are constructed on-the-fly
 //
-template < typename coeff_t,
-           typename lrapx_t,
-           typename basisapx_t >
-std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename coeff_t::value_t > >,
-            std::unique_ptr< hlr::matrix::shared_cluster_basis< typename coeff_t::value_t > >,
-            std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > > >
+template < coefficient_function_type coeff_t,
+           lowrank_approx_type lrapx_t,
+           approx::approximation_type basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
+            std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
+            std::unique_ptr< Hpro::TMatrix< Hpro::value_type_t< coeff_t > > > >
 build_uniform_rec ( const Hpro::TBlockCluster *  bct,
                     const coeff_t &              coeff,
                     const lrapx_t &              lrapx,
@@ -729,14 +730,14 @@ build_uniform_rec ( const Hpro::TBlockCluster *  bct,
                     const Hpro::TTruncAcc &      acc,
                     const size_t                 /* nseq */ = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
-    static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
+    static_assert( std::is_same_v< Hpro::value_type_t< coeff_t >, Hpro::value_type_t< lrapx_t > >,
                    "coefficient function and low-rank approximation must have equal value type" );
-    static_assert( std::is_same_v< typename coeff_t::value_t, typename basisapx_t::value_t >,
+    static_assert( std::is_same_v< Hpro::value_type_t< coeff_t >, Hpro::value_type_t< basisapx_t > >,
                    "coefficient function and basis approximation must have equal value type" );
     
     HLR_ASSERT( bct != nullptr );
 
-    using value_t       = typename coeff_t::value_t;
+    using value_t       = Hpro::value_type_t< coeff_t >;
     using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
 
     auto  rowcb  = std::make_unique< cluster_basis >( bct->is().row_is() );
