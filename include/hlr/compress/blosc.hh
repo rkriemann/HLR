@@ -14,10 +14,15 @@
 #include <blosc2.h>
 
 #include <hlr/arith/blas.hh>
+#include <hlr/compress/byte_n.hh>
 
 namespace hlr { namespace compress { namespace blosc {
 
-using byte_t = uint8_t;
+//
+// signal availability of compressed BLAS
+//
+#define HLR_HAS_ZBLAS_DIRECT
+#define HLR_HAS_ZBLAS_APLR
 
 //
 // define compression mode
@@ -142,7 +147,7 @@ decompress ( const byte_t *  zdata,
     dparams.nthreads = 1;
 
     auto  dctx  = blosc2_create_dctx( dparams );
-    auto  dsize = blosc2_decompress_ctx( dctx, zdata, zsize, dest, nsize * sizeof(double) );
+    auto  dsize = blosc2_decompress_ctx( dctx, zdata, zsize, dest, nsize * sizeof(value_t) );
 
     blosc2_free_ctx( dctx );
     
@@ -262,6 +267,277 @@ decompress_lr ( const zarray &             zdata,
         decompress( zdata.data() + pos, s_i, U.data() + l*n, n );
         pos += s_i;
     }// for
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// compressed blas
+//
+////////////////////////////////////////////////////////////////////////////////
+
+namespace
+{
+
+template < typename value_t >
+void
+mulvec ( blosc2_context *  ctx,    // BLOSC decompression context
+         const void *      zdata,  // pointer to compressed data
+         const int32_t     zsize,  // size of compressed data
+         const int32_t     zofs,   // offset within compressed data
+         const size_t      nrows,
+         const size_t      ncols,
+         const matop_t     op_A,
+         const value_t     alpha,
+         const value_t *   x,
+         value_t *         y )
+{
+    //
+    // set up read-ahead buffer size as either multiple of nrows
+    // or less than nrows
+    
+    size_t  nbuf     = 16384; // size of read-ahead buffer
+    size_t  col_step = 1;
+
+    if ( nbuf > nrows )
+    {
+        // ensure full columns
+        col_step = std::min( nbuf / nrows, ncols );
+        nbuf     = col_step * nrows;
+    }// if
+    else
+        nbuf = std::min( nbuf, nrows );
+    
+    auto  fbuf = std::vector< value_t >( nbuf );
+    auto  fptr = fbuf.data();
+
+    if ( col_step > 1 )
+    {
+        const size_t  ncols_buf = (ncols / col_step) * col_step; // upper limit of cols for <nbuf> step width
+        
+        switch ( op_A )
+        {
+            case  apply_normal :
+            {
+                size_t  pos = zofs;
+                size_t  j   = 0;
+                
+                for ( ; j < ncols_buf; j += col_step, pos += nbuf )
+                {
+                    // decompress multiple columns
+                    const auto  dsize = blosc2_getitem_ctx( ctx, zdata, zsize, pos, nbuf, fptr, nbuf * sizeof(value_t) );
+
+                    HLR_ASSERT( dsize == nbuf * sizeof(value_t) );
+
+                    blas::gemv( 'N', nrows, col_step, alpha, fptr, nrows, x + j, 1, value_t(1), y, 1 );
+                }// for
+
+                if ( j < ncols )
+                {
+                    // handle remaining columns
+                    const auto  nrest_cols = ncols - j;
+                    const auto  nrest      = nrest_cols * nrows;
+                    const auto  dsize      = blosc2_getitem_ctx( ctx, zdata, zsize, pos, nrest, fptr, nrest * sizeof(value_t) );
+                    
+                    HLR_ASSERT( dsize == nrest * sizeof(value_t) );
+                    
+                    blas::gemv( 'N', nrows, nrest_cols, alpha, fptr, nrows, x + j, 1, value_t(1), y, 1 );
+                }// if
+            }// case
+            break;
+        
+            case  apply_adjoint :
+            {
+                size_t  pos = zofs;
+                size_t  j   = 0;
+                
+                for ( ; j < ncols_buf; j += col_step, pos += nbuf )
+                {
+                    // decompress multiple columns
+                    const auto  dsize = blosc2_getitem_ctx( ctx, zdata, zsize, pos, nbuf, fptr, nbuf * sizeof(value_t) );
+
+                    HLR_ASSERT( dsize == nbuf * sizeof(value_t) );
+
+                    blas::gemv( 'C', nrows, col_step, alpha, fptr, nrows, x, 1, value_t(1), y + j, 1 );
+                }// for
+                
+                if ( j < ncols )
+                {
+                    // decompress multiple columns
+                    const auto  nrest_cols = ncols - j;
+                    const auto  nrest      = nrest_cols * nrows;
+                    const auto  dsize      = blosc2_getitem_ctx( ctx, zdata, zsize, pos, nrest, fptr, nrest * sizeof(value_t) );
+                    
+                    HLR_ASSERT( dsize == nrest * sizeof(value_t) );
+                    
+                    blas::gemv( 'C', nrows, nrest_cols, alpha, fptr, nrows, x, 1, value_t(1), y + j, 1 );
+                }// if
+            }// case
+            break;
+
+            default:
+                HLR_ERROR( "TODO" );
+        }// switch
+    }// if
+    else
+    {
+        const size_t  nrows_buf = (nrows / nbuf) * nbuf;         // upper limit of rows for <nbuf> step width
+        
+        switch ( op_A )
+        {
+            case  apply_normal :
+            {
+                size_t  pos = zofs;
+            
+                for ( size_t  j = 0; j < ncols; ++j )
+                {
+                    const auto  x_j = alpha * x[j];
+                    size_t      i   = 0;
+
+                    for ( ; i < nrows_buf; i += nbuf, pos += nbuf )
+                    {
+                        const auto  dsize = blosc2_getitem_ctx( ctx, zdata, zsize, pos, nbuf, fptr, nbuf * sizeof(value_t) );
+
+                        HLR_ASSERT( dsize == nbuf * sizeof(value_t) );
+                    
+                        blas::axpy( nbuf, x_j, fptr, 1, y + i, 1 );
+                        
+                        // #pragma GCC ivdep
+                        // for ( uint  ii = 0; ii < nbuf; ++ii )
+                        //     y[i+ii] += fptr[ii] * x_j;
+                    }// for
+
+                    // handle remaining part
+                    {
+                        const auto  nrest = nrows - i;
+                        const auto  dsize = blosc2_getitem_ctx( ctx, zdata, zsize, pos, nrest, fptr, nrest * sizeof(value_t) );
+
+                        HLR_ASSERT( dsize == nrest * sizeof(value_t) );
+                    
+                        blas::axpy( nrest, x_j, fptr, 1, y + i, 1 );
+                        
+                        // #pragma GCC ivdep
+                        // for ( uint  ii = 0; ii < nrest; ++ii )
+                        //     y[i+ii] += fptr[ii] * x_j;
+                    }// for
+                }// for
+            }// case
+            break;
+        
+            case  apply_adjoint :
+            {
+                size_t  pos = zofs;
+            
+                for ( size_t  j = 0; j < ncols; ++j )
+                {
+                    value_t  y_j = value_t(0);
+                    size_t   i   = 0;
+
+                    for ( ; i < nrows_buf; i += nbuf, pos += nbuf )
+                    {
+                        const auto  dsize = blosc2_getitem_ctx( ctx, zdata, zsize, pos, nbuf, fptr, nbuf * sizeof(value_t) );
+                        
+                        HLR_ASSERT( dsize == nbuf * sizeof(value_t) );
+                    
+                        for ( uint  ii = 0; ii < nbuf; ++ii )
+                            y_j += fptr[ii] * x[i+ii];
+                    }// for
+
+                    // handle remaining part
+                    {
+                        const auto  nrest = nrows - i;
+                        const auto  dsize = blosc2_getitem_ctx( ctx, zdata, zsize, pos, nrest, fptr, nrest * sizeof(value_t) );
+                    
+                        HLR_ASSERT( dsize == nrest * sizeof(value_t) );
+                    
+                        for ( uint  ii = 0; ii < nrest; ++ii )
+                            y_j += fptr[ii] * x[i+ii];
+                    }
+
+                    y[j] += alpha * y_j;
+                }// for
+            }// case
+            break;
+
+            default:
+                HLR_ERROR( "TODO" );
+        }// switch
+    }// if
+}
+
+}// namespace anonymous
+
+template < typename value_t >
+void
+mulvec ( const size_t     nrows,
+         const size_t     ncols,
+         const matop_t    op_A,
+         const value_t    alpha,
+         const zarray &   zA,
+         const value_t *  x,
+         value_t *        y )
+{
+    blosc2_dparams  dparams = BLOSC2_DPARAMS_DEFAULTS;
+    
+    dparams.nthreads = 1;
+    
+    auto  dctx = blosc2_create_dctx( dparams );
+
+    mulvec< value_t >( dctx, zA.data(), zA.size(), 0, nrows, ncols, op_A, alpha, x, y );
+
+    blosc2_free_ctx( dctx );
+}
+
+template < typename value_t >
+void
+mulvec_lr ( const size_t     nrows,
+            const size_t     ncols,
+            const matop_t    op_A,
+            const value_t    alpha,
+            const zarray &   zA,
+            const value_t *  x,
+            value_t *        y )
+{
+    blosc2_dparams  dparams = BLOSC2_DPARAMS_DEFAULTS;
+    
+    dparams.nthreads = 1;
+    
+    auto    dctx = blosc2_create_dctx( dparams );
+    size_t  pos  = 0;
+
+    switch ( op_A )
+    {
+        case  apply_normal :
+        {
+            for ( uint  l = 0; l < ncols; ++l )
+            {
+                auto  s_i = * reinterpret_cast< const size_t * >( zA.data() + pos );
+
+                pos += sizeof(size_t);
+                mulvec( dctx, zA.data() + pos, s_i, 0, nrows, 1, op_A, alpha, x+l, y );
+                pos += s_i;
+            }// for
+        }// case
+        break;
+        
+        case  apply_conjugate  : HLR_ERROR( "TODO" );
+            
+        case  apply_transposed : HLR_ERROR( "TODO" );
+
+        case  apply_adjoint :
+        {
+            for ( uint  l = 0; l < ncols; ++l )
+            {
+                auto  s_i = * reinterpret_cast< const size_t * >( zA.data() + pos );
+
+                pos += sizeof(size_t);
+                mulvec( dctx, zA.data() + pos, s_i, 0, nrows, 1, op_A, alpha, x, y+l );
+                pos += s_i;
+            }// for
+        }// case
+        break;
+    }// switch
+
+    blosc2_free_ctx( dctx );
 }
 
 }}}// namespace hlr::compress::blosc

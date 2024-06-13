@@ -158,6 +158,8 @@ using hlr::compress::blosc::get_config;
 using hlr::compress::blosc::byte_size;
 using hlr::compress::blosc::compressed_size;
 
+namespace zblas { using hlr::compress::blosc::mulvec; }
+
 }} // namespace hlr::compress
 
 //////////////////////////////////////////////////////////////////////
