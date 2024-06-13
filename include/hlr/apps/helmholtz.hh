@@ -25,7 +25,7 @@ public:
     using  value_t = std::complex< double >;
 
     // signal support for HCA based construction
-    static constexpr bool supports_hca = false;
+    static constexpr bool supports_hca = true;
 
 private:
     // BEM data
