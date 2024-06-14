@@ -58,7 +58,7 @@ inline
 std::string
 format_mem ( const size_t  m )
 {
-    return hlr::term::black( Hpro::Mem::to_string( m ) ) + "\t" + mem_usage();
+    return hlr::term::blue( Hpro::Mem::to_string( m ) ) + "\t" + mem_usage();
 }
 
 template < typename ... T_size >
@@ -66,7 +66,7 @@ std::string
 format_mem ( const size_t    m,
              const T_size... ms )
 {
-    return hlr::term::black( Hpro::Mem::to_string( m ) ) + " / " + format_mem( ms... );
+    return hlr::term::blue( Hpro::Mem::to_string( m ) ) + " / " + format_mem( ms... );
 }
 
 // return default formated timing string
@@ -246,7 +246,7 @@ gen_bct ( Hpro::TClusterTree &  rowct,
         
         return bct_builder.build( & rowct, & colct, & adm_cond );
     }// if
-    else if ( hlr::cmdline::adm == "angular" )
+    else if ( hlr::cmdline::adm == "vertex" )
     {
         Hpro::TWeakStdGeomAdmCond  adm_cond;
         

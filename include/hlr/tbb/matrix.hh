@@ -282,10 +282,6 @@ build_mixedprec ( const Hpro::TBlockCluster *  bct,
     const auto  rowis = bct->is().row_is();
     const auto  colis = bct->is().col_is();
 
-    // parallel handling too inefficient for small matrices
-    if ( std::max( rowis.size(), colis.size() ) <= 0 )
-        return seq::matrix::build( bct, coeff, lrapx, acc );
-        
     if ( bct->is_leaf() )
     {
         auto  lacc = acc( rowis, colis );
@@ -402,6 +398,147 @@ build_mixedprec ( const Hpro::TBlockCluster *  bct,
     M->set_procs( bct->procs() );
 
     return M;
+}
+
+template < typename coeff_t,
+           typename lrapx_t >
+size_t
+mem_mixedprec ( const Hpro::TBlockCluster *  bct,
+                const coeff_t &              coeff,
+                const lrapx_t &              lrapx,
+                const Hpro::TTruncAcc &      acc,
+                const size_t                 nseq = Hpro::CFG::Arith::max_seq_size )
+{
+    static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
+                   "coefficient function and low-rank approximation must have equal value type" );
+
+    HLR_ASSERT( bct != nullptr );
+
+    using  value_t = typename coeff_t::value_t;
+    
+    //
+    // decide upon cluster type, how to construct matrix
+    //
+
+    size_t      mem   = 0;
+    const auto  rowis = bct->is().row_is();
+    const auto  colis = bct->is().col_is();
+
+    if ( bct->is_leaf() )
+    {
+        auto  M    = std::unique_ptr< Hpro::TMatrix< value_t > >();
+        auto  lacc = acc( rowis, colis );
+        
+        if ( bct->is_adm() )
+        {
+            M = std::unique_ptr< Hpro::TMatrix< value_t > >( lrapx.build( bct, lacc ) );
+
+            if ( Hpro::is_lowrank( *M ) )
+            {
+                auto  R  = ptrcast( M.get(), Hpro::TRkMatrix< value_t > );
+                auto  zR = std::make_unique< hlr::matrix::lrsvmatrix< value_t > >( rowis, colis,
+                                                                                   std::move( blas::mat_U( R ) ),
+                                                                                   std::move( blas::mat_V( R ) ) );
+
+                zR->compress( lacc );
+                M = std::move( zR );
+            }// if
+            else if ( matrix::is_lowrank( *M ) )
+            {
+                auto  R  = ptrcast( M.get(), matrix::lrmatrix< value_t > );
+                auto  zR = std::make_unique< hlr::matrix::lrsvmatrix< value_t > >( rowis, colis, R->U(), R->V() );
+                
+                zR->compress( lacc );
+                M = std::move( zR );
+            }// if
+            else if ( matrix::is_lowrank_sv( *M ) )
+            {
+                auto  R = ptrcast( M.get(), matrix::lrsvmatrix< value_t > );
+
+                R->compress( lacc );
+            }// if
+            else if ( Hpro::is_dense( *M ) )
+            {
+                auto  D  = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
+                auto  zD = std::make_unique< matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) );
+
+                zD->compress( lacc );
+                M = std::move( zD );
+            }// if
+            else if ( matrix::is_dense( *M ) )
+            {
+                auto  D = ptrcast( M.get(), matrix::dense_matrix< value_t > );
+
+                D->compress( lacc );
+            }// if
+            else
+            {
+                HLR_LOG( 0, M->typestr() );
+            }// else
+        }// if
+        else
+        {
+            M = coeff.build( rowis, colis );
+
+            if ( Hpro::is_dense( *M ) )
+            {
+                auto  D  = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
+                auto  zD = std::make_unique< matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) );
+
+                zD->compress( lacc );
+                M = std::move( zD );
+            }// if
+            else if ( matrix::is_dense( *M ) )
+            {
+                auto  D = ptrcast( M.get(), matrix::dense_matrix< value_t > );
+
+                D->compress( lacc );
+            }// if
+            else
+            {
+                HLR_LOG( 0, M->typestr() );
+            }// else
+        }// else
+
+        mem += M->data_byte_size();
+    }// if
+    else if ( std::min( rowis.size(), colis.size() ) <= nseq )
+    {
+        mem += hlr::seq::matrix::mem_mixedprec( bct, coeff, lrapx, acc, nseq );
+    }// if
+    else
+    {
+        //
+        // recurse
+        //
+
+        auto  mtx = std::mutex();
+        
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< uint >( 0, bct->nrows(),
+                                            0, bct->ncols() ),
+            [&,bct,nseq] ( const ::tbb::blocked_range2d< uint > &  r )
+            {
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        if ( ! is_null( bct->son( i, j ) ) )
+                        {
+                            const auto  mem_ij = mem_mixedprec( bct->son( i, j ), coeff, lrapx, acc, nseq );
+                            
+                            {
+                                auto  lock = std::scoped_lock( mtx );
+
+                                mem += mem_ij;
+                            }
+                        }// if
+                    }// for
+                }// for
+            } );
+    }// else
+
+    return mem;
 }
 
 //
