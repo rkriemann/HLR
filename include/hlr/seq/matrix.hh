@@ -955,7 +955,25 @@ build_uniform_rec2 ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
     
     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
 }
-    
+
+namespace blr
+{
+//
+// special version for BLR format
+//
+template < typename basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
+build_uniform ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
+                const basisapx_t &                                     basisapx,
+                const Hpro::TTruncAcc &                                acc ) // ignored
+{
+    return detail::build_uniform_blr( A, basisapx, acc );
+}
+
+}// namespace blr
+
 template < typename basisapx_t >
 std::tuple< std::unique_ptr< hlr::matrix::nested_cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< hlr::matrix::nested_cluster_basis< typename basisapx_t::value_t > >,
