@@ -1221,9 +1221,9 @@ template < typename basisapx_t >
 std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
-build_uniform_blr ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
-                    const basisapx_t &                                     basisapx,
-                    const accuracy &                                       acc )
+build_blr2 ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
+             const basisapx_t &                                     basisapx,
+             const accuracy &                                       acc )
 {
     using value_t = typename basisapx_t::value_t;
     using real_t  = Hpro::real_type_t< value_t >;
@@ -1231,7 +1231,7 @@ build_uniform_blr ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
     using namespace hlr::matrix;
 
     if ( ! is_blocked( A ) )
-        HLR_ERROR( "todo" );
+        HLR_ERROR( "TODO" );
     
     auto  B = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
 
@@ -1312,9 +1312,11 @@ build_uniform_blr ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
         // truncate extended basis to form cluster basis
         //
 
-        auto  Un      = basisapx.column_basis( U, acc );
-        auto  rowcb_i = std::make_unique< shared_cluster_basis< value_t > >( rowis, std::move( Un ) );
+        auto  sv      = blas::vector< real_t >();
+        auto  Un      = basisapx.column_basis( U, acc, & sv );
+        auto  rowcb_i = std::make_unique< shared_cluster_basis< value_t > >( rowis );
 
+        rowcb_i->set_basis( std::move( Un ), std::move( sv ) );
         rowcb->set_son( i, rowcb_i.release() );
     }// for
 
@@ -1395,9 +1397,11 @@ build_uniform_blr ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
         // truncate extended basis to form cluster basis
         //
 
-        auto  Vn      = basisapx.column_basis( V, acc );
-        auto  colcb_j = std::make_unique< shared_cluster_basis< value_t > >( colis, std::move( Vn ) );
+        auto  sv      = blas::vector< real_t >();
+        auto  Vn      = basisapx.column_basis( V, acc, & sv );
+        auto  colcb_j = std::make_unique< shared_cluster_basis< value_t > >( colis );
 
+        colcb_j->set_basis( std::move( Vn ), std::move( sv ) );
         colcb->set_son( j, colcb_j.release() );
     }// for
 

@@ -97,17 +97,17 @@ public:
     //
 
     // return number of sons
-    uint                   nsons     () const                { return _sons.size(); }
+    uint                          nsons     () const                { return _sons.size(); }
 
     // set number of sons
-    void                   set_nsons ( const uint  n )       { _sons.resize( n ); }
+    void                          set_nsons ( const uint  n )       { _sons.resize( n ); }
 
     // access <i>'th son
     shared_cluster_basis *        son       ( const uint  i )       { return _sons[i]; }
     const shared_cluster_basis *  son       ( const uint  i ) const { return _sons[i]; }
 
-    void                   set_son   ( const uint       i,
-                                       shared_cluster_basis *  cb ) { _sons[i] = cb; }
+    void                          set_son   ( const uint              i,
+                                              shared_cluster_basis *  cb ) { _sons[i] = cb; }
 
     //
     // access basis

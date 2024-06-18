@@ -212,6 +212,39 @@ lu ( hpro::TMatrix< value_t > &                      A,
 
 }// namespace accu2
 
+//////////////////////////////////////////////////////////////////////
+//
+// TLR versions
+//
+//////////////////////////////////////////////////////////////////////
+
+namespace tlr
+{
+
+//
+// mat-vec : y = y + α op( M ) x
+//
+template < typename value_t >
+void
+mul_vec ( const value_t                              alpha,
+          const hpro::matop_t                        op_M,
+          const hpro::TMatrix< value_t > &           M,
+          const vector::scalar_vector< value_t > &   x,
+          vector::scalar_vector< value_t > &         y,
+          matrix::shared_cluster_basis< value_t > &  rowcb,
+          matrix::shared_cluster_basis< value_t > &  colcb )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    if ( op_M == apply_normal )
+        detail::mul_vec( alpha, op_M, M, x, y, rowcb, colcb );
+    else
+        detail::mul_vec( alpha, op_M, M, x, y, colcb, rowcb );
+}
+
+}// namespace tlr
+
 }}}// namespace hlr::tbb::uniform
 
 #endif // __HLR_TBB_ARITH_UNIFORM_HH

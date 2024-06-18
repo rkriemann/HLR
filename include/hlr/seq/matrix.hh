@@ -956,7 +956,7 @@ build_uniform_rec2 ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
 }
 
-namespace blr
+namespace tlr
 {
 //
 // special version for BLR format
@@ -969,7 +969,7 @@ build_uniform ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
                 const basisapx_t &                                     basisapx,
                 const Hpro::TTruncAcc &                                acc ) // ignored
 {
-    return detail::build_uniform_blr( A, basisapx, acc );
+    return detail::build_blr2( A, basisapx, acc );
 }
 
 }// namespace blr

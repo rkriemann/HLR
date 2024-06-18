@@ -175,6 +175,8 @@ gauss_elim ( Hpro::TMatrix< value_t > &  A,
 namespace tlr
 {
 
+using hlr::tlr::mul_vec;
+
 //
 // LU factorization A = L·U, with unit lower triangular L and upper triangular U
 // 

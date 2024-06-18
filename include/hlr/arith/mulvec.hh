@@ -747,6 +747,53 @@ mul_vec_datasize ( const Hpro::matop_t               op_M,
     return M.data_byte_size() + 2 * sizeof( value_t ) * ( M.nrows() + M.ncols() );
 }
 
+namespace tlr
+{
+
+//
+// special version for BLR format
+//
+template < typename value_t >
+void
+mul_vec ( const value_t                             alpha,
+          const Hpro::matop_t                       op_M,
+          const Hpro::TMatrix< value_t > &          M,
+          const vector::scalar_vector< value_t > &  x,
+          vector::scalar_vector< value_t > &        y )
+{
+    using namespace hlr::matrix;
+
+    HLR_ASSERT( is_blocked( M ) );
+
+    auto  B = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+
+    for ( uint  i = 0; i < B->nblock_rows(); ++i )
+    {
+        bool  first = true;
+        auto  y_i   = blas::vector< value_t >();
+        
+        for ( uint  j = 0; j < B->nblock_cols(); ++j )
+        {
+            auto  B_ij = B->block( i, j );
+            
+            if ( ! is_null( B_ij ) )
+            {
+                if ( first )
+                {
+                    y_i   = blas::vector< value_t >( blas::vec( y ), B_ij->row_is( op_M ) - y.ofs() );
+                    first = false;
+                }// if
+                
+                auto  x_j = blas::vector< value_t >( blas::vec( x ), B_ij->col_is( op_M ) - x.ofs() );
+        
+                B_ij->apply_add( alpha, x_j, y_i, op_M );
+            }// if
+        }// for
+    }// for
+}
+
+}// namespace tlr
+
 }// namespace hlr
 
 #endif // __HLR_ARITH_MULVEC_HH

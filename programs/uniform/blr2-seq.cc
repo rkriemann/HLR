@@ -10,6 +10,7 @@
 #include "hlr/seq/arith_h2.hh"
 #include "hlr/seq/cluster_basis.hh"
 #include "hlr/seq/convert.hh"
+#include "hlr/seq/compress.hh"
 #include "hlr/seq/norm.hh"
 
 namespace          impl      = hlr::seq;

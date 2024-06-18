@@ -47,6 +47,7 @@ namespace accu4 { using hlr::uniform::accu4::lu; }// namespace accu4
 namespace tlr
 {
 
+using hlr::uniform::tlr::mul_vec;
 // using hlr::uniform::tlr::addlr;
 using hlr::uniform::tlr::multiply;
 using hlr::uniform::tlr::lu;

@@ -59,7 +59,7 @@ string  capprox    = "default";    // construction low-rank approximation method
 string  aapprox    = "default";    // arithmetic low-rank approximation method (svd,rrqr,randsvd,randlr,aca,lanczos)
 string  tapprox    = "default";    // tensor low-rank approximation method (hosvd,sthosvd,ghosvd,hhosvd,tcafull)
 string  arith      = "std";        // which kind of arithmetic to use
-double  compress   = 0;            // apply SZ/ZFP compression with rate (1…, ZFP only) or accuracy (0,1] (0 = off)
+bool    compress   = false;        // apply FP compression to matrix data
 auto    kappa      = std::complex< double >( 2, 0 ); // wave number for helmholtz problems
 double  sigma      = 1;            // parameter for matern covariance and gaussian kernel
 
@@ -140,7 +140,7 @@ parse ( int argc, char ** argv )
         ( "matrix",      value<string>(), ": matrix file to use" )
         ( "nprob,n",     value<int>(),    ": set problem size" )
         ( "sparse",      value<string>(), ": sparse matrix file to use" )
-        ( "compress",    value<double>(), ": apply SZ/ZFP compression with rate [1,…; ZFP only) or accuracy (0,1) (default: 0 = off)" )
+        ( "compress",                     ": apply FP compression to matrix data" )
         ( "coarsen",                      ": coarsen matrix structure" )
         ( "tohodlr",                      ": convert matrix to HODLR format" )
         ( "capprox",     value<string>(), ": LR approximation to use (aca,hca,dense)" )
@@ -248,7 +248,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "cluster"    ) ) cluster    = vm["cluster"].as<string>();
     if ( vm.count( "adm"        ) ) adm        = vm["adm"].as<string>();
     if ( vm.count( "eta"        ) ) eta        = vm["eta"].as<double>();
-    if ( vm.count( "compress"   ) ) compress   = vm["compress"].as<double>();
+    if ( vm.count( "compress"   ) ) compress   = true;
 
     if ( appl == "help" )
     {
