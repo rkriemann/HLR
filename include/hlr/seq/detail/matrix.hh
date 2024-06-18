@@ -1214,6 +1214,9 @@ build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &   A,
     return M;
 }
 
+//
+// special construction in BLR2 format (blr clustering)
+//
 template < typename basisapx_t >
 std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
@@ -1259,7 +1262,7 @@ build_uniform_blr ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
 
             if ( first )
             {
-                rowis = B_ij->rowis();
+                rowis = B_ij->row_is();
                 first = false;
             }// if
             
@@ -1310,7 +1313,7 @@ build_uniform_blr ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
         //
 
         auto  Un      = basisapx.column_basis( U, acc );
-        auto  rowcb_i = std::unique_ptr< shared_cluster_basis< value_t > >( rowis, std::move( Un ) );
+        auto  rowcb_i = std::make_unique< shared_cluster_basis< value_t > >( rowis, std::move( Un ) );
 
         rowcb->set_son( i, rowcb_i.release() );
     }// for
@@ -1342,7 +1345,7 @@ build_uniform_blr ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
 
             if ( first )
             {
-                colis = B_ij->colis();
+                colis = B_ij->col_is();
                 first = false;
             }// if
             
@@ -1393,7 +1396,7 @@ build_uniform_blr ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
         //
 
         auto  Vn      = basisapx.column_basis( V, acc );
-        auto  colcb_j = std::unique_ptr< shared_cluster_basis< value_t > >( colis, std::move( Vn ) );
+        auto  colcb_j = std::make_unique< shared_cluster_basis< value_t > >( colis, std::move( Vn ) );
 
         colcb->set_son( j, colcb_j.release() );
     }// for
@@ -1402,7 +1405,7 @@ build_uniform_blr ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
     // build uniform H-matrix by converting all lowrank blocks to uniform blocks
     //
     
-    auto  M = std::unique_ptr< Hpro::TBlockMatrix< value_t > >( A.row_is(), A.col_is() );
+    auto  M = std::make_unique< Hpro::TBlockMatrix< value_t > >( A.row_is(), A.col_is() );
 
     M->copy_struct_from( B );
 
@@ -1455,6 +1458,9 @@ build_uniform_blr ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
     return { std::move( rowcb ), std::move( colcb ), std::move( M ) };
 }
 
+//
+// set up initial recursive structure of cluster bases
+//
 template < typename value_t >
 void
 init_cluster_bases ( const Hpro::TMatrix< value_t > &   M,

@@ -42,7 +42,7 @@ program_main ()
     auto  coord   = problem->coordinates();
 
     // set ntile to √n but round to nearest power of 2
-    if ( false )
+    if ( true )
     {
         auto  sqn = std::sqrt( double(coord->ncoord()) );
         auto  lg2 = std::log2( sqn );
@@ -138,7 +138,7 @@ program_main ()
     const auto  mem_rcb = rowcb->byte_size();
     const auto  mem_ccb = colcb->byte_size();
     
-    std::cout << "    mem   = " << format_mem( mem_rcb, mem_ccb, mem_uni, mem_rcb + mem_ccb + mem_uni ) << std::endl;
+    std::cout << "    mem    = " << format_mem( mem_rcb, mem_ccb, mem_uni, mem_rcb + mem_ccb + mem_uni ) << std::endl;
 
     {
         auto  [ row_min, row_avg, row_max ] = matrix::rank_info( *rowcb );
@@ -166,7 +166,7 @@ program_main ()
     {
         auto  error = impl::norm::frobenius( 1, *A, -1, *A_uni );
         
-        std::cout << "    error = " << format_error( error, error / normA ) << std::endl;
+        std::cout << "    error  = " << format_error( error, error / normA ) << std::endl;
     }
     
     //////////////////////////////////////////////////////////////////////
