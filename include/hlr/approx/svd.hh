@@ -616,6 +616,9 @@ struct SVD
                    const accuracy &                 acc,
                    blas::vector< real_t > *         sv = nullptr ) const
     {
+        if ( M.ncols() == 0 )
+            return blas::matrix< value_t >( M.nrows(), 0 );
+        
         if ( M.ncols() > 2 * M.nrows() )
         {
             //
