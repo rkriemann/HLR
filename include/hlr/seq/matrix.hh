@@ -958,16 +958,32 @@ build_uniform_rec2 ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
 
 namespace tlr
 {
+
 //
-// special version for BLR format
+// special versions for BLR format
 //
+template < coefficient_function_type coeff_t,
+           lowrank_approx_type       lrapx_t,
+           approx::approximation_type        basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
+build_uniform ( const Hpro::TBlockCluster *  bc,
+                const coeff_t &              coeff,
+                const lrapx_t &              lrapx,
+                const basisapx_t &           basisapx,
+                const accuracy &             acc )
+{
+    return detail::build_blr2( bc, coeff, lrapx, basisapx, acc );
+}
+
 template < typename basisapx_t >
 std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
 build_uniform ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
                 const basisapx_t &                                     basisapx,
-                const Hpro::TTruncAcc &                                acc ) // ignored
+                const Hpro::TTruncAcc &                                acc )
 {
     return detail::build_blr2( A, basisapx, acc );
 }

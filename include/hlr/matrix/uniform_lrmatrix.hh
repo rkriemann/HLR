@@ -221,18 +221,20 @@ public:
     // set coupling matrix without bases consistency check
     // (because cluster bases need to be adjusted later)
     void
-    set_coeff_unsafe ( const blas::matrix< value_t > &  aS )
+    set_coupling_unsafe ( const blas::matrix< value_t > &  aS )
     {
         HLR_ASSERT( ! is_compressed() );
         blas::copy( aS, _S );
     }
     
     void
-    set_coeff_unsafe ( blas::matrix< value_t > &&  aS )
+    set_coupling_unsafe ( blas::matrix< value_t > &&  aS )
     {
         HLR_ASSERT( ! is_compressed() );
         _S = std::move( aS );
     }
+    void set_coeff_unsafe ( const blas::matrix< value_t > &  aS ) { set_coupling_unsafe( aS ); }
+    void set_coeff_unsafe ( blas::matrix< value_t > &&       aS ) { set_coupling_unsafe( std::forward( aS ) ); }
     
     void
     set_matrix_data ( cluster_basis_t &                arow_cb,

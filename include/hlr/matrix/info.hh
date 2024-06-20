@@ -22,6 +22,7 @@
 
 #include <hlr/matrix/lrmatrix.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
+#include <hlr/matrix/h2_lrmatrix.hh>
 
 namespace hlr { namespace matrix {
 
@@ -66,19 +67,22 @@ rank_info_helper_mat ( const Hpro::TMatrix< value_t > &  M )
 
         return { R->rank(), R->rank(), R->rank(), R->rank() > 0 ? 1 : 0 };
     }// if
-    #if defined(HLR_HAS_H2)
-    else if ( is_uniform( &M ) )
+    else if ( matrix::is_uniform_lowrank( M ) )
     {
-        auto  R = cptrcast( &M, Hpro::TUniformMatrix< value_t > );
-
-        return {
-            std::min( R->row_rank(), R->col_rank() ),  // min
-            ( R->row_rank() + R->col_rank() ) / 2,     // average
-            std::max( R->row_rank(), R->col_rank() ),  // max
-            R->row_rank() + R->row_rank() > 0 ? 1 : 0  // #blocks
-        };
+        auto  R       = cptrcast( &M, matrix::uniform_lrmatrix< value_t > );
+        auto  minrank = std::min( R->row_rank(), R->col_rank() );
+        auto  maxrank = std::max( R->row_rank(), R->col_rank() );
+        
+        return { minrank, ( minrank + maxrank ) / 2, maxrank, minrank > 0 ? 1 : 0 };
     }// if
-    #endif
+    else if ( matrix::is_h2_lowrank( &M ) )
+    {
+        auto  R       = cptrcast( &M, matrix::h2_lrmatrix< value_t > );
+        auto  minrank = std::min( R->row_rank(), R->col_rank() );
+        auto  maxrank = std::max( R->row_rank(), R->col_rank() );
+        
+        return { minrank, ( minrank + maxrank ) / 2, maxrank, minrank > 0 ? 1 : 0 };
+    }// if
     // else if ( is_generic_lowrank( M ) )
     // {
     //     auto  R = cptrcast( &M, lrmatrix< value_t > );
