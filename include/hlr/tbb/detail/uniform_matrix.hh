@@ -1471,7 +1471,6 @@ build_blr2 ( const Hpro::TBlockCluster *  bc,
     auto  nbcols  = bc->ncols();
     auto  B       = std::make_unique< Hpro::TBlockMatrix< value_t > >( bc->rowis(), bc->colis() );
     auto  weights = tensor2< real_t >( bc->nrows(), bc->ncols() );
-    auto  mtx     = std::mutex();
 
     B->set_block_struct( nbrows, nbcols );
     
@@ -1514,15 +1513,15 @@ build_blr2 ( const Hpro::TBlockCluster *  bc,
                         }// if
                         else
                             HLR_ERROR( "unsupported matrix type: " + B_ij->typestr() );
-
-                        B->set_block( i, j, B_ij.release() );
                     }// else
 
+                    HLR_ASSERT( ! is_null( B_ij.get() ) );
+                    
                     //
                     // convert to uniform while updating bases
                     //
                     
-                    if ( hlr::matrix::is_lowrank( *B_ij ) )
+                    if ( hlr::matrix::is_lowrank( B_ij.get() ) )
                     {
                         //
                         // form U·V' = W·T·X' with orthogonal W/X
@@ -1704,8 +1703,6 @@ build_blr2 ( const Hpro::TBlockCluster *  bc,
                         // update couplings of previous blocks
                         //
 
-                        auto  lock_mtx  = std::scoped_lock( mtx );
-                        
                         if ( rowcb_i->rank() > 0 )
                         {
                             auto  U  = rowcb_i->basis();
@@ -1776,9 +1773,9 @@ build_blr2 ( const Hpro::TBlockCluster *  bc,
                         // }// DEBUG }
                 
                         B_ij = std::move( RU );
-
-                        B->set_block( i, j, B_ij.release() );
                     }// if
+
+                    B->set_block( i, j, B_ij.release() );
                 }// for
             }// for
         } );

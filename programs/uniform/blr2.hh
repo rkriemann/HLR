@@ -41,16 +41,20 @@ program_main ()
     auto  problem = gen_problem< problem_t >();
     auto  coord   = problem->coordinates();
 
-    // set ntile to √n but round to nearest power of 2
-    if ( false )
+    // adjust ntile to √n
+    if ( cmdline::ntile == 0 )
     {
         auto  sqn = std::sqrt( double(coord->ncoord()) );
         auto  lg2 = std::log2( sqn );
         auto  up  = 1 << uint( std::ceil( lg2 ) );
         auto  lo  = 1 << uint( std::floor( lg2 ) );
+
+        // round to next larger power of 2
+        ntile = up;
         
-        if (( up - sqn ) < ( sqn - lo )) ntile = up;
-        else                             ntile = lo;
+        // round to nearest power of 2
+        // if (( up - sqn ) < ( sqn - lo )) ntile = up;
+        // else                             ntile = lo;
 
         std::cout << "    ntile  = " << ntile << std::endl;
     }
