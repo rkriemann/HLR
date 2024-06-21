@@ -234,7 +234,7 @@ public:
         _S = std::move( aS );
     }
     void set_coeff_unsafe ( const blas::matrix< value_t > &  aS ) { set_coupling_unsafe( aS ); }
-    void set_coeff_unsafe ( blas::matrix< value_t > &&       aS ) { set_coupling_unsafe( std::forward( aS ) ); }
+    void set_coeff_unsafe ( blas::matrix< value_t > &&       aS ) { set_coupling_unsafe( std::move( aS ) ); }
     
     void
     set_matrix_data ( cluster_basis_t &                arow_cb,

@@ -56,9 +56,16 @@ mem_usage ()
 // return default formated memory string
 inline
 std::string
+format_mem_base ( const size_t  m )
+{
+    return hlr::term::blue( Hpro::Mem::to_string( m ) );
+}
+
+inline
+std::string
 format_mem ( const size_t  m )
 {
-    return hlr::term::blue( Hpro::Mem::to_string( m ) ) + "\t" + mem_usage();
+    return format_mem_base( m ) + "\t" + mem_usage();
 }
 
 template < typename ... T_size >
@@ -66,7 +73,7 @@ std::string
 format_mem ( const size_t    m,
              const T_size... ms )
 {
-    return hlr::term::blue( Hpro::Mem::to_string( m ) ) + " / " + format_mem( ms... );
+    return format_mem_base( m ) + " / " + format_mem( ms... );
 }
 
 // return default formated timing string
