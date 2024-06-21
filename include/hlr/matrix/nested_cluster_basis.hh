@@ -618,15 +618,31 @@ public:
     {
         size_t  n = 0;
 
-        if ( nsons() == 0 )
-            n += sizeof( value_t ) * _is.size() * rank();
+        if ( is_compressed() )
+        {
+            if ( nsons() == 0 )
+                n += hlr::compress::aplr::byte_size( _zV ) + _sv.data_byte_size();
+            else
+            {
+                for ( uint  i = 0; i < nsons(); ++i )
+                    n += hlr::compress::byte_size( _zE[i] );
+                
+                for ( auto  son : _sons )
+                    n += son->data_byte_size();
+            }// else
+        }// if
         else
         {
-            for ( uint  i = 0; i < nsons(); ++i )
-                n += sizeof( value_t ) * _E[i].nrows() * rank();
-            
-            for ( auto  son : _sons )
-                n += son->data_byte_size();
+            if ( nsons() == 0 )
+                n += sizeof( value_t ) * _is.size() * rank();
+            else
+            {
+                for ( uint  i = 0; i < nsons(); ++i )
+                    n += sizeof( value_t ) * _E[i].nrows() * rank();
+                
+                for ( auto  son : _sons )
+                    n += son->data_byte_size();
+            }// else
         }// else
 
         return  n;

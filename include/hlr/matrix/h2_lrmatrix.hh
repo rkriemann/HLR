@@ -607,7 +607,10 @@ template < typename value_t >
 size_t
 h2_lrmatrix< value_t >::data_byte_size () const
 {
-    return sizeof( value_t ) * row_rank() * col_rank();
+    if ( is_compressed() )
+        return hlr::compress::byte_size( _zS );
+    else
+        return sizeof( value_t ) * row_rank() * col_rank();
 }
 
 //
