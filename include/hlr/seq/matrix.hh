@@ -14,9 +14,9 @@
 #include <hpro/matrix/TMatrix.hh>
 #include <hpro/matrix/TBlockMatrix.hh>
 #include <hpro/matrix/structure.hh>
-#include <hpro/base/TTruncAcc.hh>
 
 #include <hlr/arith/blas.hh>
+#include <hlr/approx/accuracy.hh>
 #include <hlr/approx/traits.hh>
 #include <hlr/bem/traits.hh>
 #include <hlr/matrix/lrmatrix.hh>
@@ -42,14 +42,15 @@ using namespace hlr::matrix;
 // matrix coefficients defined by <coeff> and
 // low-rank blocks computed by <lrapx>
 //
-template < typename coeff_t,
-           typename lrapx_t >
+template < coefficient_function_type  coeff_t,
+           lowrank_approx_type        lrapx_t >
 std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > >
 build ( const Hpro::TBlockCluster *  bct,
         const coeff_t &              coeff,
         const lrapx_t &              lrapx,
-        const Hpro::TTruncAcc &      acc,
-        const size_t                 nseq = Hpro::CFG::Arith::max_seq_size ) // ignored
+        const accuracy &             acc,
+        const bool                   compress = false,
+        const size_t                 nseq     = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
     static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
                    "coefficient function and low-rank approximation must have equal value type" );
@@ -68,6 +69,7 @@ build ( const Hpro::TBlockCluster *  bct,
     {
         auto  rowis = bct->is().row_is();
         auto  colis = bct->is().col_is();
+        auto  lacc  = acc( rowis, colis );
         
         if ( bct->is_adm() )
         {
@@ -76,11 +78,51 @@ build ( const Hpro::TBlockCluster *  bct,
             if ( Hpro::is_lowrank( *M ) )
             {
                 auto  R = ptrcast( M.get(), Hpro::TRkMatrix< value_t > );
+                auto  zR = std::make_unique< hlr::matrix::lrsvmatrix< value_t > >( rowis, colis,
+                                                                                   std::move( blas::mat_U( R ) ),
+                                                                                   std::move( blas::mat_V( R ) ) );
 
-                M = std::move( std::make_unique< hlr::matrix::lrmatrix< value_t > >( rowis, colis,
-                                                                                     std::move( blas::mat_U( R ) ),
-                                                                                     std::move( blas::mat_V( R ) ) ) );
+                if ( compress )
+                    zR->compress( lacc );
+                
+                M = std::move( zR );
             }// if
+            else if ( matrix::is_lowrank( *M ) )
+            {
+                auto  R  = ptrcast( M.get(), matrix::lrmatrix< value_t > );
+                auto  zR = std::make_unique< hlr::matrix::lrsvmatrix< value_t > >( rowis, colis, R->U(), R->V() );
+                
+                if ( compress )
+                    zR->compress( lacc );
+                
+                M = std::move( zR );
+            }// if
+            else if ( matrix::is_lowrank_sv( *M ) )
+            {
+                auto  R = ptrcast( M.get(), matrix::lrsvmatrix< value_t > );
+
+                if ( compress )
+                    R->compress( lacc );
+            }// if
+            else if ( Hpro::is_dense( *M ) )
+            {
+                auto  D  = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
+                auto  zD = std::make_unique< matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) );
+
+                if ( compress )
+                    zD->compress( lacc );
+                
+                M = std::move( zD );
+            }// if
+            else if ( matrix::is_dense( *M ) )
+            {
+                auto  D = ptrcast( M.get(), matrix::dense_matrix< value_t > );
+
+                if ( compress )
+                    D->compress( lacc );
+            }// if
+            else
+                HLR_ERROR( "unsupported matrix type: " + M->typestr() );
         }// if
         else
         {
@@ -88,10 +130,23 @@ build ( const Hpro::TBlockCluster *  bct,
 
             if ( Hpro::is_dense( *M ) )
             {
-                auto  D = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
+                auto  D  = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
+                auto  zD = std::make_unique< matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) );
 
-                M = std::move( std::make_unique< hlr::matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) ) );
+                if ( compress )
+                    zD->compress( lacc );
+                
+                M = std::move( zD );
             }// if
+            else if ( matrix::is_dense( *M ) )
+            {
+                auto  D = ptrcast( M.get(), matrix::dense_matrix< value_t > );
+
+                if ( compress )
+                    D->compress( lacc );
+            }// if
+            else
+                HLR_ERROR( "unsupported matrix type: " + M->typestr() );
         }// else
     }// if
     else
@@ -112,7 +167,7 @@ build ( const Hpro::TBlockCluster *  bct,
             {
                 if ( bct->son( i, j ) != nullptr )
                 {
-                    auto  B_ij = build( bct->son( i, j ), coeff, lrapx, acc, nseq );
+                    auto  B_ij = build( bct->son( i, j ), coeff, lrapx, acc, compress, nseq );
 
                     B->set_block( i, j, B_ij.release() );
                 }// if
@@ -132,13 +187,13 @@ build ( const Hpro::TBlockCluster *  bct,
 // e.g., dense_matrix and lrmatrix, and directly compress
 // matrix data
 //
-template < typename coeff_t,
-           typename lrapx_t >
+template < coefficient_function_type  coeff_t,
+           lowrank_approx_type        lrapx_t >
 std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > >
 build_compressed ( const Hpro::TBlockCluster *  bct,
                    const coeff_t &              coeff,
                    const lrapx_t &              lrapx,
-                   const Hpro::TTruncAcc &      acc,
+                   const accuracy &             acc,
                    const size_t                 nseq = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
     static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
@@ -221,13 +276,13 @@ build_compressed ( const Hpro::TBlockCluster *  bct,
     return M;
 }
 
-template < typename coeff_t,
-           typename lrapx_t >
+template < coefficient_function_type  coeff_t,
+           lowrank_approx_type        lrapx_t >
 std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > >
 build_mixedprec ( const Hpro::TBlockCluster *  bct,
                   const coeff_t &              coeff,
                   const lrapx_t &              lrapx,
-                  const Hpro::TTruncAcc &      acc,
+                  const accuracy &             acc,
                   const size_t                 nseq = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
     static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
@@ -352,13 +407,13 @@ build_mixedprec ( const Hpro::TBlockCluster *  bct,
     return M;
 }
 
-template < typename coeff_t,
-           typename lrapx_t >
+template < coefficient_function_type  coeff_t,
+           lowrank_approx_type        lrapx_t >
 size_t
 mem_mixedprec ( const Hpro::TBlockCluster *  bct,
                 const coeff_t &              coeff,
                 const lrapx_t &              lrapx,
-                const Hpro::TTruncAcc &      acc,
+                const accuracy &             acc,
                 const size_t                 nseq = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
     static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
@@ -480,7 +535,7 @@ mem_mixedprec ( const Hpro::TBlockCluster *  bct,
 // matrix structure defined by <bct>,  matrix coefficients
 // defined by <coeff>
 //
-template < typename coeff_t >
+template < coefficient_function_type coeff_t >
 std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > >
 build_nearfield ( const Hpro::TBlockCluster *  bct,
                   const coeff_t &              coeff,
@@ -555,11 +610,11 @@ build_nearfield ( const Hpro::TBlockCluster *  bct,
 // truncated to accuracy <acc> using approximation method <apx>
 //
 template < typename value_t,
-           typename approx_t >
+           approx::approximation_type  approx_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
 build ( const Hpro::TBlockCluster &             bct,
         const Hpro::TSparseMatrix< value_t > &  S,
-        const Hpro::TTruncAcc &                 acc,
+        const accuracy &                        acc,
         const approx_t &                        apx,
         const size_t                            nseq = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
@@ -620,11 +675,11 @@ build ( const Hpro::TBlockCluster &             bct,
 }
 
 template < typename value_t,
-           typename approx_t >
+           approx::approximation_type  approx_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
 build_nd ( const Hpro::TBlockCluster &             bct,
            const Hpro::TSparseMatrix< value_t > &  S,
-           const Hpro::TTruncAcc &                 acc,
+           const accuracy &                        acc,
            const approx_t &                        apx,
            const size_t                            nseq = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
@@ -714,11 +769,11 @@ build_nd ( const Hpro::TBlockCluster &             bct,
 // for non-admissible blocks
 //
 template < typename value_t,
-           typename approx_t >
+           approx::approximation_type  approx_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
 build_sparse ( const Hpro::TBlockCluster &             bct,
                const Hpro::TSparseMatrix< value_t > &  S,
-               const Hpro::TTruncAcc &                 acc,
+               const accuracy &                        acc,
                const approx_t &                        apx,
                const size_t                            nseq = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
@@ -800,7 +855,7 @@ build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
                     const coeff_t &              coeff,
                     const lrapx_t &              lrapx,
                     const basisapx_t &           basisapx,
-                    const Hpro::TTruncAcc &      acc,
+                    const accuracy &             acc,
                     const size_t                 /* nseq */ = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
     return detail::build_uniform_lvl( bct, coeff, lrapx, basisapx, acc );
@@ -812,7 +867,7 @@ std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisap
             std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
 build_uniform_lvl ( const Hpro::TMatrix< typename basisapx_t::value_t > &    A,
                     const basisapx_t &       basisapx,
-                    const Hpro::TTruncAcc &  acc,
+                    const accuracy &         acc,
                     const size_t             /* nseq */ = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
     using value_t       = typename basisapx_t::value_t;
@@ -850,7 +905,7 @@ build_uniform_rec ( const Hpro::TBlockCluster *  bct,
                     const coeff_t &              coeff,
                     const lrapx_t &              lrapx,
                     const basisapx_t &           basisapx,
-                    const Hpro::TTruncAcc &      acc,
+                    const accuracy &             acc,
                     const size_t                 /* nseq */ = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
     static_assert( std::is_same_v< Hpro::value_type_t< coeff_t >, Hpro::value_type_t< lrapx_t > >,
@@ -888,7 +943,7 @@ std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisap
             std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
 build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
                     const basisapx_t &           basisapx,
-                    const Hpro::TTruncAcc &      acc,
+                    const accuracy &             acc,
                     const size_t                 /* nseq */ = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
     using value_t       = typename basisapx_t::value_t;
@@ -916,7 +971,7 @@ std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisap
             std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
 build_uniform_rec2 ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
                      const basisapx_t &           basisapx,
-                     const Hpro::TTruncAcc &      acc,
+                     const accuracy &             acc,
                      const size_t                 /* nseq */ = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
     using value_t       = typename basisapx_t::value_t;
@@ -983,7 +1038,7 @@ std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisap
             std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
 build_uniform ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
                 const basisapx_t &                                     basisapx,
-                const Hpro::TTruncAcc &                                acc )
+                const accuracy &                                       acc )
 {
     return detail::build_blr2( A, basisapx, acc );
 }
@@ -996,7 +1051,7 @@ std::tuple< std::unique_ptr< hlr::matrix::nested_cluster_basis< typename basisap
             std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
 build_h2_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
                const basisapx_t &                                     basisapx,
-               const Hpro::TTruncAcc &                                acc,
+               const accuracy &                                       acc,
                const size_t                                           /* nseq */ = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
     using value_t       = typename basisapx_t::value_t;
@@ -1235,7 +1290,7 @@ copy_struct ( const Hpro::TMatrix< value_t > &  M )
 template < typename value_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
 copy ( const Hpro::TMatrix< value_t > &  M,
-       const Hpro::TTruncAcc &           acc )
+       const accuracy &                  acc )
 {
     if ( is_blocked( M ) )
     {

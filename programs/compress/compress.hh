@@ -22,14 +22,14 @@ using namespace hlr;
 
 using indexset = Hpro::TIndexSet;
 
-struct local_accuracy : public Hpro::TTruncAcc
+struct local_accuracy : public accuracy
 {
     local_accuracy ( const double  abs_eps )
-            : Hpro::TTruncAcc( 0.0, abs_eps )
+            : accuracy( 0.0, abs_eps )
     {}
     
-    virtual const TTruncAcc  acc ( const indexset &  rowis,
-                                   const indexset &  colis ) const
+    virtual const accuracy  acc ( const indexset &  rowis,
+                                  const indexset &  colis ) const
     {
         return Hpro::absolute_prec( abs_eps() * std::sqrt( double(rowis.size() * colis.size()) ) );
     }
@@ -174,28 +174,26 @@ program_main ()
                 auto  hca    = bem::hca( pcoeff, *hcagen, cmdline::eps / 100.0, 6 );
                 auto  hcalr  = bem::hca_lrapx( hca );
                 
-                A = impl::matrix::build( bct->root(), pcoeff, hcalr, acc, nseq );
+                A = impl::matrix::build( bct->root(), pcoeff, hcalr, acc, false, nseq );
             }// if
             else
                 cmdline::capprox = "default";
         }// if
-
-        if (( cmdline::capprox == "aca" ) || ( cmdline::capprox == "default" ))
+        else if (( cmdline::capprox == "aca" ) || ( cmdline::capprox == "default" ))
         {
             std::cout << "    using ACA" << std::endl;
 
             auto  acalr = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
         
-            A = impl::matrix::build( bct->root(), pcoeff, acalr, acc, nseq );
+            A = impl::matrix::build( bct->root(), pcoeff, acalr, acc, false, nseq );
         }// else
-        
-        if ( cmdline::capprox == "dense" )
+        else if ( cmdline::capprox == "dense" )
         {
             std::cout << "    using dense" << std::endl;
 
             auto  dense = bem::dense_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
         
-            A = impl::matrix::build( bct->root(), pcoeff, dense, acc, nseq );
+            A = impl::matrix::build( bct->root(), pcoeff, dense, acc, false, nseq );
         }// else
         
         toc = timer::since( tic );
