@@ -31,6 +31,7 @@ size_t  k          = 16;           // constant rank
 double  eps        = 1e-4;         // constant precision
 double  tol        = 0;            // tolerance
 string  appl       = "logkernel";  // application
+string  kernel     = "newton";     // (radial) kernel to use
 string  distr      = "cyclic2d";   // block distribution
 uint    nthreads   = 0;            // number of threads to use (prefer "taskset" or "numactl")
 uint    verbosity  = 1;            // verbosity level
@@ -77,6 +78,7 @@ read_config ( const std::string &  filename )
     boost::property_tree::ini_parser::read_ini( filename, cfg );
 
     appl       = cfg.get( "app.appl",    appl );
+    kernel     = cfg.get( "app.kernel",  kernel );
     n          = cfg.get( "app.n",       n );
     adm        = cfg.get( "app.adm",     adm );
     eta        = cfg.get( "app.eta",     eta );
@@ -131,6 +133,7 @@ parse ( int argc, char ** argv )
     app_opts.add_options()
         ( "adm",         value<string>(), ": admissibility (strong,vertex,weak,offdiag)" )
         ( "app",         value<string>(), ": application type (logkernel,matern,laplaceslp,helmholtzslp,exp)" )
+        ( "kernel",      value<string>(), ": kernel to use (newton,log,exp,...)" )
         ( "cluster",     value<string>(), ": clustering technique (tlr,blr,mblr(-n),tileh,bsp,h,sfc)" )
         ( "data",        value<string>(), ": data file to use" )
         ( "eta",         value<double>(), ": admissibility parameter for \"std\" and \"weak\"" )
@@ -224,6 +227,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "eps"        ) ) eps        = vm["eps"].as<double>();
     if ( vm.count( "tol"        ) ) tol        = vm["tol"].as<double>();
     if ( vm.count( "app"        ) ) appl       = vm["app"].as<string>();
+    if ( vm.count( "kernel"     ) ) kernel     = vm["kernel"].as<string>();
     if ( vm.count( "grid"       ) ) gridfile   = vm["grid"].as<string>();
     if ( vm.count( "matrix"     ) ) matrixfile = vm["matrix"].as<string>();
     if ( vm.count( "sparse"     ) ) sparsefile = vm["sparse"].as<string>();
