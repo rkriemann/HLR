@@ -301,13 +301,13 @@ program_main ()
     
     std::cout << "done in " << format_time( toc ) << std::endl;
 
-    auto  acc = fixed_prec( 1e-6 );
+    auto  acc = fixed_prec( cmdline::eps );
 
     std::cout << "ranks : " << acc.trunc_rank( S1 ) << " / " << acc.trunc_rank( S2 ) << " / " << acc.trunc_rank( S3 ) << " / " << acc.trunc_rank( S4 ) << std::endl;
     
-    io::matlab::write( S0, "newton_S0" );
-    io::matlab::write( S1, "newton_S1" );
-    io::matlab::write( S2, "newton_S2" );
-    io::matlab::write( S3, "newton_S3" );
-    io::matlab::write( S4, "newton_S4" );
+    io::matlab::write( S0, cmdline::kernel + "_S0" );
+    io::matlab::write( S1, cmdline::kernel + "_S1" );
+    io::matlab::write( S2, cmdline::kernel + "_S2" );
+    io::matlab::write( S3, cmdline::kernel + "_S3" );
+    io::matlab::write( S4, cmdline::kernel + "_S4" );
 }
