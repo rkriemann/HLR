@@ -1,9 +1,9 @@
 //
 // Project     : HLR
-// Module      : uniform.hh
-// Description : program for testing uniform matrix arithmetic
+// Module      : weakadm
+// Description : program for testing weak admissibility
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <tbb/parallel_invoke.h>
