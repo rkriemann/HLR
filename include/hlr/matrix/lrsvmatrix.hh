@@ -45,7 +45,6 @@ public:
     using  real_t  = Hpro::real_type_t< value_t >;
     
 private:
-private:
     // local index set of matrix
     indexset                 _row_is, _col_is;
     

@@ -58,6 +58,8 @@ print_mem_lvl ( const Hpro::TMatrix< value_t > & H )
             }// if
             else if ( matrix::is_lowrank( M ) )
                 size_lr += M->data_byte_size();
+            else if ( matrix::is_lowrank_sv( M ) )
+                size_lr += M->data_byte_size();
             else if ( matrix::is_dense( M ) )
                 size_d += M->data_byte_size();
             else
@@ -91,6 +93,7 @@ print_mem_lvl ( const Hpro::TMatrix< value_t > &                 H,
     {
         size_t  size_d   = 0;
         size_t  size_lr  = 0;
+        size_t  size_cb  = 0;
         auto    next_mat = decltype( current_mat )();
         auto    next_rcb = decltype( current_rcb )();
         auto    next_ccb = decltype( current_ccb )();
@@ -116,7 +119,7 @@ print_mem_lvl ( const Hpro::TMatrix< value_t > &                 H,
 
         for ( auto  cb : current_rcb )
         {
-            size_lr += sizeof( value_t ) * cb->is().size() * cb->rank();
+            size_cb += sizeof( value_t ) * cb->is().size() * cb->rank();
             
             for ( uint  i = 0; i < cb->nsons(); ++i )
                 if ( ! is_null( cb->son( i ) ) )
@@ -125,7 +128,7 @@ print_mem_lvl ( const Hpro::TMatrix< value_t > &                 H,
 
         for ( auto  cb : current_ccb )
         {
-            size_lr += sizeof( value_t ) * cb->is().size() * cb->rank();
+            size_cb += sizeof( value_t ) * cb->is().size() * cb->rank();
             
             for ( uint  i = 0; i < cb->nsons(); ++i )
                 if ( ! is_null( cb->son( i ) ) )
@@ -133,7 +136,7 @@ print_mem_lvl ( const Hpro::TMatrix< value_t > &                 H,
         }// for
 
         if ( size_d + size_lr > 0 )
-            std::cout << boost::format( "%4d : " ) % lvl << format_mem_base( size_lr ) << " / " << format_mem_base( size_d ) <<std::endl;
+            std::cout << boost::format( "%4d : " ) % lvl << format_mem_base( size_lr ) << " / " << format_mem_base( size_cb ) << " / " << format_mem_base( size_d ) <<std::endl;
 
         lvl++;
         current_mat = std::move( next_mat );
@@ -205,7 +208,7 @@ program_main ()
 
     tic = timer::now();
 
-    auto  A = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, nseq );
+    auto  A = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, cmdline::compress );
     
     toc = timer::since( tic );
     
@@ -278,7 +281,7 @@ program_main ()
     
         tic = timer::now();
     
-        auto  [ rowcb, colcb, A2 ] = impl::matrix::build_uniform_rec( *A, apx, acc, nseq );
+        auto  [ rowcb, colcb, A2 ] = impl::matrix::build_uniform_rec( *A, apx, acc, cmdline::compress );
 
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;
@@ -369,7 +372,7 @@ program_main ()
     auto  colcb_h2 = std::unique_ptr< matrix::nested_cluster_basis< value_t > >();
     auto  A_h2     = std::unique_ptr< hpro::TMatrix< value_t > >();
 
-    if ( true )
+    if ( false )
     {
         std::cout << term::bullet << term::bold << "H²-matrix" << term::reset << std::endl;
     
@@ -417,6 +420,8 @@ program_main ()
         colcb_h2 = std::move( colcb );
     }
 
+    const bool  has_h2 = ! is_null( A_h2.get() );
+    
     //////////////////////////////////////////////////////////////////////
     //
     // H-matrix matrix vector multiplication
@@ -431,16 +436,18 @@ program_main ()
     
         const auto  flops_h   = nmvm * hlr::mul_vec_flops( apply_normal, *A );
         const auto  flops_uni = nmvm * hlr::uniform::mul_vec_flops( apply_normal, *A_uni, *rowcb_uni, *colcb_uni );
-        const auto  flops_h2  = nmvm * hlr::h2::mul_vec_flops( apply_normal, *A_h2, *rowcb_h2, *colcb_h2 );
+        const auto  flops_h2  = has_h2 ? nmvm * hlr::h2::mul_vec_flops( apply_normal, *A_h2, *rowcb_h2, *colcb_h2 ) : 0;
 
         const auto  bytes_h   = nmvm * hlr::mul_vec_datasize( apply_normal, *A );
         const auto  bytes_uni = nmvm * hlr::uniform::mul_vec_datasize( apply_normal, *A_uni, *rowcb_uni, *colcb_uni );
-        const auto  bytes_h2  = nmvm * hlr::h2::mul_vec_datasize( apply_normal, *A_h2, *rowcb_h2, *colcb_h2 );
+        const auto  bytes_h2  = has_h2 ? nmvm * hlr::h2::mul_vec_datasize( apply_normal, *A_h2, *rowcb_h2, *colcb_h2 ) : 0;
 
         std::cout << "  " << term::bullet << term::bold << "FLOPs/byte " << term::reset << std::endl;
         std::cout << "    H    = " << format_flops( flops_h   ) << ", " << flops_h   / bytes_h   << std::endl;
         std::cout << "    UniH = " << format_flops( flops_uni ) << ", " << flops_uni / bytes_uni << std::endl;
-        std::cout << "    H²   = " << format_flops( flops_h2  ) << ", " << flops_h2  / bytes_h2  << std::endl;
+
+        if ( has_h2 )
+            std::cout << "    H²   = " << format_flops( flops_h2  ) << ", " << flops_h2  / bytes_h2  << std::endl;
     
         if ( true )
         {
@@ -643,7 +650,7 @@ program_main ()
         //
         //////////////////////////////////////////////////////////////////////
 
-        if ( true )
+        if ( true && has_h2 )
         {
             std::cout << "  " << term::bullet << term::bold << "H²-matrix" << term::reset << std::endl;
 

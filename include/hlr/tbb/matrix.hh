@@ -44,8 +44,8 @@ using namespace hlr::matrix;
 // matrix coefficients defined by <coeff> and
 // low-rank blocks computed by <lrapx>
 //
-template < typename coeff_t,
-           typename lrapx_t >
+template < coefficient_function_type  coeff_t,
+           lowrank_approx_type        lrapx_t >
 std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > >
 build ( const Hpro::TBlockCluster *  bct,
         const coeff_t &              coeff,
@@ -205,8 +205,8 @@ build ( const Hpro::TBlockCluster *  bct,
 // e.g., dense_matrix and lrmatrix, and directly compress
 // matrix data
 //
-template < typename coeff_t,
-           typename lrapx_t >
+template < coefficient_function_type  coeff_t,
+           lowrank_approx_type        lrapx_t >
 std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > >
 build_compressed ( const Hpro::TBlockCluster *  bct,
                    const coeff_t &              coeff,
@@ -314,8 +314,8 @@ build_compressed ( const Hpro::TBlockCluster *  bct,
     return M;
 }
 
-template < typename coeff_t,
-           typename lrapx_t >
+template < coefficient_function_type  coeff_t,
+           lowrank_approx_type        lrapx_t >
 std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > >
 build_mixedprec ( const Hpro::TBlockCluster *  bct,
                   const coeff_t &              coeff,
@@ -456,8 +456,8 @@ build_mixedprec ( const Hpro::TBlockCluster *  bct,
     return M;
 }
 
-template < typename coeff_t,
-           typename lrapx_t >
+template < coefficient_function_type  coeff_t,
+           lowrank_approx_type        lrapx_t >
 size_t
 mem_mixedprec ( const Hpro::TBlockCluster *  bct,
                 const coeff_t &              coeff,
@@ -602,7 +602,7 @@ mem_mixedprec ( const Hpro::TBlockCluster *  bct,
 // matrix structure defined by <bct>, matrix coefficients
 // defined by <coeff>
 //
-template < typename coeff_t >
+template < coefficient_function_type coeff_t >
 std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > >
 build_nearfield ( const Hpro::TBlockCluster *  bct,
                   const coeff_t &              coeff,
@@ -691,7 +691,7 @@ build_nearfield ( const Hpro::TBlockCluster *  bct,
 // truncated to accuracy <acc> using approximation method <apx>
 //
 template < typename value_t,
-           typename approx_t >
+           approx::approximation_type approx_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
 build ( const Hpro::TBlockCluster &             bct,
         const Hpro::TSparseMatrix< value_t > &  S,
@@ -764,7 +764,7 @@ build ( const Hpro::TBlockCluster &             bct,
 }
     
 template < typename value_t,
-           typename approx_t >
+           approx::approximation_type approx_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
 build_nd ( const Hpro::TBlockCluster &             bct,
            const Hpro::TSparseMatrix< value_t > &  S,
@@ -860,7 +860,7 @@ build_nd ( const Hpro::TBlockCluster &             bct,
 // for non-admissible blocks
 //
 template < typename value_t,
-           typename approx_t >
+           approx::approximation_type approx_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
 build_sparse ( const Hpro::TBlockCluster &             bct,
                const Hpro::TSparseMatrix< value_t > &  S,
@@ -957,7 +957,7 @@ build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
     return detail::build_uniform_lvl( bct, coeff, lrapx, basisapx, acc );
 }
 
-template < typename basisapx_t >
+template < approx::approximation_type basisapx_t >
 std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
@@ -1034,13 +1034,14 @@ build_uniform_lvl ( const Hpro::TMatrix< typename basisapx_t::value_t > &    A,
 // - low-rank blocks are converted to uniform low-rank matrices and
 //   shared bases are constructed on-the-fly
 //
-template < typename basisapx_t >
+template < approx::approximation_type basisapx_t >
 std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
 build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &    A,
                     const basisapx_t &                                       basisapx,
                     const Hpro::TTruncAcc &                                  acc,
+                    const bool                                               compress,
                     const size_t                                             /* nseq */ = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
     using value_t       = typename basisapx_t::value_t;
@@ -1065,27 +1066,27 @@ build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &    A,
 
     #endif
     
-    auto  row_map = detail::lr_coupling_map_t< value_t >();
-    auto  col_map = detail::lr_coupling_map_t< value_t >();
-    auto  row_mtx = std::mutex();
-    auto  col_mtx = std::mutex();
+    auto  lr_row_map   = detail::lr_coupling_map_t< value_t >();
+    auto  lr_col_map   = detail::lr_coupling_map_t< value_t >();
+    auto  lrsv_row_map = detail::lrsv_mat_map_t< value_t >();
+    auto  lrsv_col_map = detail::lrsv_mat_map_t< value_t >();
 
-    detail::build_mat_map( A, *rowcb, *colcb, row_map, row_mtx, col_map, col_mtx );
+    detail::build_mat_map( A, *rowcb, *colcb, lr_row_map, lr_col_map, lrsv_row_map, lrsv_col_map );
 
     //
     // build cluster bases
     //
 
     ::tbb::parallel_invoke(
-        [&] () { detail::build_cluster_basis( *rowcb, basisapx, acc, row_map, false ); },
-        [&] () { detail::build_cluster_basis( *colcb, basisapx, acc, col_map, true );  }
+        [&] () { detail::build_cluster_basis( *rowcb, basisapx, acc, lrsv_row_map, false, compress ); },
+        [&] () { detail::build_cluster_basis( *colcb, basisapx, acc, lrsv_col_map, true, compress );  }
     );
 
     //
     // construct uniform lowrank matrices with given cluster bases
     //
     
-    auto  M = detail::build_uniform( A, *rowcb, *colcb );
+    auto  M = detail::build_uniform( A, *rowcb, *colcb, acc, compress );
 
     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
 }
@@ -1110,7 +1111,7 @@ build_uniform ( const Hpro::TBlockCluster *  bc,
     return detail::build_blr2( bc, coeff, lrapx, basisapx, acc );
 }
 
-template < typename basisapx_t >
+template < approx::approximation_type basisapx_t >
 std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
@@ -1126,7 +1127,7 @@ build_uniform ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
 //
 // construct H² matrix with corresponding cluster bases out of given H-matrix
 //
-template < typename basisapx_t >
+template < approx::approximation_type basisapx_t >
 std::tuple< std::unique_ptr< hlr::matrix::nested_cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< hlr::matrix::nested_cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >

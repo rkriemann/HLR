@@ -13,5 +13,5 @@
 namespace          impl      = hlr::seq;
 const std::string  impl_name = "seq";
 
-#include "mpmvm.hh"
+#include "mvm.hh"
 #include "seq.hh"
