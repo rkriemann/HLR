@@ -67,6 +67,12 @@ rank_info_helper_mat ( const Hpro::TMatrix< value_t > &  M )
 
         return { R->rank(), R->rank(), R->rank(), R->rank() > 0 ? 1 : 0 };
     }// if
+    else if ( matrix::is_lowrank_sv( M ) )
+    {
+        auto  R = cptrcast( &M, matrix::lrsvmatrix< value_t > );
+
+        return { R->rank(), R->rank(), R->rank(), R->rank() > 0 ? 1 : 0 };
+    }// if
     else if ( matrix::is_uniform_lowrank( M ) )
     {
         auto  R       = cptrcast( &M, matrix::uniform_lrmatrix< value_t > );

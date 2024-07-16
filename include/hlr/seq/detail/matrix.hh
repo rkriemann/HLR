@@ -1154,6 +1154,55 @@ build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &   A,
 
         M = std::move( RU );
     }// if
+    else if ( hlr::matrix::is_lowrank_sv( A ) )
+    {
+        //
+        // matrix already is W·S·X' with orthogonal W/X
+        //
+        
+        auto  R  = cptrcast( &A, lrsvmatrix< value_t > );
+        auto  k  = R->rank();
+        auto  W  = R->U();
+        auto  X  = R->V();
+        auto  T  = blas::diag< value_t >( R->S() );
+
+        //
+        // update cluster bases
+        //
+
+        auto  Us = blas::vector< real_t >(); // singular values corresponding to basis vectors
+        auto  Vs = blas::vector< real_t >();
+            
+        auto  Un = hlr::uniform::detail::compute_extended_row_basis< value_t, basisapx_t >( rowcb, W, T, acc, basisapx, rowmap, nullptr, & Us );
+        auto  Vn = hlr::uniform::detail::compute_extended_col_basis< value_t, basisapx_t >( colcb, T, X, acc, basisapx, colmap, nullptr, & Vs );
+            
+        hlr::uniform::detail::update_row_coupling( rowcb, Un, rowmap );
+        hlr::uniform::detail::update_col_coupling( colcb, Vn, colmap );
+
+        //
+        // compute coupling matrix with new row/col bases Un/Vn
+        //
+
+        auto  UW = blas::prod( blas::adjoint( Un ), W );
+        auto  VX = blas::prod( blas::adjoint( Vn ), X );
+
+        blas::prod_diag_ip( UW, R->S() );
+        
+        auto  S  = blas::prod( UW, blas::adjoint( VX ) );
+
+        // update bases in cluster bases objects (only now since Un/Vn are used before)
+        rowcb.set_basis( std::move( Un ), std::move( Us ) );
+        colcb.set_basis( std::move( Vn ), std::move( Vs ) );
+                
+        auto  RU = std::make_unique< uniform_lrmatrix< value_t > >( R->row_is(), R->col_is(), rowcb, colcb, std::move( S ) );
+
+        // std::cout << R->id() << " " << R->rank() << " " << RU->row_rank() << " " << RU->col_rank() << std::endl;
+
+        rowmap[ rowcb.is() ].push_back( RU.get() );
+        colmap[ colcb.is() ].push_back( RU.get() );
+
+        M = std::move( RU );
+    }// if
     else if ( is_blocked( A ) )
     {
         auto  BA = cptrcast( &A, Hpro::TBlockMatrix< value_t > );

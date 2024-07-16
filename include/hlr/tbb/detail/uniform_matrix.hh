@@ -1209,7 +1209,8 @@ build_cluster_basis ( shared_cluster_basis< value_t > &     cb,
                       const basisapx_t &                    basisapx,
                       const accuracy &                      acc,
                       const lr_coupling_map_t< value_t > &  mat_map,
-                      const bool                            transposed )
+                      const bool                            transposed,
+                      const bool                            compress )
 {
     using  real_t  = Hpro::real_type_t< value_t >;
 
@@ -1263,6 +1264,9 @@ build_cluster_basis ( shared_cluster_basis< value_t > &     cb,
         auto  W  = basisapx.column_basis( X, acc, & Ws );
 
         cb.set_basis( std::move( W ), std::move( Ws ) );
+
+        if ( compress )
+            cb.compress( acc );
     }// if
 
     //
@@ -1274,7 +1278,7 @@ build_cluster_basis ( shared_cluster_basis< value_t > &     cb,
         [&,transposed] ( const uint  i )
         {
             if ( ! is_null( cb.son( i ) ) )
-                build_cluster_basis( *cb.son( i ), basisapx, acc, mat_map, transposed );
+                build_cluster_basis( *cb.son( i ), basisapx, acc, mat_map, transposed, compress );
         } );
 }
 
@@ -1303,16 +1307,9 @@ build_cluster_basis ( shared_cluster_basis< value_t > &  cb,
         //
         // compute column basis for block row
         //
-        //  ( U₀·V₀'  U₁·V₁'  U₂·V₂'  … )
+        //  ( U₀·S₀·V₀'  U₁·S₁·V₁'  U₂·S₂·V₂'  … )
         //
-        // as 
-        //
-        //   ( U₀·C₀'·Q₀'  U₁·C₁'·Q₁'  U₂'·C₂'·Q₂' … )
-        //
-        // with QR decomposition V_i = Q_i C_i
-        // (precomputed in "build_mat_map" above)
-        //
-        // As Q_i is orthogonal, it can be neglected in column basis computation!
+        // As V_i is orthogonal, it can be neglected in column basis computation!
         //
 
         const uint  nrows = cb.is().size();

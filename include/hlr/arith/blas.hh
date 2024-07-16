@@ -438,6 +438,23 @@ join_col ( const std::list< matrix< value_t > > &  matrices )
 }
 
 //
+// convert given vector into diagonal matrix
+//
+template < typename valueM_t,
+           typename valueD_t >
+matrix< valueM_t >
+diag ( const vector< valueD_t > &  d )
+{
+    const auto  n = d.length();
+    auto        M = matrix< valueM_t >( n, n );
+
+    for ( size_t  i = 0; i < n; ++i )
+        M(i,i) = d(i);
+    
+    return M;
+}
+
+//
 // construct block-diagonal matrix out of given matrices M_i
 //
 template < typename value_t >
