@@ -11,4 +11,4 @@ namespace          impl      = hlr::seq;
 const std::string  impl_name = "tbb";
 
 #include "weakadm-sv.hh"
-#include "seq.hh"
+#include "tbb.hh"

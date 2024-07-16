@@ -245,7 +245,10 @@ struct thin_plate_spline_function
     {
         const auto  er = epsilon * r;
         
-        return math::square( er ) * math::log( er );
+        if ( er < std::numeric_limits< value_t >::epsilon() )
+            return value_t(0);
+        else
+            return math::square( er ) * math::log( er );
     }
 };
 

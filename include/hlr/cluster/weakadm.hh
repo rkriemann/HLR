@@ -8,7 +8,13 @@
 // Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
+#include <hpro/cluster/TAdmCondition.hh>
+#include <hpro/cluster/TGeomAdmCond.hh>
+#include <hpro/cluster/TGeomCluster.hh>
+
 namespace hlr { namespace cluster {
+
+using strong_adm_cond = Hpro::TStdGeomAdmCond;
 
 //
 // implements weak admissibility with axis aligned
@@ -27,7 +33,7 @@ private:
 public:
     // ctor
     weak_adm_cond ( const uint    codim,
-                    const double  eta = 1.0 )
+                    const double  eta = 2.0 )
             : TAdmCondition()
             , _codim( codim )
             , _eta( eta )
@@ -42,8 +48,8 @@ public:
     {
         HLR_ASSERT( Hpro::is_geom_cluster( cl->rowcl() ) && Hpro::is_geom_cluster( cl->colcl() ) );
     
-        auto  rowcl = cptrcast( c->rowcl(), Hpro::TGeomCluster );
-        auto  colcl = cptrcast( c->colcl(), Hpro::TGeomCluster );
+        auto  rowcl = cptrcast( cl->rowcl(), Hpro::TGeomCluster );
+        auto  colcl = cptrcast( cl->colcl(), Hpro::TGeomCluster );
 
         // identical clusters are always inadmissibile
         if ( rowcl == colcl )
@@ -61,7 +67,7 @@ public:
         //
 
         const uint  dim   = rowcl->bbox().min().dim();
-        uint        codim = dim;
+        uint        codim = 0;
     
         // in 1D, different clusters share at most one vertex => admissible
         if ( dim == 1 )
@@ -80,7 +86,7 @@ public:
         {
             if (( rbbox.max()[i] <= cbbox.min()[i] ) ||   // ├── τ ──┼── σ ──┤
                 ( cbbox.max()[i] <= rbbox.min()[i] ))     // ├── σ ──┼── τ ──┤
-                codim--;
+                codim++;
         }// for
 
         if ( codim >= _codim )
@@ -90,7 +96,7 @@ public:
         // test standard admissibility
         //
 
-        return std::min( rowcl->diameter(), colcl->diameter() ) <= ( _eta * rowcl->distance( colcl ) );
+        return std::min( rbbox.diameter(), cbbox.diameter() ) <= ( _eta * rbbox.distance( cbbox ) );
     }
 };
 
