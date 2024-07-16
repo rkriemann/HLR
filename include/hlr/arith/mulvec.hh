@@ -494,54 +494,107 @@ build_joined_matrix ( const matop_t                  op_M,
         {
             HLR_ASSERT( has_lrsv );
             
-            //
-            // determine joined rank and compressed size
-            //
+            if ( ! cm.R.empty() )
+            {
+                bool  all_compressed   = true;
+                bool  all_uncompressed = true;
+            
+                for ( auto  M : cm.R )
+                {
+                    auto  R = cptrcast( M, matrix::lrsvmatrix< value_t > );
+                    
+                    if ( R->is_compressed() ) all_uncompressed = false;
+                    else                      all_compressed   = false;
+                }// for
+                
+                HLR_ASSERT( all_compressed != all_uncompressed );
 
-            uint    k     = 0;
-            size_t  zsize = 0;
+                if ( all_compressed )
+                {
+                    //
+                    // determine joined rank and compressed size
+                    //
+                
+                    uint    k     = 0;
+                    size_t  zsize = 0;
+                
+                    for ( auto  M : cm.R )
+                    {
+                        auto  R = cptrcast( M, matrix::lrsvmatrix< value_t > );
+                    
+                        k += R->rank();
+                    
+                        if ( op_M == apply_normal ) zsize += R->zU().size();
+                        else                        zsize += R->zV().size();
+                    }// for
+                
+                    //
+                    // build joined U factor
+                    //
+                
+                    uint    kpos = 0;
+                    size_t  zpos = 0;
+                
+                    cm.S = blas::vector< real_t >( k );
+                    cm.zU.resize( zsize );
+                
+                    for ( auto  M : cm.R )
+                    {
+                        auto  R   = cptrcast( M, matrix::lrsvmatrix< value_t > );
+                        auto  UR  = R->U( op_M );
+                        auto  k_i = R->rank();
+                        auto  S_i = blas::vector< value_t >( cm.S, blas::range( kpos, kpos + k_i - 1 ) );
+
+                        blas::copy( R->S(), S_i );
+                        kpos += k_i;
+
+                        auto  zsize_i = ( op_M == apply_normal ? R->zU().size() : R->zV().size() );
+                
+                        if ( op_M == apply_normal ) memcpy( cm.zU.data() + zpos, R->zU().data(), zsize_i );
+                        else                        memcpy( cm.zU.data() + zpos, R->zV().data(), zsize_i );
+
+                        zpos += zsize_i;
+                    }// for
+
+                    HLR_ASSERT( zpos == zsize );
+            
+                    cm.compressed = true;
+                }// if
+                else
+                {
+                    //
+                    // determine joined rank
+                    //
+
+                    uint  k = 0;
         
-            for ( auto  M : cm.R )
-            {
-                auto  R = cptrcast( M, matrix::lrsvmatrix< value_t > );
-                
-                k += R->rank();
+                    for ( auto  M : cm.R )
+                        k += cptrcast( M, matrix::lrsvmatrix< value_t > )->rank();
 
-                if ( op_M == apply_normal ) zsize += R->zU().size();
-                else                        zsize += R->zV().size();
-            }// for
+                    //
+                    // build joined U factor
+                    //
 
-            //
-            // build joined U factor
-            //
+                    auto  nrows = cm.is.size();
+                    auto  U     = blas::matrix< value_t >( nrows, k );
+                    uint  pos   = 0;
 
-            uint    kpos = 0;
-            size_t  zpos = 0;
+                    for ( auto  M : cm.R )
+                    {
+                        auto  R   = cptrcast( M, matrix::lrsvmatrix< value_t > );
+                        auto  UR  = blas::prod_diag( R->U( op_M ), R->S() );
+                        auto  k_i = R->rank();
+                        auto  U_i = blas::matrix< value_t >( U, blas::range::all, blas::range( pos, pos + k_i - 1 ) );
 
-            cm.S = blas::vector< real_t >( k );
-            cm.zU.resize( zsize );
-            
-            for ( auto  M : cm.R )
-            {
-                auto  R   = cptrcast( M, matrix::lrsvmatrix< value_t > );
-                auto  UR  = R->U( op_M );
-                auto  k_i = R->rank();
-                auto  S_i = blas::vector< value_t >( cm.S, blas::range( kpos, kpos + k_i - 1 ) );
+                        blas::copy( UR, U_i );
+                        pos += k_i;
+                    }// for
 
-                blas::copy( R->S(), S_i );
-                kpos += k_i;
+                    cm.U = std::move( U );
 
-                auto  zsize_i = ( op_M == apply_normal ? R->zU().size() : R->zV().size() );
-                
-                if ( op_M == apply_normal ) memcpy( cm.zU.data() + zpos, R->zU().data(), zsize_i );
-                else                        memcpy( cm.zU.data() + zpos, R->zV().data(), zsize_i );
-
-                zpos += zsize_i;
-            }// for
-
-            HLR_ASSERT( zpos == zsize );
-            
-            cm.compressed = true;
+                    cm.compressed = false;
+                }// else
+            }// if
         }// else
     }// if
 
@@ -637,7 +690,9 @@ mul_vec_cl ( const value_t                             alpha,
             
                 for ( auto  M : cm.R )
                 {
-                    auto  R   = cptrcast( M, matrix::lrmatrix< value_t > );
+                    HLR_ASSERT( matrix::is_lowrank_sv( M ) );
+                    
+                    auto  R   = cptrcast( M, matrix::lrsvmatrix< value_t > );
                     auto  VR  = R->V( op_M );
                     auto  k_i = R->rank();
                     auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );

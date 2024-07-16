@@ -695,7 +695,37 @@ build_joined_matrix ( const matop_t                  op_M,
                 }// if
                 else
                 {
-                    HLR_ERROR( "TODO" );
+                    //
+                    // determine joined rank
+                    //
+
+                    uint  k = 0;
+        
+                    for ( auto  M : cm.R )
+                        k += cptrcast( M, matrix::lrsvmatrix< value_t > )->rank();
+
+                    //
+                    // build joined U factor
+                    //
+
+                    auto  nrows = cm.is.size();
+                    auto  U     = blas::matrix< value_t >( nrows, k );
+                    uint  pos   = 0;
+
+                    for ( auto  M : cm.R )
+                    {
+                        auto  R   = cptrcast( M, matrix::lrsvmatrix< value_t > );
+                        auto  UR  = blas::prod_diag( R->U( op_M ), R->S() );
+                        auto  k_i = R->rank();
+                        auto  U_i = blas::matrix< value_t >( U, blas::range::all, blas::range( pos, pos + k_i - 1 ) );
+
+                        blas::copy( UR, U_i );
+                        pos += k_i;
+                    }// for
+
+                    cm.U = std::move( U );
+
+                    cm.compressed = false;
                 }// else
             }// if
         }// else
@@ -789,7 +819,9 @@ mul_vec_cl ( const value_t                             alpha,
             
                 for ( auto  M : cm.R )
                 {
-                    auto  R   = cptrcast( M, matrix::lrmatrix< value_t > );
+                    HLR_ASSERT( matrix::is_lowrank_sv( M ) );
+                    
+                    auto  R   = cptrcast( M, matrix::lrsvmatrix< value_t > );
                     auto  VR  = R->V( op_M );
                     auto  k_i = R->rank();
                     auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
