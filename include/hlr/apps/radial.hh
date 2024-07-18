@@ -72,7 +72,7 @@ struct gaussian : public radial< matrix::gaussian_function< double > >
 {
     using  value_t = double;
 
-    gaussian ( const double     sigma,
+    gaussian ( const double         sigma,
                const std::string &  grid )
             : radial( matrix::gaussian_function< double >( sigma * sigma ), grid )
     {}
