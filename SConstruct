@@ -202,7 +202,7 @@ def path ( program, source ) :
 ######################################################################
 
 def scan_programs () :
-    cc_file = re.compile( '.*\.(cc|CC|cpp|c\+\+)\Z' )
+    cc_file = re.compile( r'.*\.(cc|CC|cpp|c\+\+)\Z' )
 
     scanned_programs = []
     scanned_subdirs  = {}
