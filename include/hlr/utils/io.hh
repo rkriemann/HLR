@@ -24,6 +24,7 @@
 #include <hpro/io/TMatrixIO.hh>
 #include <hpro/io/TClusterVis.hh>
 #include <hpro/io/TCoordVis.hh>
+#include <hpro/io/TGridVis.hh>
 
 #if defined(HLR_USE_H2)
 #  include <hpro/io/TClusterBasisVis.hh>
@@ -466,6 +467,16 @@ print ( const Hpro::TClusterBasis< value_t > &  cb,
 
 namespace vtk
 {
+
+inline
+void
+print ( const Hpro::TGrid &  grid,
+        const std::string &  filename )
+{
+    Hpro::TVTKGridVis  vis;
+
+    vis.print( & grid, filename );
+}
 
 //
 // print coordinates

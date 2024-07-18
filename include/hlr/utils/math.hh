@@ -73,6 +73,13 @@ template <> struct decrease_precision< long double > { using type_t = float64; }
 template < typename value_t >
 using decrease_precision_t = typename decrease_precision< value_t >::type_t;
 
+//
+// additional math functions
+//
+
+auto square ( const auto  val ) { return val*val; }
+auto abs2   ( const auto  val ) { return square( abs( val ) ); }
+
 }}// namespace hlr::math
 
 #endif // __HLR_TOOLS_MATH_HH

@@ -31,6 +31,7 @@ size_t  k          = 16;           // constant rank
 double  eps        = 1e-4;         // constant precision
 double  tol        = 0;            // tolerance
 string  appl       = "logkernel";  // application
+string  kernel     = "newton";     // (radial) kernel to use
 string  distr      = "cyclic2d";   // block distribution
 uint    nthreads   = 0;            // number of threads to use (prefer "taskset" or "numactl")
 uint    verbosity  = 1;            // verbosity level
@@ -53,7 +54,7 @@ uint    nbench     = 1;            // perform computations <nbench> times (at mo
 double  tbench     = 1;            // minimal time for benchmark runs
 string  ref        = "";           // reference matrix, algorithm, etc.
 string  cluster    = "h";          // clustering technique (h,tlr,mblr,hodlr)
-string  adm        = "strong";     // admissibility (strong,angular,weak,offdiagonal)
+string  adm        = "strong";     // admissibility (strong,vertex,weak,offdiagonal)
 double  eta        = 2.0;          // admissibility parameter
 string  capprox    = "default";    // construction low-rank approximation method (aca,hca,dense)
 string  aapprox    = "default";    // arithmetic low-rank approximation method (svd,rrqr,randsvd,randlr,aca,lanczos)
@@ -77,6 +78,7 @@ read_config ( const std::string &  filename )
     boost::property_tree::ini_parser::read_ini( filename, cfg );
 
     appl       = cfg.get( "app.appl",    appl );
+    kernel     = cfg.get( "app.kernel",  kernel );
     n          = cfg.get( "app.n",       n );
     adm        = cfg.get( "app.adm",     adm );
     eta        = cfg.get( "app.eta",     eta );
@@ -129,8 +131,9 @@ parse ( int argc, char ** argv )
         ;
 
     app_opts.add_options()
-        ( "adm",         value<string>(), ": admissibility (strong,angular,weak,offdiag)" )
+        ( "adm",         value<string>(), ": admissibility (strong,vertex,weak,offdiag)" )
         ( "app",         value<string>(), ": application type (logkernel,matern,laplaceslp,helmholtzslp,exp)" )
+        ( "kernel",      value<string>(), ": kernel to use (newton,log,exp,...)" )
         ( "cluster",     value<string>(), ": clustering technique (tlr,blr,mblr(-n),tileh,bsp,h,sfc)" )
         ( "data",        value<string>(), ": data file to use" )
         ( "eta",         value<double>(), ": admissibility parameter for \"std\" and \"weak\"" )
@@ -224,6 +227,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "eps"        ) ) eps        = vm["eps"].as<double>();
     if ( vm.count( "tol"        ) ) tol        = vm["tol"].as<double>();
     if ( vm.count( "app"        ) ) appl       = vm["app"].as<string>();
+    if ( vm.count( "kernel"     ) ) kernel     = vm["kernel"].as<string>();
     if ( vm.count( "grid"       ) ) gridfile   = vm["grid"].as<string>();
     if ( vm.count( "matrix"     ) ) matrixfile = vm["matrix"].as<string>();
     if ( vm.count( "sparse"     ) ) sparsefile = vm["sparse"].as<string>();
@@ -345,10 +349,10 @@ parse ( int argc, char ** argv )
     if ( adm == "help" )
     {
         std::cout << "Admissibility Conditions:" << std::endl
-                  << "  - strong/std    : standard geometric admissibility min(diam(t),diam(s)) ≤ η dist(t,s)" << std::endl
-                  << "  - angular       : angular geometric admissibility" << std::endl
-                  << "  - weak          : weak geometric admissibility" << std::endl
-                  << "  - offdiag/hodlr : off-diagonal addmissibility" << std::endl
+                  << "  - strong/std    : standard geometric admissibility (min(diam(t),diam(s)) ≤ η dist(t,s))" << std::endl
+                  << "  - vertex        : vertex geometric admissibility" << std::endl
+                  << "  - weak          : weak geometric admissibility (dist(t,s) > 0)" << std::endl
+                  << "  - offdiag/hodlr : off-diagonal addmissibility (t ≠ s)"<< std::endl
                   << "  - hilo          : Hi/Low frequency addmissibility" << std::endl
                   << "  - none          : nothing admissible" << std::endl;
 
