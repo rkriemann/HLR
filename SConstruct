@@ -133,6 +133,7 @@ COMPRESSORS   = [ 'none',
                   'aflp',
                   'bfl',
                   'dfl',
+                  'dfl2',
                   'blosc' ]
 compressor    = 'none'
 
@@ -611,6 +612,8 @@ elif compressor == 'bfl' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=3' )
 elif compressor == 'dfl' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=4' )
+elif compressor == 'dfl2' :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=22' )
 elif compressor == 'zfp' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=5' )
     env.Append( CPPDEFINES = 'HLR_HAS_ZFP' )
