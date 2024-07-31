@@ -500,12 +500,22 @@ template < typename value_t >
 void
 uniform_lrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 {
-    HLR_ASSERT( acc.rel_eps() == 0 );
-
     if ( this->nrows() * this->ncols() == 0 )
         return;
+
+    auto  lacc = acc( this->row_is(), this->col_is() );
+    auto  tol  = lacc.abs_eps();
+    
+    if ( lacc.rel_eps() != 0 )
+    {
+        // use relative error: δ = ε |M|
+        if      ( lacc.norm_mode() == Hpro::spectral_norm  ) tol = lacc.rel_eps() * blas::norm_2( _S );
+        else if ( lacc.norm_mode() == Hpro::frobenius_norm ) tol = lacc.rel_eps() * blas::norm_F( _S );
+        else
+            HLR_ERROR( "unsupported norm mode" );
+    }// if
         
-    compress( compress::get_config( acc( this->row_is(), this->col_is() ).abs_eps() ) );
+    compress( compress::get_config( tol ) );
 }
 
 //

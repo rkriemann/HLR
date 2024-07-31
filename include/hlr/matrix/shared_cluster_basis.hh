@@ -437,10 +437,36 @@ shared_cluster_basis< value_t >::compress ( const accuracy &  acc )
     if ( is_compressed() )
         return;
 
-    HLR_ASSERT( acc.rel_eps() == 0 );
-
     if ( _V.nrows() * _V.ncols() == 0 )
         return;
+        
+    //
+    // compute Frobenius norm and set tolerance
+    //
+
+    // defaults to absolute error: δ = ε
+    auto  lacc = acc( _is, _is ); // TODO: accuracy for just _is
+    auto  tol  = lacc.abs_eps();
+
+    if ( lacc.rel_eps() != 0 )
+    {
+        // use relative error: δ = ε |M|
+        real_t  norm = real_t(0);
+
+        if ( lacc.norm_mode() == Hpro::spectral_norm )
+            norm = _sv(0);
+        else if ( lacc.norm_mode() == Hpro::frobenius_norm )
+        {
+            for ( uint  i = 0; i < _sv.length(); ++i )
+                norm += math::square( _sv(i) );
+
+            norm = math::sqrt( norm );
+        }// if
+        else
+            HLR_ERROR( "unsupported norm mode" );
+    
+        tol = lacc.rel_eps() * norm;
+    }// if
         
     const size_t  mem_dense = sizeof(value_t) * _V.nrows() * _V.ncols();
 
@@ -450,7 +476,7 @@ shared_cluster_basis< value_t >::compress ( const accuracy &  acc )
 
     HLR_ASSERT( _sv.length() == _V.ncols() );
 
-    real_t  tol  = acc.abs_eps() * _sv(0);
+    // real_t  tol  = acc.abs_eps() * _sv(0);
     auto    S    = blas::copy( _sv );
 
     for ( uint  l = 0; l < S.length(); ++l )

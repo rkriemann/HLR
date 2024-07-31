@@ -388,8 +388,8 @@ compress ( const double *  data,
     uint32_t          bpos = 0; // start bit position in current byte
     size_t            i    = 0;
 
-    size_t    nexp     = 0;
-    uint64_t  zexp_old = -1;
+    // size_t    nexp     = 0;
+    // uint64_t  zexp_old = -1;
         
     for ( ; i < nbsize; i += nbuf )
     {
@@ -421,11 +421,11 @@ compress ( const double *  data,
             const uint64_t  zexp  = sexp & exp_mask;
             const uint64_t  zmant = smant >> prec_ofs;
                 
-            if ( zexp != zexp_old )
-            {
-                zexp_old = zexp;
-                nexp++;
-            }// if
+            // if ( zexp != zexp_old )
+            // {
+            //     zexp_old = zexp;
+            //     nexp++;
+            // }// if
             
             ibuf[j] = (((sign[j] << exp_bits) | zexp) << prec_bits) | zmant;
         }// for
@@ -475,11 +475,11 @@ compress ( const double *  data,
             const uint64_t  zexp  = sexp & exp_mask;
             const uint64_t  zmant = smant >> prec_ofs;
 
-            if ( zexp != zexp_old )
-            {
-                zexp_old = zexp;
-                nexp++;
-            }// if
+            // if ( zexp != zexp_old )
+            // {
+            //     zexp_old = zexp;
+            //     nexp++;
+            // }// if
             
             zval  = (((zsign << exp_bits) | zexp) << prec_bits) | zmant;
 
@@ -505,7 +505,7 @@ compress ( const double *  data,
         } while ( sbits < nbits );
     }// for
 
-    std::cout << nsize << " / " << nexp << " | " << ( nbits * nsize ) / 8 << " / " << (( nsize - nexp ) * exp_bits ) / 8 << std::endl;
+    // std::cout << nsize << " / " << nexp << " | " << ( nbits * nsize ) / 8 << " / " << (( nsize - nexp ) * exp_bits ) / 8 << std::endl;
 }
 
 inline

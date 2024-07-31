@@ -447,6 +447,28 @@ namespace zblas { using hlr::compress::dfl::mulvec; }
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_DFL2
+
+#include <hlr/compress/dfl2.hh>
+
+namespace hlr { namespace compress {
+
+static const char provider[] = "dfl2";
+
+using  zconfig_t = hlr::compress::dfl2::config;
+using  zarray    = hlr::compress::dfl2::zarray;
+
+using hlr::compress::dfl2::compress;
+using hlr::compress::dfl2::decompress;
+using hlr::compress::dfl2::get_config;
+using hlr::compress::dfl2::byte_size;
+using hlr::compress::dfl2::compressed_size;
+
+}} // namespace hlr::compress
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
 #elif HLR_COMPRESSOR == HLR_COMPRESSOR_MGARD
 
 #include <hlr/compress/mgard.hh>
