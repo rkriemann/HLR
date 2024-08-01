@@ -306,7 +306,7 @@ public:
         if ( is_compressed() )
         {
             // as this is just an update, compress without memory size test
-            auto  zconfig = get_zconfig( acc );
+            auto  zconfig = get_zconfig( acc, aU );
             
             _zU = std::move( compress::compress< value_t >( zconfig, aU ) );
         }// if
@@ -325,7 +325,7 @@ public:
         if ( is_compressed() )
         {
             // as this is just an update, compress without memory size test
-            auto  zconfig = get_zconfig( acc );
+            auto  zconfig = get_zconfig( acc, aU );
             
             _zU = std::move( compress::compress< value_t >( zconfig, aU ) );
         }// if
@@ -345,7 +345,7 @@ public:
         if ( is_compressed() )
         {
             // as this is just an update, compress without memory size test
-            auto  zconfig = get_zconfig( acc );
+            auto  zconfig = get_zconfig( acc, aV );
             
             _zV = std::move( compress::compress< value_t >( zconfig, aV ) );
         }// if
@@ -364,7 +364,7 @@ public:
         if ( is_compressed() )
         {
             // as this is just an update, compress without memory size test
-            auto  zconfig = get_zconfig( acc );
+            auto  zconfig = get_zconfig( acc, aV );
             
             _zV = std::move( compress::compress< value_t >( zconfig, aV ) );
         }// if
@@ -536,7 +536,8 @@ public:
     }
 
     // return compression config based on given accuracy
-    virtual auto   get_zconfig   ( const accuracy &  acc ) -> compress::zconfig_t;
+    virtual auto   get_zconfig   ( const accuracy &                 acc,
+                                   const blas::matrix< value_t > &  M ) -> compress::zconfig_t;
     
     //
     // misc.
@@ -828,27 +829,91 @@ lrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     if ( this->nrows() * this->ncols() == 0 )
         return;
 
+    if ( is_compressed() )
+        return;
+                 
     // // DEBUG
     // auto  R1 = this->copy();
     // auto  M1 = blas::prod( ptrcast( R1.get(), lrmatrix< value_t > )->U(),
     //                        blas::adjoint( ptrcast( R1.get(), lrmatrix< value_t > )->V() ) );
 
-    compress( get_zconfig( acc ) );
+    // if ( this->block_is() == Hpro::bis( Hpro::is( 0, 63 ), Hpro::is( 256, 319 ) ) )
+    //     std::cout << std::endl;
 
-    // // DEBUG
-    // auto  R2 = this->copy();
+    auto          oU     = _U;
+    auto          oV     = _V;
+    const auto    orank  = oU.ncols();
+    const size_t  mem_lr = sizeof(value_t) * orank * ( oU.nrows() + oV.nrows() );
 
-    // ptrcast( R2.get(), lrmatrix< value_t > )->decompress();
+    const auto    zconfU = get_zconfig( acc, oU );
+    const auto    zconfV = get_zconfig( acc, oV );
+    auto          zU     = compress::compress< value_t >( zconfU, oU );
+    auto          zV     = compress::compress< value_t >( zconfV, oV );
+    const auto    zmem_U = compress::compressed_size( zU );
+    const auto    zmem_V = compress::compressed_size( zV );
 
-    // auto  M2 = blas::prod( ptrcast( R2.get(), lrmatrix< value_t > )->U(),
-    //                        blas::adjoint( ptrcast( R2.get(), lrmatrix< value_t > )->V() ) );
+    // DEBUG
+    {
+        {
+            auto  dU = blas::matrix< value_t >( oU.nrows(), oU.ncols() );
+
+            compress::decompress( zU, dU );
+
+            // io::matlab::write( oU, "U1" );
+            // io::matlab::write( dU, "U2" );
+            
+            blas::add( value_t(-1), oU, dU );
+            std::cout << this->block_is().to_string() << " : " << "U " << this->block_is().to_string()
+                      << " : abs = " << boost::format( "%.4e" ) % ( blas::norm_F( dU ) / blas::norm_F(oU) )
+                      << " / rel = " << boost::format( "%.4e" ) % ( blas::norm_F( dU ) / blas::norm_F(oU) )
+                      << " / max val = " << boost::format( "%.4e" ) % blas::max_abs_val( dU )
+                      << std::endl;
+        }
     
-    // blas::add( -1.0, M1, M2 );
+        {
+            auto  dV = blas::matrix< value_t >( oV.nrows(), oV.ncols() );
 
-    // auto  n1 = blas::norm_F( M1 );
-    // auto  n2 = blas::norm_F( M2 );
+            compress::decompress( zV, dV );
 
-    // std::cout << "R: " << boost::format( "%.4e" ) % n1 << " / " << boost::format( "%.4e" ) % n2 << " / " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
+            // io::matlab::write( oV, "V1" );
+            // io::matlab::write( dV, "V2" );
+            
+            blas::add( value_t(-1), oV, dV );
+            std::cout << this->block_is().to_string() << " : " << "V " << this->block_is().to_string()
+                      << " : abs = " << boost::format( "%.4e" ) % ( blas::norm_F( dV ) )
+                      << " / rel = " << boost::format( "%.4e" ) % ( blas::norm_F( dV ) / blas::norm_F(oV) )
+                      << " / max val = " << boost::format( "%.4e" ) % blas::max_abs_val( dV )
+                      << std::endl;
+        }
+    
+        {
+            auto  M1 = blas::prod( oU, blas::adjoint( oV ) );
+            auto  dU = blas::matrix< value_t >( oU.nrows(), oU.ncols() );
+            auto  dV = blas::matrix< value_t >( oV.nrows(), oV.ncols() );
+
+            compress::decompress( zU, dU );
+            compress::decompress( zV, dV );
+
+            auto  M2 = blas::prod( dU, blas::adjoint( dV ) );
+        
+            blas::add( value_t(-1), M1, M2 );
+        
+            std::cout << this->block_is().to_string() << " : " << "M " << this->block_is().to_string()
+                      << " : abs = " << boost::format( "%.4e" ) % ( blas::norm_F( M2 ) )
+                      << " / rel = " << boost::format( "%.4e" ) % ( blas::norm_F( M2 ) / blas::norm_F(M1) )
+                      << " / max val = " << boost::format( "%.4e" ) % blas::max_abs_val( M2 )
+                      << std::endl;
+        }
+    }
+    // DEBUG
+    
+    if (( zmem_U != 0 ) && ( zmem_V != 0 ) && ( zmem_U + zmem_V < mem_lr ))
+    {
+        _zU = std::move( zU );
+        _zV = std::move( zV );
+        _U  = std::move( blas::matrix< value_t >( 0, 0 ) );
+        _V  = std::move( blas::matrix< value_t >( 0, 0 ) );
+    }// if
 }
 
 // decompress internal data
@@ -870,24 +935,27 @@ lrmatrix< value_t >::decompress ()
 //
 template < typename value_t >
 compress::zconfig_t
-lrmatrix< value_t >::get_zconfig ( const accuracy &  acc )
+lrmatrix< value_t >::get_zconfig ( const accuracy &                 acc,
+                                   const blas::matrix< value_t > &  M )
 {
     const auto  lacc = acc( this->row_is(), this->col_is() );
+    auto        tol  = lacc.abs_eps();
 
-    if ( lacc.rel_eps() != 0 )
+    if ( lacc.abs_eps() != 0 )
     {
-        const auto  eps = lacc.rel_eps();
-        
-        return compress::get_config( eps );
+        if      ( lacc.norm_mode() == Hpro::spectral_norm  ) tol = lacc.abs_eps() / blas::norm_2( M );
+        else if ( lacc.norm_mode() == Hpro::frobenius_norm ) tol = lacc.abs_eps() / blas::norm_F( M );
+        else
+            HLR_ERROR( "unsupported norm mode" );
     }// if
-    else if ( lacc.abs_eps() != 0 )
+    else if ( lacc.rel_eps() != 0 )
     {
-        const auto  eps = lacc.abs_eps();
-        
-        return compress::get_config( eps );
+        tol = lacc.rel_eps();
     }// if
     else
-        HLR_ERROR( "unsupported accuracy type" );
+        HLR_ERROR( "zero error" );
+
+    return compress::get_config( tol );
 }
 
 }} // namespace hlr::matrix

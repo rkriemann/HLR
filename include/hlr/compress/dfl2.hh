@@ -33,12 +33,14 @@ struct fp_info
 template <>
 struct fp_info< float >
 {
+    constexpr static uint32_t  exp_bits    = 8;
     constexpr static uint32_t  mant_bits   = 23;
 };
     
 template <>
 struct fp_info< double >
 {
+    constexpr static uint32_t  exp_bits    = 11;
     constexpr static uint32_t  mant_bits   = 52;
 };
 
@@ -362,7 +364,7 @@ compress ( const double *  data,
     // compress data in "vectorized" form
     //
         
-    size_t    pos  = 8; // position in compressed storage
+    size_t    pos  = 2; // position in compressed storage
     uint32_t  bpos = 0; // start bit position in current byte
 
     for ( size_t  i = 0; i < nsize; ++i )
@@ -376,7 +378,7 @@ compress ( const double *  data,
             const uint64_t  irval = ( zval << shift );
             const double    rval  = * reinterpret_cast< const double * >( & irval );
 
-            std::cout << isval << " / " << irval << " / " << std::abs( val - rval ) << std::endl;
+            // std::cout << isval << " / " << irval << " / " << std::abs( val - rval ) << std::endl;
         }
         
         do
@@ -412,7 +414,7 @@ decompress ( double *        data,
     // decompress in "vectorised" form
     //
         
-    size_t    pos  = 8;
+    size_t    pos  = 2;
     uint32_t  bpos = 0;                          // bit position in current byte
 
     for ( size_t  i = 0; i < nsize; ++i )
@@ -468,7 +470,7 @@ compress ( const config &   config,
     const uint32_t  exp_bits  = 11;
     const uint32_t  prec_bits = std::min< uint32_t >( fp_info< real_t >::mant_bits, config.bitrate );        // total no. of bits per value
     const size_t    nbits     = 1 + exp_bits + prec_bits;                                                    // number of bits per value
-    auto            zdata     = std::vector< byte_t >( sizeof(real_t) + 1 + 1 + byte_pad( nsize * nbits ) / 8 );
+    auto            zdata     = std::vector< byte_t >( 1 + 1 + byte_pad( nsize * nbits ) / 8 );
 
     compress( data, nsize, zdata.data(), exp_bits, prec_bits );
 
@@ -592,7 +594,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
 {
     using  real_t = Hpro::real_type_t< value_t >;
     
-    constexpr real_t  fp_maximum = fp_info< real_t >::maximum;
+    constexpr auto  exp_bits   = fp_info< real_t >::exp_bits;
     
     //
     // first, determine exponent bits and mantissa bits for all columns
@@ -601,33 +603,15 @@ compress_lr ( const blas::matrix< value_t > &                       U,
     const size_t  n = U.nrows();
     const size_t  k = U.ncols();
     auto          m = std::vector< uint32_t >( k );
-    auto          e = std::vector< uint32_t >( k );
-    auto          s = std::vector< real_t >( k );
     size_t        zsize = 0;
 
     for ( uint32_t  l = 0; l < k; ++l )
     {
-        auto  vmin = fp_maximum;
-        auto  vmax = real_t(0);
-
-        for ( size_t  i = 0; i < n; ++i )
-        {
-            const auto  u_il = std::abs( U(i,l) );
-            const auto  val  = ( u_il == real_t(0) ? fp_maximum : u_il );
-            
-            vmin = std::min( vmin, val );
-            vmax = std::max( vmax, u_il );
-        }// for
-
-        s[l] = real_t(1) / vmin;
-        e[l] = uint32_t( std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ) );
         m[l] = eps_to_rate_aplr( S(l) );
 
-        HLR_ASSERT( std::isfinite( s[l] ) );
+        const size_t  nbits = 1 + exp_bits + m[l]; // number of bits per value
         
-        const size_t  nbits = 1 + e[l] + m[l]; // number of bits per value
-        
-        zsize += sizeof(real_t) + 1 + 1 + byte_pad( n * nbits ) / 8;
+        zsize += 1 + 1 + byte_pad( n * nbits ) / 8;
     }// for
 
     // for ( uint32_t  l = 0; l < k; ++l )
@@ -640,17 +624,15 @@ compress_lr ( const blas::matrix< value_t > &                       U,
 
     auto              zdata       = std::vector< byte_t >( zsize );
     size_t            pos         = 0;
-    constexpr size_t  header_size = sizeof(real_t) + 2;
+    constexpr size_t  header_size = 2;
     const real_t *    U_ptr       = reinterpret_cast< const real_t * >( U.data() );
         
     for ( uint32_t  l = 0; l < k; ++l )
     {
-        const uint32_t  exp_bits  = e[l];
         const uint32_t  prec_bits = m[l];
-        const real_t    scale     = s[l];
         const size_t    nbits     = 1 + exp_bits + prec_bits; // number of bits per value
 
-        compress( U.data() + l*n, n, zdata.data() + pos, scale, exp_bits, prec_bits );
+        compress( U.data() + l*n, n, zdata.data() + pos, exp_bits, prec_bits );
         pos += header_size + byte_pad( n * nbits ) / 8;
     }// for
 
@@ -672,70 +654,48 @@ zarray
 compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double > > &  U,
                                         const blas::vector< double > &                  S )
 {
-    // using  real_t = double;
+    using  real_t = double;
     
-    // constexpr real_t  fp_maximum = fp_info< real_t >::maximum;
+    constexpr auto  exp_bits   = fp_info< real_t >::exp_bits;
     
-    // //
-    // // first, determine exponent bits and mantissa bits for all columns
-    // //
+    //
+    // first, determine exponent bits and mantissa bits for all columns
+    //
 
-    // const size_t  n     = U.nrows();
-    // const size_t  k     = U.ncols();
-    // const size_t  n2    = 2 * n;
-    // auto          m     = std::vector< uint32_t >( k );
-    // auto          e     = std::vector< uint32_t >( k );
-    // auto          s     = std::vector< real_t >( k );
-    // size_t        zsize = 0;
+    const size_t  n     = U.nrows();
+    const size_t  k     = U.ncols();
+    const size_t  n2    = 2 * n;
+    auto          m     = std::vector< uint32_t >( k );
+    size_t        zsize = 0;
 
-    // for ( uint32_t  l = 0; l < k; ++l )
-    // {
-    //     auto  vmin = fp_maximum;
-    //     auto  vmax = real_t(0);
+    for ( uint32_t  l = 0; l < k; ++l )
+    {
+        m[l] = eps_to_rate_aplr( S(l) );
 
-    //     for ( size_t  i = 0; i < n; ++i )
-    //     {
-    //         const auto  u_il   = U(i,l);
-    //         const auto  u_re   = std::abs( std::real( u_il ) );
-    //         const auto  u_im   = std::abs( std::imag( u_il ) );
-    //         const auto  val_re = ( u_re == real_t(0) ? fp_maximum : u_re );
-    //         const auto  val_im = ( u_im == real_t(0) ? fp_maximum : u_im );
-            
-    //         vmin = std::min( vmin, std::min( val_re, val_im ) );
-    //         vmax = std::max( vmax, std::max( u_re, u_im ) );
-    //     }// for
-
-    //     s[l] = real_t(1) / vmin;
-    //     e[l] = uint32_t( std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ) );
-    //     m[l] = eps_to_rate_aplr( S(l) );
-
-    //     HLR_ASSERT( std::isfinite( s[l] ) );
-
-    //     const size_t  nbits = 1 + e[l] + m[l]; // number of bits per value
+        const size_t  nbits = 1 + exp_bits + m[l]; // number of bits per value
         
-    //     zsize += sizeof(real_t) + 1 + 1 + byte_pad( n2 * nbits ) / 8; // twice because real+imag
-    // }// for
+        zsize += 1 + 1 + byte_pad( n2 * nbits ) / 8; // twice because real+imag
+    }// for
 
-    // //
-    // // convert each column to compressed form
-    // //
+    //
+    // convert each column to compressed form
+    //
 
-    // auto              zdata       = std::vector< byte_t >( zsize );
-    // size_t            pos         = 0;
-    // constexpr size_t  header_size = sizeof(real_t) + 2;
-    // const real_t *    U_ptr       = reinterpret_cast< const real_t * >( U.data() );
+    auto              zdata       = std::vector< byte_t >( zsize );
+    size_t            pos         = 0;
+    constexpr size_t  header_size = 2;
+    const real_t *    U_ptr       = reinterpret_cast< const real_t * >( U.data() );
         
-    // for ( uint32_t  l = 0; l < k; ++l )
-    // {
-    //     const uint32_t  exp_bits  = e[l];
-    //     const uint32_t  prec_bits = m[l];
-    //     const size_t    nbits     = 1 + exp_bits + prec_bits; // number of bits per value
+    for ( uint32_t  l = 0; l < k; ++l )
+    {
+        const uint32_t  prec_bits = m[l];
+        const size_t    nbits     = 1 + exp_bits + prec_bits; // number of bits per value
 
-    //     compress( U_ptr + l * n2, n2, zdata.data() + pos, exp_bits, prec_bits );
-    //     pos += header_size + byte_pad( n2 * nbits ) / 8;
-    // }// for
+        compress( U_ptr + l * n2, n2, zdata.data() + pos, exp_bits, prec_bits );
+        pos += header_size + byte_pad( n2 * nbits ) / 8;
+    }// for
 
-    // return zdata;
+    return zdata;
 }
 
 template < typename value_t >
@@ -743,27 +703,27 @@ void
 decompress_lr ( const zarray &             zdata,
                 blas::matrix< value_t > &  U )
 {
-    // using  real_t = Hpro::real_type_t< value_t >;
+    using  real_t = Hpro::real_type_t< value_t >;
     
-    // const size_t      n           = U.nrows();
-    // const uint32_t    k           = U.ncols();
-    // size_t            pos         = 0;
-    // constexpr size_t  header_size = sizeof(real_t) + 2;
+    const size_t      n           = U.nrows();
+    const uint32_t    k           = U.ncols();
+    size_t            pos         = 0;
+    constexpr size_t  header_size = 2;
 
-    // for ( uint32_t  l = 0; l < k; ++l )
-    // {
-    //     //
-    //     // read compression header (scaling, exponent and precision bits)
-    //     // and decompress data
-    //     //
+    for ( uint32_t  l = 0; l < k; ++l )
+    {
+        //
+        // read compression header (scaling, exponent and precision bits)
+        // and decompress data
+        //
     
-    //     const uint32_t  exp_bits  = zdata[ pos ];
-    //     const uint32_t  prec_bits = zdata[ pos+1 ];
-    //     const uint32_t  nbits     = 1 + exp_bits + prec_bits;
+        const uint32_t  exp_bits  = zdata[ pos ];
+        const uint32_t  prec_bits = zdata[ pos+1 ];
+        const uint32_t  nbits     = 1 + exp_bits + prec_bits;
 
-    //     decompress( U.data() + l * n, n, zdata.data() + pos + 2, exp_bits, prec_bits );
-    //     pos += header_size + byte_pad( nbits * n ) / 8;
-    // }// for
+        decompress( U.data() + l * n, n, zdata.data() + pos, exp_bits, prec_bits );
+        pos += header_size + byte_pad( nbits * n ) / 8;
+    }// for
 }
 
 
@@ -782,29 +742,29 @@ void
 decompress_lr< std::complex< double > > ( const zarray &                            zdata,
                                           blas::matrix< std::complex< double > > &  U )
 {
-    // using  real_t = double;
+    using  real_t = double;
     
-    // const size_t      n           = U.nrows();
-    // const uint32_t    k           = U.ncols();
-    // size_t            pos         = 0;
-    // constexpr size_t  header_size = sizeof(real_t) + 2;
-    // real_t *          U_ptr       = reinterpret_cast< real_t * >( U.data() );
-    // const size_t      n2          = 2 * n;
+    const size_t      n           = U.nrows();
+    const uint32_t    k           = U.ncols();
+    size_t            pos         = 0;
+    constexpr size_t  header_size = 2;
+    real_t *          U_ptr       = reinterpret_cast< real_t * >( U.data() );
+    const size_t      n2          = 2 * n;
 
-    // for ( uint32_t  l = 0; l < k; ++l )
-    // {
-    //     //
-    //     // read compression header (scaling, exponent and precision bits)
-    //     // and decompress data
-    //     //
+    for ( uint32_t  l = 0; l < k; ++l )
+    {
+        //
+        // read compression header (scaling, exponent and precision bits)
+        // and decompress data
+        //
     
-    //     const uint32_t  exp_bits  = zdata[ pos ];
-    //     const uint32_t  prec_bits = zdata[ pos+1 ];
-    //     const uint32_t  nbits     = 1 + exp_bits + prec_bits;
+        const uint32_t  exp_bits  = zdata[ pos ];
+        const uint32_t  prec_bits = zdata[ pos+1 ];
+        const uint32_t  nbits     = 1 + exp_bits + prec_bits;
 
-    //     decompress( U_ptr + l * n2, n2, zdata.data() + pos + 2, exp_bits, prec_bits );
-    //     pos += header_size + byte_pad( nbits * n2 ) / 8;
-    // }// for
+        decompress( U_ptr + l * n2, n2, zdata.data() + pos, exp_bits, prec_bits );
+        pos += header_size + byte_pad( nbits * n2 ) / 8;
+    }// for
 }
 
 }}}// namespace hlr::compress::dfl2

@@ -837,7 +837,11 @@ lrsvmatrix< value_t >::compress ( const accuracy &  acc )
     auto  lacc = acc( this->row_is(), this->col_is() );
     auto  tol  = lacc.abs_eps();
 
-    if ( lacc.rel_eps() != 0 )
+    if ( lacc.abs_eps() != 0 )
+    {
+        tol = lacc.abs_eps();
+    }// if
+    else if ( lacc.rel_eps() != 0 )
     {
         // use relative error: δ = ε |M|
         real_t  norm = real_t(0);
@@ -891,6 +895,9 @@ lrsvmatrix< value_t >::compress ( const accuracy &  acc )
         auto  tT2 = blas::prod_diag( dU, _S );
         auto  tM2 = blas::prod( tT2, blas::adjoint( dV ) );
 
+        io::matlab::write( tM1, "M1" );
+        io::matlab::write( tM2, "M2" );
+
         blas::add( value_t(-1), tM1, tM2 );
 
         if ( lacc.norm_mode() == Hpro::spectral_norm )
@@ -898,14 +905,20 @@ lrsvmatrix< value_t >::compress ( const accuracy &  acc )
             auto  n1 = blas::norm_2( tM1 );
             auto  n2 = blas::norm_2( tM2 );
 
-            std::cout << "R: " << boost::format( "%.4e" ) % n1 << " / " << boost::format( "%.4e" ) % n2 << " / " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
+            std::cout << "Rs: tol = " << boost::format( "%.4e" ) % tol
+                      << " / norm = " << boost::format( "%.4e" ) % n1
+                      << " / abs = " << boost::format( "%.4e" ) % n2
+                      << " / rel = " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
         }// if
         else
         {
             auto  n1 = blas::norm_F( tM1 );
             auto  n2 = blas::norm_F( tM2 );
 
-            std::cout << "R: " << boost::format( "%.4e" ) % n1 << " / " << boost::format( "%.4e" ) % n2 << " / " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
+            std::cout << "Rf: tol = " << boost::format( "%.4e" ) % tol
+                      << " / norm = " << boost::format( "%.4e" ) % n1
+                      << " / abs = " << boost::format( "%.4e" ) % n2
+                      << " / rel = " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
         }// else
     }
     

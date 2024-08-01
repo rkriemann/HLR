@@ -561,14 +561,20 @@ dense_matrix< value_t >::compress ( const accuracy &  acc )
             auto  n1 = blas::norm_2( M1 );
             auto  n2 = blas::norm_2( M2 );
 
-            std::cout << "Ds: " << boost::format( "%.4e" ) % tol << " / " << boost::format( "%.4e" ) % n1 << " / " << boost::format( "%.4e" ) % n2 << " / " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
+            std::cout << "Ds: tol = " << boost::format( "%.4e" ) % tol
+                      << " / norm = " << boost::format( "%.4e" ) % n1
+                      << " / abs = " << boost::format( "%.4e" ) % n2
+                      << " / rel = " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
         }// if
         else
         {
             auto  n1 = blas::norm_F( M1 );
             auto  n2 = blas::norm_F( M2 );
 
-            std::cout << "Df: " << boost::format( "%.4e" ) % tol << " / " << boost::format( "%.4e" ) % n1 << " / " << boost::format( "%.4e" ) % n2 << " / " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
+            std::cout << "Df: tol = " << boost::format( "%.4e" ) % tol
+                      << " / norm = " << boost::format( "%.4e" ) % n1
+                      << " / abs = " << boost::format( "%.4e" ) % n2
+                      << " / rel = " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
         }// else
     }
 

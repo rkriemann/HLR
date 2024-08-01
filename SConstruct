@@ -687,6 +687,7 @@ if aplr == 'default'  :
     elif compressor == 'aflp'   : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=2' )
     elif compressor == 'bfl'    : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=3' )
     elif compressor == 'dfl'    : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=4' )
+    elif compressor == 'dfl2'   : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=22' )
     elif compressor == 'zfp'    : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=5' )
     elif compressor == 'sz'     : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=6' )
     elif compressor == 'sz3'    : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=7' )
@@ -703,6 +704,8 @@ elif aplr == 'bfl'  :
     env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=3' )
 elif aplr == 'dfl'  :
     env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=4' )
+elif aplr == 'dfl2'  :
+    env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=22' )
 elif aplr == 'zfp'  :
     env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=5' )
     env.Append( CPPDEFINES = 'HLR_HAS_ZFP' )

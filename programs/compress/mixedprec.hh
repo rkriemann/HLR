@@ -211,7 +211,7 @@ program_main ()
 
     {
         // auto  lacc = local_accuracy( delta );
-        auto  lacc  = relative_prec( delta );
+        auto  lacc  = absolute_prec( Hpro::frobenius_norm, delta );
         auto  niter = std::max( nbench, 1u );
         
         runtime.clear();

@@ -32,8 +32,8 @@ namespace matrix
 {
 
 //
-// represents cluster basis for single cluster with
-// additional hierarchy
+// represents (orthogonal) cluster basis for single cluster
+// with additional hierarchy
 //
 template < typename T_value >
 class shared_cluster_basis : public compress::compressible
@@ -358,9 +358,9 @@ public:
     // compression
     //
 
-    // compress internal data based on given configuration
-    // - may result in non-compression if storage does not decrease
-    virtual void   compress      ( const compress::zconfig_t &  zconfig );
+    // // compress internal data based on given configuration
+    // // - may result in non-compression if storage does not decrease
+    // virtual void   compress      ( const compress::zconfig_t &  zconfig );
 
     // compress internal data based on given accuracy
     virtual void   compress      ( const accuracy &  acc );
@@ -409,26 +409,26 @@ copy ( const shared_cluster_basis< value_src_t > &  src )
 //
 // compress internal data
 //
-template < typename value_t >
-void
-shared_cluster_basis< value_t >::compress ( const compress::zconfig_t &  zconfig )
-{
-    if ( is_compressed() )
-        return;
+// template < typename value_t >
+// void
+// shared_cluster_basis< value_t >::compress ( const compress::zconfig_t &  zconfig )
+// {
+//     if ( is_compressed() )
+//         return;
 
-    const size_t  mem_dense = sizeof(value_t) * _V.nrows() * _V.ncols();
+//     const size_t  mem_dense = sizeof(value_t) * _V.nrows() * _V.ncols();
 
-    HLR_ASSERT( false );
+//     HLR_ASSERT( false );
     
-    // auto        zV   = compress::compress< value_t >( zconfig, _V );
-    // const auto  zmem = compress::compressed_size( zV );
+//     // auto        zV   = compress::compress< value_t >( zconfig, _V );
+//     // const auto  zmem = compress::compressed_size( zV );
 
-    // if (( zmem > 0 ) && ( zmem < mem_dense ))
-    // {
-    //     _zV = std::move( zV );
-    //     _V  = std::move( blas::matrix< value_t >( 0, _V.ncols() ) ); // remember rank
-    // }// if
-}
+//     // if (( zmem > 0 ) && ( zmem < mem_dense ))
+//     // {
+//     //     _zV = std::move( zV );
+//     //     _V  = std::move( blas::matrix< value_t >( 0, _V.ncols() ) ); // remember rank
+//     // }// if
+// }
 
 template < typename value_t >
 void
@@ -477,7 +477,7 @@ shared_cluster_basis< value_t >::compress ( const accuracy &  acc )
     HLR_ASSERT( _sv.length() == _V.ncols() );
 
     // real_t  tol  = acc.abs_eps() * _sv(0);
-    auto    S    = blas::copy( _sv );
+    auto  S = blas::copy( _sv );
 
     for ( uint  l = 0; l < S.length(); ++l )
         S(l) = tol / S(l);
