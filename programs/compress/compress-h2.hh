@@ -12,6 +12,7 @@
 #include <hlr/arith/norm.hh>
 #include <hlr/bem/aca.hh>
 #include <hlr/bem/hca.hh>
+#include <hlr/bem/dense.hh>
 
 #include "common.hh"
 #include "common-main.hh"
@@ -47,23 +48,38 @@ program_main ()
         
         tic = timer::now();
         
-        if constexpr ( problem_t::supports_hca )
+        if ( cmdline::capprox == "hca" )
         {
-            std::cout << "    using HCA" << std::endl;
-
-            auto  hcagen = problem->hca_gen_func( *ct );
-            auto  hca    = bem::hca( pcoeff, *hcagen, cmdline::eps / 100.0, 6 );
-            auto  hcalr  = bem::hca_lrapx( hca );
-
-            H = impl::matrix::build( bct->root(), pcoeff, hcalr, acc, nseq );
+            if constexpr ( problem_t::supports_hca )
+            {
+                std::cout << "    using HCA" << std::endl;
+                
+                auto  hcagen = problem->hca_gen_func( *ct );
+                auto  hca    = bem::hca( pcoeff, *hcagen, cmdline::eps / 100.0, 6 );
+                auto  hcalr  = bem::hca_lrapx( hca );
+                
+                H = impl::matrix::build( bct->root(), pcoeff, hcalr, acc, nseq );
+            }// if
+            else
+                cmdline::capprox = "default";
         }// if
-        else
+
+        if (( cmdline::capprox == "aca" ) || ( cmdline::capprox == "default" ))
         {
             std::cout << "    using ACA" << std::endl;
 
             auto  acalr = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
-            
+        
             H = impl::matrix::build( bct->root(), pcoeff, acalr, acc, nseq );
+        }// else
+        
+        if ( cmdline::capprox == "dense" )
+        {
+            std::cout << "    using dense" << std::endl;
+
+            auto  dense = bem::dense_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
+        
+            H = impl::matrix::build( bct->root(), pcoeff, dense, acc, nseq );
         }// else
         
         toc = timer::since( tic );
@@ -215,7 +231,7 @@ program_main ()
               << term::reset << std::endl;
 
     {
-        auto  lacc  = absolute_prec( cmdline::eps );
+        auto  lacc  = relative_prec( cmdline::eps );
         auto  niter = std::max( nbench, 1u );
         
         runtime.clear();

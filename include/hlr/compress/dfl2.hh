@@ -52,7 +52,7 @@ using FP64 = fp_info< double >;
 //
 //   |d_i - ~d_i| ≤ 2^(-m) ≤ ε with mantissa length m = ⌈-log₂ ε⌉
 //
-inline byte_t eps_to_rate      ( const double  eps ) { return std::max< double >( 1, std::ceil( -std::log2( eps ) ) ); }
+inline byte_t eps_to_rate      ( const double  eps ) { return std::max< double >( 0, std::ceil( -std::log2( eps ) ) ); }
 inline byte_t eps_to_rate_aplr ( const double  eps ) { return eps_to_rate( eps ) + 1; }
 
 struct config
@@ -374,12 +374,12 @@ compress ( const double *  data,
         uint64_t        zval  = ( isval >> shift );
         uint32_t        sbits = 0;
 
-        {
-            const uint64_t  irval = ( zval << shift );
-            const double    rval  = * reinterpret_cast< const double * >( & irval );
+        // {
+        //     const uint64_t  irval = ( zval << shift );
+        //     const double    rval  = * reinterpret_cast< const double * >( & irval );
 
-            // std::cout << isval << " / " << irval << " / " << std::abs( val - rval ) << std::endl;
-        }
+        //     // std::cout << isval << " / " << irval << " / " << std::abs( val - rval ) << std::endl;
+        // }
         
         do
         {

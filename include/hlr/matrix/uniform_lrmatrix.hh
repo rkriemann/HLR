@@ -301,7 +301,7 @@ public:
     using Hpro::TMatrix< value_t >::apply_add;
     
     // truncate matrix to accuracy \a acc
-    virtual void truncate ( const Hpro::TTruncAcc & acc );
+    virtual void truncate ( const accuracy & acc );
 
     // scale matrix by alpha
     virtual void scale    ( const value_t  alpha )
@@ -319,7 +319,7 @@ public:
     virtual void   compress      ( const compress::zconfig_t &  zconfig );
 
     // compress internal data based on given accuracy
-    virtual void   compress      ( const Hpro::TTruncAcc &  acc );
+    virtual void   compress      ( const accuracy &  acc );
 
     // decompress internal data
     virtual void   decompress    ();
@@ -347,8 +347,8 @@ public:
     virtual auto   copy         () const -> std::unique_ptr< Hpro::TMatrix< value_t > >;
 
     // return copy matrix wrt. given accuracy; if \a do_coarsen is set, perform coarsening
-    virtual auto   copy         ( const Hpro::TTruncAcc &  acc,
-                                  const bool               do_coarsen = false ) const -> std::unique_ptr< Hpro::TMatrix< value_t > >;
+    virtual auto   copy         ( const accuracy &  acc,
+                                  const bool        do_coarsen = false ) const -> std::unique_ptr< Hpro::TMatrix< value_t > >;
 
     // return structural copy of matrix
     virtual auto   copy_struct  () const -> std::unique_ptr< Hpro::TMatrix< value_t > >;
@@ -358,7 +358,7 @@ public:
 
     // copy matrix data to \a A and truncate w.r.t. \acc with optional coarsening
     virtual void   copy_to      ( Hpro::TMatrix< value_t > *  A,
-                                  const Hpro::TTruncAcc &     acc,
+                                  const accuracy &            acc,
                                   const bool                  do_coarsen = false ) const;
     
     //
@@ -467,7 +467,7 @@ uniform_lrmatrix< value_t >::apply_add ( const value_t                    alpha,
 //
 template < typename value_t >
 void
-uniform_lrmatrix< value_t >::truncate ( const Hpro::TTruncAcc & )
+uniform_lrmatrix< value_t >::truncate ( const accuracy & )
 {
 }
 
@@ -498,24 +498,46 @@ uniform_lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
 
 template < typename value_t >
 void
-uniform_lrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
+uniform_lrmatrix< value_t >::compress ( const accuracy &  acc )
 {
+    if ( is_compressed() )
+        return;
+
     if ( this->nrows() * this->ncols() == 0 )
         return;
 
-    auto  lacc = acc( this->row_is(), this->col_is() );
-    auto  tol  = lacc.abs_eps();
-    
-    if ( lacc.rel_eps() != 0 )
+    const auto  lacc = acc( this->row_is(), this->col_is() );
+    auto        tol  = lacc.abs_eps();
+
+    if ( lacc.abs_eps() != 0 )
     {
-        // use relative error: δ = ε |M|
-        if      ( lacc.norm_mode() == Hpro::spectral_norm  ) tol = lacc.rel_eps() * blas::norm_2( _S );
-        else if ( lacc.norm_mode() == Hpro::frobenius_norm ) tol = lacc.rel_eps() * blas::norm_F( _S );
+        if      ( lacc.norm_mode() == Hpro::spectral_norm  ) tol = lacc.abs_eps() / blas::norm_2( _S );
+        else if ( lacc.norm_mode() == Hpro::frobenius_norm ) tol = lacc.abs_eps() / blas::norm_F( _S );
         else
             HLR_ERROR( "unsupported norm mode" );
     }// if
+    else if ( lacc.rel_eps() != 0 )
+    {
+        if      ( lacc.norm_mode() == Hpro::spectral_norm  ) tol = lacc.rel_eps();
+        else if ( lacc.norm_mode() == Hpro::frobenius_norm ) tol = lacc.rel_eps();
+        else
+            HLR_ERROR( "unsupported norm mode" );
+    }// if
+    else
+        HLR_ERROR( "zero error" );
         
-    compress( compress::get_config( tol ) );
+    const auto    zconfig   = compress::get_config( tol );
+    const size_t  mem_dense = sizeof(value_t) * _S.nrows() * _S.ncols();
+    auto          zS        = compress::compress( zconfig, _S );
+    const auto    zmem      = compress::compressed_size( zS );
+
+    if (( zmem > 0 ) && ( zmem < mem_dense ))
+    {
+        HLR_ASSERT( ( zS.size() == 0 ) || ( zS.data() != nullptr ) );
+
+        _zS = std::move( zS );
+        _S  = std::move( blas::matrix< value_t >( 0, 0 ) );
+    }// if
 }
 
 //
@@ -564,7 +586,7 @@ uniform_lrmatrix< value_t >::copy () const
 //
 template < typename value_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
-uniform_lrmatrix< value_t >::copy ( const Hpro::TTruncAcc &,
+uniform_lrmatrix< value_t >::copy ( const accuracy &,
                                     const bool       ) const
 {
     return copy();
@@ -609,7 +631,7 @@ uniform_lrmatrix< value_t >::copy_to ( Hpro::TMatrix< value_t > *  A ) const
 template < typename value_t >
 void
 uniform_lrmatrix< value_t >::copy_to ( Hpro::TMatrix< value_t > *  A,
-                                       const Hpro::TTruncAcc &,
+                                       const accuracy &,
                                        const bool  ) const
 {
     return copy_to( A );

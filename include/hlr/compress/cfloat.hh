@@ -39,14 +39,14 @@ byte_t
 eps_to_rate ( const double eps )
 {
     // |d_i - ~d_i| ≤ 2^(-m) ≤ ε with m = remaining mantissa length
-    return std::max< double >( 1, std::ceil( -std::log2( eps ) ) );
+    return std::max< double >( 0, std::ceil( -std::log2( eps ) ) );
 }
 
 inline
 uint32_t
 tol_to_rate ( const double  tol )
 {
-    return uint32_t( std::max< double >( 1, -std::log2( tol ) ) ) + 1;
+    return uint32_t( std::max< double >( 0, -std::log2( tol ) ) ) + 1;
 }
 
 struct config

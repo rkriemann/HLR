@@ -26,7 +26,7 @@ constexpr uint8_t  ES = 2;
 //
 // return bitrate for given accuracy
 //
-inline byte_t eps_to_rate      ( const double  eps ) { return std::max< double >( 1, std::ceil( -std::log2( eps ) ) ); }
+inline byte_t eps_to_rate      ( const double  eps ) { return std::max< double >( 0, std::ceil( -std::log2( eps ) ) ); }
 inline byte_t eps_to_rate_aplr ( const double  eps ) { return eps_to_rate( eps ) + 2; }
 
 //

@@ -544,39 +544,40 @@ dense_matrix< value_t >::compress ( const accuracy &  acc )
     auto          zM        = compress::compress< value_t >( zconfig, M );
     const auto    zmem      = compress::compressed_size( zM );
     
-    // DEBUG
-    {
-        auto  M1 = blas::copy( M );
-        auto  M2 = blas::matrix< value_t >( M.nrows(), M.ncols() );
+    // // DEBUG
+    // {
+    //     auto  M1 = blas::copy( M );
+    //     auto  M2 = blas::matrix< value_t >( M.nrows(), M.ncols() );
 
-        compress::decompress( zM, M2 );
+    //     compress::decompress( zM, M2 );
 
-        io::matlab::write( M1, "M1" );
-        io::matlab::write( M2, "M2" );
+    //     io::matlab::write( M1, "M1" );
+    //     io::matlab::write( M2, "M2" );
         
-        blas::add( -1.0, M1, M2 );
+    //     blas::add( -1.0, M1, M2 );
 
-        if ( lacc.norm_mode() == Hpro::spectral_norm )
-        {
-            auto  n1 = blas::norm_2( M1 );
-            auto  n2 = blas::norm_2( M2 );
+    //     if ( lacc.norm_mode() == Hpro::spectral_norm )
+    //     {
+    //         auto  n1 = blas::norm_2( M1 );
+    //         auto  n2 = blas::norm_2( M2 );
 
-            std::cout << "Ds: tol = " << boost::format( "%.4e" ) % tol
-                      << " / norm = " << boost::format( "%.4e" ) % n1
-                      << " / abs = " << boost::format( "%.4e" ) % n2
-                      << " / rel = " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
-        }// if
-        else
-        {
-            auto  n1 = blas::norm_F( M1 );
-            auto  n2 = blas::norm_F( M2 );
+    //         std::cout << "Ds: tol = " << boost::format( "%.4e" ) % tol
+    //                   << " / norm = " << boost::format( "%.4e" ) % n1
+    //                   << " / abs = " << boost::format( "%.4e" ) % n2
+    //                   << " / rel = " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
+    //     }// if
+    //     else
+    //     {
+    //         auto  n1 = blas::norm_F( M1 );
+    //         auto  n2 = blas::norm_F( M2 );
 
-            std::cout << "Df: tol = " << boost::format( "%.4e" ) % tol
-                      << " / norm = " << boost::format( "%.4e" ) % n1
-                      << " / abs = " << boost::format( "%.4e" ) % n2
-                      << " / rel = " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
-        }// else
-    }
+    //         std::cout << "Df: tol = " << boost::format( "%.4e" ) % tol
+    //                   << " / norm = " << boost::format( "%.4e" ) % n1
+    //                   << " / abs = " << boost::format( "%.4e" ) % n2
+    //                   << " / rel = " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
+    //     }// else
+    // }
+    // // DEBUG
 
     //
     // finish

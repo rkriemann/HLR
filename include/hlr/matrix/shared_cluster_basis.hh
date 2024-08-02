@@ -358,10 +358,6 @@ public:
     // compression
     //
 
-    // // compress internal data based on given configuration
-    // // - may result in non-compression if storage does not decrease
-    // virtual void   compress      ( const compress::zconfig_t &  zconfig );
-
     // compress internal data based on given accuracy
     virtual void   compress      ( const accuracy &  acc );
 
@@ -409,27 +405,6 @@ copy ( const shared_cluster_basis< value_src_t > &  src )
 //
 // compress internal data
 //
-// template < typename value_t >
-// void
-// shared_cluster_basis< value_t >::compress ( const compress::zconfig_t &  zconfig )
-// {
-//     if ( is_compressed() )
-//         return;
-
-//     const size_t  mem_dense = sizeof(value_t) * _V.nrows() * _V.ncols();
-
-//     HLR_ASSERT( false );
-    
-//     // auto        zV   = compress::compress< value_t >( zconfig, _V );
-//     // const auto  zmem = compress::compressed_size( zV );
-
-//     // if (( zmem > 0 ) && ( zmem < mem_dense ))
-//     // {
-//     //     _zV = std::move( zV );
-//     //     _V  = std::move( blas::matrix< value_t >( 0, _V.ncols() ) ); // remember rank
-//     // }// if
-// }
-
 template < typename value_t >
 void
 shared_cluster_basis< value_t >::compress ( const accuracy &  acc )
@@ -626,17 +601,8 @@ public:
     // compression
     //
 
-    // compress internal data based on given configuration
-    // - may result in non-compression if storage does not decrease
-    virtual void   compress      ( const compress::zconfig_t &  zconfig )
-    {
-        for ( auto &  lvl : _hier )
-            for ( auto  cb : lvl )
-                cb->compress( zconfig );
-    }
-
     // compress internal data based on given accuracy
-    virtual void   compress      ( const accuracy &  acc )
+    virtual void   compress    ( const accuracy &  acc )
     {
         for ( auto &  lvl : _hier )
             for ( auto  cb : lvl )
@@ -644,7 +610,7 @@ public:
     }
 
     // decompress internal data
-    virtual void   decompress    ()
+    virtual void   decompress  ()
     {
         for ( auto &  lvl : _hier )
             for ( auto  cb : lvl )

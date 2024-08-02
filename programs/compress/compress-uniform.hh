@@ -200,7 +200,7 @@ program_main ()
               << term::reset << std::endl;
 
     {
-        auto  lacc  = relative_prec( Hpro::frobenius_norm, cmdline::eps );
+        auto  lacc  = relative_prec( cmdline::eps );
         auto  niter = std::max( nbench, 1u );
         
         runtime.clear();
