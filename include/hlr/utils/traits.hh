@@ -18,11 +18,20 @@ namespace hlr
 // requires types to have "value_t" as sub type
 //
 template < typename T >
-concept with_value_type = requires ( T a )
+concept has_value_type = requires ( T a )
 {
     typename T::value_t;
 };
 
+// //
+// // concept for types with value type
+// //
+// template < typename T >
+// concept has_value_type = requires
+// {
+//     typename T::value_t;
+// };
+    
 // access value type
 template < typename T > struct value_type { using  type_t = typename T::value_t; };
 template < typename T > using  value_type_t = typename value_type< T >::type_t;

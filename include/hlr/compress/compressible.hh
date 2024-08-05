@@ -22,9 +22,9 @@ public:
     // compression interface
     //
 
-    // compress internal data
-    // - may result in non-compression if storage does not decrease
-    virtual void   compress      ( const compress::zconfig_t &  zconfig ) = 0;
+    // // compress internal data
+    // // - may result in non-compression if storage does not decrease
+    // virtual void   compress      ( const compress::zconfig_t &  zconfig ) = 0;
 
     // compress data based on given accuracy
     virtual void   compress      ( const Hpro::TTruncAcc &  acc ) = 0;

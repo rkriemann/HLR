@@ -11,6 +11,7 @@
 #include <hpro/cluster/TCluster.hh>
 
 #include <hlr/arith/blas.hh>
+#include <hlr/approx/accuracy.hh>
 #include <hlr/compress/compressible.hh>
 #include <hlr/compress/direct.hh>
 #include <hlr/compress/aplr.hh>
@@ -21,7 +22,6 @@ namespace hlr
 
 using indexset     = Hpro::TIndexSet;
 using cluster_tree = Hpro::TCluster;
-using accuracy     = Hpro::TTruncAcc;
 
 using Hpro::idx_t;
 
@@ -32,8 +32,8 @@ namespace matrix
 {
 
 //
-// represents cluster basis for single cluster with
-// additional hierarchy
+// represents (orthogonal) cluster basis for single cluster
+// with additional hierarchy
 //
 template < typename T_value >
 class shared_cluster_basis : public compress::compressible
@@ -97,17 +97,17 @@ public:
     //
 
     // return number of sons
-    uint                   nsons     () const                { return _sons.size(); }
+    uint                          nsons     () const                { return _sons.size(); }
 
     // set number of sons
-    void                   set_nsons ( const uint  n )       { _sons.resize( n ); }
+    void                          set_nsons ( const uint  n )       { _sons.resize( n ); }
 
     // access <i>'th son
     shared_cluster_basis *        son       ( const uint  i )       { return _sons[i]; }
     const shared_cluster_basis *  son       ( const uint  i ) const { return _sons[i]; }
 
-    void                   set_son   ( const uint       i,
-                                       shared_cluster_basis *  cb ) { _sons[i] = cb; }
+    void                          set_son   ( const uint              i,
+                                              shared_cluster_basis *  cb ) { _sons[i] = cb; }
 
     //
     // access basis
@@ -323,7 +323,12 @@ public:
     // return size of (floating point) data in bytes handled by this object
     size_t data_byte_size () const
     {
-        auto  n = sizeof( value_t ) * _is.size() * rank();
+        size_t  n = 0;
+
+        if ( is_compressed() )
+            n = hlr::compress::aplr::byte_size( _zV ) + _sv.data_byte_size();
+        else
+            n = sizeof( value_t ) * _is.size() * rank();
 
         for ( auto  son : _sons )
             n += son->data_byte_size();
@@ -353,12 +358,8 @@ public:
     // compression
     //
 
-    // compress internal data based on given configuration
-    // - may result in non-compression if storage does not decrease
-    virtual void   compress      ( const compress::zconfig_t &  zconfig );
-
     // compress internal data based on given accuracy
-    virtual void   compress      ( const Hpro::TTruncAcc &  acc );
+    virtual void   compress      ( const accuracy &  acc );
 
     // decompress internal data
     virtual void   decompress    ();
@@ -406,36 +407,41 @@ copy ( const shared_cluster_basis< value_src_t > &  src )
 //
 template < typename value_t >
 void
-shared_cluster_basis< value_t >::compress ( const compress::zconfig_t &  zconfig )
+shared_cluster_basis< value_t >::compress ( const accuracy &  acc )
 {
     if ( is_compressed() )
         return;
-
-    const size_t  mem_dense = sizeof(value_t) * _V.nrows() * _V.ncols();
-
-    HLR_ASSERT( false );
-    
-    // auto        zV   = compress::compress< value_t >( zconfig, _V );
-    // const auto  zmem = compress::compressed_size( zV );
-
-    // if (( zmem > 0 ) && ( zmem < mem_dense ))
-    // {
-    //     _zV = std::move( zV );
-    //     _V  = std::move( blas::matrix< value_t >( 0, _V.ncols() ) ); // remember rank
-    // }// if
-}
-
-template < typename value_t >
-void
-shared_cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
-{
-    if ( is_compressed() )
-        return;
-
-    HLR_ASSERT( acc.rel_eps() == 0 );
 
     if ( _V.nrows() * _V.ncols() == 0 )
         return;
+        
+    //
+    // compute Frobenius norm and set tolerance
+    //
+
+    // defaults to absolute error: δ = ε
+    auto  lacc = acc( _is, _is ); // TODO: accuracy for just _is
+    auto  tol  = lacc.abs_eps();
+
+    if ( lacc.rel_eps() != 0 )
+    {
+        // use relative error: δ = ε |M|
+        real_t  norm = real_t(0);
+
+        if ( lacc.norm_mode() == Hpro::spectral_norm )
+            norm = _sv(0);
+        else if ( lacc.norm_mode() == Hpro::frobenius_norm )
+        {
+            for ( uint  i = 0; i < _sv.length(); ++i )
+                norm += math::square( _sv(i) );
+
+            norm = math::sqrt( norm );
+        }// if
+        else
+            HLR_ERROR( "unsupported norm mode" );
+    
+        tol = lacc.rel_eps() * norm;
+    }// if
         
     const size_t  mem_dense = sizeof(value_t) * _V.nrows() * _V.ncols();
 
@@ -445,8 +451,8 @@ shared_cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 
     HLR_ASSERT( _sv.length() == _V.ncols() );
 
-    real_t  tol  = acc.abs_eps() * _sv(0);
-    auto    S    = blas::copy( _sv );
+    // real_t  tol  = acc.abs_eps() * _sv(0);
+    auto  S = blas::copy( _sv );
 
     for ( uint  l = 0; l < S.length(); ++l )
         S(l) = tol / S(l);
@@ -519,6 +525,195 @@ rank_info ( const shared_cluster_basis< value_t > &  cb )
 
     return { min_rank, uint( double(sum_rank) / double(nnodes) ), max_rank };
 }
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// level wise representation of shared cluster bases
+//
+
+//
+// represents hierarchy of shared cluster bases in a level wise way
+//
+template < typename T_value >
+class shared_cluster_basis_hierarchy
+{
+public:
+
+    using  value_t         = T_value;
+    using  real_t          = Hpro::real_type_t< value_t >;
+    using  cluster_basis_t = shared_cluster_basis< value_t >;
+    
+private:
+    // basis
+    std::vector< std::vector< cluster_basis_t * > >  _hier;
+    
+public:
+    
+    // ctor
+    shared_cluster_basis_hierarchy ()
+    {}
+
+    // ctor with predefined level number
+    shared_cluster_basis_hierarchy ( const uint  nlvl )
+            : _hier( nlvl )
+    {}
+
+    shared_cluster_basis_hierarchy ( shared_cluster_basis_hierarchy &&  hier )
+            : _hier( std::move( hier._hier ) )
+    {}
+
+    // dtor: delete sons
+    ~shared_cluster_basis_hierarchy ()
+    {
+        // for ( auto  lvl : _hier )
+        //     for ( auto  cb : lvl )
+        //         delete cb;
+    }
+
+    //
+    // access sons
+    //
+
+    // return number of sons
+    uint  nlevel     () const          { return _hier.size(); }
+
+    // set number of sons
+    void  set_nlevel ( const uint  n ) { _hier.resize( n ); }
+
+    // access cluster basis at level <lvl> and position <i>
+    cluster_basis_t *        cb  ( const uint  lvl,
+                                   const uint  i )       { return _hier[lvl][i]; }
+    const cluster_basis_t *  cb  ( const uint  lvl,
+                                   const uint  i ) const { return _hier[lvl][i]; }
+
+    void  set_cb   ( const uint         lvl,
+                     const uint         i,
+                     cluster_basis_t *  cb )
+    {
+        _hier[lvl][i] = cb;
+    }
+
+    // return full hierarchy
+    auto &        hierarchy ()       { return _hier; }
+    const auto &  hierarchy () const { return _hier; }
+    
+    //
+    // compression
+    //
+
+    // compress internal data based on given accuracy
+    virtual void   compress    ( const accuracy &  acc )
+    {
+        for ( auto &  lvl : _hier )
+            for ( auto  cb : lvl )
+                cb->compress( acc );
+    }
+
+    // decompress internal data
+    virtual void   decompress  ()
+    {
+        for ( auto &  lvl : _hier )
+            for ( auto  cb : lvl )
+                cb->decompress();
+    }
+};
+
+//
+// create level wise hierarchy out of tree bases shared cluster basis
+//
+template < typename value_t >
+shared_cluster_basis_hierarchy< value_t >
+build_level_hierarchy ( shared_cluster_basis< value_t > &  root_cb )
+{
+    //
+    // traverse in BFS style and construct each level
+    //
+
+    auto  hier    = shared_cluster_basis_hierarchy< value_t >( root_cb.depth() );
+    auto  current = std::list< shared_cluster_basis< value_t > * >();
+    uint  lvl     = 0;
+
+    current.push_back( & root_cb );
+
+    while ( ! current.empty() )
+    {
+        //
+        // add bases on current level to hierarchy
+        //
+
+        hier.hierarchy()[lvl].reserve( current.size() );
+
+        for ( auto  cb : current )
+            hier.hierarchy()[lvl].push_back( cb );
+
+        //
+        // collect bases on next level
+        //
+        
+        auto  sub = std::list< shared_cluster_basis< value_t > * >();
+        
+        for ( auto  cb : current )
+            for ( uint  i = 0; i < cb->nsons(); ++i )
+                if ( ! is_null( cb->son(i) ) )
+                    sub.push_back( cb->son(i) );
+
+        current = std::move( sub );
+        lvl++;
+    }// while
+
+    return hier;
+}
+
+template < typename value_t >
+void
+print ( const shared_cluster_basis_hierarchy< value_t > &  hier )
+{
+    uint  lvl_idx = 0;
+    
+    for ( auto lvl : hier.hierarchy() )
+    {
+        uint  idx = 0;
+        
+        std::cout << lvl_idx++ << std::endl;
+        
+        for ( auto cb : lvl )
+            std::cout << "    " << idx++ << " : " << cb->is() << std::endl;
+    }// for
+}
+
+//
+// return min/avg/max rank of given cluster basis
+//
+template < typename value_t >
+std::tuple< uint, uint, uint >
+rank_info ( const shared_cluster_basis_hierarchy< value_t > &  cb_hier )
+{
+    uint    min_rank = 0;
+    uint    max_rank = 0;
+    size_t  sum_rank = 0;
+    size_t  nnodes   = 0;
+    
+    for ( auto &  lvl : cb_hier.hierarchy() )
+    {
+        for ( auto  cb : lvl )
+        {
+            const auto  rank = cb.rank();
+
+            if ( rank > 0 )
+            {
+                if ( min_rank == 0 ) min_rank = rank;
+                else                 min_rank = std::min( min_rank, rank );
+            
+                max_rank  = std::max( max_rank, rank );
+                sum_rank += rank;
+                ++nnodes;
+            }// if
+        }// for
+    }// for
+
+    return { min_rank, uint( double(sum_rank) / double(nnodes) ), max_rank };
+}
+
 
 }} // namespace hlr::matrix
 

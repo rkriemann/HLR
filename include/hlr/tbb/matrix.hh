@@ -44,14 +44,15 @@ using namespace hlr::matrix;
 // matrix coefficients defined by <coeff> and
 // low-rank blocks computed by <lrapx>
 //
-template < typename coeff_t,
-           typename lrapx_t >
+template < coefficient_function_type  coeff_t,
+           lowrank_approx_type        lrapx_t >
 std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > >
 build ( const Hpro::TBlockCluster *  bct,
         const coeff_t &              coeff,
         const lrapx_t &              lrapx,
         const Hpro::TTruncAcc &      acc,
-        const size_t                 nseq = Hpro::CFG::Arith::max_seq_size )
+        const bool                   compress = false,
+        const size_t                 nseq     = Hpro::CFG::Arith::max_seq_size )
 {
     static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
                    "coefficient function and low-rank approximation must have equal value type" );
@@ -70,39 +71,15 @@ build ( const Hpro::TBlockCluster *  bct,
 
     // parallel handling too inefficient for small matrices
     if ( std::max( rowis.size(), colis.size() ) <= 0 )
-        return seq::matrix::build( bct, coeff, lrapx, acc );
+        return seq::matrix::build( bct, coeff, lrapx, acc, compress );
         
     if ( bct->is_leaf() )
     {
-        if ( bct->is_adm() )
-        {
-            // auto  T = lrapx.build( bct, Hpro::absolute_prec( acc.abs_eps() * std::sqrt( double(rowis.size() * colis.size()) ) ) );
-            M = std::unique_ptr< Hpro::TMatrix< value_t > >( lrapx.build( bct, acc( rowis, colis ) ) );
-
-            if ( Hpro::is_lowrank( *M ) )
-            {
-                auto  R = ptrcast( M.get(), Hpro::TRkMatrix< value_t > );
-
-                M = std::move( std::make_unique< hlr::matrix::lrmatrix< value_t > >( rowis, colis,
-                                                                                     std::move( blas::mat_U( R ) ),
-                                                                                     std::move( blas::mat_V( R ) ) ) );
-            }// if
-        }// if
-        else
-        {
-            M = coeff.build( rowis, colis );
-
-            if ( Hpro::is_dense( *M ) )
-            {
-                auto  D = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
-
-                M = std::move( std::make_unique< hlr::matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) ) );
-            }// if
-        }// else
+        M = hlr::seq::matrix::build( bct, coeff, lrapx, acc, compress, nseq );
     }// if
     else if ( std::min( rowis.size(), colis.size() ) <= nseq )
     {
-        M = hlr::seq::matrix::build( bct, coeff, lrapx, acc, nseq );
+        M = hlr::seq::matrix::build( bct, coeff, lrapx, acc, compress, nseq );
     }// if
     else
     {
@@ -119,7 +96,7 @@ build ( const Hpro::TBlockCluster *  bct,
         ::tbb::parallel_for(
             ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
                                             0, B->nblock_cols() ),
-            [&,B,bct,nseq] ( const ::tbb::blocked_range2d< uint > &  r )
+            [&,B,bct,compress,nseq] ( const ::tbb::blocked_range2d< uint > &  r )
             {
                 for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
                 {
@@ -127,7 +104,7 @@ build ( const Hpro::TBlockCluster *  bct,
                     {
                         if ( ! is_null( bct->son( i, j ) ) )
                         {
-                            auto  B_ij = build( bct->son( i, j ), coeff, lrapx, acc, nseq );
+                            auto  B_ij = build( bct->son( i, j ), coeff, lrapx, acc, compress, nseq );
                             
                             B->set_block( i, j, B_ij.release() );
                         }// if
@@ -145,18 +122,17 @@ build ( const Hpro::TBlockCluster *  bct,
 }
 
 //
-// same as above but use compressable matrix types,
-// e.g., dense_matrix and lrmatrix, and directly compress
-// matrix data
+// same as above but use lrsvmatrix for lowrank matrices
 //
-template < typename coeff_t,
-           typename lrapx_t >
+template < coefficient_function_type  coeff_t,
+           lowrank_approx_type        lrapx_t >
 std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > >
-build_compressed ( const Hpro::TBlockCluster *  bct,
-                   const coeff_t &              coeff,
-                   const lrapx_t &              lrapx,
-                   const Hpro::TTruncAcc &      acc,
-                   const size_t                 nseq = Hpro::CFG::Arith::max_seq_size )
+build_sv ( const Hpro::TBlockCluster *  bct,
+           const coeff_t &              coeff,
+           const lrapx_t &              lrapx,
+           const Hpro::TTruncAcc &      acc,
+           const bool                   compress = false,
+           const size_t                 nseq     = Hpro::CFG::Arith::max_seq_size )
 {
     static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
                    "coefficient function and low-rank approximation must have equal value type" );
@@ -173,51 +149,13 @@ build_compressed ( const Hpro::TBlockCluster *  bct,
     const auto  rowis = bct->is().row_is();
     const auto  colis = bct->is().col_is();
 
-    // parallel handling too inefficient for small matrices
-    if ( std::max( rowis.size(), colis.size() ) <= 0 )
-        return seq::matrix::build( bct, coeff, lrapx, acc );
-        
     if ( bct->is_leaf() )
     {
-        auto  lacc = acc( rowis, colis );
-        
-        if ( bct->is_adm() )
-        {
-            // auto  T = lrapx.build( bct, Hpro::absolute_prec( acc.abs_eps() * std::sqrt( double(rowis.size() * colis.size()) ) ) );
-            auto  T = lrapx.build( bct, lacc );
-
-            if ( Hpro::is_lowrank( *T ) )
-            {
-                auto  R  = ptrcast( T.get(), Hpro::TRkMatrix< value_t > );
-                auto  zR = std::make_unique< hlr::matrix::lrmatrix< value_t > >( rowis, colis,
-                                                                                 std::move( blas::mat_U( R ) ),
-                                                                                 std::move( blas::mat_V( R ) ) );
-                
-                zR->compress( lacc );
-                M = std::move( zR );
-            }// if
-            else
-            {
-                M = std::move( T );
-            }// else
-        }// if
-        else
-        {
-            M = coeff.build( rowis, colis );
-
-            if ( Hpro::is_dense( *M ) )
-            {
-                auto  D  = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
-                auto  zD = std::make_unique< matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) );
-
-                zD->compress( lacc );
-                M = std::move( zD );
-            }// if
-        }// else
+        M = hlr::seq::matrix::build_sv( bct, coeff, lrapx, acc, compress, nseq );
     }// if
     else if ( std::min( rowis.size(), colis.size() ) <= nseq )
     {
-        M = hlr::seq::matrix::build_compressed( bct, coeff, lrapx, acc, nseq );
+        M = hlr::seq::matrix::build_sv( bct, coeff, lrapx, acc, compress, nseq );
     }// if
     else
     {
@@ -242,7 +180,7 @@ build_compressed ( const Hpro::TBlockCluster *  bct,
                     {
                         if ( ! is_null( bct->son( i, j ) ) )
                         {
-                            auto  B_ij = build_compressed( bct->son( i, j ), coeff, lrapx, acc, nseq );
+                            auto  B_ij = build_sv( bct->son( i, j ), coeff, lrapx, acc, nseq );
                             
                             B->set_block( i, j, B_ij.release() );
                         }// if
@@ -258,156 +196,14 @@ build_compressed ( const Hpro::TBlockCluster *  bct,
     return M;
 }
 
-template < typename coeff_t,
-           typename lrapx_t >
-std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > >
-build_mixedprec ( const Hpro::TBlockCluster *  bct,
-                  const coeff_t &              coeff,
-                  const lrapx_t &              lrapx,
-                  const Hpro::TTruncAcc &      acc,
-                  const size_t                 nseq = Hpro::CFG::Arith::max_seq_size )
-{
-    static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
-                   "coefficient function and low-rank approximation must have equal value type" );
-
-    HLR_ASSERT( bct != nullptr );
-
-    using  value_t = typename coeff_t::value_t;
-    
-    //
-    // decide upon cluster type, how to construct matrix
-    //
-
-    auto        M     = std::unique_ptr< Hpro::TMatrix< value_t > >();
-    const auto  rowis = bct->is().row_is();
-    const auto  colis = bct->is().col_is();
-
-    if ( bct->is_leaf() )
-    {
-        auto  lacc = acc( rowis, colis );
-        
-        if ( bct->is_adm() )
-        {
-            M = std::unique_ptr< Hpro::TMatrix< value_t > >( lrapx.build( bct, lacc ) );
-
-            if ( Hpro::is_lowrank( *M ) )
-            {
-                auto  R  = ptrcast( M.get(), Hpro::TRkMatrix< value_t > );
-                auto  zR = std::make_unique< hlr::matrix::lrsvmatrix< value_t > >( rowis, colis,
-                                                                                   std::move( blas::mat_U( R ) ),
-                                                                                   std::move( blas::mat_V( R ) ) );
-
-                zR->compress( lacc );
-                M = std::move( zR );
-            }// if
-            else if ( matrix::is_lowrank( *M ) )
-            {
-                auto  R  = ptrcast( M.get(), matrix::lrmatrix< value_t > );
-                auto  zR = std::make_unique< hlr::matrix::lrsvmatrix< value_t > >( rowis, colis, R->U(), R->V() );
-                
-                zR->compress( lacc );
-                M = std::move( zR );
-            }// if
-            else if ( matrix::is_lowrank_sv( *M ) )
-            {
-                auto  R = ptrcast( M.get(), matrix::lrsvmatrix< value_t > );
-
-                R->compress( lacc );
-            }// if
-            else if ( Hpro::is_dense( *M ) )
-            {
-                auto  D  = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
-                auto  zD = std::make_unique< matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) );
-
-                zD->compress( lacc );
-                M = std::move( zD );
-            }// if
-            else if ( matrix::is_dense( *M ) )
-            {
-                auto  D = ptrcast( M.get(), matrix::dense_matrix< value_t > );
-
-                D->compress( lacc );
-            }// if
-            else
-            {
-                HLR_LOG( 0, M->typestr() );
-            }// else
-        }// if
-        else
-        {
-            M = coeff.build( rowis, colis );
-
-            if ( Hpro::is_dense( *M ) )
-            {
-                auto  D  = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
-                auto  zD = std::make_unique< matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) );
-
-                zD->compress( lacc );
-                M = std::move( zD );
-            }// if
-            else if ( matrix::is_dense( *M ) )
-            {
-                auto  D = ptrcast( M.get(), matrix::dense_matrix< value_t > );
-
-                D->compress( lacc );
-            }// if
-            else
-            {
-                HLR_LOG( 0, M->typestr() );
-            }// else
-        }// else
-    }// if
-    else if ( std::min( rowis.size(), colis.size() ) <= nseq )
-    {
-        M = hlr::seq::matrix::build_mixedprec( bct, coeff, lrapx, acc, nseq );
-    }// if
-    else
-    {
-        M = std::make_unique< Hpro::TBlockMatrix< value_t > >( bct );
-        
-        auto  B = ptrcast( M.get(), Hpro::TBlockMatrix< value_t > );
-
-        // make sure, block structure is correct
-        if (( B->nblock_rows() != bct->nrows() ) ||
-            ( B->nblock_cols() != bct->ncols() ))
-            B->set_block_struct( bct->nrows(), bct->ncols() );
-
-        // recurse
-        ::tbb::parallel_for(
-            ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
-                                            0, B->nblock_cols() ),
-            [&,B,bct,nseq] ( const ::tbb::blocked_range2d< uint > &  r )
-            {
-                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
-                {
-                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
-                    {
-                        if ( ! is_null( bct->son( i, j ) ) )
-                        {
-                            auto  B_ij = build_mixedprec( bct->son( i, j ), coeff, lrapx, acc, nseq );
-                            
-                            B->set_block( i, j, B_ij.release() );
-                        }// if
-                    }// for
-                }// for
-            } );
-    }// else
-
-    // copy properties from the cluster
-    M->set_id( bct->id() );
-    M->set_procs( bct->procs() );
-
-    return M;
-}
-
-template < typename coeff_t,
-           typename lrapx_t >
+template < coefficient_function_type  coeff_t,
+           lowrank_approx_type        lrapx_t >
 size_t
-mem_mixedprec ( const Hpro::TBlockCluster *  bct,
-                const coeff_t &              coeff,
-                const lrapx_t &              lrapx,
-                const Hpro::TTruncAcc &      acc,
-                const size_t                 nseq = Hpro::CFG::Arith::max_seq_size )
+mem_sv ( const Hpro::TBlockCluster *  bct,
+         const coeff_t &              coeff,
+         const lrapx_t &              lrapx,
+         const Hpro::TTruncAcc &      acc,
+         const size_t                 nseq = Hpro::CFG::Arith::max_seq_size )
 {
     static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
                    "coefficient function and low-rank approximation must have equal value type" );
@@ -426,85 +222,11 @@ mem_mixedprec ( const Hpro::TBlockCluster *  bct,
 
     if ( bct->is_leaf() )
     {
-        auto  M    = std::unique_ptr< Hpro::TMatrix< value_t > >();
-        auto  lacc = acc( rowis, colis );
-        
-        if ( bct->is_adm() )
-        {
-            M = std::unique_ptr< Hpro::TMatrix< value_t > >( lrapx.build( bct, lacc ) );
-
-            if ( Hpro::is_lowrank( *M ) )
-            {
-                auto  R  = ptrcast( M.get(), Hpro::TRkMatrix< value_t > );
-                auto  zR = std::make_unique< hlr::matrix::lrsvmatrix< value_t > >( rowis, colis,
-                                                                                   std::move( blas::mat_U( R ) ),
-                                                                                   std::move( blas::mat_V( R ) ) );
-
-                zR->compress( lacc );
-                M = std::move( zR );
-            }// if
-            else if ( matrix::is_lowrank( *M ) )
-            {
-                auto  R  = ptrcast( M.get(), matrix::lrmatrix< value_t > );
-                auto  zR = std::make_unique< hlr::matrix::lrsvmatrix< value_t > >( rowis, colis, R->U(), R->V() );
-                
-                zR->compress( lacc );
-                M = std::move( zR );
-            }// if
-            else if ( matrix::is_lowrank_sv( *M ) )
-            {
-                auto  R = ptrcast( M.get(), matrix::lrsvmatrix< value_t > );
-
-                R->compress( lacc );
-            }// if
-            else if ( Hpro::is_dense( *M ) )
-            {
-                auto  D  = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
-                auto  zD = std::make_unique< matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) );
-
-                zD->compress( lacc );
-                M = std::move( zD );
-            }// if
-            else if ( matrix::is_dense( *M ) )
-            {
-                auto  D = ptrcast( M.get(), matrix::dense_matrix< value_t > );
-
-                D->compress( lacc );
-            }// if
-            else
-            {
-                HLR_LOG( 0, M->typestr() );
-            }// else
-        }// if
-        else
-        {
-            M = coeff.build( rowis, colis );
-
-            if ( Hpro::is_dense( *M ) )
-            {
-                auto  D  = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
-                auto  zD = std::make_unique< matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) );
-
-                zD->compress( lacc );
-                M = std::move( zD );
-            }// if
-            else if ( matrix::is_dense( *M ) )
-            {
-                auto  D = ptrcast( M.get(), matrix::dense_matrix< value_t > );
-
-                D->compress( lacc );
-            }// if
-            else
-            {
-                HLR_LOG( 0, M->typestr() );
-            }// else
-        }// else
-
-        mem += M->data_byte_size();
+        mem += hlr::seq::matrix::mem_sv( bct, coeff, lrapx, acc, nseq );
     }// if
     else if ( std::min( rowis.size(), colis.size() ) <= nseq )
     {
-        mem += hlr::seq::matrix::mem_mixedprec( bct, coeff, lrapx, acc, nseq );
+        mem += hlr::seq::matrix::mem_sv( bct, coeff, lrapx, acc, nseq );
     }// if
     else
     {
@@ -525,7 +247,7 @@ mem_mixedprec ( const Hpro::TBlockCluster *  bct,
                     {
                         if ( ! is_null( bct->son( i, j ) ) )
                         {
-                            const auto  mem_ij = mem_mixedprec( bct->son( i, j ), coeff, lrapx, acc, nseq );
+                            const auto  mem_ij = mem_sv( bct->son( i, j ), coeff, lrapx, acc, nseq );
                             
                             {
                                 auto  lock = std::scoped_lock( mtx );
@@ -546,7 +268,7 @@ mem_mixedprec ( const Hpro::TBlockCluster *  bct,
 // matrix structure defined by <bct>, matrix coefficients
 // defined by <coeff>
 //
-template < typename coeff_t >
+template < coefficient_function_type coeff_t >
 std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > >
 build_nearfield ( const Hpro::TBlockCluster *  bct,
                   const coeff_t &              coeff,
@@ -570,19 +292,7 @@ build_nearfield ( const Hpro::TBlockCluster *  bct,
         
     if ( bct->is_leaf() )
     {
-        if ( bct->is_adm() )
-            return nullptr;
-        else
-        {
-            M = coeff.build( rowis, colis );
-
-            if ( Hpro::is_dense( *M ) )
-            {
-                auto  D = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
-
-                M = std::move( std::make_unique< hlr::matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) ) );
-            }// if
-        }// else
+        M = hlr::seq::matrix::build_nearfield( bct, coeff, nseq );
     }// if
     else if ( std::min( rowis.size(), colis.size() ) <= nseq )
     {
@@ -635,7 +345,7 @@ build_nearfield ( const Hpro::TBlockCluster *  bct,
 // truncated to accuracy <acc> using approximation method <apx>
 //
 template < typename value_t,
-           typename approx_t >
+           approx::approximation_type approx_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
 build ( const Hpro::TBlockCluster &             bct,
         const Hpro::TSparseMatrix< value_t > &  S,
@@ -653,20 +363,7 @@ build ( const Hpro::TBlockCluster &             bct,
     
     if ( bct.is_leaf() )
     {
-        //
-        // restrict to local cluster and convert to desired format
-        //
-
-        auto  S_bct = hlr::matrix::restrict( S, bct.is() );
-        
-        if ( bct.is_adm() )
-        {
-            M = hlr::matrix::convert_to_lowrank( *S_bct, acc, apx );
-        }// if
-        else
-        {
-            M = hlr::matrix::convert_to_dense< value_t >( *S_bct );
-        }// else
+        M = hlr::seq::matrix::build( bct, S, acc, apx, nseq );
     }// if
     else
     {
@@ -708,7 +405,7 @@ build ( const Hpro::TBlockCluster &             bct,
 }
     
 template < typename value_t,
-           typename approx_t >
+           approx::approximation_type approx_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
 build_nd ( const Hpro::TBlockCluster &             bct,
            const Hpro::TSparseMatrix< value_t > &  S,
@@ -804,7 +501,7 @@ build_nd ( const Hpro::TBlockCluster &             bct,
 // for non-admissible blocks
 //
 template < typename value_t,
-           typename approx_t >
+           approx::approximation_type approx_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
 build_sparse ( const Hpro::TBlockCluster &             bct,
                const Hpro::TSparseMatrix< value_t > &  S,
@@ -820,25 +517,7 @@ build_sparse ( const Hpro::TBlockCluster &             bct,
     
     if ( bct.is_leaf() )
     {
-        //
-        // restrict to local cluster and convert to desired format
-        //
-
-        auto  S_bct = hlr::matrix::restrict( S, bct.is() );
-        
-        if ( bct.is_adm() )
-        {
-            M = hlr::matrix::convert_to_lowrank( *S_bct, acc, apx );
-        }// if
-        else if ( is_sparse( *S_bct ) )
-        {
-            // M = std::make_unique< matrix::sparse_matrix< value_t > >( * ptrcast( S_bct.get(), Hpro::TSparseMatrix< value_t > ) );
-            M = std::move( S_bct );
-        }// else
-        else
-        {
-            M = hlr::matrix::convert_to_dense< value_t >( *S_bct );
-        }// else
+        M = hlr::seq::matrix::build_sparse( bct, S, acc, apx, nseq );
     }// if
     else
     {
@@ -885,12 +564,12 @@ build_sparse ( const Hpro::TBlockCluster &             bct,
 // - low-rank blocks are converted to uniform low-rank matrices and
 //   shared bases are constructed on-the-fly
 //
-template < typename coeff_t,
-           typename lrapx_t,
-           typename basisapx_t >
-std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename coeff_t::value_t > >,
-            std::unique_ptr< hlr::matrix::shared_cluster_basis< typename coeff_t::value_t > >,
-            std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > > >
+template < coefficient_function_type coeff_t,
+           lowrank_approx_type lrapx_t,
+           approx::approximation_type basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
+            std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
+            std::unique_ptr< Hpro::TMatrix< Hpro::value_type_t< coeff_t > > > >
 build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
                     const coeff_t &              coeff,
                     const lrapx_t &              lrapx,
@@ -901,7 +580,7 @@ build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
     return detail::build_uniform_lvl( bct, coeff, lrapx, basisapx, acc );
 }
 
-template < typename basisapx_t >
+template < approx::approximation_type basisapx_t >
 std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
@@ -936,12 +615,12 @@ build_uniform_lvl ( const Hpro::TMatrix< typename basisapx_t::value_t > &    A,
 //   shared bases are constructed on-the-fly
 //
 
-// template < typename coeff_t,
-//            typename lrapx_t,
-//            typename basisapx_t >
-// std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename coeff_t::value_t > >,
-//             std::unique_ptr< hlr::matrix::shared_cluster_basis< typename coeff_t::value_t > >,
-//             std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > > >
+// template < coefficient_function_type coeff_t,
+//            lowrank_approx_type lrapx_t,
+//            approx::approximation_type basisapx_t >
+// std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
+//             std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
+//             std::unique_ptr< Hpro::TMatrix< Hpro::value_type_t< coeff_t > > > >
 // build_uniform_rec ( const Hpro::TBlockCluster *  bct,
 //                     const coeff_t &              coeff,
 //                     const lrapx_t &              lrapx,
@@ -949,14 +628,14 @@ build_uniform_lvl ( const Hpro::TMatrix< typename basisapx_t::value_t > &    A,
 //                     const Hpro::TTruncAcc &      acc,
 //                     const size_t                 /* nseq */ = Hpro::CFG::Arith::max_seq_size ) // ignored
 // {
-//     static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
+//     static_assert( std::is_same_v< Hpro::value_type_t< coeff_t >, Hpro::value_type_t< lrapx_t > >,
 //                    "coefficient function and low-rank approximation must have equal value type" );
-//     static_assert( std::is_same_v< typename coeff_t::value_t, typename basisapx_t::value_t >,
+//     static_assert( std::is_same_v< Hpro::value_type_t< coeff_t >, Hpro::value_type_t< basisapx_t > >,
 //                    "coefficient function and basis approximation must have equal value type" );
     
 //     HLR_ASSERT( bct != nullptr );
 
-//     using value_t       = typename coeff_t::value_t;
+//     using value_t       = Hpro::value_type_t< coeff_t >;
 //     using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
 
 //     auto  rowcb  = std::make_unique< cluster_basis >( bct->is().row_is() );
@@ -978,13 +657,14 @@ build_uniform_lvl ( const Hpro::TMatrix< typename basisapx_t::value_t > &    A,
 // - low-rank blocks are converted to uniform low-rank matrices and
 //   shared bases are constructed on-the-fly
 //
-template < typename basisapx_t >
+template < approx::approximation_type basisapx_t >
 std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
 build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &    A,
                     const basisapx_t &                                       basisapx,
                     const Hpro::TTruncAcc &                                  acc,
+                    const bool                                               compress,
                     const size_t                                             /* nseq */ = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
     using value_t       = typename basisapx_t::value_t;
@@ -1003,38 +683,80 @@ build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &    A,
         colcb->set_nsons( cptrcast( &A, Hpro::TBlockMatrix< value_t > )->nblock_cols() );
     }// if
 
-    #if 1
-    
     detail::init_cluster_bases( A, *rowcb, *colcb );
-
-    #endif
     
-    auto  row_map = detail::lr_coupling_map_t< value_t >();
-    auto  col_map = detail::lr_coupling_map_t< value_t >();
-    auto  row_mtx = std::mutex();
-    auto  col_mtx = std::mutex();
+    auto  lr_row_map   = detail::lr_coupling_map_t< value_t >();
+    auto  lr_col_map   = detail::lr_coupling_map_t< value_t >();
+    auto  lrsv_row_map = detail::lrsv_mat_map_t< value_t >();
+    auto  lrsv_col_map = detail::lrsv_mat_map_t< value_t >();
 
-    detail::build_mat_map( A, *rowcb, *colcb, row_map, row_mtx, col_map, col_mtx );
+    detail::build_mat_map( A, *rowcb, *colcb, lr_row_map, lr_col_map, lrsv_row_map, lrsv_col_map );
 
     //
     // build cluster bases
     //
 
-    ::tbb::parallel_invoke(
-        [&] () { detail::build_cluster_basis( *rowcb, basisapx, acc, row_map, false ); },
-        [&] () { detail::build_cluster_basis( *colcb, basisapx, acc, col_map, true );  }
-    );
+    if ( lrsv_row_map.empty() )
+    {
+        ::tbb::parallel_invoke(
+            [&] () { detail::build_cluster_basis( *rowcb, basisapx, acc, lr_row_map, false, compress ); },
+            [&] () { detail::build_cluster_basis( *colcb, basisapx, acc, lr_col_map, true,  compress );  }
+        );
+    }// if
+    else
+    {
+        ::tbb::parallel_invoke(
+            [&] () { detail::build_cluster_basis( *rowcb, basisapx, acc, lrsv_row_map, false, compress ); },
+            [&] () { detail::build_cluster_basis( *colcb, basisapx, acc, lrsv_col_map, true,  compress );  }
+        );
+    }// else
 
     //
     // construct uniform lowrank matrices with given cluster bases
     //
     
-    auto  M = detail::build_uniform( A, *rowcb, *colcb );
+    auto  M = detail::build_uniform( A, *rowcb, *colcb, acc, compress );
 
     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
 }
 
-template < typename basisapx_t >
+namespace tlr
+{
+//
+// special version for BLR format
+//
+template < coefficient_function_type coeff_t,
+           lowrank_approx_type       lrapx_t,
+           approx::approximation_type        basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
+build_uniform ( const Hpro::TBlockCluster *  bc,
+                const coeff_t &              coeff,
+                const lrapx_t &              lrapx,
+                const basisapx_t &           basisapx,
+                const accuracy &             acc )
+{
+    return detail::build_blr2( bc, coeff, lrapx, basisapx, acc );
+}
+
+template < approx::approximation_type basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
+build_uniform ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
+                const basisapx_t &                                     basisapx,
+                const Hpro::TTruncAcc &                                acc ) // ignored
+{
+    return detail::build_blr2( A, basisapx, acc );
+}
+
+}// namespace tlr
+
+//
+// construct H² matrix with corresponding cluster bases out of given H-matrix
+//
+template < approx::approximation_type basisapx_t >
 std::tuple< std::unique_ptr< hlr::matrix::nested_cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< hlr::matrix::nested_cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
@@ -1251,6 +973,14 @@ copy_compressible ( const Hpro::TMatrix< value_t > &  M )
         return N;
     }// if
     else if ( matrix::is_lowrank( M ) )
+    {
+        auto  N = M.copy();
+        
+        N->set_id( M.id() );
+        
+        return N;
+    }// if
+    else if ( matrix::is_lowrank_sv( M ) )
     {
         auto  N = M.copy();
         

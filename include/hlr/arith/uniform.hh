@@ -179,6 +179,28 @@ mul_vec2 ( const value_t                              alpha,
     // std::cout << t1 << " / " << t2 << std::endl;
 }
 
+template < typename value_t >
+void
+mul_vec_hier ( const value_t                                        alpha,
+               const hpro::matop_t                                  op_M,
+               const matrix::level_hierarchy< value_t > &           M,
+               const vector::scalar_vector< value_t > &             x,
+               vector::scalar_vector< value_t > &                   y,
+               matrix::shared_cluster_basis_hierarchy< value_t > &  rowcb,
+               matrix::shared_cluster_basis_hierarchy< value_t > &  colcb )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    //
+    // construct uniform representation of x and y
+    //
+
+    auto  ux = detail::scalar_to_uniform( ( op_M == hpro::apply_normal ? colcb : rowcb ), x );
+
+    detail::mul_vec_hier( alpha, op_M, M, *ux, x, y, ( op_M == hpro::apply_normal ? rowcb : colcb ) );
+}
+
 //
 // return FLOPs needed for computing y = y + α op( M ) x
 // (implicit vectors)
@@ -490,6 +512,28 @@ lu ( hpro::TMatrix< value_t > &                 A,
 
 namespace tlr
 {
+
+//
+// mat-vec : y = y + α op( M ) x
+//
+template < typename value_t >
+void
+mul_vec ( const value_t                              alpha,
+          const hpro::matop_t                        op_M,
+          const hpro::TMatrix< value_t > &           M,
+          const vector::scalar_vector< value_t > &   x,
+          vector::scalar_vector< value_t > &         y,
+          matrix::shared_cluster_basis< value_t > &  rowcb,
+          matrix::shared_cluster_basis< value_t > &  colcb )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    if ( op_M == apply_normal )
+        detail::mul_vec( alpha, op_M, M, x, y, rowcb, colcb );
+    else
+        detail::mul_vec( alpha, op_M, M, x, y, colcb, rowcb );
+}
 
 //
 // add global low-rank matrix W·X' to H²-matrix M

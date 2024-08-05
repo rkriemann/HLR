@@ -32,8 +32,8 @@ struct config
 //
 // return bitrate for given accuracy
 //
-inline uint  eps_to_rate      ( const double  eps ) { return std::max< double >( 1, std::ceil( -std::log2( eps ) ) ) + 2; }
-inline uint  eps_to_rate_aplr ( const double  eps ) { return std::max< double >( 1, std::ceil( -1.1 * std::log2( eps ) ) ) + 5; }
+inline uint  eps_to_rate      ( const double  eps ) { return std::max< double >( 0, std::ceil( -std::log2( eps ) ) ) + 2; }
+inline uint  eps_to_rate_aplr ( const double  eps ) { return std::max< double >( 0, std::ceil( -1.1 * std::log2( eps ) ) ) + 5; }
 
 //
 // define various compression modes

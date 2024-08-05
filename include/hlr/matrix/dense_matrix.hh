@@ -260,18 +260,18 @@ public:
                                const matop_t                    op = apply_normal ) const;
     
     // truncate matrix to accuracy \a acc
-    virtual void  truncate   ( const Hpro::TTruncAcc & ) {}
+    virtual void  truncate   ( const accuracy & ) {}
 
     //
     // compression
     //
 
-    // compress internal data based on given configuration
-    // - may result in non-compression if storage does not decrease
-    virtual void   compress      ( const compress::zconfig_t &  zconfig );
+    // // compress internal data based on given configuration
+    // // - may result in non-compression if storage does not decrease
+    // virtual void   compress      ( const compress::zconfig_t &  zconfig );
 
     // compress internal data based on given accuracy
-    virtual void   compress      ( const Hpro::TTruncAcc &  acc );
+    virtual void   compress      ( const accuracy &  acc );
 
     // decompress internal data
     virtual void   decompress    ();
@@ -324,8 +324,8 @@ public:
     }
 
     // return copy matrix wrt. given accuracy; if \a do_coarsen is set, perform coarsening
-    virtual auto   copy  ( const Hpro::TTruncAcc &  /* acc */,
-                           const bool               /* do_coarsen */ = false ) const -> std::unique_ptr< Hpro::TMatrix< value_t > >
+    virtual auto   copy  ( const accuracy &  /* acc */,
+                           const bool        /* do_coarsen */ = false ) const -> std::unique_ptr< Hpro::TMatrix< value_t > >
     {
         return copy();
     }
@@ -363,7 +363,7 @@ public:
 
     // copy matrix data to \a A and truncate w.r.t. \acc with optional coarsening
     virtual void   copy_to      ( Hpro::TMatrix< value_t > *  A,
-                                  const Hpro::TTruncAcc &     /* acc */,
+                                  const accuracy &            /* acc */,
                                   const bool                  /* do_coarsen */ = false ) const
     {
         copy_to( A );
@@ -501,44 +501,7 @@ dense_matrix< value_t >::apply_add   ( const value_t                    alpha,
 //
 template < typename value_t >
 void
-dense_matrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
-{
-    if ( is_compressed() )
-        return;
-
-    auto          M         = _mat;
-    const size_t  mem_dense = sizeof(value_t) * M.nrows() * M.ncols();
-    auto          zM        = compress::compress< value_t >( zconfig, M );
-    const auto    zmem      = compress::compressed_size( zM );
-
-    // // DEBUG
-    // {
-    //     auto  dM = blas::matrix< value_t >( M.nrows(), M.ncols() );
-
-    //     compress::decompress( zM, dM );
-
-    //     // io::matlab::write( M, "M1" );
-    //     // io::matlab::write( dM, "M2" );
-        
-    //     blas::add( value_t(-1), M, dM );
-
-    //     std::cout << "D " << this->block_is().to_string() << " : "
-    //               << blas::norm_F( dM ) / blas::norm_F(M)
-    //               << " / "
-    //               << blas::max_abs_val( dM )
-    //               << std::endl;
-    // }
-    
-    if (( zmem != 0 ) && ( zmem < mem_dense ))
-    {
-        _zM  = std::move( zM );
-        _mat = std::move( blas::matrix< value_t >( 0, 0 ) );
-    }// if
-}
-
-template < typename value_t >
-void
-dense_matrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
+dense_matrix< value_t >::compress ( const accuracy &  acc )
 {
     if ( this->nrows() * this->ncols() == 0 )
         return;
@@ -546,37 +509,85 @@ dense_matrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     // // DEBUG
     // auto  D1 = this->copy();
     // auto  M1 = ptrcast( D1.get(), dense_matrix< value_t > )->mat();
-    
-    const auto  lacc = acc( this->row_is(), this->col_is() );
 
-    if ( lacc.rel_eps() != 0 )
+    //
+    // determine compression accuracy
+    //
+    
+    auto        M    = _mat;
+    const auto  lacc = acc( this->row_is(), this->col_is() );
+    auto        tol  = lacc.abs_eps();
+
+    if ( lacc.abs_eps() != 0 )
     {
-        const auto  eps = lacc.rel_eps();
-        
-        compress( compress::get_config( eps ) );
+        if      ( lacc.norm_mode() == Hpro::spectral_norm  ) tol = lacc.abs_eps() / blas::norm_2( M );
+        else if ( lacc.norm_mode() == Hpro::frobenius_norm ) tol = lacc.abs_eps() / blas::norm_F( M );
+        else
+            HLR_ERROR( "unsupported norm mode" );
     }// if
-    else if ( lacc.abs_eps() != 0 )
+    else if ( lacc.rel_eps() != 0 )
     {
-        const auto  eps = lacc.abs_eps();
-        
-        compress( compress::get_config( eps ) );
+        if      ( lacc.norm_mode() == Hpro::spectral_norm  ) tol = lacc.rel_eps(); // * blas::norm_2( M );
+        else if ( lacc.norm_mode() == Hpro::frobenius_norm ) tol = lacc.rel_eps(); // * blas::norm_F( M );
+        else
+            HLR_ERROR( "unsupported norm mode" );
     }// if
     else
-        HLR_ERROR( "unsupported accuracy type" );
+        HLR_ERROR( "zero error" );
 
-    // // DEBUG
-    // auto  D2 = this->copy();
+    //
+    // compress
+    //
 
-    // ptrcast( D2.get(), dense_matrix< value_t > )->decompress();
-
-    // auto  M2 = ptrcast( D2.get(), dense_matrix< value_t > )->mat();
+    const auto    zconfig   = compress::get_config( tol );
+    const size_t  mem_dense = sizeof(value_t) * M.nrows() * M.ncols();
+    auto          zM        = compress::compress< value_t >( zconfig, M );
+    const auto    zmem      = compress::compressed_size( zM );
     
-    // blas::add( -1.0, M1, M2 );
+    // // DEBUG
+    // {
+    //     auto  M1 = blas::copy( M );
+    //     auto  M2 = blas::matrix< value_t >( M.nrows(), M.ncols() );
 
-    // auto  n1 = blas::norm_F( M1 );
-    // auto  n2 = blas::norm_F( M2 );
+    //     compress::decompress( zM, M2 );
 
-    // std::cout << "D: " << boost::format( "%.4e" ) % n1 << " / " << boost::format( "%.4e" ) % n2 << " / " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
+    //     io::matlab::write( M1, "M1" );
+    //     io::matlab::write( M2, "M2" );
+        
+    //     blas::add( -1.0, M1, M2 );
+
+    //     if ( lacc.norm_mode() == Hpro::spectral_norm )
+    //     {
+    //         auto  n1 = blas::norm_2( M1 );
+    //         auto  n2 = blas::norm_2( M2 );
+
+    //         std::cout << "Ds: tol = " << boost::format( "%.4e" ) % tol
+    //                   << " / norm = " << boost::format( "%.4e" ) % n1
+    //                   << " / abs = " << boost::format( "%.4e" ) % n2
+    //                   << " / rel = " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
+    //     }// if
+    //     else
+    //     {
+    //         auto  n1 = blas::norm_F( M1 );
+    //         auto  n2 = blas::norm_F( M2 );
+
+    //         std::cout << "Df: tol = " << boost::format( "%.4e" ) % tol
+    //                   << " / norm = " << boost::format( "%.4e" ) % n1
+    //                   << " / abs = " << boost::format( "%.4e" ) % n2
+    //                   << " / rel = " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
+    //     }// else
+    // }
+    // // DEBUG
+
+    //
+    // finish
+    //
+    
+    if (( zmem != 0 ) && ( zmem < mem_dense ))
+    {
+        _zM  = std::move( zM );
+        _mat = std::move( blas::matrix< value_t >( 0, 0 ) );
+    }// if
 }
 
 //

@@ -28,7 +28,6 @@ namespace hlr
 
 using indexset     = Hpro::TIndexSet;
 using cluster_tree = Hpro::TCluster;
-using accuracy     = Hpro::TTruncAcc;
 
 using Hpro::idx_t;
 
@@ -618,15 +617,31 @@ public:
     {
         size_t  n = 0;
 
-        if ( nsons() == 0 )
-            n += sizeof( value_t ) * _is.size() * rank();
+        if ( is_compressed() )
+        {
+            if ( nsons() == 0 )
+                n += hlr::compress::aplr::byte_size( _zV ) + _sv.data_byte_size();
+            else
+            {
+                for ( uint  i = 0; i < nsons(); ++i )
+                    n += hlr::compress::byte_size( _zE[i] );
+                
+                for ( auto  son : _sons )
+                    n += son->data_byte_size();
+            }// else
+        }// if
         else
         {
-            for ( uint  i = 0; i < nsons(); ++i )
-                n += sizeof( value_t ) * _E[i].nrows() * rank();
-            
-            for ( auto  son : _sons )
-                n += son->data_byte_size();
+            if ( nsons() == 0 )
+                n += sizeof( value_t ) * _is.size() * rank();
+            else
+            {
+                for ( uint  i = 0; i < nsons(); ++i )
+                    n += sizeof( value_t ) * _E[i].nrows() * rank();
+                
+                for ( auto  son : _sons )
+                    n += son->data_byte_size();
+            }// else
         }// else
 
         return  n;
@@ -654,12 +669,8 @@ public:
     // compression
     //
 
-    // compress internal data based on given configuration
-    // - may result in non-compression if storage does not decrease
-    virtual void   compress      ( const compress::zconfig_t &  zconfig );
-
     // compress internal data based on given accuracy
-    virtual void   compress      ( const Hpro::TTruncAcc &  acc );
+    virtual void   compress      ( const accuracy &  acc );
 
     // decompress internal data
     virtual void   decompress    ();
@@ -710,23 +721,13 @@ copy ( const nested_cluster_basis< value_src_t > &  src )
 //
 template < typename value_t >
 void
-nested_cluster_basis< value_t >::compress ( const compress::zconfig_t &  zconfig )
+nested_cluster_basis< value_t >::compress ( const accuracy &  acc )
 {
     if ( is_compressed() )
         return;
 
-    HLR_ASSERT( false );
-}
-
-template < typename value_t >
-void
-nested_cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
-{
-    if ( is_compressed() )
-        return;
-
-    HLR_ASSERT( acc.rel_eps() == 0 );
-
+    auto  lacc = acc( _is, _is ); // TODO: accuracy for just _is
+    
     if ( nsons() == 0 )
     {
         if ( _V.nrows() * _V.ncols() == 0 )
@@ -740,8 +741,30 @@ nested_cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 
         HLR_ASSERT( _sv.length() == _V.ncols() );
 
-        real_t  tol = acc.abs_eps() * _sv(0);
-        auto    S   = blas::copy( _sv );
+        // defaults to absolute error: δ = ε
+        auto  tol = lacc.abs_eps();
+
+        if ( lacc.rel_eps() != 0 )
+        {
+            // use relative error: δ = ε |M|
+            real_t  norm = real_t(0);
+
+            if ( lacc.norm_mode() == Hpro::spectral_norm )
+                norm = _sv(0);
+            else if ( lacc.norm_mode() == Hpro::frobenius_norm )
+            {
+                for ( uint  i = 0; i < _sv.length(); ++i )
+                    norm += math::square( _sv(i) );
+
+                norm = math::sqrt( norm );
+            }// if
+            else
+                HLR_ERROR( "unsupported norm mode" );
+    
+            tol = lacc.rel_eps() * norm;
+        }// if
+        
+        auto  S = blas::copy( _sv );
 
         for ( uint  l = 0; l < S.length(); ++l )
             S(l) = tol / S(l);
@@ -769,9 +792,32 @@ nested_cluster_basis< value_t >::compress ( const Hpro::TTruncAcc &  acc )
         if ( _E.size() == 0 )
             return;
 
+        // defaults to absolute error: δ = ε
+        auto  tol = lacc.rel_eps();
+
+        if ( lacc.abs_eps() != 0 )
+        {
+            // use relative error: δ = ε |M|
+            real_t  norm = real_t(0);
+
+            if ( lacc.norm_mode() == Hpro::spectral_norm )
+                norm = _sv(0);
+            else if ( lacc.norm_mode() == Hpro::frobenius_norm )
+            {
+                for ( uint  i = 0; i < _sv.length(); ++i )
+                    norm += math::square( _sv(i) );
+
+                norm = math::sqrt( norm );
+            }// if
+            else
+                HLR_ERROR( "unsupported norm mode" );
+    
+            tol = lacc.abs_eps() / norm;
+        }// if
+
         size_t  mem_dense = 0;
         size_t  mem_compr = 0;
-        auto    zconfig   = compress::get_config( acc.abs_eps() );
+        auto    zconfig   = compress::get_config( tol );
         auto    zE        = std::vector< compress::zarray >( _E.size() );
         
         for ( uint  i = 0; i < _E.size(); ++i )

@@ -224,6 +224,25 @@ mulvec ( const size_t     nrows,
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
+#elif HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_DFL2
+
+#include <hlr/compress/dfl2.hh>
+
+namespace hlr { namespace compress { namespace aplr {
+
+using zarray = hlr::compress::dfl2::zarray;
+using hlr::compress::dfl2::compress_lr;
+using hlr::compress::dfl2::decompress_lr;
+using hlr::compress::dfl2::byte_size;
+using hlr::compress::dfl2::compressed_size;
+
+static const char provider[] = "dfl2";
+
+}}}// namespace hlr::compress::aplr
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
 #elif HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_AFLP
 
 #include <hlr/compress/aflp.hh>

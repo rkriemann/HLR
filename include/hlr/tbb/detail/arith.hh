@@ -695,7 +695,37 @@ build_joined_matrix ( const matop_t                  op_M,
                 }// if
                 else
                 {
-                    HLR_ERROR( "TODO" );
+                    //
+                    // determine joined rank
+                    //
+
+                    uint  k = 0;
+        
+                    for ( auto  M : cm.R )
+                        k += cptrcast( M, matrix::lrsvmatrix< value_t > )->rank();
+
+                    //
+                    // build joined U factor
+                    //
+
+                    auto  nrows = cm.is.size();
+                    auto  U     = blas::matrix< value_t >( nrows, k );
+                    uint  pos   = 0;
+
+                    for ( auto  M : cm.R )
+                    {
+                        auto  R   = cptrcast( M, matrix::lrsvmatrix< value_t > );
+                        auto  UR  = blas::prod_diag( R->U( op_M ), R->S() );
+                        auto  k_i = R->rank();
+                        auto  U_i = blas::matrix< value_t >( U, blas::range::all, blas::range( pos, pos + k_i - 1 ) );
+
+                        blas::copy( UR, U_i );
+                        pos += k_i;
+                    }// for
+
+                    cm.U = std::move( U );
+
+                    cm.compressed = false;
                 }// else
             }// if
         }// else
@@ -789,7 +819,9 @@ mul_vec_cl ( const value_t                             alpha,
             
                 for ( auto  M : cm.R )
                 {
-                    auto  R   = cptrcast( M, matrix::lrmatrix< value_t > );
+                    HLR_ASSERT( matrix::is_lowrank_sv( M ) );
+                    
+                    auto  R   = cptrcast( M, matrix::lrsvmatrix< value_t > );
                     auto  VR  = R->V( op_M );
                     auto  k_i = R->rank();
                     auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
@@ -819,6 +851,46 @@ mul_vec_cl ( const value_t                             alpha,
                 hlr::tbb::detail::mul_vec_cl( alpha, op_M, *cm.sub_blocks[i], x, y );
             } );
     }// if
+}
+
+template < typename value_t >
+void
+mul_vec_hier ( const value_t                               alpha,
+               const Hpro::matop_t                         op_M,
+               const matrix::level_hierarchy< value_t > &  M,
+               const scalar_vector< value_t > &            sx,
+               scalar_vector< value_t > &                  sy )
+{
+    HLR_ASSERT( op_M == apply_normal );
+    
+    for ( uint  lvl = 0; lvl < M.nlevel(); ++lvl )
+    {
+        ::tbb::parallel_for< uint >(
+            0, M.row_ptr[lvl].size()-1,
+            [&,alpha,op_M,lvl] ( const uint  row )
+            {
+                const auto  lb = M.row_ptr[lvl][row];
+                const auto  ub = M.row_ptr[lvl][row+1];
+
+                if ( lb == ub )
+                    return;
+            
+                const auto  row_is = M.row_mat[lvl][lb]->row_is( op_M );
+                auto        y_j    = blas::vector< value_t >( blas::vec( sy ), row_is - sy.ofs() );
+                auto        t_j    = blas::vector< value_t >( y_j.length() );
+                
+                for ( uint  j = lb; j < ub; ++j )
+                {
+                    auto  col_idx = M.col_idx[lvl][j];
+                    auto  mat     = M.row_mat[lvl][j];
+                    auto  x_i     = blas::vector< value_t >( blas::vec( sx ), mat->col_is( op_M ) - sx.ofs() );
+                        
+                    mat->apply_add( alpha, x_i, t_j, op_M );
+                }// for
+
+                blas::add( 1, t_j, y_j );
+            } );
+    }// for
 }
 
 ///////////////////////////////////////////////////////////////////////

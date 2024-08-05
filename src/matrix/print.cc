@@ -294,6 +294,59 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
                 }// if
             }// if
         }// if
+        else if ( matrix::is_lowrank_sv( M ) )
+        {
+            auto  R    = cptrcast( &M, matrix::lrsvmatrix< value_t > );
+            auto  rank = R->rank();
+
+            if ( ! contains( options, "nonempty" ) || ( rank > 0 ))
+            {
+                if ( R->is_compressed() ) prn.set_rgb( colors[HLR_COLOR_BG_LOWRANK_COMPRESSED] );
+                else                      prn.set_rgb( colors[HLR_COLOR_BG_LOWRANK] );
+
+                prn.fill_rect( M.col_ofs(),
+                               M.row_ofs(),
+                               M.col_ofs() + M.ncols(),
+                               M.row_ofs() + M.nrows() );
+
+                if ( contains( options, "sv" ) )
+                {
+                    auto  S = R->S();
+
+                    if ( S.length() > 0 )
+                    {
+                        prn.set_gray( 128 );
+                        print_sv( prn, M, S );
+                    }// if
+                }// if
+
+                if ( ! contains( options, "norank" ) )
+                {
+                    prn.save();
+                    prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 4.0 ) );
+                    
+                    prn.set_rgb( colors[HLR_COLOR_FG_RANK] );
+                    prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
+                                   double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
+                                   Hpro::to_string( "%d", rank ) );
+                    
+                    prn.restore();
+                }// if
+
+                if ( contains( options, "pattern" ) )
+                {
+                    auto  D = blas::prod( R->U(), blas::adjoint( R->V() ) );
+                    
+                    prn.set_gray( 0 );
+                
+                    for ( uint  i = 0; i < D.nrows(); ++i )
+                        for ( uint  j = 0; j < D.ncols(); ++j )
+                            if ( D(i,j) != value_t(0) )
+                                prn.fill_rect( j     + M.col_ofs(), i     + M.row_ofs(),
+                                               j + 1 + M.col_ofs(), i + 1 + M.row_ofs() );
+                }// if
+            }// if
+        }// if
         else if ( matrix::is_uniform_lowrank( M ) )
         {
             auto  R = cptrcast( &M, matrix::uniform_lrmatrix< value_t > );

@@ -45,7 +45,6 @@ public:
     using  real_t  = Hpro::real_type_t< value_t >;
     
 private:
-private:
     // local index set of matrix
     indexset                 _row_is, _col_is;
     
@@ -258,7 +257,7 @@ public:
     using Hpro::TMatrix< value_t >::apply_add;
     
     // truncate matrix to accuracy acc
-    virtual void truncate ( const Hpro::TTruncAcc & acc )
+    virtual void truncate ( const accuracy & acc )
     {
         HLR_ERROR( "todo" );
     }
@@ -288,8 +287,8 @@ public:
     virtual auto   copy         () const -> std::unique_ptr< Hpro::TMatrix< value_t > >;
 
     // return copy matrix wrt. given accuracy; if do_coarsen is set, perform coarsening
-    virtual auto   copy         ( const Hpro::TTruncAcc &  /* acc */,
-                                  const bool               /* do_coarsen */ = false ) const -> std::unique_ptr< Hpro::TMatrix< value_t > >
+    virtual auto   copy         ( const accuracy &  /* acc */,
+                                  const bool        /* do_coarsen */ = false ) const -> std::unique_ptr< Hpro::TMatrix< value_t > >
     {
         return copy();
     }
@@ -305,7 +304,7 @@ public:
 
     // copy matrix data to A and truncate w.r.t. acc with optional coarsening
     virtual void   copy_to      ( Hpro::TMatrix< value_t > *  A,
-                                  const Hpro::TTruncAcc &     /* acc */,
+                                  const accuracy &            /* acc */,
                                   const bool                  /* do_coarsen */ = false ) const
     {
         return copy_to( A );
@@ -317,8 +316,8 @@ public:
 
     // compress internal data
     // - may result in non-compression if storage does not decrease
-    virtual void   compress      ( const compress::zconfig_t &  zconfig ) { HLR_ERROR( "unsupported" ); }
-    virtual void   compress      ( const Hpro::TTruncAcc &      acc );
+    // virtual void   compress      ( const compress::zconfig_t &  zconfig ) { HLR_ERROR( "unsupported" ); }
+    virtual void   compress      ( const accuracy &      acc );
 
     // decompress internal data
     virtual void   decompress    ();
@@ -813,7 +812,7 @@ lrsvmatrix< value_t >::copy_to ( Hpro::TMatrix< value_t > *  A ) const
 // - may result in non-compression if storage does not decrease
 template < typename value_t >
 void
-lrsvmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
+lrsvmatrix< value_t >::compress ( const accuracy &  acc )
 {
     if ( this->nrows() * this->ncols() == 0 )
         return;
@@ -838,26 +837,38 @@ lrsvmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     auto  lacc = acc( this->row_is(), this->col_is() );
     auto  tol  = lacc.abs_eps();
 
-    if ( lacc.rel_eps() != 0 )
+    if ( lacc.abs_eps() != 0 )
+    {
+        tol = lacc.abs_eps();
+    }// if
+    else if ( lacc.rel_eps() != 0 )
     {
         // use relative error: δ = ε |M|
         real_t  norm = real_t(0);
 
-        for ( uint  i = 0; i < _S.length(); ++i )
-            norm += math::square( _S(i) );
+        if ( lacc.norm_mode() == Hpro::spectral_norm )
+        {
+            norm = _S(0);
+        }// if
+        else if ( lacc.norm_mode() == Hpro::frobenius_norm )
+        {
+            for ( uint  i = 0; i < _S.length(); ++i )
+                norm += math::square( _S(i) );
 
-        norm = math::sqrt( norm );
+            norm = math::sqrt( norm );
+        }// if
+        else
+            HLR_ERROR( "unsupported norm mode" );
     
         tol = lacc.rel_eps() * norm;
     }// if
         
-    const auto  k = this->rank();
-
     //
     // we aim for σ_i ≈ δ u_i and hence choose u_i = δ / σ_i
     //
     
-    auto  S_tol = blas::copy( _S );
+    auto        S_tol = blas::copy( _S );
+    const auto  k     = this->rank();
 
     for ( uint  l = 0; l < k; ++l )
         S_tol(l) = tol / _S(l);
@@ -868,6 +879,49 @@ lrsvmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     const size_t  mem_zU = compress::aplr::compressed_size( zU );
     const size_t  mem_zV = compress::aplr::compressed_size( zV );
 
+    // DEBUG
+    {
+        auto  tU  = blas::copy( oU );
+        auto  tV  = blas::copy( oV );
+        auto  tT1 = blas::prod_diag( oU, _S );
+        auto  tM1 = blas::prod( tT1, blas::adjoint( oV ) );
+                               
+        auto  dU = blas::matrix< value_t >( oU.nrows(), oU.ncols() );
+        auto  dV = blas::matrix< value_t >( oV.nrows(), oV.ncols() );
+
+        compress::aplr::decompress_lr( zU, dU );
+        compress::aplr::decompress_lr( zV, dV );
+
+        auto  tT2 = blas::prod_diag( dU, _S );
+        auto  tM2 = blas::prod( tT2, blas::adjoint( dV ) );
+
+        io::matlab::write( tM1, "M1" );
+        io::matlab::write( tM2, "M2" );
+
+        blas::add( value_t(-1), tM1, tM2 );
+
+        if ( lacc.norm_mode() == Hpro::spectral_norm )
+        {
+            auto  n1 = blas::norm_2( tM1 );
+            auto  n2 = blas::norm_2( tM2 );
+
+            std::cout << "Rs: tol = " << boost::format( "%.4e" ) % tol
+                      << " / norm = " << boost::format( "%.4e" ) % n1
+                      << " / abs = " << boost::format( "%.4e" ) % n2
+                      << " / rel = " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
+        }// if
+        else
+        {
+            auto  n1 = blas::norm_F( tM1 );
+            auto  n2 = blas::norm_F( tM2 );
+
+            std::cout << "Rf: tol = " << boost::format( "%.4e" ) % tol
+                      << " / norm = " << boost::format( "%.4e" ) % n1
+                      << " / abs = " << boost::format( "%.4e" ) % n2
+                      << " / rel = " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
+        }// else
+    }
+    
     // // DEBUG
     // {
     //     auto  tU = blas::copy( oU );

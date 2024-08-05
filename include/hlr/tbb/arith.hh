@@ -153,6 +153,20 @@ mul_vec_cl2 ( const value_t                             alpha,
 
 template < typename value_t >
 void
+mul_vec_hier ( const value_t                               alpha,
+               const hpro::matop_t                         op_M,
+               const matrix::level_hierarchy< value_t > &  M,
+               const vector::scalar_vector< value_t > &    x,
+               vector::scalar_vector< value_t > &          y )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    detail::mul_vec_hier( alpha, op_M, M, x, y );
+}
+
+template < typename value_t >
+void
 realloc ( cluster_blocks_t< value_t > &  cb )
 {
     if ( ! cb.M.empty() )
@@ -938,6 +952,55 @@ namespace tlr
 // arithmetic functions for tile low-rank format
 //
 ///////////////////////////////////////////////////////////////////////
+
+//
+// matrix-vector multiplication
+//
+template < typename value_t >
+void
+mul_vec ( const value_t                             alpha,
+          const Hpro::matop_t                       op_M,
+          const Hpro::TMatrix< value_t > &          M,
+          const vector::scalar_vector< value_t > &  x,
+          vector::scalar_vector< value_t > &        y )
+{
+    using namespace hlr::matrix;
+
+    HLR_ASSERT( is_blocked( M ) );
+
+    auto  B = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+
+    ::tbb::parallel_for< size_t >(
+        0, B->nblock_rows(),
+        [&,B,alpha,op_M] ( const auto  i )
+        {
+            bool  first = true;
+            auto  y_i   = blas::vector< value_t >();
+            auto  t_i   = blas::vector< value_t >();
+        
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                auto  B_ij = B->block( i, j );
+            
+                if ( ! is_null( B_ij ) )
+                {
+                    if ( first )
+                    {
+                        y_i   = std::move( blas::vector< value_t >( blas::vec( y ), B_ij->row_is( op_M ) - y.ofs() ) );
+                        t_i   = std::move( blas::vector< value_t >( y_i.length() ) );
+                        first = false;
+                    }// if
+                    
+                    auto  x_j = blas::vector< value_t >( blas::vec( x ), B_ij->col_is( op_M ) - x.ofs() );
+                    
+                    B_ij->apply_add( alpha, x_j, t_i, op_M );
+                }// if
+            }// for
+
+            // add update to y
+            blas::add( value_t(1), t_i, y_i );
+        } );
+}
 
 //
 // LU factorization for TLR block format
