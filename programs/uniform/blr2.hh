@@ -104,7 +104,7 @@ program_main ()
     
     std::cout << "    done in  " << format_time( toc ) << std::endl;
     std::cout << "    dims   = " << term::bold << A->nrows() << " × " << A->ncols() << term::reset << std::endl;
-    std::cout << "    mem    = " << format_mem( A->byte_size() ) << std::endl;
+    std::cout << "    mem    = " << format_mem( rowcb->byte_size(), colcb->byte_size(), A->byte_size() ) << std::endl;
 
     // assign clusters since needed for cluster bases
     // seq::matrix::assign_cluster( *A, *bct->root() );
@@ -122,6 +122,23 @@ program_main ()
         std::cout << "    ranks  = " << kmin << " … " << kavg << " … " << kmax << std::endl;
     }
 
+    if ( true )
+    {
+        std::cout << term::bullet << term::bold
+                  << "BLR² with sep. couplings"
+                  << term::reset << std::endl;
+        
+        tic = timer::now();
+
+        auto  [ rowcb2, colcb2, A2 ] = impl::matrix::tlr::build_uniform_sep( bct->root(), pcoeff, lrapx, cbapx, acc );
+    
+        toc = timer::since( tic );
+    
+        std::cout << "    done in  " << format_time( toc ) << std::endl;
+        std::cout << "    mem    = " << format_mem( rowcb2->byte_size(), colcb2->byte_size(), A2->byte_size() ) << std::endl;
+        std::cout << "    |A|    = " << format_norm( norm::frobenius( *A2 ) ) << std::endl;
+    }// if
+    
     if (( cmdline::ref == "H" ) || ( cmdline::ref == "BLR" ))
     {
         std::cout << term::bullet << term::bold

@@ -314,10 +314,6 @@ public:
     // compression
     //
 
-    // compress internal data based on given configuration
-    // - may result in non-compression if storage does not decrease
-    virtual void   compress      ( const compress::zconfig_t &  zconfig );
-
     // compress internal data based on given accuracy
     virtual void   compress      ( const accuracy &  acc );
 
@@ -474,28 +470,6 @@ uniform_lrmatrix< value_t >::truncate ( const accuracy & )
 //
 // compress internal data
 //
-template < typename value_t >
-void
-uniform_lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
-{
-    if ( is_compressed() )
-        return;
-
-    HLR_ASSERT(( _S.nrows() != 0 ) && ( _S.ncols() != 0 ));
-    
-    const size_t  mem_dense = sizeof(value_t) * _S.nrows() * _S.ncols();
-    auto          zS        = compress::compress( zconfig, _S );
-    const auto    zmem      = compress::compressed_size( zS );
-
-    if (( zmem > 0 ) && ( zmem < mem_dense ))
-    {
-        HLR_ASSERT( ( zS.size() == 0 ) || ( zS.data() != nullptr ) );
-
-        _zS = std::move( zS );
-        _S  = std::move( blas::matrix< value_t >( 0, 0 ) );
-    }// if
-}
-
 template < typename value_t >
 void
 uniform_lrmatrix< value_t >::compress ( const accuracy &  acc )

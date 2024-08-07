@@ -21,6 +21,7 @@
 #include <hlr/bem/traits.hh>
 #include <hlr/matrix/lrmatrix.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
+#include <hlr/matrix/uniform_lr2matrix.hh>
 #include <hlr/matrix/h2_lrmatrix.hh>
 #include <hlr/matrix/lrsvmatrix.hh>
 #include <hlr/matrix/tiled_lrmatrix.hh>
@@ -855,20 +856,56 @@ build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
     using value_t       = typename basisapx_t::value_t;
     using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
 
+    //
+    // mapping of index sets to lowrank matrices 
+    //
+
     auto  rowcb  = std::make_unique< cluster_basis >( A.row_is() );
     auto  colcb  = std::make_unique< cluster_basis >( A.col_is() );
 
     if ( is_blocked( A ) )
     {
-        rowcb->set_nsons( cptrcast( &A, Hpro::TBlockMatrix< value_t > )->nblock_rows() );
-        colcb->set_nsons( cptrcast( &A, Hpro::TBlockMatrix< value_t > )->nblock_cols() );
+        rowcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix< value_t > )->nblock_rows() );
+        colcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix< value_t > )->nblock_cols() );
     }// if
-    
-    auto  rowmap = detail::is_matrix_map_t< value_t >();
-    auto  colmap = detail::is_matrix_map_t< value_t >();
-    auto  M      = detail::build_uniform_rec( A, basisapx, acc, *rowcb, *colcb, rowmap, colmap );
 
+    auto  row_map = detail::lr_coupling_map_t< value_t >();
+    auto  col_map = detail::lr_coupling_map_t< value_t >();
+    
+    detail::build_mat_map( A, *rowcb, *colcb, row_map, col_map );
+    
+    //
+    // build cluster bases
+    //
+    
+    detail::build_cluster_basis( *rowcb, basisapx, acc, row_map, false );
+    detail::build_cluster_basis( *colcb, basisapx, acc, col_map, true );
+
+    //
+    // construct uniform lowrank matrices with given cluster bases
+    //
+    
+    auto  M = detail::build_uniform( A, *rowcb, *colcb );
+    
     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
+
+    // using value_t       = typename basisapx_t::value_t;
+    // using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
+
+    // auto  rowcb  = std::make_unique< cluster_basis >( A.row_is() );
+    // auto  colcb  = std::make_unique< cluster_basis >( A.col_is() );
+
+    // if ( is_blocked( A ) )
+    // {
+    //     rowcb->set_nsons( cptrcast( &A, Hpro::TBlockMatrix< value_t > )->nblock_rows() );
+    //     colcb->set_nsons( cptrcast( &A, Hpro::TBlockMatrix< value_t > )->nblock_cols() );
+    // }// if
+    
+    // auto  rowmap = detail::is_matrix_map_t< value_t >();
+    // auto  colmap = detail::is_matrix_map_t< value_t >();
+    // auto  M      = detail::build_uniform_rec( A, basisapx, acc, *rowcb, *colcb, rowmap, colmap );
+
+    // return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
 }
 
 template < typename basisapx_t >
@@ -912,7 +949,7 @@ build_uniform_rec2 ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
     // construct uniform lowrank matrices with given cluster bases
     //
     
-    auto  M = detail::build_uniform( A, *rowcb, *colcb );
+    auto  M = detail::build_uniform2( A, *rowcb, *colcb );
     
     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
 }
@@ -936,6 +973,21 @@ build_uniform ( const Hpro::TBlockCluster *  bc,
                 const accuracy &             acc )
 {
     return detail::build_blr2( bc, coeff, lrapx, basisapx, acc );
+}
+
+template < coefficient_function_type coeff_t,
+           lowrank_approx_type       lrapx_t,
+           approx::approximation_type        basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
+build_uniform_sep ( const Hpro::TBlockCluster *  bc,
+                    const coeff_t &              coeff,
+                    const lrapx_t &              lrapx,
+                    const basisapx_t &           basisapx,
+                    const accuracy &             acc )
+{
+    return detail::build_blr2_sep( bc, coeff, lrapx, basisapx, acc );
 }
 
 template < typename basisapx_t >

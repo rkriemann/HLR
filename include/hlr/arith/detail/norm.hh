@@ -19,6 +19,7 @@
 #include <hlr/matrix/lrsvmatrix.hh>
 #include <hlr/matrix/tiled_lrmatrix.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
+#include <hlr/matrix/uniform_lr2matrix.hh>
 #include <hlr/matrix/h2_lrmatrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
 #include <hlr/matrix/convert.hh>
@@ -151,6 +152,21 @@ frobenius_squared ( const Hpro::TMatrix< value_t > &  A )
 
         for ( size_t  i = 0; i < C.nrows()*C.ncols(); ++i )
             val += std::abs( math::square( C.data()[ i ] ) );
+
+        return val;
+    }// if
+    else if ( hlr::matrix::is_uniform_lowrank2( A ) )
+    {
+        //
+        // |A| = | U S_r S_c' V' | = |U||S_r·S_c||V| = |S_r · S_c| with orthogonal U/V
+        //
+
+        auto  R   = cptrcast( &A, hlr::matrix::uniform_lr2matrix< value_t > );
+        auto  S   = blas::prod( R->row_coupling(), blas::adjoint( R->col_coupling() ) );
+        auto  val = result_t(0);
+
+        for ( size_t  i = 0; i < S.nrows()*S.ncols(); ++i )
+            val += std::abs( math::square( S.data()[ i ] ) );
 
         return val;
     }// if
@@ -390,6 +406,18 @@ frobenius_squared ( const alpha_t                     alpha,
         return frobenius_squared( alpha, *RA, beta, B );
     }// if
     else if ( matrix::is_uniform_lowrank( B ) )
+    {
+        auto  RB = matrix::convert_to_lowrank( B );
+
+        return frobenius_squared( alpha, A, beta, *RB );
+    }// if
+    else if ( matrix::is_uniform_lowrank2( A ) )
+    {
+        auto  RA = matrix::convert_to_lowrank( A );
+
+        return frobenius_squared( alpha, *RA, beta, B );
+    }// if
+    else if ( matrix::is_uniform_lowrank2( B ) )
     {
         auto  RB = matrix::convert_to_lowrank( B );
 

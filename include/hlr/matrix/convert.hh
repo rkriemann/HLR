@@ -14,6 +14,7 @@
 #include <hlr/approx/traits.hh>
 #include <hlr/matrix/lrmatrix.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
+#include <hlr/matrix/uniform_lr2matrix.hh>
 #include <hlr/matrix/h2_lrmatrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
 #include <hlr/matrix/lrsmatrix.hh>
@@ -99,6 +100,15 @@ convert_to_lowrank ( const Hpro::TMatrix< value_t > &  M,
         auto  R        = cptrcast( &M, uniform_lrmatrix< value_t > );
         auto  US       = blas::prod( R->row_basis(), R->coupling() );
         auto  [ U, V ] = approx( US, R->col_basis(), acc );
+        
+        return std::make_unique< lrmatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+    }// if
+    else if ( matrix::is_uniform_lowrank( M ) )
+    {
+        auto  R        = cptrcast( &M, uniform_lr2matrix< value_t > );
+        auto  US       = blas::prod( R->row_basis(), R->row_coupling() );
+        auto  VS       = blas::prod( R->col_basis(), R->col_coupling() );
+        auto  [ U, V ] = approx( US, VS, acc );
         
         return std::make_unique< lrmatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
     }// if
@@ -347,6 +357,14 @@ convert_to_lowrank ( const Hpro::TMatrix< value_t > &  M )
         auto  R = cptrcast( &M, uniform_lrmatrix< value_t > );
         auto  U = blas::prod( R->row_basis(), R->coupling() );
         auto  V = blas::copy( R->col_basis() );
+        
+        return std::make_unique< matrix::lrmatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+    }// if
+    else if ( matrix::is_uniform_lowrank2( M ) )
+    {
+        auto  R = cptrcast( &M, uniform_lr2matrix< value_t > );
+        auto  U = blas::prod( R->row_basis(), R->row_coupling() );
+        auto  V = blas::prod( R->col_basis(), R->col_coupling() );
         
         return std::make_unique< matrix::lrmatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
     }// if
