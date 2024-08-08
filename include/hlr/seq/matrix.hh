@@ -1012,9 +1012,10 @@ build_uniform_sep ( const Hpro::TBlockCluster *  bc,
                     const coeff_t &              coeff,
                     const lrapx_t &              lrapx,
                     const basisapx_t &           basisapx,
-                    const accuracy &             acc )
+                    const accuracy &             acc,
+                    const bool                   compress )
 {
-    return detail::build_blr2_sep( bc, coeff, lrapx, basisapx, acc );
+    return detail::build_blr2_sep( bc, coeff, lrapx, basisapx, acc, compress );
 }
 
 template < typename basisapx_t >

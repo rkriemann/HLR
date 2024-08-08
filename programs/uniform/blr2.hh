@@ -130,7 +130,7 @@ program_main ()
         
         tic = timer::now();
 
-        auto  [ rowcb2, colcb2, A2 ] = impl::matrix::tlr::build_uniform_sep( bct->root(), pcoeff, lrapx, cbapx, acc );
+        auto  [ rowcb2, colcb2, A2 ] = impl::matrix::tlr::build_uniform_sep( bct->root(), pcoeff, lrapx, cbapx, acc, cmdline::compress );
     
         toc = timer::since( tic );
     

@@ -2028,7 +2028,8 @@ build_blr2_sep ( const Hpro::TBlockCluster *  bc,
                  const coeff_t &              coeff,
                  const lrapx_t &              lrapx,
                  const basisapx_t &           basisapx,
-                 const accuracy &             acc )
+                 const accuracy &             acc,
+                 const bool                   compress )
 {
     using value_t = typename basisapx_t::value_t;
     using real_t  = Hpro::real_type_t< value_t >;
@@ -2373,6 +2374,9 @@ build_blr2_sep ( const Hpro::TBlockCluster *  bc,
                 }// if
                 else
                     HLR_ERROR( "unsupported matrix type: " + B_ij->typestr() );
+
+                if ( compress )
+                    ptrcast( B_ij.get(), dense_matrix< value_t > )->compress( acc );
             }// else
 
             B->set_block( i, j, B_ij.release() );

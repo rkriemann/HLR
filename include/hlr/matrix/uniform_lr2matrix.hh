@@ -188,8 +188,8 @@ public:
     set_cluster_bases ( cluster_basis_t &  arow_cb,
                         cluster_basis_t &  acol_cb )
     {
-        HLR_ASSERT(( row_rank() == arow_cb.rank() ) &&
-                   ( col_rank() == acol_cb.rank() ));
+        HLR_ASSERT( ( is_null( _row_cb ) || ( row_rank() == arow_cb.rank() )) &&
+                    ( is_null( _col_cb ) || ( col_rank() == acol_cb.rank() )) );
             
         _row_cb = & arow_cb;
         _col_cb = & acol_cb;
