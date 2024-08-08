@@ -22,6 +22,7 @@
 
 #include <hlr/matrix/lrmatrix.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
+#include <hlr/matrix/uniform_lr2matrix.hh>
 #include <hlr/matrix/h2_lrmatrix.hh>
 
 namespace hlr { namespace matrix {
@@ -108,6 +109,132 @@ rank_info ( const Hpro::TMatrix< value_t > & M )
     auto [ min_rank, sum_rank, max_rank, nnodes ] = detail::rank_info_helper_mat( M );
 
     return { min_rank, uint( double(sum_rank) / double(nnodes) ), max_rank };
+}
+
+//
+// determine data memory per level in H-matrix
+//
+template < typename value_t >
+void
+print_mem_lvl ( const Hpro::TMatrix< value_t > & H )
+{
+    using  matrix_t       = Hpro::TMatrix< value_t >;
+    using  block_matrix_t = Hpro::TBlockMatrix< value_t >;
+    
+    auto  current = std::list< const matrix_t * >{ &H };
+    uint  lvl     = 0;
+
+    while ( current.size() > 0 )
+    {
+        size_t  size_lr = 0;
+        size_t  size_d  = 0;
+        auto    next    = decltype( current )();
+
+        for ( auto  M : current )
+        {
+            if ( is_blocked( M ) )
+            {
+                auto  B = cptrcast( M, block_matrix_t );
+
+                for ( uint  i = 0; i < B->nblock_rows(); ++i )
+                    for ( uint  j = 0; j < B->nblock_cols(); ++j )
+                        if ( ! is_null( B->block( i, j ) ) )
+                            next.push_back( B->block( i, j ) );
+            }// if
+            else if ( matrix::is_lowrank( M ) )
+                size_lr += M->data_byte_size();
+            else if ( matrix::is_lowrank_sv( M ) )
+                size_lr += M->data_byte_size();
+            else if ( matrix::is_dense( M ) )
+                size_d += M->data_byte_size();
+            else
+                HLR_ERROR( "unsupported matrix type: " + M->typestr() );
+        }// for
+
+        if ( size_d + size_lr > 0 )
+            std::cout << boost::format( "%4d : " ) % lvl
+                      << boost::format( "%10s" ) % Hpro::Mem::to_string( size_lr ) << " / "
+                      << boost::format( "%10s" ) % Hpro::Mem::to_string( size_d ) <<std::endl;
+
+        lvl++;
+        current = std::move( next );
+    }// while
+}
+
+template < typename value_t >
+void
+print_mem_lvl ( const Hpro::TMatrix< value_t > &                 H,
+                const matrix::shared_cluster_basis< value_t > &  rcb,
+                const matrix::shared_cluster_basis< value_t > &  ccb )
+{
+    using  matrix_t        = Hpro::TMatrix< value_t >;
+    using  block_matrix_t  = Hpro::TBlockMatrix< value_t >;
+    using  cluster_basis_t = matrix::shared_cluster_basis< value_t >;
+    
+    auto  current_mat = std::list< const matrix_t * >{ &H };
+    auto  current_rcb = std::list< const cluster_basis_t * >{ &rcb };
+    auto  current_ccb = std::list< const cluster_basis_t * >{ &ccb };
+    uint  lvl         = 0;
+
+    while ( current_mat.size() > 0 )
+    {
+        size_t  size_d   = 0;
+        size_t  size_lr  = 0;
+        size_t  size_cb  = 0;
+        auto    next_mat = decltype( current_mat )();
+        auto    next_rcb = decltype( current_rcb )();
+        auto    next_ccb = decltype( current_ccb )();
+
+        for ( auto  M : current_mat )
+        {
+            if ( is_blocked( M ) )
+            {
+                auto  B = cptrcast( M, block_matrix_t );
+
+                for ( uint  i = 0; i < B->nblock_rows(); ++i )
+                    for ( uint  j = 0; j < B->nblock_cols(); ++j )
+                        if ( ! is_null( B->block( i, j ) ) )
+                            next_mat.push_back( B->block( i, j ) );
+            }// if
+            else if ( matrix::is_uniform_lowrank( M ) )
+                size_lr += M->data_byte_size();
+            else if ( matrix::is_uniform_lowrank2( M ) )
+                size_lr += M->data_byte_size();
+            else if ( matrix::is_dense( M ) )
+                size_d += M->data_byte_size();
+            else
+                HLR_ERROR( "unsupported matrix type: " + M->typestr() );
+        }// for
+
+        for ( auto  cb : current_rcb )
+        {
+            size_cb += sizeof( value_t ) * cb->is().size() * cb->rank();
+            
+            for ( uint  i = 0; i < cb->nsons(); ++i )
+                if ( ! is_null( cb->son( i ) ) )
+                    next_rcb.push_back( cb->son( i ) );
+        }// for
+
+        for ( auto  cb : current_ccb )
+        {
+            size_cb += sizeof( value_t ) * cb->is().size() * cb->rank();
+            
+            for ( uint  i = 0; i < cb->nsons(); ++i )
+                if ( ! is_null( cb->son( i ) ) )
+                    next_ccb.push_back( cb->son( i ) );
+        }// for
+
+        if ( size_d + size_lr > 0 )
+            std::cout << boost::format( "%4d : " ) % lvl
+                      << boost::format( "%10s" ) % Hpro::Mem::to_string( size_lr ).c_str() << " / "
+                      << boost::format( "%10s" ) % Hpro::Mem::to_string( size_cb ).c_str() << " / "
+                      << boost::format( "%10s" ) % Hpro::Mem::to_string( size_d ).c_str() <<std::endl;
+
+        lvl++;
+        current_mat = std::move( next_mat );
+        current_rcb = std::move( next_rcb );
+        current_ccb = std::move( next_ccb );
+    }// while
 }
 
 }}// namespace hlr::matrix
