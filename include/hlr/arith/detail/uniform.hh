@@ -14,6 +14,7 @@
 #include <hlr/arith/solve.hh>
 #include <hlr/arith/invert.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
+#include <hlr/matrix/uniform_lr2matrix.hh>
 #include <hlr/matrix/convert.hh>
 #include <hlr/matrix/level_hierarchy.hh>
 #include <hlr/vector/scalar_vector.hh>
@@ -33,7 +34,9 @@ namespace hlr { namespace uniform { namespace detail {
 using matrix::shared_cluster_basis;
 using matrix::shared_cluster_basis_hierarchy;
 using matrix::uniform_lrmatrix;
+using matrix::uniform_lr2matrix;
 using matrix::is_uniform_lowrank;
+using matrix::is_uniform_lowrank2;
 using matrix::level_hierarchy;
 using vector::scalar_vector;
 using vector::uniform_vector;
@@ -88,6 +91,9 @@ mul_vec ( const value_t                                              alpha,
     }// if
     else if ( matrix::is_uniform_lowrank( M ) )
     {
+        //
+        // y = U S V^H x
+        //
         auto  R = cptrcast( &M, uniform_lrmatrix< value_t > );
 
         #if defined(HLR_HAS_ZBLAS_DIRECT)
@@ -112,6 +118,69 @@ mul_vec ( const value_t                                              alpha,
                 case apply_transposed : HLR_ASSERT( false );
                 case apply_adjoint    : blas::mulvec( alpha, blas::adjoint( R->coupling() ), x.coeffs(), value_t(1), y.coeffs() ); break;
                 default               : HLR_ERROR( "unsupported matrix operator" );
+            }// switch
+        }// else
+    }// if
+    else if ( matrix::is_uniform_lowrank2( M ) )
+    {
+        //
+        // y = U S_r S_c^H V^H x
+        //
+        auto        R = cptrcast( &M, uniform_lr2matrix< value_t > );
+        const auto  k = R->rank();
+        auto        t = blas::vector< value_t >( k );
+
+        #if defined(HLR_HAS_ZBLAS_DIRECT)
+        if ( R->is_compressed() )
+        {
+            switch ( op_M )
+            {
+                case apply_normal :
+                    compress::zblas::mulvec( R->col_rank(), k, apply_adjoint, value_t(1), R->zcol_coupling(), x.coeffs().data(), t.data() );
+                    compress::zblas::mulvec( R->row_rank(), k, apply_normal,       alpha, R->zrow_coupling(), t.data(), y.coeffs().data() );
+                    break;
+                    
+                case apply_conjugate :
+                { HLR_ASSERT( false ); }
+                
+                case apply_transposed :
+                { HLR_ASSERT( false ); }
+                
+                case apply_adjoint :
+                    compress::zblas::mulvec( R->row_rank(), k, apply_adjoint, value_t(1), R->zrow_coupling(), x.coeffs().data(), t.data() );
+                    compress::zblas::mulvec( R->col_rank(), k, apply_normal,       alpha, R->zcol_coupling(), t.data(), y.coeffs().data() );
+                    break;
+                    
+                default :
+                    HLR_ERROR( "unsupported matrix operator" );
+            }// switch
+        }// if
+        else
+        #endif
+        {
+            auto  S_c = R->col_coupling();
+            auto  S_r = R->row_coupling();
+            
+            switch ( op_M )
+            {
+                case apply_normal     :
+                    blas::mulvec( value_t(1), blas::adjoint( S_c ), x.coeffs(), value_t(1), t );
+                    blas::mulvec( alpha, S_r, t, value_t(1), y.coeffs() );
+                    break;
+                    
+                case apply_conjugate  :
+                    HLR_ASSERT( false );
+                    
+                case apply_transposed :
+                    HLR_ASSERT( false );
+                    
+                case apply_adjoint    :
+                    blas::mulvec( value_t(1), blas::adjoint( S_r ), x.coeffs(), value_t(1), t );
+                    blas::mulvec( alpha, S_c, t, value_t(1), y.coeffs() );
+                    break;
+                    
+                default :
+                    HLR_ERROR( "unsupported matrix operator" );
             }// switch
         }// else
     }// if
@@ -393,6 +462,73 @@ mul_vec_hier ( const value_t                                                    
                         }// switch
                     }// else
                 }// if
+                else if ( matrix::is_uniform_lowrank2( mat ) )
+                {
+                    auto        R  = cptrcast( mat, uniform_lr2matrix< value_t > );
+                    auto        ux = x.hierarchy()[lvl][col_idx];
+                    const auto  k  = R->rank();
+                    auto        t  = blas::vector< value_t >( k );
+                    
+                    if ( is_null( ycb ) )
+                    {
+                        ycb = rowcb.hierarchy()[lvl][row];
+                        s   = blas::vector< value_t >( ycb->rank() );
+                    }// if
+                    
+                    #if defined(HLR_HAS_ZBLAS_DIRECT)
+                    if ( R->is_compressed() )
+                    {
+                        switch ( op_M )
+                        {
+                            case apply_normal :
+                                compress::zblas::mulvec( R->col_rank(), k, apply_adjoint, value_t(1), R->zcol_coupling(), ux->coeffs().data(), t.data() );
+                                compress::zblas::mulvec( R->row_rank(), k, apply_normal,       alpha, R->zrow_coupling(), t.data(), s.data() );
+                                break;
+                    
+                            case apply_conjugate :
+                            { HLR_ASSERT( false ); }
+                
+                            case apply_transposed :
+                            { HLR_ASSERT( false ); }
+                
+                            case apply_adjoint :
+                                compress::zblas::mulvec( R->row_rank(), k, apply_adjoint, value_t(1), R->zrow_coupling(), ux->coeffs().data(), t.data() );
+                                compress::zblas::mulvec( R->col_rank(), k, apply_normal,       alpha, R->zcol_coupling(), t.data(), s.data() );
+                                break;
+                    
+                            default :
+                                HLR_ERROR( "unsupported matrix operator" );
+                        }// switch
+                    }// if
+                    else
+                    #endif
+                    {
+                        auto  S_c = R->col_coupling();
+                        auto  S_r = R->row_coupling();
+            
+                        switch ( op_M )
+                        {
+                            case apply_normal     :
+                                blas::mulvec( value_t(1), blas::adjoint( S_c ), ux->coeffs(), value_t(1), t );
+                                blas::mulvec( alpha, S_r, t, value_t(1), s );
+                                break;
+                    
+                            case apply_conjugate  :
+                                HLR_ASSERT( false );
+                    
+                            case apply_transposed :
+                                HLR_ASSERT( false );
+                    
+                            case apply_adjoint    :
+                                blas::mulvec( value_t(1), blas::adjoint( S_r ), ux->coeffs(), value_t(1), t );
+                                blas::mulvec( alpha, S_c, t, value_t(1), s );
+                                break;
+                    
+                            default :
+                                HLR_ERROR( "unsupported matrix operator" );
+                        }// switch
+                    }// else
+                }// if
                 else if ( matrix::is_dense( mat ) )
                 {
                     auto  x_i = blas::vector< value_t >( blas::vec( sx ), mat->col_is( op_M ) - sx.ofs() );
@@ -512,6 +648,15 @@ mul_vec_flops ( const Hpro::matop_t               op_M,
             return FLOPS_ZGEMV( R->row_rank( op_M ), R->col_rank( op_M ) );
         else
             return FLOPS_DGEMV( R->row_rank( op_M ), R->col_rank( op_M ) );
+    }// if
+    else if ( matrix::is_uniform_lowrank2( M ) )
+    {
+        const auto  R = cptrcast( &M, matrix::uniform_lr2matrix< value_t > );
+        
+        if constexpr ( Hpro::is_complex_type_v< value_t > )
+            return FLOPS_ZGEMV( R->row_rank( op_M ), R->rank() ) + FLOPS_ZGEMV( R->col_rank( op_M ), R->rank() );
+        else
+            return FLOPS_DGEMV( R->row_rank( op_M ), R->rank() ) + FLOPS_DGEMV( R->col_rank( op_M ), R->rank() );
     }// if
     else if ( matrix::is_dense( M ) )
     {

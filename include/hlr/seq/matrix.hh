@@ -763,9 +763,27 @@ build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
                     const lrapx_t &              lrapx,
                     const basisapx_t &           basisapx,
                     const accuracy &             acc,
+                    const bool                   compress,
                     const size_t                 /* nseq */ = 0 ) // ignored
 {
-    return detail::build_uniform_lvl( bct, coeff, lrapx, basisapx, acc );
+    return detail::build_uniform_lvl( bct, coeff, lrapx, basisapx, acc, compress );
+}
+
+template < coefficient_function_type coeff_t,
+           lowrank_approx_type lrapx_t,
+           approx::approximation_type basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
+            std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
+            std::unique_ptr< Hpro::TMatrix< Hpro::value_type_t< coeff_t > > > >
+build_uniform_lvl2 ( const Hpro::TBlockCluster *  bct,
+                     const coeff_t &              coeff,
+                     const lrapx_t &              lrapx,
+                     const basisapx_t &           basisapx,
+                     const accuracy &             acc,
+                     const bool                   compress,
+                     const size_t                 /* nseq */ = 0 ) // ignored
+{
+    return detail::build_uniform_lvl2( bct, coeff, lrapx, basisapx, acc, compress );
 }
 
 template < typename basisapx_t >
@@ -949,9 +967,18 @@ build_uniform_rec2 ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
     // construct uniform lowrank matrices with given cluster bases
     //
     
-    auto  M = detail::build_uniform2( A, *rowcb, *colcb );
+    auto  M = detail::build_uniform_sep( A, *rowcb, *colcb );
     
     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
+}
+
+template < typename value_t >
+std::unique_ptr< Hpro::TMatrix< value_t > >
+build_uniform_sep ( const Hpro::TMatrix< value_t > &                A,
+                    hlr::matrix::shared_cluster_basis< value_t > &  rowcb,
+                    hlr::matrix::shared_cluster_basis< value_t > &  colcb )
+{
+    return detail::build_uniform_sep( A, rowcb, colcb );
 }
 
 namespace tlr

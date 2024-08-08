@@ -11,6 +11,7 @@
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/uniform.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
+#include <hlr/matrix/uniform_lr2matrix.hh>
 #include <hlr/vector/scalar_vector.hh>
 #include <hlr/vector/uniform_vector.hh>
 #include <hlr/utils/hash.hh>
@@ -20,6 +21,7 @@ namespace hlr { namespace tbb { namespace uniform { namespace detail {
 using hlr::matrix::shared_cluster_basis;
 using hlr::matrix::shared_cluster_basis_hierarchy;
 using hlr::matrix::uniform_lrmatrix;
+using hlr::matrix::uniform_lr2matrix;
 using hlr::matrix::level_hierarchy;
 using hlr::vector::scalar_vector;
 using hlr::vector::uniform_vector;
@@ -178,6 +180,57 @@ mul_vec_row ( const value_t                                              alpha,
                 case apply_conjugate  : { HLR_ASSERT( false ); }
                 case apply_transposed : { HLR_ASSERT( false ); }
                 case apply_adjoint    : blas::mulvec( alpha, blas::adjoint(R->coeff()), x.coeffs(), value_t(1), y.coeffs() ); break;
+                default               :
+                    HLR_ERROR( "unsupported matrix operator" );
+            }// switch
+        }// else
+    }// if
+    else if ( hlr::matrix::is_uniform_lowrank2( M ) )
+    {
+        auto  R = cptrcast( &M, uniform_lr2matrix< value_t > );
+        auto  k = R->rank();
+        auto  t = blas::vector< value_t >( k );
+
+        #if defined(HLR_HAS_ZBLAS_DIRECT)
+        if ( R->is_compressed() )
+        {
+            switch ( op_M )
+            {
+                case apply_normal     :
+                    compress::zblas::mulvec( R->col_rank(), k, apply_adjoint, value_t(1), R->zcol_coupling(), x.coeffs().data(), t.data() );
+                    compress::zblas::mulvec( R->row_rank(), k, apply_normal,       alpha, R->zrow_coupling(), t.data(), y.coeffs().data() );
+                    break;
+                    
+                case apply_conjugate  : { HLR_ASSERT( false ); }
+                case apply_transposed : { HLR_ASSERT( false ); }
+                    
+                case apply_adjoint    :
+                    compress::zblas::mulvec( R->row_rank(), k, apply_adjoint, value_t(1), R->zrow_coupling(), x.coeffs().data(), t.data() );
+                    compress::zblas::mulvec( R->col_rank(), k, apply_normal,       alpha, R->zcol_coupling(), t.data(), y.coeffs().data() );
+                    break;
+                    
+                default :
+                    HLR_ERROR( "unsupported matrix operator" );
+            }// switch
+        }// if
+        else
+        #endif
+        {
+            switch ( op_M )
+            {
+                case apply_normal     :
+                    blas::mulvec( value_t(1), blas::adjoint( R->col_coupling() ), x.coeffs(), value_t(1), t );
+                    blas::mulvec( alpha, R->row_coupling(), t, value_t(1), y.coeffs() );
+                    break;
+                    
+                case apply_conjugate  : { HLR_ASSERT( false ); }
+                case apply_transposed : { HLR_ASSERT( false ); }
+                    
+                case apply_adjoint    :
+                    blas::mulvec( value_t(1), blas::adjoint( R->row_coupling() ), x.coeffs(), value_t(1), t );
+                    blas::mulvec( alpha, R->col_coupling(), t, value_t(1), y.coeffs() );
+                    break;
+                    
                 default               :
                     HLR_ERROR( "unsupported matrix operator" );
             }// switch
@@ -405,6 +458,64 @@ mul_vec_hier ( const value_t                                                    
                                 case apply_transposed : HLR_ASSERT( false );
                                 case apply_adjoint    : blas::mulvec( alpha, blas::adjoint( R->coupling() ), ux->coeffs(), value_t(1), s ); break;
                                 default               : HLR_ERROR( "unsupported matrix operator" );
+                            }// switch
+                        }// else
+                    }// if
+                    else if ( matrix::is_uniform_lowrank2( mat ) )
+                    {
+                        auto  R  = cptrcast( mat, uniform_lr2matrix< value_t > );
+                        auto  k  = R->rank();
+                        auto  t  = blas::vector< value_t >( k );
+                        auto  ux = x.hierarchy()[lvl][col_idx];
+                        
+                        if ( is_null( ycb ) )
+                        {
+                            ycb = rowcb.hierarchy()[lvl][row];
+                            s   = blas::vector< value_t >( ycb->rank() );
+                        }// if
+                        
+                        #if defined(HLR_HAS_ZBLAS_DIRECT)
+                        if ( R->is_compressed() )
+                        {
+                            switch ( op_M )
+                            {
+                                case apply_normal     :
+                                    compress::zblas::mulvec( R->col_rank(), k, apply_adjoint, value_t(1), R->zcol_coupling(), ux->coeffs().data(), t.data() );
+                                    compress::zblas::mulvec( R->row_rank(), k, apply_normal,       alpha, R->zrow_coupling(), t.data(), s.data() );
+                                    break;
+                    
+                                case apply_conjugate  : { HLR_ASSERT( false ); }
+                                case apply_transposed : { HLR_ASSERT( false ); }
+                    
+                                case apply_adjoint    :
+                                    compress::zblas::mulvec( R->row_rank(), k, apply_adjoint, value_t(1), R->zrow_coupling(), ux->coeffs().data(), t.data() );
+                                    compress::zblas::mulvec( R->col_rank(), k, apply_normal,       alpha, R->zcol_coupling(), t.data(), s.data() );
+                                    break;
+                    
+                                default :
+                                    HLR_ERROR( "unsupported matrix operator" );
+                            }// switch
+                        }// if
+                        else
+                        #endif
+                        {
+                            switch ( op_M )
+                            {
+                                case apply_normal     :
+                                    blas::mulvec( value_t(1), blas::adjoint( R->col_coupling() ), ux->coeffs(), value_t(1), t );
+                                    blas::mulvec( alpha, R->row_coupling(), t, value_t(1), s );
+                                    break;
+                    
+                                case apply_conjugate  : { HLR_ASSERT( false ); }
+                                case apply_transposed : { HLR_ASSERT( false ); }
+                    
+                                case apply_adjoint    :
+                                    blas::mulvec( value_t(1), blas::adjoint( R->row_coupling() ), ux->coeffs(), value_t(1), t );
+                                    blas::mulvec( alpha, R->col_coupling(), t, value_t(1), s );
+                                    break;
+                    
+                                default               :
+                                    HLR_ERROR( "unsupported matrix operator" );
                             }// switch
                         }// else
                     }// if

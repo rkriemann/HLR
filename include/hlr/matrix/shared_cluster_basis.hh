@@ -414,7 +414,9 @@ shared_cluster_basis< value_t >::compress ( const accuracy &  acc )
 
     if ( _V.nrows() * _V.ncols() == 0 )
         return;
-        
+
+    HLR_ASSERT( _sv.length() == _V.ncols() );
+    
     //
     // compute Frobenius norm and set tolerance
     //

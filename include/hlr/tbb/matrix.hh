@@ -180,7 +180,7 @@ build_sv ( const Hpro::TBlockCluster *  bct,
                     {
                         if ( ! is_null( bct->son( i, j ) ) )
                         {
-                            auto  B_ij = build_sv( bct->son( i, j ), coeff, lrapx, acc, nseq );
+                            auto  B_ij = build_sv( bct->son( i, j ), coeff, lrapx, acc, compress, nseq );
                             
                             B->set_block( i, j, B_ij.release() );
                         }// if
@@ -564,8 +564,8 @@ build_sparse ( const Hpro::TBlockCluster &             bct,
 // - low-rank blocks are converted to uniform low-rank matrices and
 //   shared bases are constructed on-the-fly
 //
-template < coefficient_function_type coeff_t,
-           lowrank_approx_type lrapx_t,
+template < coefficient_function_type  coeff_t,
+           lowrank_approx_type        lrapx_t,
            approx::approximation_type basisapx_t >
 std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
             std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
@@ -575,9 +575,27 @@ build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
                     const lrapx_t &              lrapx,
                     const basisapx_t &           basisapx,
                     const Hpro::TTruncAcc &      acc,
+                    const bool                   compress = false,
                     const size_t                 /* nseq */ = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
-    return detail::build_uniform_lvl( bct, coeff, lrapx, basisapx, acc );
+    return detail::build_uniform_lvl( bct, coeff, lrapx, basisapx, acc, compress );
+}
+
+template < coefficient_function_type  coeff_t,
+           lowrank_approx_type        lrapx_t,
+           approx::approximation_type basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
+            std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
+            std::unique_ptr< Hpro::TMatrix< Hpro::value_type_t< coeff_t > > > >
+build_uniform_lvl2 ( const Hpro::TBlockCluster *  bct,
+                     const coeff_t &              coeff,
+                     const lrapx_t &              lrapx,
+                     const basisapx_t &           basisapx,
+                     const Hpro::TTruncAcc &      acc,
+                     const bool                   compress = false,
+                     const size_t                 /* nseq */ = Hpro::CFG::Arith::max_seq_size ) // ignored
+{
+    return detail::build_uniform_lvl2( bct, coeff, lrapx, basisapx, acc, compress );
 }
 
 template < approx::approximation_type basisapx_t >

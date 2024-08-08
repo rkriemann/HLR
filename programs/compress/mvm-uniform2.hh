@@ -67,7 +67,7 @@ program_main ()
             auto  hca    = bem::hca( pcoeff, *hcagen, cmdline::eps / 100.0, 6 );
             auto  hcalr  = bem::hca_lrapx( hca );
                 
-            std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_lvl( bct->root(), pcoeff, hcalr, cbapx, acc, cmdline::compress );
+            std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_lvl2( bct->root(), pcoeff, hcalr, cbapx, acc, cmdline::compress );
         }// if
         else
             cmdline::capprox = "default";
@@ -81,7 +81,7 @@ program_main ()
 
         auto  acalr = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
 
-        std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_lvl( bct->root(), pcoeff, acalr, cbapx, acc, cmdline::compress );
+        std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_lvl2( bct->root(), pcoeff, acalr, cbapx, acc, cmdline::compress );
     }// else
         
     if ( cmdline::capprox == "dense" )
@@ -92,7 +92,7 @@ program_main ()
 
         auto  dense = bem::dense_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
         
-        std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_lvl( bct->root(), pcoeff, dense, cbapx, acc, cmdline::compress );
+        std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_lvl2( bct->root(), pcoeff, dense, cbapx, acc, cmdline::compress );
     }// else
         
     toc = timer::since( tic );

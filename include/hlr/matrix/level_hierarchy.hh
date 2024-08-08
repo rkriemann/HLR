@@ -216,9 +216,11 @@ build_level_hierarchy ( const Hpro::TMatrix< value_t > &  M )
                 {
                     auto        B   = cptrcast( mat, Hpro::TBlockMatrix< value_t > );
                     const auto  col = col_idx[j];
+
+                    HLR_ASSERT(( B->nblock_rows() == 2 ) && ( B->nblock_cols() == 2 ));
                     
                     nsubrows = std::max( nsubrows, B->nblock_rows() );
-                    
+
                     for ( uint  ii = 0; ii < B->nblock_rows(); ++ii )
                     {
                         for ( uint  jj = 0; jj < B->nblock_cols(); ++jj )
