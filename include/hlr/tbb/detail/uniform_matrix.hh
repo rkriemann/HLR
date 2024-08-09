@@ -2576,7 +2576,7 @@ build_blr2_sep ( const Hpro::TBlockCluster *  bc,
                             {
                                 auto  B_ij = row_blocks( i, jj );
                         
-                                if ( ! is_null( B_ij ) && ( jj != j ) )
+                                if ( ! is_null( B_ij ) ) // && ( jj != j ) )
                                     nrows_S += cptrcast( B_ij, uniform_lr2matrix< value_t > )->rank();
                             }// for
 
@@ -2596,7 +2596,7 @@ build_blr2_sep ( const Hpro::TBlockCluster *  bc,
                                 {
                                     auto  B_ij = row_blocks( i, jj );
 
-                                    if ( ! is_null( B_ij ) && ( jj != j ))
+                                    if ( ! is_null( B_ij ) ) // && ( jj != j ))
                                     {
                                         auto        lock_ij = std::scoped_lock( B_ij->mutex() );
                                         const auto  R_ij    = cptrcast( B_ij, uniform_lr2matrix< value_t > );
@@ -2650,7 +2650,7 @@ build_blr2_sep ( const Hpro::TBlockCluster *  bc,
                 
                                 for ( size_t  jj = 0; jj < nbcols; ++jj )
                                 {
-                                    auto  B_ij = B->block( i, jj );
+                                    auto  B_ij = row_blocks( i, jj );
                         
                                     if ( ! is_null( B_ij ) && ( jj != j ) && is_uniform_lowrank2( B_ij ) )
                                     {
@@ -2761,7 +2761,7 @@ build_blr2_sep ( const Hpro::TBlockCluster *  bc,
 
                                 for ( size_t  ii = 0; ii < nbrows; ++ii )
                                 {
-                                    auto  B_ij = B->block( ii, j );
+                                    auto  B_ij = col_blocks( ii, j );
                         
                                     if ( ! is_null( B_ij ) && ( ii != i ) && is_uniform_lowrank2( B_ij ) )
                                     {

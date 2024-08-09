@@ -137,6 +137,13 @@ program_main ()
         std::cout << "    done in  " << format_time( toc ) << std::endl;
         std::cout << "    mem    = " << format_mem( rowcb2->byte_size(), colcb2->byte_size(), A2->byte_size() ) << std::endl;
         std::cout << "    |A|    = " << format_norm( norm::frobenius( *A2 ) ) << std::endl;
+
+        {
+            auto  diff  = matrix::sum( 1, *A, -1, *A2 );
+            auto  error = hlr::norm::spectral( impl::arithmetic, *diff, 1e-4 );
+        
+            std::cout << "    error  = " << format_error( error / normA ) << std::endl;
+        }
     }// if
     
     if (( cmdline::ref == "H" ) || ( cmdline::ref == "BLR" ))

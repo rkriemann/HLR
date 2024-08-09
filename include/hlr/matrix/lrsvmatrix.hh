@@ -879,48 +879,48 @@ lrsvmatrix< value_t >::compress ( const accuracy &  acc )
     const size_t  mem_zU = compress::aplr::compressed_size( zU );
     const size_t  mem_zV = compress::aplr::compressed_size( zV );
 
-    // DEBUG
-    {
-        auto  tU  = blas::copy( oU );
-        auto  tV  = blas::copy( oV );
-        auto  tT1 = blas::prod_diag( oU, _S );
-        auto  tM1 = blas::prod( tT1, blas::adjoint( oV ) );
+    // // DEBUG
+    // {
+    //     auto  tU  = blas::copy( oU );
+    //     auto  tV  = blas::copy( oV );
+    //     auto  tT1 = blas::prod_diag( oU, _S );
+    //     auto  tM1 = blas::prod( tT1, blas::adjoint( oV ) );
                                
-        auto  dU = blas::matrix< value_t >( oU.nrows(), oU.ncols() );
-        auto  dV = blas::matrix< value_t >( oV.nrows(), oV.ncols() );
+    //     auto  dU = blas::matrix< value_t >( oU.nrows(), oU.ncols() );
+    //     auto  dV = blas::matrix< value_t >( oV.nrows(), oV.ncols() );
 
-        compress::aplr::decompress_lr( zU, dU );
-        compress::aplr::decompress_lr( zV, dV );
+    //     compress::aplr::decompress_lr( zU, dU );
+    //     compress::aplr::decompress_lr( zV, dV );
 
-        auto  tT2 = blas::prod_diag( dU, _S );
-        auto  tM2 = blas::prod( tT2, blas::adjoint( dV ) );
+    //     auto  tT2 = blas::prod_diag( dU, _S );
+    //     auto  tM2 = blas::prod( tT2, blas::adjoint( dV ) );
 
-        io::matlab::write( tM1, "M1" );
-        io::matlab::write( tM2, "M2" );
+    //     io::matlab::write( tM1, "M1" );
+    //     io::matlab::write( tM2, "M2" );
 
-        blas::add( value_t(-1), tM1, tM2 );
+    //     blas::add( value_t(-1), tM1, tM2 );
 
-        if ( lacc.norm_mode() == Hpro::spectral_norm )
-        {
-            auto  n1 = blas::norm_2( tM1 );
-            auto  n2 = blas::norm_2( tM2 );
+    //     if ( lacc.norm_mode() == Hpro::spectral_norm )
+    //     {
+    //         auto  n1 = blas::norm_2( tM1 );
+    //         auto  n2 = blas::norm_2( tM2 );
 
-            std::cout << "Rs: tol = " << boost::format( "%.4e" ) % tol
-                      << " / norm = " << boost::format( "%.4e" ) % n1
-                      << " / abs = " << boost::format( "%.4e" ) % n2
-                      << " / rel = " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
-        }// if
-        else
-        {
-            auto  n1 = blas::norm_F( tM1 );
-            auto  n2 = blas::norm_F( tM2 );
+    //         std::cout << "Rs: tol = " << boost::format( "%.4e" ) % tol
+    //                   << " / norm = " << boost::format( "%.4e" ) % n1
+    //                   << " / abs = " << boost::format( "%.4e" ) % n2
+    //                   << " / rel = " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
+    //     }// if
+    //     else
+    //     {
+    //         auto  n1 = blas::norm_F( tM1 );
+    //         auto  n2 = blas::norm_F( tM2 );
 
-            std::cout << "Rf: tol = " << boost::format( "%.4e" ) % tol
-                      << " / norm = " << boost::format( "%.4e" ) % n1
-                      << " / abs = " << boost::format( "%.4e" ) % n2
-                      << " / rel = " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
-        }// else
-    }
+    //         std::cout << "Rf: tol = " << boost::format( "%.4e" ) % tol
+    //                   << " / norm = " << boost::format( "%.4e" ) % n1
+    //                   << " / abs = " << boost::format( "%.4e" ) % n2
+    //                   << " / rel = " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
+    //     }// else
+    // }
     
     // // DEBUG
     // {
