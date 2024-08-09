@@ -27,15 +27,20 @@ private:
     // allowed codimension of cluster overlap
     const uint    _codim;
 
+    // permitted overlap ratio
+    const double  _overlap;
+    
     // parameter for standard admissibility
     const double  _eta;
     
 public:
     // ctor
     weak_adm_cond ( const uint    codim,
-                    const double  eta = 2.0 )
+                    const double  overlap = 0.0,
+                    const double  eta     = 2.0 )
             : TAdmCondition()
             , _codim( codim )
+            , _overlap( overlap )
             , _eta( eta )
     {}
 
@@ -63,30 +68,55 @@ public:
             return true;
 
         //
-        // compute codimension of overlap: empty intersection reduces codimension
+        // compute codimension of overlap
         //
 
         const uint  dim   = rowcl->bbox().min().dim();
         uint        codim = 0;
     
-        // in 1D, different clusters share at most one vertex => admissible
+        // in 1D, different clusters share at most one vertex ⇒ admissible
         if ( dim == 1 )
             return true;
 
-        const auto  rbbox = rowcl->bbox();
-        const auto  cbbox = colcl->bbox();
+        const auto  rbox = rowcl->bbox();
+        const auto  cbox = colcl->bbox();
         
-        HLR_ASSERT( ( rbbox.max().dim() == dim ) && 
-                    ( cbbox.min().dim() == dim ) &&
-                    ( cbbox.max().dim() == dim ) );
+        HLR_ASSERT( ( rbox.max().dim() == dim ) && 
+                    ( cbox.min().dim() == dim ) &&
+                    ( cbox.max().dim() == dim ) );
 
-        // TODO: add "h" as overlap
-        
         for ( uint  i = 0; i < dim; ++i )
         {
-            if (( rbbox.max()[i] <= cbbox.min()[i] ) ||   // ├── τ ──┼── σ ──┤
-                ( cbbox.max()[i] <= rbbox.min()[i] ))     // ├── σ ──┼── τ ──┤
+            const auto  rmin   = rbox.min()[i];
+            const auto  rmax   = rbox.max()[i];
+            
+            const auto  cmin   = cbox.min()[i];
+            const auto  cmax   = cbox.max()[i];
+            
+            const auto  rlen   = rmax - rmin;
+            const auto  clen   = cmax - cmin;
+            const auto  minlen = std::min( rlen, clen );
+            
+            if (( rmax <= cmin ) ||   // ├── τ ──┤├── σ ──┤
+                ( cmax <= rmin ))     // ├── σ ──┤├── τ ──┤
+            {
                 codim++;
+            }// if
+            else if ( _overlap > 0 )
+            {
+                //
+                // test relative overlap size
+                //
+
+                //               h
+                // test ├── τ ──┼─┼── σ ──┤
+                if (( rmax >= cmin ) && ( rmax <= cmax ) && (( rmax - cmin ) / minlen < _overlap ))
+                    codim++;
+                    
+                // test ├── σ ──┼┼── τ ──┤
+                if (( cmax >= rmin ) && ( cmax <= rmax ) && (( cmax - rmin ) / minlen < _overlap ))
+                    codim++;
+            }// if
         }// for
 
         if ( codim >= _codim )
@@ -96,7 +126,7 @@ public:
         // test standard admissibility
         //
 
-        return std::min( rbbox.diameter(), cbbox.diameter() ) <= ( _eta * rbbox.distance( cbbox ) );
+        return std::min( rbox.diameter(), cbox.diameter() ) <= ( _eta * rbox.distance( cbox ) );
     }
 };
 
