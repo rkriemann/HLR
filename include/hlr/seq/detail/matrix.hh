@@ -641,12 +641,12 @@ template < typename coeff_t,
 std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename coeff_t::value_t > >,
             std::unique_ptr< hlr::matrix::shared_cluster_basis< typename coeff_t::value_t > >,
             std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > > >
-build_uniform_lvl2 ( const Hpro::TBlockCluster *  bct,
-                     const coeff_t &              coeff,
-                     const lrapx_t &              lrapx,
-                     const basisapx_t &           basisapx,
-                     const accuracy &             acc,
-                     const bool                   compress )
+build_uniform_lvl_sep ( const Hpro::TBlockCluster *  bct,
+                        const coeff_t &              coeff,
+                        const lrapx_t &              lrapx,
+                        const basisapx_t &           basisapx,
+                        const accuracy &             acc,
+                        const bool                   compress )
 {
     static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
                    "coefficient function and low-rank approximation must have equal value type" );
@@ -2092,9 +2092,8 @@ build_blr2_sep ( const Hpro::TBlockCluster *  bc,
     // construct blocks and update bases
     //
 
-    auto  B           = std::make_unique< Hpro::TBlockMatrix< value_t > >( bc->rowis(), bc->colis() );
-    auto  row_weights = tensor2< real_t >( bc->nrows(), bc->ncols() );
-    auto  col_weights = tensor2< real_t >( bc->nrows(), bc->ncols() );
+    auto  B       = std::make_unique< Hpro::TBlockMatrix< value_t > >( bc->rowis(), bc->colis() );
+    auto  weights = tensor2< real_t >( bc->nrows(), bc->ncols() );
 
     B->set_block_struct( bc->nrows(), bc->ncols() );
     
@@ -2131,30 +2130,35 @@ build_blr2_sep ( const Hpro::TBlockCluster *  bc,
                 blas::qr( W, Rw );
                 blas::qr( X, Rx );
 
+                auto  T  = blas::prod( Rw, blas::adjoint( Rx ) );
+                
                 // remember norm of block as weight for bases updates
-                row_weights(i,j) = norm::spectral( Rw );
-                col_weights(i,j) = norm::spectral( Rx );
+                weights(i,j) = norm::spectral( T );
                 
                 //
                 // compute extended row cluster basis
                 // - for details see "compute_extended_row_basis"
                 //
 
+                auto  Us = blas::vector< real_t >();
                 auto  Un = blas::matrix< value_t >();
                 
                 {
-                    size_t  nrows_S = Rw.ncols();
+                    size_t  nrows_S = T.ncols();
 
                     for ( size_t  jj = 0; jj < j; ++jj )
                     {
                         auto  B_ij = B->block( i, jj );
                         
                         if ( ! is_null( B_ij ) && is_uniform_lowrank2( B_ij ) )
-                            nrows_S += cptrcast( B_ij, uniform_lr2matrix< value_t > )->rank();
+                            nrows_S += cptrcast( B_ij, uniform_lr2matrix< value_t > )->col_rank();
                     }// for
 
-                    if ( nrows_S == Rw.ncols() )
+                    if ( nrows_S == T.ncols() )
+                    {
                         Un = std::move( blas::copy( W ) );
+                        Us = blas::sv( T );
+                    }// if
                     else
                     {
                         auto    U   = rowcb_i->basis();
@@ -2169,9 +2173,9 @@ build_blr2_sep ( const Hpro::TBlockCluster *  bc,
                             if ( ! is_null( B_ij ) && is_uniform_lowrank2( B_ij ) )
                             {
                                 const auto  R_ij  = cptrcast( B_ij, uniform_lr2matrix< value_t > );
-                                const auto  rank  = R_ij->rank();
-                                auto        S_ij  = blas::copy( R_ij->row_coupling() );
-                                auto        w_ij  = row_weights(i,jj);
+                                const auto  rank  = R_ij->col_rank();
+                                auto        S_ij  = blas::prod( R_ij->col_coupling(), blas::adjoint( R_ij->row_coupling() ) );
+                                auto        w_ij  = weights(i,jj);
                                 auto        S_sub = blas::matrix< value_t >( S,
                                                                              blas::range( pos, pos + rank-1 ),
                                                                              blas::range( 0, U.ncols() - 1 ) );
@@ -2179,15 +2183,15 @@ build_blr2_sep ( const Hpro::TBlockCluster *  bc,
                                 if ( w_ij != real_t(0) )
                                     blas::scale( value_t(1) / w_ij, S_ij );
             
-                                blas::copy( blas::adjoint( S_ij ), S_sub );
+                                blas::copy( S_ij, S_sub );
                                 pos += rank;
                             }// else
                         }// for
 
                         {
-                            const auto  rank  = Rw.ncols();
-                            auto        S_ij  = blas::copy( Rw );
-                            auto        w_ij  = row_weights(i,j);
+                            const auto  rank  = T.ncols();
+                            auto        S_ij  = blas::copy( T );
+                            auto        w_ij  = weights(i,j);
                             auto        S_sub = blas::matrix< value_t >( S,
                                                                          blas::range( pos, pos + rank-1 ),
                                                                          blas::range( U.ncols(), Ue.ncols() - 1 ) );
@@ -2213,22 +2217,24 @@ build_blr2_sep ( const Hpro::TBlockCluster *  bc,
                 // compute extended column cluster basis
                 //
 
+                auto  Vs = blas::vector< real_t >();
                 auto  Vn = blas::matrix< value_t >();
 
                 {
-                    size_t  nrows_S = Rx.nrows();
+                    size_t  nrows_S = T.nrows();
     
                     for ( size_t  ii = 0; ii < i; ++ii )
                     {
                         auto  B_ij = B->block( ii, j );
                     
                         if ( ! is_null( B_ij ) && is_uniform_lowrank2( B_ij ) )
-                            nrows_S += cptrcast( B_ij, uniform_lr2matrix< value_t > )->rank();
+                            nrows_S += cptrcast( B_ij, uniform_lr2matrix< value_t > )->row_rank();
                     }// for
 
-                    if ( nrows_S == Rx.nrows() )
+                    if ( nrows_S == T.nrows() )
                     {
                         Vn = std::move( blas::copy( X ) );
+                        Vs = blas::sv( T );
                     }// if
                     else
                     {
@@ -2244,9 +2250,9 @@ build_blr2_sep ( const Hpro::TBlockCluster *  bc,
                             if ( ! is_null( B_ij ) && is_uniform_lowrank2( B_ij ) )
                             {
                                 const auto  R_ij  = cptrcast( B_ij, uniform_lr2matrix< value_t > );
-                                const auto  rank  = R_ij->rank();
-                                auto        S_ij  = blas::copy( R_ij->col_coupling() );
-                                auto        w_ij  = col_weights(ii,j);
+                                const auto  rank  = R_ij->row_rank();
+                                auto        S_ij  = blas::prod( R_ij->row_coupling(), blas::adjoint( R_ij->col_coupling() ) );
+                                auto        w_ij  = weights(ii,j);
                                 auto        S_sub = blas::matrix< value_t >( S,
                                                                              blas::range( pos, pos + rank-1 ),
                                                                              blas::range( 0, V.ncols() - 1 ) );
@@ -2260,9 +2266,9 @@ build_blr2_sep ( const Hpro::TBlockCluster *  bc,
                         }// for
 
                         {
-                            const auto  rank  = Rx.nrows();
-                            auto        S_ij  = blas::copy( Rx );
-                            auto        w_ij  = col_weights(i,j);
+                            const auto  rank  = T.nrows();
+                            auto        S_ij  = blas::copy( T );
+                            auto        w_ij  = weights(i,j);
                             auto        S_sub = blas::matrix< value_t >( S,
                                                                          blas::range( pos, pos + rank-1 ),
                                                                          blas::range( V.ncols(), Ve.ncols() - 1 ) );

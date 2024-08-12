@@ -122,30 +122,28 @@ program_main ()
         std::cout << "    ranks  = " << kmin << " … " << kavg << " … " << kmax << std::endl;
     }
 
-    if ( true )
-    {
-        std::cout << term::bullet << term::bold
-                  << "BLR² with sep. couplings"
-                  << term::reset << std::endl;
-        
-        tic = timer::now();
+    //
+    // build with sep. bases
+    //
+    
+    std::cout << term::bullet << term::bold
+              << "BLR² with sep. couplings"
+              << term::reset << std::endl;
+    
+    tic = timer::now();
+    
+    auto  [ rowcb2, colcb2, A2 ] = impl::matrix::tlr::build_uniform_sep( bct->root(), pcoeff, lrapx, cbapx, acc, cmdline::compress );
+    
+    toc = timer::since( tic );
+    
+    std::cout << "    done in  " << format_time( toc ) << std::endl;
+    std::cout << "    mem    = " << format_mem( rowcb2->byte_size(), colcb2->byte_size(), A2->byte_size() ) << std::endl;
+    std::cout << "    |A|    = " << format_norm( norm::frobenius( *A2 ) ) << std::endl;
 
-        auto  [ rowcb2, colcb2, A2 ] = impl::matrix::tlr::build_uniform_sep( bct->root(), pcoeff, lrapx, cbapx, acc, cmdline::compress );
-    
-        toc = timer::since( tic );
-    
-        std::cout << "    done in  " << format_time( toc ) << std::endl;
-        std::cout << "    mem    = " << format_mem( rowcb2->byte_size(), colcb2->byte_size(), A2->byte_size() ) << std::endl;
-        std::cout << "    |A|    = " << format_norm( norm::frobenius( *A2 ) ) << std::endl;
-
-        {
-            auto  diff  = matrix::sum( 1, *A, -1, *A2 );
-            auto  error = hlr::norm::spectral( impl::arithmetic, *diff, 1e-4 );
-        
-            std::cout << "    error  = " << format_error( error / normA ) << std::endl;
-        }
-    }// if
-    
+    //
+    // compare with reference matrix
+    //
+ 
     if (( cmdline::ref == "H" ) || ( cmdline::ref == "BLR" ))
     {
         std::cout << term::bullet << term::bold
@@ -174,34 +172,40 @@ program_main ()
             std::cout << "    error  = " << format_error( error / normH ) << std::endl;
         }
 
-        std::cout << "  " << term::bullet << term::bold << "BLR² matrix" << term::reset << std::endl;
-    
-        tic = timer::now();
-    
-        auto  [ rowcb2, colcb2, A2 ] = impl::matrix::tlr::build_uniform( *H, cbapx, acc );
-
-        toc = timer::since( tic );
-        std::cout << "    done in  " << format_time( toc ) << std::endl;
-
-        const auto  mem_uni = A2->byte_size();
-        const auto  mem_rcb = rowcb2->byte_size();
-        const auto  mem_ccb = colcb2->byte_size();
-    
-        std::cout << "    mem    = " << format_mem( mem_rcb, mem_ccb, mem_uni, mem_rcb + mem_ccb + mem_uni ) << std::endl;
-
-        {
-            auto  [ kmin, kavg, kmax ] = matrix::rank_info( *A2 );
-    
-            std::cout << "    ranks  = " << kmin << " … " << kavg << " … " << kmax << std::endl;
-        }
-    
         {
             auto  diff  = matrix::sum( 1, *H, -1, *A2 );
             auto  error = hlr::norm::spectral( impl::arithmetic, *diff, 1e-4 );
         
             std::cout << "    error  = " << format_error( error / normH ) << std::endl;
         }
+
+        std::cout << "  " << term::bullet << term::bold << "BLR² matrix" << term::reset << std::endl;
+    
+        tic = timer::now();
+    
+        auto  [ rowcb3, colcb3, A3 ] = impl::matrix::tlr::build_uniform( *H, cbapx, acc );
+
+        toc = timer::since( tic );
+        std::cout << "    done in  " << format_time( toc ) << std::endl;
+
+        const auto  mem_uni = A3->byte_size();
+        const auto  mem_rcb = rowcb3->byte_size();
+        const auto  mem_ccb = colcb3->byte_size();
+    
+        std::cout << "    mem    = " << format_mem( mem_rcb, mem_ccb, mem_uni, mem_rcb + mem_ccb + mem_uni ) << std::endl;
+
+        {
+            auto  [ kmin, kavg, kmax ] = matrix::rank_info( *A3 );
+    
+            std::cout << "    ranks  = " << kmin << " … " << kavg << " … " << kmax << std::endl;
+        }
+    
+        {
+            auto  diff  = matrix::sum( 1, *H, -1, *A3 );
+            auto  error = hlr::norm::spectral( impl::arithmetic, *diff, 1e-4 );
         
+            std::cout << "    error  = " << format_error( error / normH ) << std::endl;
+        }
     }// if
     
     if ( cmdline::compress )

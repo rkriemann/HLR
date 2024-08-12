@@ -2000,6 +2000,117 @@ build_uniform ( const Hpro::TMatrix< value_t > &   A,
     return M;
 }
 
+template < typename value_t >
+std::unique_ptr< Hpro::TMatrix< value_t > >
+build_uniform_sep ( const Hpro::TMatrix< value_t > &   A,
+                    shared_cluster_basis< value_t > &  rowcb,
+                    shared_cluster_basis< value_t > &  colcb,
+                    const accuracy &                   acc,
+                    const bool                         compress )
+{
+    using namespace hlr::matrix;
+
+    //
+    // decide upon cluster type, how to construct matrix
+    //
+
+    std::unique_ptr< Hpro::TMatrix< value_t > >  M;
+    
+    if ( hlr::matrix::is_lowrank( A ) )
+    {
+        //
+        // compute coupling matrix as W'·U·(X'·V)'
+        // with cluster basis W and X
+        //
+        
+        auto  R  = cptrcast( &A, hlr::matrix::lrmatrix< value_t > );
+        auto  Sr = blas::prod( blas::adjoint( rowcb.basis() ), R->U_direct() );
+        auto  Sc = blas::prod( blas::adjoint( colcb.basis() ), R->V_direct() );
+
+        M = std::make_unique< uniform_lr2matrix< value_t > >( A.row_is(), A.col_is(), rowcb, colcb, std::move( Sr ), std::move( Sc ) );
+    }// if
+    else if ( hlr::matrix::is_lowrank_sv( A ) )
+    {
+        //
+        // compute coupling matrix as W'·U·(X'·V)'
+        // with cluster basis W and X
+        //
+        
+        auto  R  = cptrcast( &A, hlr::matrix::lrsvmatrix< value_t > );
+        auto  U  = R->U();
+        auto  V  = R->V();
+        auto  Sr = blas::prod( blas::adjoint( rowcb.basis() ), U );
+        auto  Sc = blas::prod( blas::adjoint( colcb.basis() ), V );
+
+        blas::prod_diag_ip( Sr, R->S() );
+        
+        auto  RU = std::make_unique< uniform_lr2matrix< value_t > >( A.row_is(), A.col_is(), rowcb, colcb, std::move( Sr ), std::move( Sc ) );
+
+        if ( compress )
+            RU->compress( acc );
+
+        M = std::move( RU );
+    }// if
+    else if ( is_blocked( A ) )
+    {
+        auto  BA = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
+        
+        M = std::make_unique< Hpro::TBlockMatrix< value_t > >();
+
+        auto  B = ptrcast( M.get(), Hpro::TBlockMatrix< value_t > );
+
+        B->copy_struct_from( BA );
+
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
+                                            0, B->nblock_cols() ),
+            [&,B] ( const ::tbb::blocked_range2d< uint > &  r )
+            {
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                {
+                    auto  rowcb_i = rowcb.son( i );
+                    
+                    HLR_ASSERT( ! is_null( rowcb_i ) );
+
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        auto  colcb_j = colcb.son( j );
+                        auto  A_ij    = BA->block( i, j );
+
+                        HLR_ASSERT( ! is_null( colcb_j ) );
+                        
+                        if ( ! is_null( A_ij ) )
+                        {
+                            auto  B_ij = build_uniform( *A_ij, *rowcb_i, *colcb_j, acc, compress );
+
+                            B->set_block( i, j, B_ij.release() );
+                        }// if
+                    }// for
+                }// for
+            } );
+    }// if
+    else if ( hlr::matrix::is_dense( A ) )
+    {
+        auto  D  = cptrcast( &A, dense_matrix< value_t > );
+        auto  DD = blas::copy( D->mat() );
+        auto  T  = std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
+
+        if ( compress )
+            T->compress( acc );
+
+        M = std::move( T );
+    }// if
+    else
+    {
+        M = A.copy();
+    }// else
+
+    M->set_id( A.id() );
+    M->set_procs( A.procs() );
+
+    return M;
+}
+
 //
 // special construction in BLR2 format (blr clustering)
 //
@@ -2021,6 +2132,8 @@ build_blr2 ( const Hpro::TBlockCluster *  bc,
     using namespace hlr::matrix;
 
     HLR_ASSERT( ! is_null( bc ) );
+
+    std::cout << "not thread safe" << std::endl;
     
     //
     // initialize empty cluster bases
@@ -2415,6 +2528,8 @@ build_blr2_sep ( const Hpro::TBlockCluster *  bc,
 
     HLR_ASSERT( ! is_null( bc ) );
     
+    std::cout << "not thread safe" << std::endl;
+    
     //
     // initialize empty cluster bases
     //
@@ -2469,13 +2584,10 @@ build_blr2_sep ( const Hpro::TBlockCluster *  bc,
     // construct blocks and update bases
     //
 
-    auto  nbrows      = bc->nrows();
-    auto  nbcols      = bc->ncols();
-    auto  B           = std::make_unique< Hpro::TBlockMatrix< value_t > >( bc->rowis(), bc->colis() );
-    auto  row_blocks  = tensor2< hlr::matrix::uniform_lr2matrix< value_t > * >( nbrows, nbcols );
-    auto  col_blocks  = tensor2< hlr::matrix::uniform_lr2matrix< value_t > * >( nbrows, nbcols );
-    auto  row_weights = tensor2< real_t >( bc->nrows(), bc->ncols() );
-    auto  col_weights = tensor2< real_t >( bc->nrows(), bc->ncols() );
+    auto  nbrows  = bc->nrows();
+    auto  nbcols  = bc->ncols();
+    auto  B       = std::make_unique< Hpro::TBlockMatrix< value_t > >( bc->rowis(), bc->colis() );
+    auto  weights = tensor2< real_t >( bc->nrows(), bc->ncols() );
 
     B->set_block_struct( nbrows, nbcols );
     
@@ -2488,10 +2600,6 @@ build_blr2_sep ( const Hpro::TBlockCluster *  bc,
             {
                 for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
                 {
-                    //
-                    // build standard H block
-                    //
-                    
                     auto  bc_ij = bc->son( i, j );
 
                     if ( is_null( bc_ij ) )
@@ -2522,9 +2630,6 @@ build_blr2_sep ( const Hpro::TBlockCluster *  bc,
                         }// if
                         else
                             HLR_ERROR( "unsupported matrix type: " + B_ij->typestr() );
-
-                        if ( compress )
-                            ptrcast( B_ij.get(), dense_matrix< value_t > )->compress( acc );
                     }// else
 
                     HLR_ASSERT( ! is_null( B_ij.get() ) );
@@ -2548,43 +2653,37 @@ build_blr2_sep ( const Hpro::TBlockCluster *  bc,
                         blas::qr( W, Rw );
                         blas::qr( X, Rx );
 
+                        auto  T  = blas::prod( Rw, blas::adjoint( Rx ) );
+
                         // remember norm of block as weight for bases updates
-                        row_weights(i,j) = norm::spectral( Rw );
-                        col_weights(i,j) = norm::spectral( Rx );
+                        weights(i,j) = norm::spectral( T );
                 
                         // block full block row/column for updates
                         auto  rowcb_i = rowcb->son( i );
                         auto  colcb_j = colcb->son( j );
-
-                        // set up empty uniform matrix 
-                        auto  RU = std::make_unique< uniform_lr2matrix< value_t > >( R->row_is(), R->col_is() );
-
-                        RU->set_cluster_bases( *rowcb_i, *colcb_j );
+                        auto  lock_i  = std::scoped_lock( rowcb_i->mutex() );
+                        auto  lock_j  = std::scoped_lock( colcb_j->mutex() );
 
                         //
                         // compute extended row cluster basis
                         // - for details see "compute_extended_row_basis"
                         //
 
+                        auto  Un = blas::matrix< value_t >();
+                
                         {
-                            auto    lock_i  = std::scoped_lock( rowcb_i->mutex() );
-                            auto    Us      = blas::vector< real_t >();
-                            auto    Un      = blas::matrix< value_t >();
-                            size_t  nrows_S = Rw.ncols();
+                            size_t  nrows_S = T.ncols();
 
                             for ( size_t  jj = 0; jj < nbcols; ++jj )
                             {
-                                auto  B_ij = row_blocks( i, jj );
+                                auto  B_ij = B->block( i, jj );
                         
-                                if ( ! is_null( B_ij ) ) // && ( jj != j ) )
-                                    nrows_S += cptrcast( B_ij, uniform_lr2matrix< value_t > )->rank();
+                                if ( ! is_null( B_ij ) && ( jj != j ) && is_uniform_lowrank2( B_ij ) )
+                                    nrows_S += cptrcast( B_ij, uniform_lr2matrix< value_t > )->col_rank();
                             }// for
 
-                            if ( nrows_S == Rw.ncols() )
-                            {
+                            if ( nrows_S == T.ncols() )
                                 Un = std::move( blas::copy( W ) );
-                                Us = blas::sv( Rw );
-                            }// if
                             else
                             {
                                 auto    U   = rowcb_i->basis();
@@ -2594,15 +2693,15 @@ build_blr2_sep ( const Hpro::TBlockCluster *  bc,
 
                                 for ( size_t  jj = 0; jj < nbcols; ++jj )
                                 {
-                                    auto  B_ij = row_blocks( i, jj );
+                                    auto  B_ij = B->block( i, jj );
 
-                                    if ( ! is_null( B_ij ) ) // && ( jj != j ))
+                                    if ( ! is_null( B_ij ) && ( jj != j ) && is_uniform_lowrank2( B_ij ) )
                                     {
                                         auto        lock_ij = std::scoped_lock( B_ij->mutex() );
                                         const auto  R_ij    = cptrcast( B_ij, uniform_lr2matrix< value_t > );
-                                        const auto  rank    = R_ij->rank();
-                                        auto        S_ij    = blas::copy( R_ij->row_coupling() );
-                                        auto        w_ij    = row_weights(i,jj);
+                                        const auto  rank    = R_ij->col_rank();
+                                        auto        S_ij    = blas::prod( R_ij->col_coupling(), blas::adjoint( R_ij->row_coupling() ) );
+                                        auto        w_ij    = weights(i,jj);
                                         auto        S_sub   = blas::matrix< value_t >( S,
                                                                                        blas::range( pos, pos + rank-1 ),
                                                                                        blas::range( 0, U.ncols() - 1 ) );
@@ -2610,15 +2709,15 @@ build_blr2_sep ( const Hpro::TBlockCluster *  bc,
                                         if ( w_ij != real_t(0) )
                                             blas::scale( value_t(1) / w_ij, S_ij );
             
-                                        blas::copy( blas::adjoint( S_ij ), S_sub );
+                                        blas::copy( S_ij, S_sub );
                                         pos += rank;
                                     }// else
                                 }// for
 
                                 {
-                                    const auto  rank  = Rw.ncols();
-                                    auto        S_ij  = blas::copy( Rw );
-                                    auto        w_ij  = row_weights(i,j);
+                                    const auto  rank  = T.ncols();
+                                    auto        S_ij  = blas::copy( T );
+                                    auto        w_ij  = weights(i,j);
                                     auto        S_sub = blas::matrix< value_t >( S,
                                                                                  blas::range( pos, pos + rank-1 ),
                                                                                  blas::range( U.ncols(), Ue.ncols() - 1 ) );
@@ -2636,68 +2735,30 @@ build_blr2_sep ( const Hpro::TBlockCluster *  bc,
 
                                 auto  UeR = blas::prod( Ue, blas::adjoint( R ) );
 
-                                Un = basisapx.column_basis( UeR, acc, & Us );
+                                Un = basisapx.column_basis( UeR, acc );
                             }// else
-
-                            //
-                            // update couplings of previous blocks
-                            //
-
-                            if ( rowcb_i->rank() > 0 )
-                            {
-                                auto  U  = rowcb_i->basis();
-                                auto  TU = blas::prod( blas::adjoint( Un ), U );
-                
-                                for ( size_t  jj = 0; jj < nbcols; ++jj )
-                                {
-                                    auto  B_ij = row_blocks( i, jj );
-                        
-                                    if ( ! is_null( B_ij ) && ( jj != j ) && is_uniform_lowrank2( B_ij ) )
-                                    {
-                                        auto  lock_ij = std::scoped_lock( B_ij->mutex() );
-                                        auto  R_ij    = ptrcast( B_ij, uniform_lr2matrix< value_t > );
-                                        auto  Sn_ij   = blas::prod( TU, R_ij->row_coupling() );
-
-                                        R_ij->set_row_coupling_unsafe( std::move( Sn_ij ) );
-                                    }// if
-                                }// for
-                            }// if
-
-                            // set row coupling of current block
-                            auto  UW = blas::prod( blas::adjoint( Un ), W );
-                            auto  Sr = blas::prod( UW, Rw );
-
-                            RU->set_row_coupling_unsafe( std::move( Sr ) );
-                            
-                            // and finally set new cluster basis (only now since used before)
-                            rowcb_i->set_basis( std::move( Un ) );
-
-                            // row part is of current block is now finished
-                            row_blocks( i, j ) = RU.get();
                         }
 
                         //
                         // compute extended column cluster basis
                         //
 
+                        auto  Vn = blas::matrix< value_t >();
+
                         {
-                            auto    lock_j  = std::scoped_lock( colcb_j->mutex() );
-                            auto    Vs      = blas::vector< value_t >();
-                            auto    Vn      = blas::matrix< value_t >();
-                            size_t  nrows_S = Rx.nrows();
+                            size_t  nrows_S = T.nrows();
     
                             for ( size_t  ii = 0; ii < nbrows; ++ii )
                             {
-                                auto  B_ij = col_blocks( ii, j );
+                                auto  B_ij = B->block( ii, j );
                     
-                                if ( ! is_null( B_ij ) && ( ii != i ))
-                                    nrows_S += cptrcast( B_ij, uniform_lr2matrix< value_t > )->rank();
+                                if ( ! is_null( B_ij ) && ( ii != i ) && is_uniform_lowrank2( B_ij ) )
+                                    nrows_S += cptrcast( B_ij, uniform_lr2matrix< value_t > )->row_rank();
                             }// for
 
-                            if ( nrows_S == Rx.nrows() )
+                            if ( nrows_S == T.nrows() )
                             {
                                 Vn = std::move( blas::copy( X ) );
-                                Vs = blas::sv( Rx );
                             }// if
                             else
                             {
@@ -2708,18 +2769,18 @@ build_blr2_sep ( const Hpro::TBlockCluster *  bc,
 
                                 for ( size_t  ii = 0; ii < nbrows; ++ii )
                                 {
-                                    auto  B_ij = col_blocks( ii, j );
+                                    auto  B_ij = B->block( ii, j );
 
-                                    if ( ! is_null( B_ij ) && ( ii != i ))
+                                    if ( ! is_null( B_ij ) && ( ii != i ) && is_uniform_lowrank2( B_ij ) )
                                     {
                                         auto        lock_ij = std::scoped_lock( B_ij->mutex() );
                                         const auto  R_ij    = cptrcast( B_ij, uniform_lr2matrix< value_t > );
-                                        const auto  rank    = R_ij->rank();
-                                        auto        S_ij    = blas::copy( R_ij->col_coupling() );
-                                        auto        w_ij    = col_weights(ii,j);
+                                        const auto  rank    = R_ij->row_rank();
+                                        auto        S_ij    = blas::prod( R_ij->row_coupling(), blas::adjoint( R_ij->col_coupling() ) );
+                                        auto        w_ij    = weights(ii,j);
                                         auto        S_sub   = blas::matrix< value_t >( S,
-                                                                                       blas::range( pos, pos + rank-1 ),
-                                                                                       blas::range( 0, V.ncols() - 1 ) );
+                                                                                     blas::range( pos, pos + rank-1 ),
+                                                                                     blas::range( 0, V.ncols() - 1 ) );
 
                                         if ( w_ij != real_t(0) )
                                             blas::scale( value_t(1) / w_ij, S_ij );
@@ -2730,9 +2791,9 @@ build_blr2_sep ( const Hpro::TBlockCluster *  bc,
                                 }// for
 
                                 {
-                                    const auto  rank  = Rx.nrows();
-                                    auto        S_ij  = blas::copy( Rx );
-                                    auto        w_ij  = col_weights(i,j);
+                                    const auto  rank  = T.nrows();
+                                    auto        S_ij  = blas::copy( T );
+                                    auto        w_ij  = weights(i,j);
                                     auto        S_sub = blas::matrix< value_t >( S,
                                                                                  blas::range( pos, pos + rank-1 ),
                                                                                  blas::range( V.ncols(), Ve.ncols() - 1 ) );
@@ -2751,43 +2812,85 @@ build_blr2_sep ( const Hpro::TBlockCluster *  bc,
 
                                 auto  VeR = blas::prod( Ve, blas::adjoint( R ) );
 
-                                Vn = basisapx.column_basis( VeR, acc, & Vs );
+                                Vn = basisapx.column_basis( VeR, acc );
                             }// else
-                            
-                            if ( colcb_j->rank() > 0 )
-                            {
-                                auto  V  = colcb_j->basis();
-                                auto  TV = blas::prod( blas::adjoint( Vn ), V );
-
-                                for ( size_t  ii = 0; ii < nbrows; ++ii )
-                                {
-                                    auto  B_ij = col_blocks( ii, j );
-                        
-                                    if ( ! is_null( B_ij ) && ( ii != i ) && is_uniform_lowrank2( B_ij ) )
-                                    {
-                                        auto  lock_ij = std::scoped_lock( B_ij->mutex() );
-                                        auto  R_ij    = ptrcast( B_ij, uniform_lr2matrix< value_t > );
-                                        auto  Sn_ij   = blas::prod( TV, R_ij->col_coupling() );
-
-                                        R_ij->set_col_coupling_unsafe( std::move( Sn_ij ) );
-                                    }// if
-                                }// for
-                            }// if
-
-                            // update current block
-                            auto  VX = blas::prod( blas::adjoint( Vn ), X );
-                            auto  Sc = blas::prod( VX, Rx );
-
-                            RU->set_col_coupling_unsafe( std::move( Sc ) );
-                            
-                            // update bases in cluster bases objects (only now since used before)
-                            colcb_j->set_basis( std::move( Vn ) );
-
-                            // column part of current block is now finished
-                            col_blocks( i, j ) = RU.get();
                         }// for
+                
+                        //
+                        // update couplings of previous blocks
+                        //
 
-                        // full block is finished
+                        if ( rowcb_i->rank() > 0 )
+                        {
+                            auto  U  = rowcb_i->basis();
+                            auto  TU = blas::prod( blas::adjoint( Un ), U );
+                
+                            for ( size_t  jj = 0; jj < nbcols; ++jj )
+                            {
+                                auto  B_ij = B->block( i, jj );
+                        
+                                if ( ! is_null( B_ij ) && ( jj != j ) && is_uniform_lowrank2( B_ij ) )
+                                {
+                                    auto  lock_ij = std::scoped_lock( B_ij->mutex() );
+                                    auto  R_ij    = ptrcast( B_ij, uniform_lr2matrix< value_t > );
+                                    auto  Sn_ij   = blas::prod( TU, R_ij->row_coupling() );
+
+                                    R_ij->set_row_coupling_unsafe( std::move( Sn_ij ) );
+                                }// if
+                            }// for
+                        }// if
+
+                        if ( colcb_j->rank() > 0 )
+                        {
+                            auto  V  = colcb_j->basis();
+                            auto  TV = blas::prod( blas::adjoint( Vn ), V );
+
+                            for ( size_t  ii = 0; ii < nbrows; ++ii )
+                            {
+                                auto  B_ij = B->block( ii, j );
+                        
+                                if ( ! is_null( B_ij ) && ( ii != i ) && is_uniform_lowrank2( B_ij ) )
+                                {
+                                    auto  lock_ij = std::scoped_lock( B_ij->mutex() );
+                                    auto  R_ij    = ptrcast( B_ij, uniform_lr2matrix< value_t > );
+                                    auto  Sn_ij   = blas::prod( TV, R_ij->col_coupling() );
+
+                                    R_ij->set_col_coupling_unsafe( std::move( Sn_ij ) );
+                                }// if
+                            }// for
+                        }// if
+
+                        //
+                        // compute coupling matrix with new row/col bases Un/Vn
+                        //
+
+                        auto  UW = blas::prod( blas::adjoint( Un ), W );
+                        auto  VX = blas::prod( blas::adjoint( Vn ), X );
+                        auto  Sr = blas::prod( UW, Rw );
+                        auto  Sc = blas::prod( VX, Rx );
+
+                        // update bases in cluster bases objects (only now since Un/Vn are used before)
+                        rowcb_i->set_basis( std::move( Un ) );
+                        colcb_j->set_basis( std::move( Vn ) );
+                
+                        auto  RU = std::make_unique< uniform_lr2matrix< value_t > >( R->row_is(), R->col_is(),
+                                                                                     *rowcb_i, *colcb_j,
+                                                                                     std::move( Sr ), std::move( Sc ) );
+
+                        // {// DEBUG {
+                        //     auto  M1 = blas::prod( U, blas::adjoint( V ) );
+                        //     auto  T2 = blas::prod( W, T );
+                        //     auto  M2 = blas::prod( T2, blas::adjoint( X ) );
+                        //     auto  T3 = blas::prod( rowcb.basis(), RU->coupling() );
+                        //     auto  M3 = blas::prod( T3, blas::adjoint( colcb.basis() ) );
+
+                        //     blas::add( value_t(-1), M1, M2 );
+                        //     blas::add( value_t(-1), M1, M3 );
+
+                        //     std::cout << blas::norm_F( M2 ) / blas::norm_F( M1 ) << "    "
+                        //               << blas::norm_F( M3 ) / blas::norm_F( M1 ) << std::endl;
+                        // }// DEBUG }
+                
                         B_ij = std::move( RU );
                     }// if
 

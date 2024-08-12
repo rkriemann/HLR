@@ -185,7 +185,7 @@ program_main ()
     
         tic = timer::now();
     
-        auto  [ rowcb, colcb, A2 ] = impl::matrix::build_uniform_rec2( *A, apx, acc, cmdline::compress );
+        auto  [ rowcb, colcb, A2 ] = impl::matrix::build_uniform_rec_sep( *A, apx, acc, cmdline::compress );
 
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;

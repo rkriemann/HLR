@@ -738,6 +738,74 @@ build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &    A,
     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
 }
 
+//
+// build uniform-H version from given H-matrix <A>
+// - low-rank blocks are converted to uniform low-rank matrices and
+//   shared bases are constructed on-the-fly
+//
+template < approx::approximation_type basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
+build_uniform_rec_sep ( const Hpro::TMatrix< typename basisapx_t::value_t > &    A,
+                        const basisapx_t &                                       basisapx,
+                        const Hpro::TTruncAcc &                                  acc,
+                        const bool                                               compress,
+                        const size_t                                             /* nseq */ = Hpro::CFG::Arith::max_seq_size ) // ignored
+{
+    using value_t       = typename basisapx_t::value_t;
+    using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
+
+    //
+    // mapping of index sets to lowrank matrices 
+    //
+
+    auto  rowcb  = std::make_unique< cluster_basis >( A.row_is() );
+    auto  colcb  = std::make_unique< cluster_basis >( A.col_is() );
+
+    if ( is_blocked( A ) )
+    {
+        rowcb->set_nsons( cptrcast( &A, Hpro::TBlockMatrix< value_t > )->nblock_rows() );
+        colcb->set_nsons( cptrcast( &A, Hpro::TBlockMatrix< value_t > )->nblock_cols() );
+    }// if
+
+    detail::init_cluster_bases( A, *rowcb, *colcb );
+    
+    auto  lr_row_map   = detail::lr_coupling_map_t< value_t >();
+    auto  lr_col_map   = detail::lr_coupling_map_t< value_t >();
+    auto  lrsv_row_map = detail::lrsv_mat_map_t< value_t >();
+    auto  lrsv_col_map = detail::lrsv_mat_map_t< value_t >();
+
+    detail::build_mat_map( A, *rowcb, *colcb, lr_row_map, lr_col_map, lrsv_row_map, lrsv_col_map );
+
+    //
+    // build cluster bases
+    //
+
+    if ( lrsv_row_map.empty() )
+    {
+        ::tbb::parallel_invoke(
+            [&] () { detail::build_cluster_basis( *rowcb, basisapx, acc, lr_row_map, false, compress ); },
+            [&] () { detail::build_cluster_basis( *colcb, basisapx, acc, lr_col_map, true,  compress );  }
+        );
+    }// if
+    else
+    {
+        ::tbb::parallel_invoke(
+            [&] () { detail::build_cluster_basis( *rowcb, basisapx, acc, lrsv_row_map, false, compress ); },
+            [&] () { detail::build_cluster_basis( *colcb, basisapx, acc, lrsv_col_map, true,  compress );  }
+        );
+    }// else
+
+    //
+    // construct uniform lowrank matrices with given cluster bases
+    //
+    
+    auto  M = detail::build_uniform_sep( A, *rowcb, *colcb, acc, compress );
+
+    return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
+}
+
 namespace tlr
 {
 //

@@ -775,15 +775,15 @@ template < coefficient_function_type coeff_t,
 std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
             std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
             std::unique_ptr< Hpro::TMatrix< Hpro::value_type_t< coeff_t > > > >
-build_uniform_lvl2 ( const Hpro::TBlockCluster *  bct,
-                     const coeff_t &              coeff,
-                     const lrapx_t &              lrapx,
-                     const basisapx_t &           basisapx,
-                     const accuracy &             acc,
-                     const bool                   compress,
-                     const size_t                 /* nseq */ = 0 ) // ignored
+build_uniform_lvl_sep ( const Hpro::TBlockCluster *  bct,
+                        const coeff_t &              coeff,
+                        const lrapx_t &              lrapx,
+                        const basisapx_t &           basisapx,
+                        const accuracy &             acc,
+                        const bool                   compress,
+                        const size_t                 /* nseq */ = 0 ) // ignored
 {
-    return detail::build_uniform_lvl2( bct, coeff, lrapx, basisapx, acc, compress );
+    return detail::build_uniform_lvl_sep( bct, coeff, lrapx, basisapx, acc, compress );
 }
 
 template < typename basisapx_t >
@@ -930,10 +930,10 @@ template < typename basisapx_t >
 std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
-build_uniform_rec2 ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
-                     const basisapx_t &           basisapx,
-                     const accuracy &             acc,
-                     const size_t                 /* nseq */ = 0 ) // ignored
+build_uniform_rec_sep ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
+                        const basisapx_t &           basisapx,
+                        const accuracy &             acc,
+                        const size_t                 /* nseq */ = 0 ) // ignored
 {
     using value_t       = typename basisapx_t::value_t;
     using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
