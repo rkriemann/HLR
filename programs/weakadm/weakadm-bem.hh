@@ -69,7 +69,8 @@ program_main ()
     auto  toc     = timer::since( tic );
 
     {
-        using  fnspace_t = Hpro::TLinearFnSpace< value_t >;
+        using  fnspace_t = Hpro::TConstFnSpace< value_t >;
+        // using  fnspace_t = Hpro::TLinearFnSpace< value_t >;
 
         auto  n1      = size_t(cmdline::n);
         auto  n2      = n1*n1;

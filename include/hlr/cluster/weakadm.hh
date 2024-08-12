@@ -12,6 +12,8 @@
 #include <hpro/cluster/TGeomAdmCond.hh>
 #include <hpro/cluster/TGeomCluster.hh>
 
+#include <hlr/utils/term.hh>
+
 namespace hlr { namespace cluster {
 
 using strong_adm_cond = Hpro::TStdGeomAdmCond;
@@ -110,15 +112,38 @@ public:
 
                 //               h
                 // test ├── τ ──┼─┼── σ ──┤
-                if (( rmax >= cmin ) && ( rmax <= cmax ) && (( rmax - cmin ) / minlen < _overlap ))
+                if (( rmax >= cmin ) && ( rmax <= cmax ) && (( rmax - cmin ) < _overlap ))
                     codim++;
                     
                 // test ├── σ ──┼┼── τ ──┤
-                if (( cmax >= rmin ) && ( cmax <= rmax ) && (( cmax - rmin ) / minlen < _overlap ))
+                else if (( cmax >= rmin ) && ( cmax <= rmax ) && (( cmax - rmin ) < _overlap ))
                     codim++;
             }// if
         }// for
 
+        // auto  inter = Hpro::intersection( rbox, cbox );
+        // auto  l0    = inter.max()[0] - inter.min()[0];
+        // auto  l1    = inter.max()[1] - inter.min()[1];
+        // auto  l2    = 0; // inter.max()[2] - inter.min()[2];
+        // double  ol  = 1e10;
+
+        // for ( uint  i = 0; i < 2; ++i )
+        //     if ( inter.max()[i] - inter.min()[i] > 0 )
+        //         ol = std::min( ol, inter.max()[i] - inter.min()[i] );
+        
+        // if ( codim <= 1 )
+        //     std::cout << rbox.to_string() << " x " << cbox.to_string() << " : "
+        //               << term::bold() << codim << ", " << ol << term::reset()
+        //               << " / " << l0 << " / " << l1 << " / " << l2 << std::endl;
+        // else if ( codim == 2 )
+        //     std::cout << term::red() << rbox.to_string() << " x " << cbox.to_string() << " : "
+        //               << term::bold() << codim << ", " << ol << term::reset()
+        //               << " / " << l0 << " / " << l1 << " / " << l2 << std::endl;
+        // else if ( codim == 3 )
+        //     std::cout << term::green() << rbox.to_string() << " x " << cbox.to_string() << " : "
+        //               << term::bold() << codim << ", " << ol << term::reset()
+        //               << " / " << l0 << " / " << l1 << " / " << l2 << std::endl;
+        
         if ( codim >= _codim )
             return true;
     
