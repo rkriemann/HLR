@@ -122,7 +122,7 @@ program_main ()
 
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;
-        std::cout << "    mem    = " << format_mem( A2->byte_size(), rowcb->byte_size(), colcb->byte_size() ) << std::endl;
+        std::cout << "    mem    = " << format_mem( rowcb->byte_size(), colcb->byte_size(), A2->byte_size() ) << std::endl;
         
         auto  [ row_min, row_avg, row_max ] = matrix::rank_info( *rowcb );
         auto  [ col_min, col_avg, col_max ] = matrix::rank_info( *colcb );
@@ -149,7 +149,7 @@ program_main ()
 
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;
-        std::cout << "    mem    = " << format_mem( A2->byte_size(), rowcb->byte_size(), colcb->byte_size() ) << std::endl;
+        std::cout << "    mem    = " << format_mem( rowcb->byte_size(), colcb->byte_size(), A2->byte_size() ) << std::endl;
 
         const auto  normA2 = hlr::norm::spectral( impl::arithmetic, *A2, 1e-4 );
 

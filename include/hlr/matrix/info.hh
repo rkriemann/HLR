@@ -124,6 +124,11 @@ print_mem_lvl ( const Hpro::TMatrix< value_t > & H )
     auto  current = std::list< const matrix_t * >{ &H };
     uint  lvl     = 0;
 
+    std::cout << boost::format( "%4s" ) % "lvl" << " │ "
+              << boost::format( "%10s" ) % "lowrank" << " │ "
+              << boost::format( "%10s" ) % "dense" << std::endl
+              << "─────┼────────────┼───────────" << std::endl;
+    
     while ( current.size() > 0 )
     {
         size_t  size_lr = 0;
@@ -152,9 +157,9 @@ print_mem_lvl ( const Hpro::TMatrix< value_t > & H )
         }// for
 
         if ( size_d + size_lr > 0 )
-            std::cout << boost::format( "%4d : " ) % lvl
-                      << boost::format( "%10s" ) % Hpro::Mem::to_string( size_lr ) << " / "
-                      << boost::format( "%10s" ) % Hpro::Mem::to_string( size_d ) <<std::endl;
+            std::cout << boost::format( "%4d" ) % lvl << " │ "
+                      << boost::format( "%10s" ) % Hpro::Mem::to_string( size_lr ) << " │ "
+                      << boost::format( "%10s" ) % Hpro::Mem::to_string( size_d ) << std::endl;
 
         lvl++;
         current = std::move( next );
@@ -176,6 +181,12 @@ print_mem_lvl ( const Hpro::TMatrix< value_t > &                 H,
     auto  current_ccb = std::list< const cluster_basis_t * >{ &ccb };
     uint  lvl         = 0;
 
+    std::cout << boost::format( "%4s" ) % "lvl" << " │ "
+              << boost::format( "%10s" ) % "bases" << " │ "
+              << boost::format( "%10s" ) % "lowrank" << " │ "
+              << boost::format( "%10s" ) % "dense" << std::endl
+              << "─────┼────────────┼────────────┼───────────" << std::endl;
+    
     while ( current_mat.size() > 0 )
     {
         size_t  size_d   = 0;
@@ -225,9 +236,9 @@ print_mem_lvl ( const Hpro::TMatrix< value_t > &                 H,
         }// for
 
         if ( size_d + size_lr > 0 )
-            std::cout << boost::format( "%4d : " ) % lvl
-                      << boost::format( "%10s" ) % Hpro::Mem::to_string( size_lr ).c_str() << " / "
-                      << boost::format( "%10s" ) % Hpro::Mem::to_string( size_cb ).c_str() << " / "
+            std::cout << boost::format( "%4d" ) % lvl << " │ "
+                      << boost::format( "%10s" ) % Hpro::Mem::to_string( size_cb ).c_str() << " │ "
+                      << boost::format( "%10s" ) % Hpro::Mem::to_string( size_lr ).c_str() << " │ "
                       << boost::format( "%10s" ) % Hpro::Mem::to_string( size_d ).c_str() <<std::endl;
 
         lvl++;

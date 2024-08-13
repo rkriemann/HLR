@@ -60,7 +60,7 @@ struct hca : public base_hca< T_coeff, T_generator_fn >
     {
         if (( rowcl.bbox().max().dim() != 3 ) ||
             ( colcl.bbox().max().dim() != 3 ))
-            HLR_ERROR( "hca::approx : unsupported dimension of cluster" );
+            HLR_ERROR( "unsupported dimension of cluster" );
 
         // generate grid for local clusters for evaluation of kernel generator function
         const auto  row_grid = tensor_grid< real_t >( rowcl.bbox(), base_class::ipol_order(), base_class::ipol_func() );
@@ -81,12 +81,14 @@ struct hca : public base_hca< T_coeff, T_generator_fn >
         const auto  G = base_class::compute_G( pivots, row_grid, col_grid );
 
         //
-        // compute low-rank matrix as (U·G) × V^H
+        // compute low-rank matrix as U×G×V^H
         //
 
-        auto  U = compute_U( rowcl, k, pivots, col_grid, G );
+        auto  U = compute_U( rowcl, k, pivots, col_grid );
         auto  V = compute_V( colcl, k, pivots, row_grid );
-        auto  R = std::make_unique< matrix::lrmatrix< value_t > >( rowcl, colcl, std::move( U ), std::move( V ) );
+
+        auto  UG = blas::prod( U, G );
+        auto  R  = std::make_unique< matrix::lrmatrix< value_t > >( rowcl, colcl, std::move( UG ), std::move( V ) );
 
         R->truncate( acc );
 
@@ -102,20 +104,18 @@ struct hca : public base_hca< T_coeff, T_generator_fn >
     compute_U  ( const Hpro::TIndexSet &          rowis,
                  const size_t                     rank,
                  const pivot_arr_t &              pivots,
-                 const tensor_grid< real_t > &    col_grid,
-                 const blas::matrix< value_t > &  G ) const
+                 const tensor_grid< real_t > &    col_grid ) const
     {
-        std::vector< Hpro::T3Point >  y_pts( rank );
+        auto  y_pts = std::vector< Hpro::T3Point >( rank );
 
         for ( size_t j = 0; j < rank; j++ )
             y_pts[j] = col_grid( col_grid.fold( pivots[j].second ) );
 
-        blas::matrix< value_t >  U( rowis.size(), rank );
+        auto  U = blas::matrix< value_t >( rowis.size(), rank );
 
         base_class::generator_fn().integrate_dx( rowis, y_pts, U );
 
-        // multiply with G
-        return blas::prod( value_t(1), U, G );
+        return U;
     }
 
     blas::matrix< value_t >
@@ -124,15 +124,14 @@ struct hca : public base_hca< T_coeff, T_generator_fn >
                  const pivot_arr_t &            pivots,
                  const tensor_grid< real_t > &  row_grid ) const
     {
-        std::vector< Hpro::T3Point >  x_pts( rank );
+        auto  x_pts = std::vector< Hpro::T3Point >( rank );
 
         for ( size_t j = 0; j < rank; j++ )
             x_pts[j] = row_grid( row_grid.fold( pivots[j].first ) );
 
-        blas::matrix< value_t >  V( colis.size(), rank );
+        auto  V = blas::matrix< value_t >( colis.size(), rank );
 
         base_class::generator_fn().integrate_dy( colis, x_pts, V );
-
         blas::conj( V );
 
         return V;
