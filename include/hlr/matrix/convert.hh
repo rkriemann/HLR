@@ -16,6 +16,7 @@
 #include <hlr/matrix/uniform_lrmatrix.hh>
 #include <hlr/matrix/uniform_lr2matrix.hh>
 #include <hlr/matrix/h2_lrmatrix.hh>
+#include <hlr/matrix/h2_lr2matrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
 #include <hlr/matrix/lrsmatrix.hh>
 #include <hlr/matrix/lrsvmatrix.hh>
@@ -118,6 +119,15 @@ convert_to_lowrank ( const Hpro::TMatrix< value_t > &  M,
         auto  U        = R->row_cb().transform_backward( R->coupling() );
         auto  I        = blas::identity< value_t >( R->col_rank() );
         auto  V        = R->col_cb().transform_backward( I );
+        auto  [ W, X ] = approx( U, V, acc );
+        
+        return std::make_unique< lrmatrix< value_t > >( M.row_is(), M.col_is(), std::move( W ), std::move( X ) );
+    }// if
+    else if ( matrix::is_h2_lowrank2( M ) )
+    {
+        auto  R        = cptrcast( &M, h2_lr2matrix< value_t > );
+        auto  U        = R->row_cb().transform_backward( R->row_coupling() );
+        auto  V        = R->col_cb().transform_backward( R->col_coupling() );
         auto  [ W, X ] = approx( U, V, acc );
         
         return std::make_unique< lrmatrix< value_t > >( M.row_is(), M.col_is(), std::move( W ), std::move( X ) );
@@ -374,6 +384,14 @@ convert_to_lowrank ( const Hpro::TMatrix< value_t > &  M )
         auto  U = R->row_cb().transform_backward( R->coupling() );
         auto  I = blas::identity< value_t >( R->col_rank() );
         auto  V = R->col_cb().transform_backward( I );
+        
+        return std::make_unique< matrix::lrmatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
+    }// if
+    else if ( matrix::is_h2_lowrank2( M ) )
+    {
+        auto  R = cptrcast( &M, h2_lr2matrix< value_t > );
+        auto  U = R->row_cb().transform_backward( R->row_coupling() );
+        auto  V = R->col_cb().transform_backward( R->col_coupling() );
         
         return std::make_unique< matrix::lrmatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
     }// if

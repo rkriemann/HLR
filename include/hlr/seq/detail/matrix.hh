@@ -15,6 +15,7 @@
 #include <hlr/bem/traits.hh>
 #include <hlr/arith/detail/uniform_basis.hh>
 #include <hlr/matrix/dense_matrix.hh>
+#include <hlr/matrix/h2_lr2matrix.hh>
 
 namespace hlr { namespace seq { namespace matrix { namespace detail {
 
@@ -3727,6 +3728,81 @@ build_h2 ( const Hpro::TMatrix< value_t > &   A,
                 if ( ! is_null( A_ij ) )
                 {
                     auto  B_ij = build_h2( *A_ij, *rowcb_i, *colcb_j );
+
+                    B->set_block( i, j, B_ij.release() );
+                }// if
+            }// for
+        }// for
+    }// if
+    else if ( hlr::matrix::is_dense( A ) )
+    {
+        auto  D  = cptrcast( &A, dense_matrix< value_t > );
+        auto  DD = blas::copy( D->mat() );
+
+        return  std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix type: " + A.typestr() );
+
+    M->set_id( A.id() );
+    M->set_procs( A.procs() );
+
+    return M;
+}
+
+template < typename value_t >
+std::unique_ptr< Hpro::TMatrix< value_t > >
+build_h2_sep ( const Hpro::TMatrix< value_t > &   A,
+               nested_cluster_basis< value_t > &  rowcb,
+               nested_cluster_basis< value_t > &  colcb )
+{
+    using namespace hlr::matrix;
+
+    //
+    // decide upon cluster type, how to construct matrix
+    //
+
+    std::unique_ptr< Hpro::TMatrix< value_t > >  M;
+    
+    if ( hlr::matrix::is_lowrank( A ) )
+    {
+        //
+        // compute coupling matrix as W'·U·(X'·V)'
+        // with cluster basis W and X
+        //
+        
+        auto  R  = cptrcast( &A, lrmatrix< value_t > );
+        auto  Sr = rowcb.transform_forward( R->U() );
+        auto  Sc = colcb.transform_forward( R->V() );
+
+        M = std::make_unique< h2_lr2matrix< value_t > >( A.row_is(), A.col_is(), rowcb, colcb, std::move( Sr ), std::move( Sc ) );
+    }// if
+    else if ( is_blocked( A ) )
+    {
+        auto  BA = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
+        
+        M = std::make_unique< Hpro::TBlockMatrix< value_t > >();
+
+        auto  B = ptrcast( M.get(), Hpro::TBlockMatrix< value_t > );
+
+        B->copy_struct_from( BA );
+
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            auto  rowcb_i = rowcb.son( i );
+
+            HLR_ASSERT( ! is_null( rowcb_i ) );
+
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                auto  colcb_j = colcb.son( j );
+                auto  A_ij    = BA->block( i, j );
+                
+                HLR_ASSERT( ! is_null( colcb_j ) );
+
+                if ( ! is_null( A_ij ) )
+                {
+                    auto  B_ij = build_h2_sep( *A_ij, *rowcb_i, *colcb_j );
 
                     B->set_block( i, j, B_ij.release() );
                 }// if

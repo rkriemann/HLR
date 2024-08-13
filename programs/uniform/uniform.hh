@@ -203,7 +203,7 @@ program_main ()
 
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;
-        std::cout << "    mem    = " << format_mem( A2->byte_size(), rowcb->byte_size(), colcb->byte_size() ) << std::endl;
+        std::cout << "    mem    = " << format_mem( rowcb->byte_size(), colcb->byte_size(), A2->byte_size() ) << std::endl;
 
         const auto  normA2 = hlr::norm::spectral( impl::arithmetic, *A2, 1e-4 );
 
@@ -234,43 +234,6 @@ program_main ()
 
     //////////////////////////////////////////////////////////////////////
     //
-    // conversion to uniform
-    //
-    //////////////////////////////////////////////////////////////////////
-
-    if ( false )
-    {
-        std::cout << "  " << term::bullet << term::bold << "build cluster bases" << term::reset << std::endl;
-    
-        tic = timer::now();
-    
-        auto  [ rowcb2, colcb2 ] = impl::matrix::construct_from_H< value_t >( *ct->root(), *ct->root(), *A, acc );
-
-        toc = timer::since( tic );
-
-        std::cout << "    done in  " << format_time( toc ) << std::endl;
-        std::cout << "    mem    = " << format_mem( rowcb2->byte_size(), colcb2->byte_size() ) << std::endl;
-
-
-        std::cout << "  " << term::bullet << term::bold << "convert matrix" << term::reset << std::endl;
-
-        tic = timer::now();
-    
-        auto  A2 = impl::matrix::copy_uniform< value_t >( *A, *rowcb2, *colcb2 );
-    
-        toc = timer::since( tic );
-
-        std::cout << "    done in  " << format_time( toc ) << std::endl;
-        std::cout << "    mem    = " << format_mem( A2->byte_size() ) << std::endl;
-
-        auto  diff  = matrix::sum( 1, *A, -1, *A2 );
-        auto  error = hlr::norm::spectral( impl::arithmetic, *diff, 1e-4 );
-        
-        std::cout << "    error  = " << format_error( error / normA ) << std::endl;
-    }// if
-    
-    //////////////////////////////////////////////////////////////////////
-    //
     // conversion to H²
     //
     //////////////////////////////////////////////////////////////////////
@@ -279,7 +242,7 @@ program_main ()
     auto  colcb_h2 = std::unique_ptr< matrix::nested_cluster_basis< value_t > >();
     auto  A_h2     = std::unique_ptr< hpro::TMatrix< value_t > >();
 
-    if ( false )
+    if ( true )
     {
         std::cout << term::bullet << term::bold << "H²-matrix" << term::reset << std::endl;
     
@@ -289,7 +252,7 @@ program_main ()
 
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;
-        std::cout << "    mem    = " << format_mem( A2->byte_size(), rowcb->byte_size(), colcb->byte_size() ) << std::endl;
+        std::cout << "    mem    = " << format_mem( rowcb->byte_size(), colcb->byte_size(), A2->byte_size() ) << std::endl;
 
         auto  [ row_min, row_avg, row_max ] = matrix::rank_info( *rowcb );
         auto  [ col_min, col_avg, col_max ] = matrix::rank_info( *colcb );
@@ -304,6 +267,8 @@ program_main ()
             io::eps::print( *rowcb, "rowcb_h2" );
             io::eps::print( *colcb, "colcb_h2" );
         }// if
+        
+        matrix::print_mem_lvl( *A2, *rowcb, *colcb );
         
         {
             auto  diff  = matrix::sum( 1, *A, -1, *A2 );
@@ -325,6 +290,48 @@ program_main ()
         A_h2     = std::move( A2 );
         rowcb_h2 = std::move( rowcb );
         colcb_h2 = std::move( colcb );
+    }
+
+    if ( true )
+    {
+        std::cout << term::bullet << term::bold << "H²-matrix (sep. coupling)" << term::reset << std::endl;
+    
+        tic = timer::now();
+    
+        auto  [ rowcb, colcb, A2 ] = impl::matrix::build_h2_rec_sep( *A, apx, acc, nseq );
+
+        toc = timer::since( tic );
+        std::cout << "    done in  " << format_time( toc ) << std::endl;
+        std::cout << "    mem    = " << format_mem( rowcb->byte_size(), colcb->byte_size(), A2->byte_size() ) << std::endl;
+
+        auto  [ row_min, row_avg, row_max ] = matrix::rank_info( *rowcb );
+        auto  [ col_min, col_avg, col_max ] = matrix::rank_info( *colcb );
+
+        std::cout << "    ranks  = "
+                  << row_min << " … " << row_avg << " … " << row_max << " / "
+                  << col_min << " … " << col_avg << " … " << col_max << std::endl;
+        
+        if ( hpro::verbose( 3 ) )
+        {
+            io::eps::print( *A2, "H2", "noid" );
+            io::eps::print( *rowcb, "rowcb_h2" );
+            io::eps::print( *colcb, "colcb_h2" );
+        }// if
+        
+        matrix::print_mem_lvl( *A2, *rowcb, *colcb );
+        
+        {
+            auto  diff  = matrix::sum( 1, *A, -1, *A2 );
+            auto  error = hlr::norm::spectral( impl::arithmetic, *diff, 1e-4 );
+        
+            std::cout << "    error  = " << format_error( error / normA ) << std::endl;
+        }
+        
+        {
+            auto  error = impl::norm::frobenius( 1, *A, -1, *A2 );
+
+            std::cout << "    error = " << format_error( error, error / normA ) << std::endl;
+        }
     }
 
     const bool  has_h2 = ! is_null( A_h2.get() );

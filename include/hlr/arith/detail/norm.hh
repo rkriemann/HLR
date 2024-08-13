@@ -435,6 +435,18 @@ frobenius_squared ( const alpha_t                     alpha,
 
         return frobenius_squared( alpha, A, beta, *RB );
     }// if
+    else if ( matrix::is_h2_lowrank2( A ) )
+    {
+        auto  RA = matrix::convert_to_lowrank( A );
+
+        return frobenius_squared( alpha, *RA, beta, B );
+    }// if
+    else if ( matrix::is_h2_lowrank2( B ) )
+    {
+        auto  RB = matrix::convert_to_lowrank( B );
+
+        return frobenius_squared( alpha, A, beta, *RB );
+    }// if
     else if ( matrix::is_dense_all( A, B ) )
     {
         auto  MA = cptrcast( &A, matrix::dense_matrix< value_t > )->mat();

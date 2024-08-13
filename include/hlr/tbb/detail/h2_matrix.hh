@@ -19,6 +19,8 @@
 #include <hlr/matrix/h2_lrmatrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
 
+#include <hlr/seq/detail/matrix.hh>
+
 #include <hlr/tbb/detail/uniform_basis.hh>
 
 namespace hlr { namespace tbb { namespace matrix { namespace detail {
@@ -589,29 +591,11 @@ build_h2 ( const Hpro::TMatrix< value_t > &   A,
     // decide upon cluster type, how to construct matrix
     //
 
-    std::unique_ptr< Hpro::TMatrix< value_t > >  M;
-    
-    if ( hlr::matrix::is_lowrank( A ) )
-    {
-        //
-        // compute coupling matrix as W'·U·(X'·V)'
-        // with cluster basis W and X
-        //
-        
-        auto  R = cptrcast( &A, hlr::matrix::lrmatrix< value_t > );
-        auto  W = rowcb.transform_forward( R->U_direct() );
-        auto  X = colcb.transform_forward( R->V_direct() );
-        auto  S = blas::prod( W, blas::adjoint( X ) );
-
-        M = std::make_unique< h2_lrmatrix< value_t > >( A.row_is(), A.col_is(), rowcb, colcb, std::move( S ) );
-    }// if
-    else if ( is_blocked( A ) )
+    if ( is_blocked( A ) )
     {
         auto  BA = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
-        
-        M = std::make_unique< Hpro::TBlockMatrix< value_t > >();
-
-        auto  B = ptrcast( M.get(), Hpro::TBlockMatrix< value_t > );
+        auto  M  = std::make_unique< Hpro::TBlockMatrix< value_t > >();
+        auto  B  = ptrcast( M.get(), Hpro::TBlockMatrix< value_t > );
 
         B->copy_struct_from( BA );
 
@@ -642,23 +626,75 @@ build_h2 ( const Hpro::TMatrix< value_t > &   A,
                     }// for
                 }// for
             } );
-    }// if
-    else if ( hlr::matrix::is_dense( A ) )
-    {
-        auto  D  = cptrcast( &A, hlr::matrix::dense_matrix< value_t > );
-        auto  DD = blas::copy( D->mat() );
 
-        return  std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
+        M->set_id( A.id() );
+        M->set_procs( A.procs() );
+
+        return M;
     }// if
-    else
+    else 
     {
-        M = A.copy();
+        return hlr::seq::matrix::detail::build_h2( A, rowcb, colcb );
     }// else
+}
 
-    M->set_id( A.id() );
-    M->set_procs( A.procs() );
+template < typename value_t >
+std::unique_ptr< Hpro::TMatrix< value_t > >
+build_h2_sep ( const Hpro::TMatrix< value_t > &   A,
+               nested_cluster_basis< value_t > &  rowcb,
+               nested_cluster_basis< value_t > &  colcb )
+{
+    using namespace hlr::matrix;
 
-    return M;
+    //
+    // decide upon cluster type, how to construct matrix
+    //
+
+    if ( is_blocked( A ) )
+    {
+        auto  BA = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
+        auto  M  = std::make_unique< Hpro::TBlockMatrix< value_t > >();
+        auto  B  = ptrcast( M.get(), Hpro::TBlockMatrix< value_t > );
+
+        B->copy_struct_from( BA );
+
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
+                                            0, B->nblock_cols() ),
+            [&,BA,B] ( const ::tbb::blocked_range2d< uint > &  r )
+            {
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                {
+                    auto  rowcb_i = rowcb.son( i );
+                    
+                    HLR_ASSERT( ! is_null( rowcb_i ) );
+
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        auto  colcb_j = colcb.son( j );
+                        auto  A_ij    = BA->block( i, j );
+                
+                        HLR_ASSERT( ! is_null( colcb_j ) );
+
+                        if ( ! is_null( A_ij ) )
+                        {
+                            auto  B_ij = build_h2_sep( *A_ij, *rowcb_i, *colcb_j );
+                            
+                            B->set_block( i, j, B_ij.release() );
+                        }// if
+                    }// for
+                }// for
+            } );
+
+        M->set_id( A.id() );
+        M->set_procs( A.procs() );
+
+        return M;
+    }// if
+    else 
+    {
+        return hlr::seq::matrix::detail::build_h2_sep( A, rowcb, colcb );
+    }// else
 }
 
 }}}}// namespace hlr::tbb::matrix::detail
