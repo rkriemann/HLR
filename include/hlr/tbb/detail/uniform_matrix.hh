@@ -2081,7 +2081,7 @@ build_uniform_sep ( const Hpro::TMatrix< value_t > &   A,
                         
                         if ( ! is_null( A_ij ) )
                         {
-                            auto  B_ij = build_uniform( *A_ij, *rowcb_i, *colcb_j, acc, compress );
+                            auto  B_ij = build_uniform_sep( *A_ij, *rowcb_i, *colcb_j, acc, compress );
 
                             B->set_block( i, j, B_ij.release() );
                         }// if

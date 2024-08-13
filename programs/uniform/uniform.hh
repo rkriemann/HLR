@@ -87,19 +87,19 @@ program_main ()
         std::cout << "    ranks  = " << kmin << " … " << kavg << " … " << kmax << std::endl;
     }
 
-    {
-        auto  A_hier = matrix::build_level_hierarchy( *A, false );
+    // {
+    //     auto  A_hier = matrix::build_level_hierarchy( *A, false );
 
-        matrix::print( A_hier );
-    }
+    //     matrix::print( A_hier, false );
+    // }
 
-    {
-        auto  A_hier = matrix::build_level_hierarchy( *A, true );
+    // {
+    //     auto  A_hier = matrix::build_level_hierarchy( *A, true );
 
-        matrix::print( A_hier );
-    }
+    //     matrix::print( A_hier, true );
+    // }
 
-    std::exit( 0 );
+    // std::exit( 0 );
     
     //////////////////////////////////////////////////////////////////////
     //

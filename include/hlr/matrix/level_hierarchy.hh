@@ -10,6 +10,10 @@
 
 #include <hpro/matrix/TBlockMatrix.hh>
 
+#include <hlr/matrix/lrmatrix.hh>
+#include <hlr/matrix/lrsvmatrix.hh>
+#include <hlr/matrix/uniform_lrmatrix.hh>
+#include <hlr/matrix/uniform_lr2matrix.hh>
 #include <hlr/utils/term.hh>
 
 namespace hlr { namespace matrix {
@@ -256,9 +260,11 @@ build_level_hierarchy ( const Hpro::TMatrix< value_t > &  M,
 
 template < typename value_t >
 void
-print ( const level_hierarchy< value_t > &  H )
+print ( const level_hierarchy< value_t > &  H,
+        const bool                          transposed = false )
 {
-    uint  lvl_idx = 0;
+    uint        lvl_idx = 0;
+    const auto  op_M    = ( transposed ? apply_transposed : apply_normal );
     
     for ( uint  lvl = 0; lvl < H.nlevel(); ++lvl )
     {
@@ -282,22 +288,38 @@ print ( const level_hierarchy< value_t > &  H )
                 
                 if ( first )
                 {
-                    rowis = mat->row_is();
+                    rowis = mat->row_is( op_M );
                     first = false;
 
-                    if ( T == 'd' )
-                        std::cout << rowis.to_string() << " × " << term::red() << col_idx << " D" << mat->col_is().to_string() << term::reset() << ", ";
+                    if ( matrix::is_dense( mat ) )
+                        std::cout << rowis.to_string() << " × " << term::red() << col_idx << " D" << mat->id() << term::reset() << ", ";
+                    else if ( matrix::is_lowrank( mat ) )
+                        std::cout << rowis.to_string() << " × " << term::green() << col_idx << " R" << mat->id() << term::reset() << ", ";
+                    else if ( matrix::is_lowrank_sv( mat ) )
+                        std::cout << rowis.to_string() << " × " << term::green() << col_idx << " R" << mat->id() << term::reset() << ", ";
+                    else if ( matrix::is_uniform_lowrank( mat ) )
+                        std::cout << rowis.to_string() << " × " << term::green() << col_idx << " U" << mat->id() << term::reset() << ", ";
+                    else if ( matrix::is_uniform_lowrank2( mat ) )
+                        std::cout << rowis.to_string() << " × " << term::green() << col_idx << " U" << mat->id() << term::reset() << ", ";
                     else
-                        std::cout << rowis.to_string() << " × " << term::green() << col_idx << " U" << mat->col_is().to_string() << term::reset() << ", ";
+                        std::cout << rowis.to_string() << " × " << term::blue() << col_idx << " ?" << mat->id() << term::reset() << ", ";
                 }// if
                 else
                 {
-                    // HLR_ASSERT( mat->row_is() == rowis );
+                    HLR_ASSERT( mat->row_is( op_M ) == rowis );
                     
-                    if ( T == 'd' )
-                        std::cout << term::red() << col_idx << " D" << mat->col_is().to_string() << term::reset() << ", ";
+                    if ( matrix::is_dense( mat ) )
+                        std::cout << term::red() << col_idx << " D" << mat->id() << term::reset() << ", ";
+                    else if ( matrix::is_lowrank( mat ) )
+                        std::cout << term::green() << col_idx << " R" << mat->id() << term::reset() << ", ";
+                    else if ( matrix::is_lowrank_sv( mat ) )
+                        std::cout << term::green() << col_idx << " R" << mat->id() << term::reset() << ", ";
+                    else if ( matrix::is_uniform_lowrank( mat ) )
+                        std::cout << term::green() << col_idx << " U" << mat->id() << term::reset() << ", ";
+                    else if ( matrix::is_uniform_lowrank2( mat ) )
+                        std::cout << term::green() << col_idx << " U" << mat->id() << term::reset() << ", ";
                     else
-                        std::cout << term::green() << col_idx << " U" << mat->col_is().to_string() << term::reset() << ", ";
+                        std::cout << term::blue() << col_idx << " ?" << mat->id() << term::reset() << ", ";
                 }// else
             }// for
             std::cout << std::endl;
