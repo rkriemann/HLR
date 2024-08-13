@@ -1745,65 +1745,72 @@ build_cluster_basis ( shared_cluster_basis< value_t > &     cb,
     // construct cluster basis for all precollected blocks
     //
 
-    auto  accessor = lr_accessor_t< value_t >();
-    
-    if ( mat_map.find( accessor, cb.is() ) )
-    {
-        //
-        // compute column basis for block row
-        //
-        //  ( U₀·V₀'  U₁·V₁'  U₂·V₂'  … )
-        //
-        // as 
-        //
-        //   ( U₀·C₀'·Q₀'  U₁·C₁'·Q₁'  U₂'·C₂'·Q₂' … )
-        //
-        // with QR decomposition V_i = Q_i C_i
-        // (precomputed in "build_mat_map" above)
-        //
-        // As Q_i is orthogonal, it can be neglected in column basis computation!
-        //
-
-        const uint  nrows = cb.is().size();
-        uint        ncols = 0;
-
-        // determine total number of columns
-        for ( const auto  [ M_i, C_i ] : accessor->second )
-            ncols += C_i.nrows();
-
-        // build ( U_0·C_0'  U_1·C_1'  U_2'·C_2' … )
-        auto  X   = blas::matrix< value_t >( nrows, ncols );
-        uint  pos = 0;
-
-        for ( const auto  [ R_i, C_i ] : accessor->second )
+    ::tbb::parallel_invoke(
+        [&,transposed] ()
         {
-            auto  U_i = blas::prod( R_i->U( op ), blas::adjoint( C_i ) );
-            auto  X_i = blas::matrix< value_t >( X, blas::range::all, blas::range( pos, pos + C_i.nrows() - 1 ) );
-
-            blas::copy( U_i, X_i );
-            pos += C_i.nrows();
-        }// for
-
-        // actually build cluster basis
-        auto  Ws = blas::vector< real_t >(); // singular values corresponding to basis vectors
-        auto  W  = basisapx.column_basis( X, acc, & Ws );
-
-        cb.set_basis( std::move( W ), std::move( Ws ) );
-
-        if ( compress )
-            cb.compress( acc );
-    }// if
-
-    //
-    // recurse
-    //
+            auto  accessor = lr_accessor_t< value_t >();
     
-    ::tbb::parallel_for< uint >(
-        0, cb.nsons(),
-        [&,transposed] ( const uint  i )
+            if ( mat_map.find( accessor, cb.is() ) )
+            {
+                //
+                // compute column basis for block row
+                //
+                //  ( U₀·V₀'  U₁·V₁'  U₂·V₂'  … )
+                //
+                // as 
+                //
+                //   ( U₀·C₀'·Q₀'  U₁·C₁'·Q₁'  U₂'·C₂'·Q₂' … )
+                //
+                // with QR decomposition V_i = Q_i C_i
+                // (precomputed in "build_mat_map" above)
+                //
+                // As Q_i is orthogonal, it can be neglected in column basis computation!
+                //
+
+                const uint  nrows = cb.is().size();
+                uint        ncols = 0;
+
+                // determine total number of columns
+                for ( const auto  [ M_i, C_i ] : accessor->second )
+                    ncols += C_i.nrows();
+
+                // build ( U_0·C_0'  U_1·C_1'  U_2'·C_2' … )
+                auto  X   = blas::matrix< value_t >( nrows, ncols );
+                uint  pos = 0;
+
+                for ( const auto  [ R_i, C_i ] : accessor->second )
+                {
+                    auto  U_i = blas::prod( R_i->U( op ), blas::adjoint( C_i ) );
+                    auto  X_i = blas::matrix< value_t >( X, blas::range::all, blas::range( pos, pos + C_i.nrows() - 1 ) );
+
+                    blas::copy( U_i, X_i );
+                    pos += C_i.nrows();
+                }// for
+
+                // actually build cluster basis
+                auto  Ws = blas::vector< real_t >(); // singular values corresponding to basis vectors
+                auto  W  = basisapx.column_basis( X, acc, & Ws );
+
+                cb.set_basis( std::move( W ), std::move( Ws ) );
+
+                if ( compress )
+                    cb.compress( acc );
+            }// if
+        },
+
+        [&,transposed] ()
         {
-            if ( ! is_null( cb.son( i ) ) )
-                build_cluster_basis( *cb.son( i ), basisapx, acc, mat_map, transposed, compress );
+            //
+            // recurse
+            //
+    
+            ::tbb::parallel_for< uint >(
+                0, cb.nsons(),
+                [&,transposed] ( const uint  i )
+                {
+                    if ( ! is_null( cb.son( i ) ) )
+                        build_cluster_basis( *cb.son( i ), basisapx, acc, mat_map, transposed, compress );
+                } );
         } );
 }
 
