@@ -241,7 +241,7 @@ public:
     build ( const Hpro::TBlockIndexSet & ,
             const Hpro::TTruncAcc & ) const
     {
-        HLR_ERROR( "hca_lrapx::build : block index set not supported" );
+        HLR_ERROR( "block index set not supported" );
     }
     
 };
