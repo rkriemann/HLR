@@ -121,8 +121,10 @@ print_mem_lvl ( const Hpro::TMatrix< value_t > & H )
     using  matrix_t       = Hpro::TMatrix< value_t >;
     using  block_matrix_t = Hpro::TBlockMatrix< value_t >;
     
-    auto  current = std::list< const matrix_t * >{ &H };
-    uint  lvl     = 0;
+    auto    current     = std::list< const matrix_t * >{ &H };
+    uint    lvl         = 0;
+    size_t  size_lr_all = 0;
+    size_t  size_d_all  = 0;
 
     std::cout << boost::format( "%4s" ) % "lvl" << " │ "
               << boost::format( "%10s" ) % "lowrank" << " │ "
@@ -161,9 +163,17 @@ print_mem_lvl ( const Hpro::TMatrix< value_t > & H )
                       << boost::format( "%10s" ) % Hpro::Mem::to_string( size_lr ) << " │ "
                       << boost::format( "%10s" ) % Hpro::Mem::to_string( size_d ) << std::endl;
 
+        size_lr_all += size_lr;
+        size_d_all  += size_d;
+        
         lvl++;
         current = std::move( next );
     }// while
+
+    std::cout << "─────┼────────────┼───────────" << std::endl
+              << boost::format( "%4s" ) % "all" << " │ "
+              << boost::format( "%10s" ) % Hpro::Mem::to_string( size_lr_all ) << " │ "
+              << boost::format( "%10s" ) % Hpro::Mem::to_string( size_d_all ) << std::endl;
 }
 
 template < typename value_t >
@@ -176,10 +186,13 @@ print_mem_lvl ( const Hpro::TMatrix< value_t > &                 H,
     using  block_matrix_t  = Hpro::TBlockMatrix< value_t >;
     using  cluster_basis_t = matrix::shared_cluster_basis< value_t >;
     
-    auto  current_mat = std::list< const matrix_t * >{ &H };
-    auto  current_rcb = std::list< const cluster_basis_t * >{ &rcb };
-    auto  current_ccb = std::list< const cluster_basis_t * >{ &ccb };
-    uint  lvl         = 0;
+    auto    current_mat = std::list< const matrix_t * >{ &H };
+    auto    current_rcb = std::list< const cluster_basis_t * >{ &rcb };
+    auto    current_ccb = std::list< const cluster_basis_t * >{ &ccb };
+    uint    lvl         = 0;
+    size_t  size_cb_all = 0;
+    size_t  size_lr_all = 0;
+    size_t  size_d_all  = 0;
 
     std::cout << boost::format( "%4s" ) % "lvl" << " │ "
               << boost::format( "%10s" ) % "bases" << " │ "
@@ -241,11 +254,21 @@ print_mem_lvl ( const Hpro::TMatrix< value_t > &                 H,
                       << boost::format( "%10s" ) % Hpro::Mem::to_string( size_lr ).c_str() << " │ "
                       << boost::format( "%10s" ) % Hpro::Mem::to_string( size_d ).c_str() <<std::endl;
 
+        size_cb_all += size_cb;
+        size_lr_all += size_lr;
+        size_d_all  += size_d;
+        
         lvl++;
         current_mat = std::move( next_mat );
         current_rcb = std::move( next_rcb );
         current_ccb = std::move( next_ccb );
     }// while
+
+    std::cout << "─────┼────────────┼────────────┼───────────" << std::endl
+              << boost::format( "%4s" ) % "all" << " │ "
+              << boost::format( "%10s" ) % Hpro::Mem::to_string( size_cb_all ).c_str() << " │ "
+              << boost::format( "%10s" ) % Hpro::Mem::to_string( size_lr_all ).c_str() << " │ "
+              << boost::format( "%10s" ) % Hpro::Mem::to_string( size_d_all ).c_str() <<std::endl;
 }
 
 }}// namespace hlr::matrix
