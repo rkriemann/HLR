@@ -87,6 +87,20 @@ program_main ()
         std::cout << "    ranks  = " << kmin << " … " << kavg << " … " << kmax << std::endl;
     }
 
+    // {
+    //     auto  A_hier = matrix::build_level_hierarchy( *A, false );
+
+    //     matrix::print( A_hier, false );
+    // }
+
+    // {
+    //     auto  A_hier = matrix::build_level_hierarchy( *A, true );
+
+    //     matrix::print( A_hier, true );
+    // }
+
+    // std::exit( 0 );
+    
     //////////////////////////////////////////////////////////////////////
     //
     // directly build uniform matrix

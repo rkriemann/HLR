@@ -10,6 +10,10 @@
 
 #include <hpro/matrix/TBlockMatrix.hh>
 
+#include <hlr/matrix/lrmatrix.hh>
+#include <hlr/matrix/lrsvmatrix.hh>
+#include <hlr/matrix/uniform_lrmatrix.hh>
+#include <hlr/matrix/uniform_lr2matrix.hh>
 #include <hlr/utils/term.hh>
 
 namespace hlr { namespace matrix {
@@ -26,9 +30,6 @@ struct level_hierarchy
     std::vector< std::vector< idx_t > >                             row_ptr;
     std::vector< std::vector< idx_t > >                             col_idx;
     std::vector< std::vector< const Hpro::TMatrix< value_t > * > >  row_mat;
-    
-    // std::deque< std::vector< idx_t > >                             row_idx;
-    // std::deque< std::vector< const Hpro::TMatrix< value_t > * > >  col_hier;
 
     //
     // ctor
@@ -46,7 +47,8 @@ struct level_hierarchy
 
 template < typename value_t >
 level_hierarchy< value_t >
-build_level_hierarchy ( const Hpro::TMatrix< value_t > &  M )
+build_level_hierarchy ( const Hpro::TMatrix< value_t > &  M,
+                        const bool                        transposed = false )
 {
     using  matrix_t = const Hpro::TMatrix< value_t >;
     
@@ -57,6 +59,7 @@ build_level_hierarchy ( const Hpro::TMatrix< value_t > &  M )
     auto        row_mat = std::vector< matrix_t * >();
     uint        lvl     = 0;
     uint        nleaves = 0;
+    const auto  op_M    = ( transposed ? apply_transposed : apply_normal );
 
     if ( is_blocked( M ) )
     {
@@ -128,11 +131,11 @@ build_level_hierarchy ( const Hpro::TMatrix< value_t > &  M )
                     HLR_ASSERT( B->nblock_rows() == 2 );
                     HLR_ASSERT( B->nblock_cols() == 2 );
                                                        
-                    nsubrows = std::max( nsubrows, B->nblock_rows() );
+                    nsubrows = std::max( nsubrows, B->nblock_rows( op_M ) );
                     
-                    for ( uint  ii = 0; ii < B->nblock_rows(); ++ii )
-                        for ( uint  jj = 0; jj < B->nblock_cols(); ++jj )
-                            if ( ! is_null( B->block( ii, jj ) ) )
+                    for ( uint  ii = 0; ii < B->nblock_rows( op_M ); ++ii )
+                        for ( uint  jj = 0; jj < B->nblock_cols( op_M ); ++jj )
+                            if ( ! is_null( B->block( ii, jj, op_M ) ) )
                                 nnext++;
                 }// else
             }// for
@@ -172,11 +175,11 @@ build_level_hierarchy ( const Hpro::TMatrix< value_t > &  M )
                 {
                     auto  B = cptrcast( mat, Hpro::TBlockMatrix< value_t > );
                     
-                    nsubrows = std::max( nsubrows, B->nblock_rows() );
+                    nsubrows = std::max( nsubrows, B->nblock_rows( op_M ) );
                     
-                    for ( uint  ii = 0; ii < B->nblock_rows(); ++ii )
-                        for ( uint  jj = 0; jj < B->nblock_cols(); ++jj )
-                            if ( ! is_null( B->block( ii, jj ) ) )
+                    for ( uint  ii = 0; ii < B->nblock_rows( op_M ); ++ii )
+                        for ( uint  jj = 0; jj < B->nblock_cols( op_M ); ++jj )
+                            if ( ! is_null( B->block( ii, jj, op_M ) ) )
                                 next_row_ptr[ row_idx+ii ]++;
                 }// else
             }// for
@@ -219,13 +222,13 @@ build_level_hierarchy ( const Hpro::TMatrix< value_t > &  M )
 
                     HLR_ASSERT(( B->nblock_rows() == 2 ) && ( B->nblock_cols() == 2 ));
                     
-                    nsubrows = std::max( nsubrows, B->nblock_rows() );
+                    nsubrows = std::max( nsubrows, B->nblock_rows( op_M ) );
 
-                    for ( uint  ii = 0; ii < B->nblock_rows(); ++ii )
+                    for ( uint  ii = 0; ii < B->nblock_rows( op_M ); ++ii )
                     {
-                        for ( uint  jj = 0; jj < B->nblock_cols(); ++jj )
+                        for ( uint  jj = 0; jj < B->nblock_cols( op_M ); ++jj )
                         {
-                            auto  B_ij = B->block( ii, jj );
+                            auto  B_ij = B->block( ii, jj, op_M );
                             
                             if ( ! is_null( B_ij ) )
                             {
@@ -257,9 +260,11 @@ build_level_hierarchy ( const Hpro::TMatrix< value_t > &  M )
 
 template < typename value_t >
 void
-print ( const level_hierarchy< value_t > &  H )
+print ( const level_hierarchy< value_t > &  H,
+        const bool                          transposed = false )
 {
-    uint  lvl_idx = 0;
+    uint        lvl_idx = 0;
+    const auto  op_M    = ( transposed ? apply_transposed : apply_normal );
     
     for ( uint  lvl = 0; lvl < H.nlevel(); ++lvl )
     {
@@ -283,22 +288,38 @@ print ( const level_hierarchy< value_t > &  H )
                 
                 if ( first )
                 {
-                    rowis = mat->row_is();
+                    rowis = mat->row_is( op_M );
                     first = false;
 
-                    if ( T == 'd' )
-                        std::cout << rowis.to_string() << " × " << term::red() << col_idx << " D" << mat->col_is().to_string() << term::reset() << ", ";
+                    if ( matrix::is_dense( mat ) )
+                        std::cout << rowis.to_string() << " × " << term::red() << col_idx << " D" << mat->id() << term::reset() << ", ";
+                    else if ( matrix::is_lowrank( mat ) )
+                        std::cout << rowis.to_string() << " × " << term::green() << col_idx << " R" << mat->id() << term::reset() << ", ";
+                    else if ( matrix::is_lowrank_sv( mat ) )
+                        std::cout << rowis.to_string() << " × " << term::green() << col_idx << " R" << mat->id() << term::reset() << ", ";
+                    else if ( matrix::is_uniform_lowrank( mat ) )
+                        std::cout << rowis.to_string() << " × " << term::green() << col_idx << " U" << mat->id() << term::reset() << ", ";
+                    else if ( matrix::is_uniform_lowrank2( mat ) )
+                        std::cout << rowis.to_string() << " × " << term::green() << col_idx << " U" << mat->id() << term::reset() << ", ";
                     else
-                        std::cout << rowis.to_string() << " × " << term::green() << col_idx << " U" << mat->col_is().to_string() << term::reset() << ", ";
+                        std::cout << rowis.to_string() << " × " << term::blue() << col_idx << " ?" << mat->id() << term::reset() << ", ";
                 }// if
                 else
                 {
-                    HLR_ASSERT( mat->row_is() == rowis );
+                    HLR_ASSERT( mat->row_is( op_M ) == rowis );
                     
-                    if ( T == 'd' )
-                        std::cout << term::red() << col_idx << " D" << mat->col_is().to_string() << term::reset() << ", ";
+                    if ( matrix::is_dense( mat ) )
+                        std::cout << term::red() << col_idx << " D" << mat->id() << term::reset() << ", ";
+                    else if ( matrix::is_lowrank( mat ) )
+                        std::cout << term::green() << col_idx << " R" << mat->id() << term::reset() << ", ";
+                    else if ( matrix::is_lowrank_sv( mat ) )
+                        std::cout << term::green() << col_idx << " R" << mat->id() << term::reset() << ", ";
+                    else if ( matrix::is_uniform_lowrank( mat ) )
+                        std::cout << term::green() << col_idx << " U" << mat->id() << term::reset() << ", ";
+                    else if ( matrix::is_uniform_lowrank2( mat ) )
+                        std::cout << term::green() << col_idx << " U" << mat->id() << term::reset() << ", ";
                     else
-                        std::cout << term::green() << col_idx << " U" << mat->col_is().to_string() << term::reset() << ", ";
+                        std::cout << term::blue() << col_idx << " ?" << mat->id() << term::reset() << ", ";
                 }// else
             }// for
             std::cout << std::endl;
