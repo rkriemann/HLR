@@ -26,9 +26,6 @@ struct level_hierarchy
     std::vector< std::vector< idx_t > >                             row_ptr;
     std::vector< std::vector< idx_t > >                             col_idx;
     std::vector< std::vector< const Hpro::TMatrix< value_t > * > >  row_mat;
-    
-    // std::deque< std::vector< idx_t > >                             row_idx;
-    // std::deque< std::vector< const Hpro::TMatrix< value_t > * > >  col_hier;
 
     //
     // ctor
@@ -46,7 +43,8 @@ struct level_hierarchy
 
 template < typename value_t >
 level_hierarchy< value_t >
-build_level_hierarchy ( const Hpro::TMatrix< value_t > &  M )
+build_level_hierarchy ( const Hpro::TMatrix< value_t > &  M,
+                        const bool                        transposed = false )
 {
     using  matrix_t = const Hpro::TMatrix< value_t >;
     
@@ -57,6 +55,7 @@ build_level_hierarchy ( const Hpro::TMatrix< value_t > &  M )
     auto        row_mat = std::vector< matrix_t * >();
     uint        lvl     = 0;
     uint        nleaves = 0;
+    const auto  op_M    = ( transposed ? apply_transposed : apply_normal );
 
     if ( is_blocked( M ) )
     {
@@ -128,11 +127,11 @@ build_level_hierarchy ( const Hpro::TMatrix< value_t > &  M )
                     HLR_ASSERT( B->nblock_rows() == 2 );
                     HLR_ASSERT( B->nblock_cols() == 2 );
                                                        
-                    nsubrows = std::max( nsubrows, B->nblock_rows() );
+                    nsubrows = std::max( nsubrows, B->nblock_rows( op_M ) );
                     
-                    for ( uint  ii = 0; ii < B->nblock_rows(); ++ii )
-                        for ( uint  jj = 0; jj < B->nblock_cols(); ++jj )
-                            if ( ! is_null( B->block( ii, jj ) ) )
+                    for ( uint  ii = 0; ii < B->nblock_rows( op_M ); ++ii )
+                        for ( uint  jj = 0; jj < B->nblock_cols( op_M ); ++jj )
+                            if ( ! is_null( B->block( ii, jj, op_M ) ) )
                                 nnext++;
                 }// else
             }// for
@@ -172,11 +171,11 @@ build_level_hierarchy ( const Hpro::TMatrix< value_t > &  M )
                 {
                     auto  B = cptrcast( mat, Hpro::TBlockMatrix< value_t > );
                     
-                    nsubrows = std::max( nsubrows, B->nblock_rows() );
+                    nsubrows = std::max( nsubrows, B->nblock_rows( op_M ) );
                     
-                    for ( uint  ii = 0; ii < B->nblock_rows(); ++ii )
-                        for ( uint  jj = 0; jj < B->nblock_cols(); ++jj )
-                            if ( ! is_null( B->block( ii, jj ) ) )
+                    for ( uint  ii = 0; ii < B->nblock_rows( op_M ); ++ii )
+                        for ( uint  jj = 0; jj < B->nblock_cols( op_M ); ++jj )
+                            if ( ! is_null( B->block( ii, jj, op_M ) ) )
                                 next_row_ptr[ row_idx+ii ]++;
                 }// else
             }// for
@@ -219,13 +218,13 @@ build_level_hierarchy ( const Hpro::TMatrix< value_t > &  M )
 
                     HLR_ASSERT(( B->nblock_rows() == 2 ) && ( B->nblock_cols() == 2 ));
                     
-                    nsubrows = std::max( nsubrows, B->nblock_rows() );
+                    nsubrows = std::max( nsubrows, B->nblock_rows( op_M ) );
 
-                    for ( uint  ii = 0; ii < B->nblock_rows(); ++ii )
+                    for ( uint  ii = 0; ii < B->nblock_rows( op_M ); ++ii )
                     {
-                        for ( uint  jj = 0; jj < B->nblock_cols(); ++jj )
+                        for ( uint  jj = 0; jj < B->nblock_cols( op_M ); ++jj )
                         {
-                            auto  B_ij = B->block( ii, jj );
+                            auto  B_ij = B->block( ii, jj, op_M );
                             
                             if ( ! is_null( B_ij ) )
                             {
@@ -293,7 +292,7 @@ print ( const level_hierarchy< value_t > &  H )
                 }// if
                 else
                 {
-                    HLR_ASSERT( mat->row_is() == rowis );
+                    // HLR_ASSERT( mat->row_is() == rowis );
                     
                     if ( T == 'd' )
                         std::cout << term::red() << col_idx << " D" << mat->col_is().to_string() << term::reset() << ", ";
