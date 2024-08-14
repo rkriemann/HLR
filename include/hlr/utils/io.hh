@@ -25,6 +25,7 @@
 #include <hpro/io/TClusterVis.hh>
 #include <hpro/io/TCoordVis.hh>
 #include <hpro/io/TGridVis.hh>
+#include <hpro/io/TGridIO.hh>
 
 #if defined(HLR_USE_H2)
 #  include <hpro/io/TClusterBasisVis.hh>
@@ -77,6 +78,20 @@ read ( const std::string &  filename )
 
     return mio.read< value_t >( filename );
 }
+
+//
+// write matrix M to file <filename>
+//
+inline
+void
+write ( const Hpro::TGrid &  grid,
+        const std::string &  filename )
+{
+    Hpro::THproGridIO  gio;
+
+    gio.write( &grid, filename );
+}
+
 
 }// namespace hpro
 

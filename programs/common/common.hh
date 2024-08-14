@@ -199,10 +199,26 @@ std::unique_ptr< Hpro::TClusterTree >
 gen_ct ( Hpro::TCoordinate &  coord )
 {
     using  hlr::cmdline::cluster;
+
+    //
+    // choose partitioning strategy
+    //
+
+    auto  part = std::unique_ptr< Hpro::TBSPPartStrat >();
+
+    if      ( hlr::cmdline::part == "bsp"      ) part = std::make_unique< Hpro::TCardBSPPartStrat >( Hpro::adaptive_split_axis );
+    else if ( hlr::cmdline::part == "bsp-card" ) part = std::make_unique< Hpro::TCardBSPPartStrat >( Hpro::adaptive_split_axis );
+    else if ( hlr::cmdline::part == "bsp-vol"  ) part = std::make_unique< Hpro::TGeomBSPPartStrat >( Hpro::adaptive_split_axis );
+    else if ( hlr::cmdline::part == "pca-card" ) part = std::make_unique< Hpro::TPCABSPPartStrat >( true );
+    else if ( hlr::cmdline::part == "pca-vol"  ) part = std::make_unique< Hpro::TPCABSPPartStrat >( false );
+
+    //
+    // actually cluster
+    //
     
     if (( cluster == "tlr" ) || ( cluster == "blr" ))
     {
-        return hlr::cluster::tlr::cluster( coord, hlr::cmdline::ntile );
+        return hlr::cluster::tlr::cluster( coord, *part, hlr::cmdline::ntile );
     }// if
     else if (( cluster == "mblr" ) ||
              (( cluster.size() >= 6 ) && ( cluster.substr( 0, 5 ) == "mblr-" )))
@@ -210,7 +226,7 @@ gen_ct ( Hpro::TCoordinate &  coord )
         if ( cluster.size() >= 6 )
             hlr::cmdline::nlvl = std::stoi( cluster.substr( 5, string::npos ) );
             
-        return hlr::cluster::mblr::cluster( coord, hlr::cmdline::ntile, hlr::cmdline::nlvl );
+        return hlr::cluster::mblr::cluster( coord, *part, hlr::cmdline::ntile, hlr::cmdline::nlvl );
     }// if
     else if (( cluster == "tileh" ) ||
              (( cluster.size() >= 7 ) && ( cluster.substr( 0, 6 ) == "tileh-" )))
@@ -218,11 +234,11 @@ gen_ct ( Hpro::TCoordinate &  coord )
         if ( cluster.size() >= 7 )
             hlr::cmdline::nlvl = std::stoi( cluster.substr( 6, string::npos ) );
         
-        return hlr::cluster::tileh::cluster( coord, hlr::cmdline::ntile, hlr::cmdline::nlvl );
+        return hlr::cluster::tileh::cluster( coord, *part, hlr::cmdline::ntile, hlr::cmdline::nlvl );
     }// if
     else if (( cluster == "bsp" ) || ( cluster == "h" ))
     {
-        return hlr::cluster::h::cluster( coord, hlr::cmdline::ntile );
+        return hlr::cluster::h::cluster( coord, *part, hlr::cmdline::ntile );
     }// if
     else if (( cluster == "sfc" ) ||
              (( cluster.size() > 3 ) && ( cluster.substr( 0, 4 ) == "sfc-" )))

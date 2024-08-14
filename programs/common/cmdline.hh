@@ -54,6 +54,7 @@ uint    nbench     = 1;            // perform computations <nbench> times (at mo
 double  tbench     = 1;            // minimal time for benchmark runs
 string  ref        = "";           // reference matrix, algorithm, etc.
 string  cluster    = "h";          // clustering technique (h,tlr,mblr,hodlr)
+string  part       = "bsp-card";   // partitioning strategy (bsp-card/vol,pca-card/vol)
 string  adm        = "strong";     // admissibility (strong,vertex,weak,offdiagonal)
 double  eta        = 2.0;          // admissibility parameter
 string  capprox    = "default";    // construction low-rank approximation method (aca,hca,dense)
@@ -83,6 +84,7 @@ read_config ( const std::string &  filename )
     adm        = cfg.get( "app.adm",     adm );
     eta        = cfg.get( "app.eta",     eta );
     cluster    = cfg.get( "app.cluster", cluster );
+    part       = cfg.get( "app.part",    part );
     gridfile   = cfg.get( "app.grid",    gridfile );
     kappa      = cfg.get( "app.kappa",   kappa );
     sigma      = cfg.get( "app.sigma",   sigma );
@@ -135,6 +137,7 @@ parse ( int argc, char ** argv )
         ( "app",         value<string>(), ": application type (logkernel,matern,laplaceslp,helmholtzslp,exp)" )
         ( "kernel",      value<string>(), ": kernel to use (newton,log,exp,...)" )
         ( "cluster",     value<string>(), ": clustering technique (tlr,blr,mblr(-n),tileh,bsp,h,sfc)" )
+        ( "part",        value<string>(), ": partitioning strategy (bsp-/pca-card,bsp-/pca-vol)" )
         ( "data",        value<string>(), ": data file to use" )
         ( "eta",         value<double>(), ": admissibility parameter for \"std\" and \"weak\"" )
         ( "grid",        value<string>(), ": grid file to use (intern: sphere,sphere2,cube,square)" )
@@ -250,6 +253,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "kappa"      ) ) kappa      = vm["kappa"].as<double>();
     if ( vm.count( "sigma"      ) ) sigma      = vm["sigma"].as<double>();
     if ( vm.count( "cluster"    ) ) cluster    = vm["cluster"].as<string>();
+    if ( vm.count( "part"       ) ) part       = vm["part"].as<string>();
     if ( vm.count( "adm"        ) ) adm        = vm["adm"].as<string>();
     if ( vm.count( "eta"        ) ) eta        = vm["eta"].as<double>();
     if ( vm.count( "compress"   ) ) compress   = true;
@@ -342,6 +346,17 @@ parse ( int argc, char ** argv )
                   << "  - tileh   : Tile-H / LatticeH for first level and BSP for rest" << std::endl
                   << "  - bsp/h   : binary space partitioning" << std::endl
                   << "  - sfc     : Hilber curve base partitioning (optional: -binary/-blr)" << std::endl;
+
+        std::exit( 0 );
+    }// if
+    
+    if ( part == "help" )
+    {
+        std::cout << "Partitioning Strategies:" << std::endl
+                  << "  - bsp-*   : binary space partitioning" << std::endl
+                  << "  - pca-*   : principle component analysis" << std::endl
+                  << "  - *-card  : with cardinality balancing" << std::endl
+                  << "  - *-vol   : with volume balancing" << std::endl;
 
         std::exit( 0 );
     }// if
