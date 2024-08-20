@@ -382,47 +382,50 @@ vtk_print_cluster ( const Hpro::TCluster &  cl,
 
     const size_t  nc = clusters.size();
 
-    out << "POINTS " << 8*nc << " FLOAT" << std::endl;
-
-    for ( auto  cluster : clusters )
+    if constexpr ( std::same_as< Hpro::TBoundingVolume, Hpro::TBBox > )
     {
-        auto  bbmin = cluster->bbox().min();
-        auto  bbmax = cluster->bbox().max();
+        out << "POINTS " << 8*nc << " FLOAT" << std::endl;
 
-        HLR_ASSERT(( bbmin.dim() == 3 ) && ( bbmax.dim() == 3 ));
+        for ( auto  cluster : clusters )
+        {
+            auto  bbmin = cluster->bvol().min();
+            auto  bbmax = cluster->bvol().max();
+            
+            HLR_ASSERT(( bbmin.dim() == 3 ) && ( bbmax.dim() == 3 ));
         
-        out << bbmin[0] << ' ' << bbmin[1] << ' ' << bbmin[2] << std::endl
-            << bbmax[0] << ' ' << bbmin[1] << ' ' << bbmin[2] << std::endl
-            << bbmin[0] << ' ' << bbmax[1] << ' ' << bbmin[2] << std::endl
-            << bbmax[0] << ' ' << bbmax[1] << ' ' << bbmin[2] << std::endl
-            << bbmin[0] << ' ' << bbmin[1] << ' ' << bbmax[2] << std::endl
-            << bbmax[0] << ' ' << bbmin[1] << ' ' << bbmax[2] << std::endl
-            << bbmin[0] << ' ' << bbmax[1] << ' ' << bbmax[2] << std::endl
-            << bbmax[0] << ' ' << bbmax[1] << ' ' << bbmax[2] << std::endl;
-    }// for
-
-    out << "CELLS " << nc << ' ' << 9 * nc << std::endl;
-
-    for ( size_t  i = 0; i < nc; ++i )
-        out << "8 "
-            << 8*i   << ' '
-            << 8*i+1 << ' '
-            << 8*i+2 << ' '
-            << 8*i+3 << ' '
-            << 8*i+4 << ' '
-            << 8*i+5 << ' '
-            << 8*i+6 << ' '
-            << 8*i+7 << std::endl;
+            out << bbmin[0] << ' ' << bbmin[1] << ' ' << bbmin[2] << std::endl
+                << bbmax[0] << ' ' << bbmin[1] << ' ' << bbmin[2] << std::endl
+                << bbmin[0] << ' ' << bbmax[1] << ' ' << bbmin[2] << std::endl
+                << bbmax[0] << ' ' << bbmax[1] << ' ' << bbmin[2] << std::endl
+                << bbmin[0] << ' ' << bbmin[1] << ' ' << bbmax[2] << std::endl
+                << bbmax[0] << ' ' << bbmin[1] << ' ' << bbmax[2] << std::endl
+                << bbmin[0] << ' ' << bbmax[1] << ' ' << bbmax[2] << std::endl
+                << bbmax[0] << ' ' << bbmax[1] << ' ' << bbmax[2] << std::endl;
+        }// for
         
-    out << "CELL_TYPES " << nc << std::endl;
+        out << "CELLS " << nc << ' ' << 9 * nc << std::endl;
         
-    for ( size_t  i = 0; i < nc; ++i )
-        out << "11 ";
-    out << std::endl;
-
-    out << "CELL_DATA " << nc << std::endl
-        << "COLOR_SCALARS label 1" << std::endl;
-
+        for ( size_t  i = 0; i < nc; ++i )
+            out << "8 "
+                << 8*i   << ' '
+                << 8*i+1 << ' '
+                << 8*i+2 << ' '
+                << 8*i+3 << ' '
+                << 8*i+4 << ' '
+                << 8*i+5 << ' '
+                << 8*i+6 << ' '
+                << 8*i+7 << std::endl;
+        
+        out << "CELL_TYPES " << nc << std::endl;
+        
+        for ( size_t  i = 0; i < nc; ++i )
+            out << "11 ";
+        out << std::endl;
+        
+        out << "CELL_DATA " << nc << std::endl
+            << "COLOR_SCALARS label 1" << std::endl;
+    }// if
+    
     uint  label = 1;
 
     for ( auto  cluster : clusters )

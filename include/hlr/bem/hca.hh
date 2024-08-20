@@ -58,8 +58,7 @@ struct hca : public base_hca< T_coeff, T_generator_fn >
              const Hpro::TGeomCluster &  colcl,
              const Hpro::TTruncAcc &     acc ) const 
     {
-        if (( rowcl.bbox().max().dim() != 3 ) ||
-            ( colcl.bbox().max().dim() != 3 ))
+        if (( rowcl.bvol().dim() != 3 ) || ( colcl.bvol().dim() != 3 ))
             HLR_ERROR( "hca::approx : unsupported dimension of cluster" );
 
         // generate grid for local clusters for evaluation of kernel generator function
