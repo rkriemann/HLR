@@ -209,8 +209,11 @@ gen_ct ( Hpro::TCoordinate &  coord )
     if      ( hlr::cmdline::part == "bsp"      ) part = std::make_unique< Hpro::TCardBSPPartStrat >( Hpro::adaptive_split_axis );
     else if ( hlr::cmdline::part == "bsp-card" ) part = std::make_unique< Hpro::TCardBSPPartStrat >( Hpro::adaptive_split_axis );
     else if ( hlr::cmdline::part == "bsp-vol"  ) part = std::make_unique< Hpro::TGeomBSPPartStrat >( Hpro::adaptive_split_axis );
+    else if ( hlr::cmdline::part == "pca"      ) part = std::make_unique< Hpro::TPCABSPPartStrat >( true );
     else if ( hlr::cmdline::part == "pca-card" ) part = std::make_unique< Hpro::TPCABSPPartStrat >( true );
     else if ( hlr::cmdline::part == "pca-vol"  ) part = std::make_unique< Hpro::TPCABSPPartStrat >( false );
+    else
+        HLR_ERROR( "unsupported partitioning strategy: " + hlr::cmdline::part );
 
     //
     // actually cluster
