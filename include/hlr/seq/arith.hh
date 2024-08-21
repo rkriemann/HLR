@@ -39,6 +39,17 @@ namespace hlr { namespace seq {
 //
 using hlr::mul_vec;
 
+template < typename value_t >
+void
+mul_vec_chunk ( const value_t                             alpha,
+                const Hpro::matop_t                       op_M,
+                const Hpro::TMatrix< value_t > &          M,
+                const vector::scalar_vector< value_t > &  x,
+                vector::scalar_vector< value_t > &        y )
+{
+    mul_vec( alpha, op_M, M, x, y );
+}
+
 using hlr::cluster_block_map_t;
 using hlr::cluster_blocks_t;
 using hlr::mul_vec_cl;

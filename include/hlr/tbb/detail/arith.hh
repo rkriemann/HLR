@@ -819,16 +819,30 @@ mul_vec_cl ( const value_t                             alpha,
             
                 for ( auto  M : cm.R )
                 {
-                    HLR_ASSERT( matrix::is_lowrank_sv( M ) );
-                    
-                    auto  R   = cptrcast( M, matrix::lrsvmatrix< value_t > );
-                    auto  VR  = R->V( op_M );
-                    auto  k_i = R->rank();
-                    auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
-                    auto  t_i = blas::vector< value_t >( t, blas::range( pos, pos + k_i - 1 )  );
-
-                    blas::mulvec( blas::adjoint( VR ), x_i, t_i );
-                    pos += k_i;
+                    if ( matrix::is_lowrank( M ) )
+                    {
+                        auto  R   = cptrcast( M, matrix::lrmatrix< value_t > );
+                        auto  VR  = R->V( op_M );
+                        auto  k_i = R->rank();
+                        auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
+                        auto  t_i = blas::vector< value_t >( t, blas::range( pos, pos + k_i - 1 )  );
+                        
+                        blas::mulvec( blas::adjoint( VR ), x_i, t_i );
+                        pos += k_i;
+                    }// if
+                    else if ( matrix::is_lowrank_sv( M ) )
+                    {
+                        auto  R   = cptrcast( M, matrix::lrsvmatrix< value_t > );
+                        auto  VR  = R->V( op_M );
+                        auto  k_i = R->rank();
+                        auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
+                        auto  t_i = blas::vector< value_t >( t, blas::range( pos, pos + k_i - 1 )  );
+                        
+                        blas::mulvec( blas::adjoint( VR ), x_i, t_i );
+                        pos += k_i;
+                    }// if
+                    else
+                        HLR_ERROR( "unsupported matrix type: " + M->typestr() );
                 }// for
 
                 blas::mulvec( value_t(1), cm.U, t, value_t(1), yt );

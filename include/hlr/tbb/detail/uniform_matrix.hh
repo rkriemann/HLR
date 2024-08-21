@@ -719,12 +719,12 @@ template < typename coeff_t,
 std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename coeff_t::value_t > >,
             std::unique_ptr< hlr::matrix::shared_cluster_basis< typename coeff_t::value_t > >,
             std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > > >
-build_uniform_lvl2 ( const Hpro::TBlockCluster *  bct,
-                     const coeff_t &              coeff,
-                     const lrapx_t &              lrapx,
-                     const basisapx_t &           basisapx,
-                     const accuracy &             acc,
-                     const bool                   compress )
+build_uniform_lvl_sep ( const Hpro::TBlockCluster *  bct,
+                        const coeff_t &              coeff,
+                        const lrapx_t &              lrapx,
+                        const basisapx_t &           basisapx,
+                        const accuracy &             acc,
+                        const bool                   compress )
 {
     static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
                    "coefficient function and low-rank approximation must have equal value type" );
@@ -995,38 +995,7 @@ build_uniform_lvl2 ( const Hpro::TBlockCluster *  bct,
                             return;
 
                         //
-                        // compute column basis for
-                        //
-                        //   ( U₀·V₀'  U₁·V₁'  U₂·V₂'  … ) =
-                        //
-                        //                  ⎛ V₀'        ⎞
-                        //   ( U₀ U₁ U₂ … ) ⎜    V₁'     ⎟ =
-                        //                  ⎜       V₂'  ⎟
-                        //                  ⎝          … ⎠
-                        //
-                        //                  ⎛ Q₀·R₀             ⎞'
-                        //   ( U₀ U₁ U₂ … ) ⎜      Q₁·R₁        ⎟ =
-                        //                  ⎜           Q₂·R₂   ⎟
-                        //                  ⎝                 … ⎠
-                        //
-                        //                  ⎛⎛Q₀     ⎞ ⎛R₀     ⎞⎞'
-                        //   ( U₀ U₁ U₂ … ) ⎜⎜  Q₁   ⎟·⎜  R₁   ⎟⎟ =
-                        //                  ⎜⎜    Q₂ ⎟ ⎜    R₂ ⎟⎟
-                        //                  ⎝⎝      …⎠ ⎝      …⎠⎠
-                        //
-                        // Since diag(Q_i) is orthogonal, it can be omitted for row bases
-                        // computation, leaving
-                        //
-                        //                  ⎛R₀     ⎞'                 
-                        //   ( U₀ U₁ U₂ … ) ⎜  R₁   ⎟ = ( U₀·R₀' U₁·R₁' U₂·R₂' … )
-                        //                  ⎜    R₂ ⎟                  
-                        //                  ⎝      …⎠                  
-                        //
-                        // of which a column basis is computed.
-                        //
-
-                        //
-                        // form U = ( U₀·R₀' U₁·R₁' U₂·R₁' … )
+                        // compute column basis
                         //
             
                         size_t  nrows_U = is.size();
@@ -1093,48 +1062,7 @@ build_uniform_lvl2 ( const Hpro::TBlockCluster *  bct,
                             return;
 
                         //
-                        // compute column basis for
-                        //
-                        //   ⎛U₀·V₀'⎞ 
-                        //   ⎜U₁·V₁'⎟
-                        //   ⎜U₂·V₂'⎟
-                        //   ⎝  …   ⎠
-                        //
-                        // or row basis of
-                        //
-                        //   ⎛U₀·V₀'⎞' 
-                        //   ⎜U₁·V₁'⎟ = ( V₀·U₀'  V₁·U₁'  V₂·U₂'  … ) =
-                        //   ⎜U₂·V₂'⎟
-                        //   ⎝  …   ⎠
-                        //
-                        //                  ⎛ U₀      ⎞'
-                        //   ( V₀ V₁ V₂ … ) ⎜   U₁    ⎟ =
-                        //                  ⎜     U₂  ⎟
-                        //                  ⎝       … ⎠
-                        //
-                        //                  ⎛ Q₀·R₀               ⎞'
-                        //   ( V₀ V₁ V₂ … ) ⎜       Q₁·R₁         ⎟ =
-                        //                  ⎜             Q₂·R₂   ⎟
-                        //                  ⎝                   … ⎠
-                        //
-                        //                  ⎛⎛Q₀     ⎞ ⎛R₀     ⎞⎞'
-                        //   ( V₀ V₁ V₂ … ) ⎜⎜  Q₁   ⎟·⎜  R₁   ⎟⎟ =
-                        //                  ⎜⎜    Q₂ ⎟ ⎜    R₂ ⎟⎟
-                        //                  ⎝⎝      …⎠ ⎝      …⎠⎠
-                        //
-                        // Since diag(Q_i) is orthogonal, it can be omitted for column bases
-                        // computation, leaving
-                        //
-                        //                  ⎛R₀     ⎞'                
-                        //   ( V₀ V₁ V₂ … ) ⎜  R₁   ⎟ = ( V₀·R₀' V₁·R₁' V₂·R₂' … )
-                        //                  ⎜    R₂ ⎟                
-                        //                  ⎝      …⎠
-                        //
-                        // of which a column basis is computed.
-                        //
-
-                        //
-                        // form matrix V = ( V₀·R₀' V₁·R₁' V₂·R₂' … )
+                        // compute column basis
                         //
 
                         size_t  nrows_V = is.size();

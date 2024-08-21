@@ -66,8 +66,11 @@ program_main ()
             auto  hcagen = problem->hca_gen_func( *ct );
             auto  hca    = bem::hca( pcoeff, *hcagen, cmdline::eps / 100.0, 6 );
             auto  hcalr  = bem::hca_lrapx( hca );
-                
-            std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_lvl( bct->root(), pcoeff, hcalr, cbapx, acc, cmdline::compress );
+
+            if ( sep_coup )
+                std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_lvl_sep( bct->root(), pcoeff, hcalr, cbapx, acc, cmdline::compress );
+            else
+                std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_lvl( bct->root(), pcoeff, hcalr, cbapx, acc, cmdline::compress );
         }// if
         else
             cmdline::capprox = "default";
@@ -81,7 +84,10 @@ program_main ()
 
         auto  acalr = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
 
-        std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_lvl( bct->root(), pcoeff, acalr, cbapx, acc, cmdline::compress );
+        if ( sep_coup )
+            std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_lvl_sep( bct->root(), pcoeff, acalr, cbapx, acc, cmdline::compress );
+        else
+            std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_lvl( bct->root(), pcoeff, acalr, cbapx, acc, cmdline::compress );
     }// else
         
     if ( cmdline::capprox == "dense" )
@@ -92,7 +98,10 @@ program_main ()
 
         auto  dense = bem::dense_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
         
-        std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_lvl( bct->root(), pcoeff, dense, cbapx, acc, cmdline::compress );
+        if ( sep_coup )
+            std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_lvl_sep( bct->root(), pcoeff, dense, cbapx, acc, cmdline::compress );
+        else
+            std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_lvl( bct->root(), pcoeff, dense, cbapx, acc, cmdline::compress );
     }// else
         
     toc = timer::since( tic );
@@ -131,14 +140,19 @@ program_main ()
         double  t_ref = 0.0;
         auto    y_ref = std::unique_ptr< vector::scalar_vector< value_t > >();
 
-        //
-        // uncompressed
-        //
+        {
+            // generate reference solution
+            auto  x = std::make_unique< vector::scalar_vector< value_t > >( A->col_is() );
 
+            y_ref = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
+            x->fill( 1 );
+            impl::uniform::mul_vec< value_t >( nmvm * 2.0, Hpro::apply_normal, *A, *x, *y_ref, *rowcb, *colcb );
+        }
+        
         {
             runtime.clear();
             
-            std::cout << "  " << term::bullet << term::bold << "standard" << term::reset << std::endl;
+            std::cout << "  " << term::bullet << term::bold << "mutex" << term::reset << std::endl;
         
             auto  x = std::make_unique< vector::scalar_vector< value_t > >( A->col_is() );
             auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
@@ -150,7 +164,7 @@ program_main ()
                 tic = timer::now();
     
                 for ( int j = 0; j < nmvm; ++j )
-                    impl::uniform::mul_vec< value_t >( 2.0, Hpro::apply_normal, *A, *x, *y, *rowcb, *colcb );
+                    impl::uniform::mul_vec_mtx< value_t >( 2.0, Hpro::apply_normal, *A, *x, *y, *rowcb, *colcb );
 
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
@@ -158,7 +172,7 @@ program_main ()
                 std::cout << term::rollback << term::clearline << "      mvm in   " << format_time( toc ) << term::flush;
 
                 if ( i < nbench-1 )
-                    y->fill( 1 );
+                    y->fill( 0 );
             }// for
         
             if ( nbench > 1 )
@@ -170,7 +184,57 @@ program_main ()
             
             t_ref = min( runtime );
             
-            y_ref = std::move( y );
+            auto  diff = y_ref->copy();
+
+            diff->axpy( value_t(-1), y.get() );
+
+            const auto  error = diff->norm2();
+            
+            std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
+        }
+
+        {
+            runtime.clear();
+            
+            std::cout << "  " << term::bullet << term::bold << "row wise" << term::reset << std::endl;
+        
+            auto  x = std::make_unique< vector::scalar_vector< value_t > >( A->col_is() );
+            auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
+
+            x->fill( 1 );
+
+            for ( int i = 0; i < nbench; ++i )
+            {
+                tic = timer::now();
+    
+                for ( int j = 0; j < nmvm; ++j )
+                    impl::uniform::mul_vec_row< value_t >( 2.0, Hpro::apply_normal, *A, *x, *y, *rowcb, *colcb );
+
+                toc = timer::since( tic );
+                runtime.push_back( toc.seconds() );
+        
+                std::cout << term::rollback << term::clearline << "      mvm in   " << format_time( toc ) << term::flush;
+
+                if ( i < nbench-1 )
+                    y->fill( 0 );
+            }// for
+        
+            if ( nbench > 1 )
+                std::cout << term::rollback << term::clearline << "      runtime = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime );
+            std::cout << std::endl;
+
+            std::cout << "      flops   = " << format_flops( flops_uh, min( runtime ) ) << std::endl;
+            
+            t_ref = min( runtime );
+            
+            auto  diff = y_ref->copy();
+
+            diff->axpy( value_t(-1), y.get() );
+
+            const auto  error = diff->norm2();
+            
+            std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
         {
@@ -200,7 +264,7 @@ program_main ()
                 std::cout << term::rollback << term::clearline << "      mvm in   " << format_time( toc ) << term::flush;
 
                 if ( i < nbench-1 )
-                    y->fill( 1 );
+                    y->fill( 0 );
             }// for
         
             if ( nbench > 1 )

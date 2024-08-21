@@ -95,6 +95,102 @@ mul_vec ( const value_t                                   alpha,
     detail::add_uniform_to_scalar( *uy, y );
 }
 
+//
+// MVM with all block parallelism and synchronization via mutexes
+//
+template < typename value_t >
+void
+mul_vec_mtx ( const value_t                                   alpha,
+              const matop_t                                   op_M,
+              const Hpro::TMatrix< value_t > &                M,
+              const vector::scalar_vector< value_t > &        x,
+              vector::scalar_vector< value_t > &              y,
+              hlr::matrix::shared_cluster_basis< value_t > &  rowcb,
+              hlr::matrix::shared_cluster_basis< value_t > &  colcb )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    HLR_ASSERT( hpro::is_complex_type< value_t >::value == M.is_complex() );
+    HLR_ASSERT( hpro::is_complex_type< value_t >::value == x.is_complex() );
+    HLR_ASSERT( hpro::is_complex_type< value_t >::value == y.is_complex() );
+    
+    //
+    // construct uniform representation of x and y
+    //
+
+    auto  ux = std::unique_ptr< hlr::vector::uniform_vector< hlr::matrix::shared_cluster_basis< value_t > > >();
+    auto  uy = std::unique_ptr< hlr::vector::uniform_vector< hlr::matrix::shared_cluster_basis< value_t > > >();
+
+    ::tbb::parallel_invoke(
+        [&] () { ux = detail::scalar_to_uniform( op_M == hpro::apply_normal ? colcb : rowcb, x ); },
+        [&] () { uy = detail::make_uniform(      op_M == hpro::apply_normal ? rowcb : colcb ); }
+    );
+
+    //
+    // multiply
+    //
+    
+    detail::mutex_map_t  mtx_map;
+    
+    detail::build_mutex_map( rowcb, mtx_map );
+    detail::mul_vec_mtx( alpha, op_M, M, *ux, *uy, x, y, mtx_map );
+
+    //
+    // and add result to y
+    //
+    
+    detail::add_uniform_to_scalar( *uy, y );
+}
+
+//
+// parallelism only via block rows without synchronization
+//
+template < typename value_t >
+void
+mul_vec_row ( const value_t                                   alpha,
+              const matop_t                                   op_M,
+              const Hpro::TMatrix< value_t > &                M,
+              const vector::scalar_vector< value_t > &        x,
+              vector::scalar_vector< value_t > &              y,
+              hlr::matrix::shared_cluster_basis< value_t > &  rowcb,
+              hlr::matrix::shared_cluster_basis< value_t > &  colcb )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    HLR_ASSERT( hpro::is_complex_type< value_t >::value == M.is_complex() );
+    HLR_ASSERT( hpro::is_complex_type< value_t >::value == x.is_complex() );
+    HLR_ASSERT( hpro::is_complex_type< value_t >::value == y.is_complex() );
+    
+    //
+    // construct uniform representation of x and y
+    //
+
+    auto  ux = std::unique_ptr< hlr::vector::uniform_vector< hlr::matrix::shared_cluster_basis< value_t > > >();
+    auto  uy = std::unique_ptr< hlr::vector::uniform_vector< hlr::matrix::shared_cluster_basis< value_t > > >();
+
+    ::tbb::parallel_invoke(
+        [&] () { ux = detail::scalar_to_uniform( op_M == hpro::apply_normal ? colcb : rowcb, x ); },
+        [&] () { uy = detail::make_uniform(      op_M == hpro::apply_normal ? rowcb : colcb ); }
+    );
+
+    //
+    // multiply
+    //
+    
+    detail::mul_vec_row( alpha, op_M, M, *ux, *uy, x, y );
+
+    //
+    // and add result to y
+    //
+    
+    detail::add_uniform_to_scalar( *uy, y );
+}
+
+//
+// parallelism of all block rows per level without synchronization
+//
 template < typename value_t >
 void
 mul_vec_hier ( const value_t                                        alpha,

@@ -64,6 +64,7 @@ string  arith      = "std";        // which kind of arithmetic to use
 bool    compress   = false;        // apply FP compression to matrix data
 auto    kappa      = std::complex< double >( 2, 0 ); // wave number for helmholtz problems
 double  sigma      = 1;            // parameter for matern covariance and gaussian kernel
+bool    sep_coup   = false;        // use separate row/column couplings for Uni-H and H²
 
 void
 read_config ( const std::string &  filename )
@@ -150,6 +151,7 @@ parse ( int argc, char ** argv )
         ( "coarsen",                      ": coarsen matrix structure" )
         ( "tohodlr",                      ": convert matrix to HODLR format" )
         ( "capprox",     value<string>(), ": LR approximation to use (aca,hca,dense)" )
+        ( "sepcoup",                      ": use separate row/column couplings for Uni-H and H²" )
         ;
 
     ari_opts.add_options()
@@ -257,6 +259,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "adm"        ) ) adm        = vm["adm"].as<string>();
     if ( vm.count( "eta"        ) ) eta        = vm["eta"].as<double>();
     if ( vm.count( "compress"   ) ) compress   = true;
+    if ( vm.count( "sepcoup"    ) ) sep_coup   = true;
 
     if ( appl == "help" )
     {

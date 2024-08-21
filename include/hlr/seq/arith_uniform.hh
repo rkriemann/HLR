@@ -19,6 +19,32 @@ using hlr::uniform::lu;
 
 template < typename value_t >
 void
+mul_vec_mtx ( const value_t                              alpha,
+              const hpro::matop_t                        op_M,
+              const hpro::TMatrix< value_t > &           M,
+              const vector::scalar_vector< value_t > &   x,
+              vector::scalar_vector< value_t > &         y,
+              matrix::shared_cluster_basis< value_t > &  rowcb,
+              matrix::shared_cluster_basis< value_t > &  colcb )
+{
+    return mul_vec( alpha, op_M, M, x, y, rowcb, colcb );
+}
+
+template < typename value_t >
+void
+mul_vec_row ( const value_t                              alpha,
+              const hpro::matop_t                        op_M,
+              const hpro::TMatrix< value_t > &           M,
+              const vector::scalar_vector< value_t > &   x,
+              vector::scalar_vector< value_t > &         y,
+              matrix::shared_cluster_basis< value_t > &  rowcb,
+              matrix::shared_cluster_basis< value_t > &  colcb )
+{
+    return mul_vec( alpha, op_M, M, x, y, rowcb, colcb );
+}
+
+template < typename value_t >
+void
 mul_vec2 ( const value_t                              alpha,
            const hpro::matop_t                        op_M,
            const hpro::TMatrix< value_t > &           M,

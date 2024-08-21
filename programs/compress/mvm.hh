@@ -43,69 +43,56 @@ program_main ()
     auto  acc = gen_accuracy();
     auto  A   = std::unique_ptr< Hpro::TMatrix< value_t > >();
 
-    if ( matrixfile == "" )
+    auto  problem = gen_problem< problem_t >();
+    auto  coord   = problem->coordinates();
+    auto  ct      = gen_ct( *coord );
+    auto  bct     = gen_bct( *ct, *ct );
+    auto  coeff   = problem->coeff_func();
+    auto  pcoeff  = Hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
+        
+    tic = timer::now();
+        
+    if ( cmdline::capprox == "hca" )
     {
-        auto  problem = gen_problem< problem_t >();
-        auto  coord   = problem->coordinates();
-        auto  ct      = gen_ct( *coord );
-        auto  bct     = gen_bct( *ct, *ct );
-        auto  coeff   = problem->coeff_func();
-        auto  pcoeff  = Hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-        
-        tic = timer::now();
-        
-        if ( cmdline::capprox == "hca" )
+        if constexpr ( problem_t::supports_hca )
         {
-            if constexpr ( problem_t::supports_hca )
-            {
-                std::cout << "    using HCA"
-                          << ( cmdline::compress ? std::string( " (" ) + hlr::compress::provider + " + " + hlr::compress::aplr::provider + ")" : "" )
-                          << std::endl;
+            std::cout << "    using HCA"
+                      << ( cmdline::compress ? std::string( " (" ) + hlr::compress::provider + " + " + hlr::compress::aplr::provider + ")" : "" )
+                      << std::endl;
                 
-                auto  hcagen = problem->hca_gen_func( *ct );
-                auto  hca    = bem::hca( pcoeff, *hcagen, cmdline::eps / 100.0, 6 );
-                auto  hcalr  = bem::hca_lrapx( hca );
+            auto  hcagen = problem->hca_gen_func( *ct );
+            auto  hca    = bem::hca( pcoeff, *hcagen, cmdline::eps / 100.0, 6 );
+            auto  hcalr  = bem::hca_lrapx( hca );
                 
-                A = impl::matrix::build( bct->root(), pcoeff, hcalr, acc, cmdline::compress, nseq );
-            }// if
-            else
-                cmdline::capprox = "default";
+            A = impl::matrix::build( bct->root(), pcoeff, hcalr, acc, cmdline::compress, nseq );
         }// if
-
-        if (( cmdline::capprox == "aca" ) || ( cmdline::capprox == "default" ))
-        {
-            std::cout << "    using ACA" 
-                      << ( cmdline::compress ? std::string( " (" ) + hlr::compress::provider + " + " + hlr::compress::aplr::provider + ")" : "" )
-                      << std::endl;
-
-            auto  acalr = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
-
-            A = impl::matrix::build( bct->root(), pcoeff, acalr, acc, cmdline::compress, nseq );
-        }// else
-        
-        if ( cmdline::capprox == "dense" )
-        {
-            std::cout << "    using dense"
-                      << ( cmdline::compress ? std::string( " (" ) + hlr::compress::provider + " + " + hlr::compress::aplr::provider + ")" : "" )
-                      << std::endl;
-
-            auto  dense = bem::dense_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
-        
-            A = impl::matrix::build( bct->root(), pcoeff, dense, acc, cmdline::compress, nseq );
-        }// else
-        
-        toc = timer::since( tic );
+        else
+            cmdline::capprox = "default";
     }// if
-    else
+
+    if (( cmdline::capprox == "aca" ) || ( cmdline::capprox == "default" ))
     {
-        std::cout << term::bullet << term::bold << "Problem Setup" << term::reset << std::endl
-                  << "    matrix = " << matrixfile
+        std::cout << "    using ACA" 
+                  << ( cmdline::compress ? std::string( " (" ) + hlr::compress::provider + " + " + hlr::compress::aplr::provider + ")" : "" )
                   << std::endl;
 
-        tic = timer::now();
-        A   = io::hpro::read< value_t >( matrixfile );
-        toc = timer::since( tic );
+        auto  acalr = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
+
+        A = impl::matrix::build( bct->root(), pcoeff, acalr, acc, cmdline::compress, nseq );
     }// else
+        
+    if ( cmdline::capprox == "dense" )
+    {
+        std::cout << "    using dense"
+                  << ( cmdline::compress ? std::string( " (" ) + hlr::compress::provider + " + " + hlr::compress::aplr::provider + ")" : "" )
+                  << std::endl;
+
+        auto  dense = bem::dense_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
+        
+        A = impl::matrix::build( bct->root(), pcoeff, dense, acc, cmdline::compress, nseq );
+    }// else
+        
+    toc = timer::since( tic );
     
     const auto  mem_A  = A->byte_size();
     const auto  norm_A = impl::norm::frobenius( *A );
@@ -142,6 +129,15 @@ program_main ()
         auto    y_ref = std::unique_ptr< vector::scalar_vector< value_t > >();
 
         {
+            // generate reference solution
+            auto  x = std::make_unique< vector::scalar_vector< value_t > >( A->col_is() );
+
+            y_ref = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
+            x->fill( 1 );
+            impl::mul_vec_chunk< value_t >( nmvm * value_t(2), apply_normal, *A, *x, *y_ref );
+        }
+        
+        {
             runtime.clear();
             
             std::cout << "    " << term::bullet << term::bold << "chunk locks" << term::reset << std::endl;
@@ -156,7 +152,7 @@ program_main ()
                 tic = timer::now();
     
                 for ( int j = 0; j < nmvm; ++j )
-                    impl::mul_vec< value_t >( value_t(2), apply_normal, *A, *x, *y );
+                    impl::mul_vec_chunk< value_t >( value_t(2), apply_normal, *A, *x, *y );
 
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
@@ -164,7 +160,7 @@ program_main ()
                 std::cout << term::rollback << term::clearline << "      mvm in   " << format_time( toc ) << term::flush;
 
                 if ( i < nbench-1 )
-                    y->fill( 1 );
+                    y->fill( 0 );
             }// for
         
             if ( nbench > 1 )
@@ -176,7 +172,13 @@ program_main ()
             
             std::cout << "      flops   = " << format_flops( flops_h, min( runtime ) ) << std::endl;
             
-            y_ref = std::move( y );
+            auto  diff = y_ref->copy();
+
+            diff->axpy( value_t(-1), y.get() );
+
+            const auto  error = diff->norm2();
+            
+            std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
         if ( true )
@@ -205,7 +207,7 @@ program_main ()
                 std::cout << term::rollback << term::clearline << "      mvm in   " << format_time( toc ) << term::flush;
 
                 if ( i < nbench-1 )
-                    y->fill( 1 );
+                    y->fill( 0 );
             }// for
         
             if ( nbench > 1 )
@@ -251,7 +253,7 @@ program_main ()
                 std::cout << term::rollback << term::clearline << "      mvm in   " << format_time( toc ) << term::flush;
 
                 if ( i < nbench-1 )
-                    y->fill( 1 );
+                    y->fill( 0 );
             }// for
         
             if ( nbench > 1 )
@@ -297,7 +299,7 @@ program_main ()
                 std::cout << term::rollback << term::clearline << "      mvm in   " << format_time( toc ) << term::flush;
 
                 if ( i < nbench-1 )
-                    y->fill( 1 );
+                    y->fill( 0 );
             }// for
         
             if ( nbench > 1 )

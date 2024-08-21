@@ -87,22 +87,83 @@ mul_vec_mtx ( const value_t                                              alpha,
         auto  R    = cptrcast( &M, uniform_lrmatrix< value_t > );
         auto  lock = std::scoped_lock( y.mutex() );
         
-        if ( op_M == Hpro::apply_normal )
+        #if defined(HLR_HAS_ZBLAS_DIRECT)
+        if ( R->is_compressed() )
         {
-            blas::mulvec( alpha, R->coeff(), x.coeffs(), value_t(1), y.coeffs() );
+            switch ( op_M )
+            {
+                case apply_normal     : compress::zblas::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoeff(), x.coeffs().data(), y.coeffs().data() ); break;
+                case apply_conjugate  : { HLR_ASSERT( false ); }
+                case apply_transposed : { HLR_ASSERT( false ); }
+                case apply_adjoint    : compress::zblas::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoeff(), x.coeffs().data(), y.coeffs().data() ); break;
+                default               : HLR_ERROR( "unsupported matrix operator" );
+            }// switch
         }// if
-        else if ( op_M == Hpro::apply_conjugate )
+        else
+        #endif
         {
-            HLR_ASSERT( false );
-        }// if
-        else if ( op_M == Hpro::apply_transposed )
+            switch ( op_M )
+            {
+                case apply_normal     : blas::mulvec( alpha, R->coeff(), x.coeffs(), value_t(1), y.coeffs() ); break;
+                case apply_conjugate  : { HLR_ASSERT( false ); }
+                case apply_transposed : { HLR_ASSERT( false ); }
+                case apply_adjoint    : blas::mulvec( alpha, blas::adjoint(R->coeff()), x.coeffs(), value_t(1), y.coeffs() ); break;
+                default               :
+                    HLR_ERROR( "unsupported matrix operator" );
+            }// switch
+        }// else
+    }// if
+    else if ( hlr::matrix::is_uniform_lowrank2( M ) )
+    {
+        auto  R    = cptrcast( &M, uniform_lr2matrix< value_t > );
+        auto  k    = R->rank();
+        auto  t    = blas::vector< value_t >( k );
+        auto  lock = std::scoped_lock( y.mutex() );
+
+        #if defined(HLR_HAS_ZBLAS_DIRECT)
+        if ( R->is_compressed() )
         {
-            HLR_ASSERT( false );
+            switch ( op_M )
+            {
+                case apply_normal     :
+                    compress::zblas::mulvec( R->col_rank(), k, apply_adjoint, value_t(1), R->zcol_coupling(), x.coeffs().data(), t.data() );
+                    compress::zblas::mulvec( R->row_rank(), k, apply_normal,       alpha, R->zrow_coupling(), t.data(), y.coeffs().data() );
+                    break;
+                    
+                case apply_conjugate  : { HLR_ASSERT( false ); }
+                case apply_transposed : { HLR_ASSERT( false ); }
+                    
+                case apply_adjoint    :
+                    compress::zblas::mulvec( R->row_rank(), k, apply_adjoint, value_t(1), R->zrow_coupling(), x.coeffs().data(), t.data() );
+                    compress::zblas::mulvec( R->col_rank(), k, apply_normal,       alpha, R->zcol_coupling(), t.data(), y.coeffs().data() );
+                    break;
+                    
+                default :
+                    HLR_ERROR( "unsupported matrix operator" );
+            }// switch
         }// if
-        else if ( op_M == Hpro::apply_adjoint )
+        else
+        #endif
         {
-            blas::mulvec( alpha, blas::adjoint(R->coeff()), x.coeffs(), value_t(1), y.coeffs() );
-        }// if
+            switch ( op_M )
+            {
+                case apply_normal     :
+                    blas::mulvec( value_t(1), blas::adjoint( R->col_coupling() ), x.coeffs(), value_t(1), t );
+                    blas::mulvec( alpha, R->row_coupling(), t, value_t(1), y.coeffs() );
+                    break;
+                    
+                case apply_conjugate  : { HLR_ASSERT( false ); }
+                case apply_transposed : { HLR_ASSERT( false ); }
+                    
+                case apply_adjoint    :
+                    blas::mulvec( value_t(1), blas::adjoint( R->row_coupling() ), x.coeffs(), value_t(1), t );
+                    blas::mulvec( alpha, R->col_coupling(), t, value_t(1), y.coeffs() );
+                    break;
+                    
+                default               :
+                    HLR_ERROR( "unsupported matrix operator" );
+            }// switch
+        }// else
     }// if
     else
         HLR_ERROR( "unsupported matrix type : " + M.typestr() );
@@ -361,29 +422,32 @@ scalar_to_uniform ( const shared_cluster_basis_hierarchy< value_t > &  cb,
     
     hier->set_nlevel( nlvl );
 
-    for ( uint  lvl = 0; lvl < nlvl; ++lvl )
-    {
-        const auto  ncb = cb.hierarchy()[lvl].size();
-        
-        hier->hierarchy()[lvl].resize( ncb );
-
-        ::tbb::parallel_for< uint >(
-            0, ncb,
-            [&,lvl] ( const uint  i )
-            {
-                auto  cb_i = cb.hierarchy()[lvl][i];
-
-                if ( ! is_null( cb_i ) && ( cb_i->rank() > 0 ))
+    ::tbb::parallel_for< uint >(
+        0, nlvl,
+        [&] ( const uint  lvl )
+        // for ( uint  lvl = 0; lvl < nlvl; ++lvl )
+        {
+            const auto  ncb = cb.hierarchy()[lvl].size();
+            
+            hier->hierarchy()[lvl].resize( ncb );
+            
+            ::tbb::parallel_for< uint >(
+                0, ncb,
+                [&,lvl] ( const uint  i )
                 {
-                    auto  u_i  = std::make_unique< uniform_vector< shared_cluster_basis< value_t > > >( *cb_i );
-                    auto  v_cb = blas::vector< value_t >( blas::vec( v ), cb_i->is() - v.ofs() );
-                    auto  s    = cb_i->transform_forward( v_cb );
+                    auto  cb_i = cb.hierarchy()[lvl][i];
                     
-                    u_i->set_coeffs( std::move( s ) );
-                    hier->hierarchy()[lvl][i] = u_i.release();
-                }// if
-            } );
-    }// for
+                    if ( ! is_null( cb_i ) && ( cb_i->rank() > 0 ))
+                    {
+                        auto  u_i  = std::make_unique< uniform_vector< shared_cluster_basis< value_t > > >( *cb_i );
+                        auto  v_cb = blas::vector< value_t >( blas::vec( v ), cb_i->is() - v.ofs() );
+                        auto  s    = cb_i->transform_forward( v_cb );
+                        
+                        u_i->set_coeffs( std::move( s ) );
+                        hier->hierarchy()[lvl][i] = u_i.release();
+                    }// if
+                } );
+        } ); // }// for
     
     return hier;
 }
