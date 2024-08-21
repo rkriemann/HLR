@@ -19,9 +19,10 @@ namespace hlr { namespace cluster { namespace tileh {
 // and top <nlvl> levels being combined (flattened)
 //
 std::unique_ptr< Hpro::TClusterTree >
-cluster      ( Hpro::TCoordinate &   coords,
-               const size_t          ntile,
-               const size_t          nlvl );
+cluster      ( Hpro::TCoordinate &          coords,
+               const Hpro::TBSPPartStrat &  part,
+               const size_t                 ntile,
+               const size_t                 nlvl );
 
 //
 // build block cluster tree based on given row/column cluster trees

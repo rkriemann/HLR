@@ -18,6 +18,8 @@
 #include "common.hh"
 #include "common-main.hh"
 
+#include <hpro/io/TGridIO.hh>
+
 using namespace hlr;
 
 using indexset = Hpro::TIndexSet;
@@ -142,6 +144,16 @@ program_main ()
     //     std::cout << y2(0) << " / " << y2(1) << " / " << y2(2) << std::endl;
 
     //     return;
+    // }
+
+    // {
+    //     auto  grid = Hpro::read_grid( cmdline::gridfile );
+
+    //     grid->rotate( Hpro::T3Point( 0, 0, 1 ), 3.1415926 * 45 / 180.0 );
+    //     grid->rotate( Hpro::T3Point( 0, 1, 0 ), 3.1415926 * 45 / 180.0 );
+        
+    //     io::vtk::print( *grid, "grid" );
+    //     io::hpro::write( *grid, "rot-" + cmdline::gridfile );
     // }
     
     auto  tic     = timer::now();

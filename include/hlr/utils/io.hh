@@ -25,6 +25,7 @@
 #include <hpro/io/TClusterVis.hh>
 #include <hpro/io/TCoordVis.hh>
 #include <hpro/io/TGridVis.hh>
+#include <hpro/io/TGridIO.hh>
 
 #if defined(HLR_USE_H2)
 #  include <hpro/io/TClusterBasisVis.hh>
@@ -77,6 +78,20 @@ read ( const std::string &  filename )
 
     return mio.read< value_t >( filename );
 }
+
+//
+// write matrix M to file <filename>
+//
+inline
+void
+write ( const Hpro::TGrid &  grid,
+        const std::string &  filename )
+{
+    Hpro::THproGridIO  gio;
+
+    gio.write( &grid, filename );
+}
+
 
 }// namespace hpro
 
@@ -513,6 +528,21 @@ print ( const Hpro::TCluster &  cl,
         const std::string &     filename )
 {
     detail::vtk_print_cluster( cl, lvl, filename );
+}
+
+//
+// print coordinates labeled according to clusters
+// in cluster tree on a particular level
+//
+inline
+void
+print ( const Hpro::TCoordinate &   coord,
+        const Hpro::TCluster &      ct,
+        const Hpro::TPermutation &  i2e,
+        const uint                  lvl,
+        const std::string &         filename )
+{
+    detail::vtk_print_cluster( coord, ct, i2e, lvl, filename );
 }
 
 //
