@@ -110,7 +110,7 @@ cluster ( Hpro::TCoordinate &          coords,
 {
     TBSPCTBuilder      ct_builder( & part, ntile );
 
-    ct_builder.adjust_bb( true );
+    ct_builder.adjust_bvol( true );
     
     auto  ct = ct_builder.build( &coords );
 
