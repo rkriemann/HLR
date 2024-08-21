@@ -64,7 +64,7 @@ program_main ()
             auto  hca    = bem::hca( pcoeff, *hcagen, cmdline::eps / 100.0, 6 );
             auto  hcalr  = bem::hca_lrapx( hca );
                 
-            A = impl::matrix::build( bct->root(), pcoeff, hcalr, acc, cmdline::compress, nseq );
+            A = impl::matrix::build_sv( bct->root(), pcoeff, hcalr, acc, cmdline::compress, nseq );
         }// if
         else
             cmdline::capprox = "default";
@@ -78,7 +78,7 @@ program_main ()
 
         auto  acalr = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
 
-        A = impl::matrix::build( bct->root(), pcoeff, acalr, acc, cmdline::compress, nseq );
+        A = impl::matrix::build_sv( bct->root(), pcoeff, acalr, acc, cmdline::compress, nseq );
     }// else
         
     if ( cmdline::capprox == "dense" )
@@ -89,7 +89,7 @@ program_main ()
 
         auto  dense = bem::dense_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
         
-        A = impl::matrix::build( bct->root(), pcoeff, dense, acc, cmdline::compress, nseq );
+        A = impl::matrix::build_sv( bct->root(), pcoeff, dense, acc, cmdline::compress, nseq );
     }// else
         
     toc = timer::since( tic );
