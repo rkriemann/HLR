@@ -33,6 +33,27 @@
 
 #include <hlr/matrix/print.hh>
 
+namespace hlr { namespace io { namespace eps {
+
+void
+print ( const Hpro::TBlockCluster &  cl,
+        const std::string &          filename,
+        const std::string &          options )
+{
+    std::vector< std::string >  optarr;
+
+    boost::split( optarr, options, [] ( char c ) { return c == ','; } );
+
+    Hpro::TPSBlockClusterVis  vis;
+
+    if ( contains( optarr, "id" ) )      vis.id( true );
+    if ( contains( optarr, "innerid" ) ) vis.inner_id( true );
+    
+    vis.print( & cl, filename );
+}
+
+}}}// hlr::io::eps
+
 namespace hlr { namespace matrix {
 
 namespace

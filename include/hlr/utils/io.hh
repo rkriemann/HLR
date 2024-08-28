@@ -382,15 +382,10 @@ print ( const Hpro::TCluster &  cl,
 //
 // print blockcluster <cl> to file <filename>
 //
-inline
 void
 print ( const Hpro::TBlockCluster &  cl,
-        const std::string &          filename )
-{
-    Hpro::TPSBlockClusterVis  vis;
-
-    vis.print( & cl, filename );
-}
+        const std::string &          filename,
+        const std::string &          options = "default" );
 
 //
 // print matrix <M> to file <filename>
