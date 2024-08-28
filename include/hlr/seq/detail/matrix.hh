@@ -1000,6 +1000,21 @@ build_uniform_lvl_sep ( const Hpro::TBlockCluster *  bct,
              std::move( M_root ) };
 }
 
+template < typename coeff_t,
+           typename lrapx_t,
+           typename basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< hlr::matrix::shared_cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > > >
+build_uniform_cl ( const Hpro::TBlockCluster *  bct,
+                   const coeff_t &              coeff,
+                   const lrapx_t &              lrapx,
+                   const basisapx_t &           basisapx,
+                   const accuracy &             acc,
+                   const bool                   compress )
+{
+}
+
 //
 // level-wise construction of uniform-H matrix from given H-matrix
 //
@@ -1262,6 +1277,8 @@ build_uniform_lvl ( const Hpro::TMatrix< typename basisapx_t::value_t > &   A,
                                                                                       *rowcb,
                                                                                       *colcb,
                                                                                       std::move( S ) );
+
+            RU->set_id( R->id() );
             
             // put uniform matrix in parent matrix
             auto  R_parent = R->parent();
@@ -1638,7 +1655,7 @@ build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &   A,
         auto  D  = cptrcast( &A, dense_matrix< value_t > );
         auto  DD = blas::copy( D->mat() );
 
-        return  std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
+        M = std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
     }// if
     else
         HLR_ERROR( "unsupported matrix type: " + A.typestr() );
@@ -3254,7 +3271,7 @@ build_uniform ( const Hpro::TMatrix< value_t > &   A,
         auto  D  = cptrcast( &A, dense_matrix< value_t > );
         auto  DD = blas::copy( D->mat() );
 
-        return  std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
+        M = std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
     }// if
     else
         HLR_ERROR( "unsupported matrix type: " + A.typestr() );
@@ -3330,7 +3347,7 @@ build_uniform_sep ( const Hpro::TMatrix< value_t > &   A,
         auto  D  = cptrcast( &A, dense_matrix< value_t > );
         auto  DD = blas::copy( D->mat() );
 
-        return  std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
+        M = std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
     }// if
     else
         HLR_ERROR( "unsupported matrix type: " + A.typestr() );
@@ -3670,6 +3687,27 @@ build_nested_cluster_basis ( nested_cluster_basis< value_t > &  cb,
     return blas::matrix< value_t >();
 }
 
+template < typename coeff_t,
+           typename lrapx_t,
+           typename basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::nested_cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< hlr::matrix::nested_cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > > >
+build_h2 ( const Hpro::TBlockCluster *  bct,
+           const coeff_t &              coeff,
+           const lrapx_t &              lrapx,
+           const basisapx_t &           basisapx,
+           const accuracy &             acc,
+           const bool                   compress )
+{
+    static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
+                   "coefficient function and low-rank approximation must have equal value type" );
+    static_assert( std::is_same_v< typename coeff_t::value_t, typename basisapx_t::value_t >,
+                   "coefficient function and basis approximation must have equal value type" );
+    
+    HLR_ASSERT( bct != nullptr );
+}
+
 //
 // build H² representation of A by converting all lowrank matrices
 // into uniform low-rank matrices using given cluster bases rowcb/colcb.
@@ -3739,7 +3777,7 @@ build_h2 ( const Hpro::TMatrix< value_t > &   A,
         auto  D  = cptrcast( &A, dense_matrix< value_t > );
         auto  DD = blas::copy( D->mat() );
 
-        return  std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
+        M = std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
     }// if
     else
         HLR_ERROR( "unsupported matrix type: " + A.typestr() );
@@ -3814,7 +3852,7 @@ build_h2_sep ( const Hpro::TMatrix< value_t > &   A,
         auto  D  = cptrcast( &A, dense_matrix< value_t > );
         auto  DD = blas::copy( D->mat() );
 
-        return  std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
+        M = std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
     }// if
     else
         HLR_ERROR( "unsupported matrix type: " + A.typestr() );

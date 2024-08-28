@@ -699,6 +699,8 @@ build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
                                                                                           *colcb,
                                                                                           std::move( S ) );
 
+                RU->set_id( R->id() );
+                
                 if ( compress )
                     RU->compress( acc );
                 
@@ -1131,6 +1133,8 @@ build_uniform_lvl_sep ( const Hpro::TBlockCluster *  bct,
                                                                                            *rowcb, *colcb,
                                                                                            std::move( Sr ), std::move( Sc ) );
 
+                RU->set_id( R->id() );
+
                 if ( compress )
                     RU->compress( acc );
                 
@@ -1480,6 +1484,8 @@ build_uniform_lvl ( const Hpro::TMatrix< typename basisapx_t::value_t > &   A,
                                                                                           *colcb,
                                                                                           std::move( S ) );
             
+                RU->set_id( R->id() );
+                
                 // replace standard lowrank block by uniform lowrank block
                 auto  R_parent = R->parent();
                 auto  U_parent = bmat_map.at( R_parent->id() );
@@ -2432,6 +2438,7 @@ build_blr2 ( const Hpro::TBlockCluster *  bc,
                         B_ij = std::move( RU );
                     }// if
 
+                    B_ij->set_id( bc_ij->id() );
                     B->set_block( i, j, B_ij.release() );
                 }// for
             }// for
@@ -2829,6 +2836,7 @@ build_blr2_sep ( const Hpro::TBlockCluster *  bc,
                         B_ij = std::move( RU );
                     }// if
 
+                    B_ij->set_id( bc_ij->id() );
                     B->set_block( i, j, B_ij.release() );
                 }// for
             }// for
@@ -3082,6 +3090,7 @@ build_blr2 ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
                                                                                                   * ( colcb->son( j ) ),
                                                                                                   std::move( S ) );
 
+                        RU->set_id( R->id() );
                         M->set_block( i, j, RU.release() );
                     }// if
                     else if ( hlr::matrix::is_dense( B_ij ) )
@@ -3089,6 +3098,7 @@ build_blr2 ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
                         auto  D  = cptrcast( B_ij, dense_matrix< value_t > );
                         auto  DD = std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( blas::copy( D->mat() ) ) );
 
+                        DD->set_id( D->id() );
                         M->set_block( i, j, DD.release() );
                     }// if
                     else

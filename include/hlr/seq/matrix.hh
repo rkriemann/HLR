@@ -786,6 +786,32 @@ build_uniform_lvl_sep ( const Hpro::TBlockCluster *  bct,
     return detail::build_uniform_lvl_sep( bct, coeff, lrapx, basisapx, acc, compress );
 }
 
+template < coefficient_function_type coeff_t,
+           lowrank_approx_type lrapx_t,
+           approx::approximation_type basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
+            std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
+            std::unique_ptr< Hpro::TMatrix< Hpro::value_type_t< coeff_t > > > >
+build_uniform_cl ( const Hpro::TBlockCluster *  bt,
+                   const coeff_t &              coeff,
+                   const lrapx_t &              lrapx,
+                   const basisapx_t &           basisapx,
+                   const accuracy &             acc,
+                   const bool                   compress,
+                   const size_t                 /* nseq */ = 0 ) // ignored
+{
+    auto  rowct      = bt->rowcl();
+    auto  colct      = bt->colcl();
+    auto  nrowcl     = rowct->id() + 1;
+    auto  ncolcl     = colct->id() + 1;
+    auto  nblocks    = bt->id() + 1;
+    auto  block_mtx  = std::vector< std::mutex >( nblocks );
+    auto  row_blocks = std::vector< std::list< const Hpro::TBlockCluster * > >( nrowcl );
+    auto  col_blocks = std::vector< std::list< const Hpro::TBlockCluster * > >( ncolcl );
+
+    build_row_lists( bt, row_blocks );
+}
+
 template < typename basisapx_t >
 std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
@@ -869,6 +895,7 @@ std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisap
 build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
                     const basisapx_t &           basisapx,
                     const accuracy &             acc,
+                    const bool                   compress,
                     const size_t                 /* nseq */ = 0 ) // ignored
 {
     using value_t       = typename basisapx_t::value_t;
