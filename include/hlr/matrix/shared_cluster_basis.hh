@@ -48,14 +48,14 @@ private:
     // associated indexset
     const indexset           _is;
 
+    // unique ID within hierarchical cluster basis
+    int                      _id;
+    
     // cluster basis of sub clusters
     std::vector< self_t * >  _sons;
     
     // basis
     blas::matrix< value_t >  _V;
-
-    // mutex for synchronised changes
-    std::mutex               _mtx;
 
     // stores compressed data
     compress::aplr::zarray   _zV;
@@ -64,11 +64,15 @@ private:
     // in case of adaptive precision compression
     blas::vector< real_t >   _sv;
     
+    // mutex for synchronised changes
+    std::mutex               _mtx;
+
 public:
     
     // construct cluster basis corresponding to cluster <cl>
     shared_cluster_basis ( const indexset &  ais )
             : _is( ais )
+            , _id(-1)
     {}
 
     // construct cluster basis corresponding to cluster <cl>
@@ -76,12 +80,14 @@ public:
     shared_cluster_basis ( const indexset &                 ais,
                            const blas::matrix< value_t > &  V )
             : _is( ais )
+            , _id(-1)
             , _V( V )
     {}
 
     shared_cluster_basis ( const indexset &                 ais,
                            blas::matrix< value_t > &&       V )
             : _is( ais )
+            , _id(-1)
             , _V( std::move( V ) )
     {}
 
@@ -91,6 +97,12 @@ public:
         for ( auto  cb : _sons )
             delete cb;
     }
+
+    // return ID
+    int   id         () const { return _id; }
+
+    // set ID
+    void  set_id     ( const int  aid ) { _id = aid; }
 
     //
     // access sons

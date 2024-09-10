@@ -1000,20 +1000,287 @@ build_uniform_lvl_sep ( const Hpro::TBlockCluster *  bct,
              std::move( M_root ) };
 }
 
-template < typename coeff_t,
-           typename lrapx_t,
-           typename basisapx_t >
-std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename coeff_t::value_t > >,
-            std::unique_ptr< hlr::matrix::shared_cluster_basis< typename coeff_t::value_t > >,
-            std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > > >
-build_uniform_cl ( const Hpro::TBlockCluster *  bct,
-                   const coeff_t &              coeff,
-                   const lrapx_t &              lrapx,
-                   const basisapx_t &           basisapx,
-                   const accuracy &             acc,
-                   const bool                   compress )
+template < typename value_t >
+void
+set_ids ( shared_cluster_basis< value_t > &  cb,
+          int &                              id )
 {
+    if ( cb.nsons() > 0 )
+    {
+        for ( uint  i = 0; i < cb.nsons(); ++i )
+        {
+            if ( ! is_null( cb.son( i ) ) )
+                set_ids( * cb.son( i ), id );
+        }// for
+    }// if
+
+    // id(parent) > id(sons)
+    cb.set_id( id++ );
 }
+
+//
+// build lists of blocks in block row per cluster
+//
+inline
+void
+build_block_lists ( const Hpro::TBlockCluster *                                bt,
+                    std::vector< std::list< const Hpro::TBlockCluster * > > &  blocks,
+                    const bool                                                 adjoint,
+                    const bool                                                 also_inner = false )
+{
+    HLR_ASSERT( ! is_null( bt ) );
+    
+    if ( bt->is_leaf() || also_inner )
+    {
+        auto  cl = ( adjoint ? bt->colcl() : bt->rowcl() );
+
+        HLR_ASSERT( cl->id() >= 0 );
+        
+        blocks[ cl->id() ].push_back( bt );
+    }// if
+
+    for ( uint  i = 0; i < bt->nsons(); ++i )
+    {
+        if ( ! is_null( bt->son(i) ) )
+            build_block_lists( bt->son(i), blocks, adjoint, also_inner );
+    }// for
+}
+
+// template < typename coeff_t,
+//            typename lrapx_t,
+//            typename basisapx_t >
+// std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename coeff_t::value_t > >,
+//             std::unique_ptr< hlr::matrix::shared_cluster_basis< typename coeff_t::value_t > >,
+//             std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > > >
+// build_uniform_cl ( const Hpro::TBlockCluster *                                bt,
+//                    const coeff_t &                                            coeff,
+//                    const lrapx_t &                                            lrapx,
+//                    const basisapx_t &                                         basisapx,
+//                    const accuracy &                                           acc,
+//                    const bool                                                 compress,
+//                    std::vector< std::list< const Hpro::TBlockCluster * > > &  row_blocks,
+//                    std::vector< std::list< const Hpro::TBlockCluster * > > &  col_blocks )
+// {
+//     using value_t       = typename coeff_t::value_t;
+//     using real_t        = Hpro::real_type_t< value_t >;
+//     using cluster       = Hpro::TCluster;
+//     using block_cluster = Hpro::TBlockCluster;
+//     using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
+//     using matrix        = Hpro::TMatrix< value_t >;
+
+//     //
+//     // go level-wise through cluster trees, construct matrices for all row/column blocks
+//     // and build corresponding cluster basis
+//     //
+
+//     auto        root_row     = bt->rowcl();
+//     auto        root_col     = bt->colcl();
+//     const auto  nrowcl       = root_row->id() + 1;
+//     const auto  ncolcl       = root_col->id() + 1;
+//     const auto  nblocks      = bt->id() + 1;
+//     auto        lrmatrices   = std::vector< lrmatrix< value_t > * >( nblocks );            // allows access to lrmatrices via id
+//     auto        parent_mat   = std::vector< Hpro::TBlockMatrix< value_t > * >( nblocks );  // stores pointer to parent matrix
+//     auto        parent_rowcl = std::vector< cluster * >( nrowcl );                         // to access cluster parents
+//     auto        parent_rowcb = std::vector< cluster_basis * >( nrowcl );                   // store pointer to parent of cluster basis
+//     auto        parent_colcl = std::vector< cluster * >( ncolcl );
+//     auto        parent_colcb = std::vector< cluster_basis * >( ncolcl );
+//     auto        root_M       = std::unique_ptr< matrix * >();
+
+//     auto        rowcls       = std::list< cluster * >{ root_row };
+//     auto        colcls       = std::list< cluster * >{ root_col };
+
+//     while ( ! ( rowcls.empty() && colcls.empty() ) )
+//     {
+//         for ( auto  rowcl : rowcls )
+//         {
+//             //
+//             // build cluster basis object
+//             //
+
+//             auto  rowcb = std::make_unique< cluster_basis >( *rowcl );
+
+//             rowcb->set_nsons( rowcl->nsons() );
+
+//             // remember for sons
+//             for ( uint  i = 0; i < rowcl->nsons(); ++i )
+//             {
+//                 if ( ! is_null( rowcl->son(i) ) )
+//                 {
+//                     parent_rowcl[ rowcl->son(i) ] = rowcl;
+//                     parent_rowcb[ rowcl->son(i) ] = rowcb.get();
+//                 }// if
+//             }// for
+            
+//             // put into parent
+//             auto  parent_cb = parent_rowcb[ rowcl->id() ];
+//             auto  parent_cl = parent_rowcl[ rowcl->id() ];
+
+//             HLR_ASSERT( is_null( parent_cb ) == is_null( parent_cl ) );
+
+//             if ( ! is_null( parent_cl ) )
+//             {
+//                 for ( uint  i = 0; i < parent_cl->nsons(); ++i )
+//                 {
+//                     if ( parent_cl->son(i) == rowcl )
+//                     {
+//                         parent_cb->set_son( i, rowcb.get() );
+//                         break;
+//                     }// if
+//                 }// for
+//             }// if
+                
+//             //
+//             // construct all matrix blocks in local list
+//             //
+
+//             {
+//                 auto  blocks   = row_blocks[ rowcl->id() ];
+//                 auto  lrblocks = std::list< lrmatrix< value_t > >();
+
+//                 for ( auto  block : blocks )
+//                 {
+//                     auto  M = std::unique_ptr< matrix >();
+
+//                     if ( block->is_leaf() )
+//                     {
+//                         if ( block->is_adm() )
+//                         {
+//                             M = lrapx.build( block, acc );
+
+//                             if ( hlr::matrix::is_lowrank( *M ) )
+//                             {
+//                                 auto  R = ptrcast( M.get(), lrmatrix< value_t > );
+
+//                                 // remember for cluster basis
+//                                 lrblocks.push_back( R );
+//                             }// if
+//                             else
+//                                 HLR_ERROR( "unsupported matrix type : " + M->typestr() );
+//                         }// if
+//                         else
+//                         {
+//                             M = coeff.build( block->is().row_is(), block->is().col_is() );
+                        
+//                             if ( hlr::matrix::is_dense( *M ) )
+//                             {
+//                                 // all is good
+//                             }// if
+//                             else if ( Hpro::is_dense( *M ) )
+//                             {
+//                                 auto  D  = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
+//                                 auto  DD = std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( D->blas_mat() ) );
+
+//                                 if ( compress )
+//                                     DD->compress( acc );
+
+//                                 M = std::move( DD );
+//                             }// if
+//                             else
+//                                 HLR_ERROR( "unsupported matrix type : " + M->typestr() );
+//                         }// else
+//                     }// if
+//                     else
+//                     {
+//                         auto  B = std::make_unique< Hpro::TBlockMatrix< value_t > >( block );
+
+//                         // make sure, block structure is correct
+//                         if (( B->nblock_rows() != block->nrows() ) || ( B->nblock_cols() != block->ncols() ))
+//                             B->set_block_struct( block->nrows(), block->ncols() );
+
+//                         // set matrix as parent for all sub blocks
+//                         for ( uint  i = 0; i < block->nsons(); ++i )
+//                         {
+//                             if ( ! is_null( block->son(i) ) )
+//                                 parent_mat[ block->son(i)->id() ] = B.get();
+//                         }// for
+//                     }// else
+
+//                     M->set_id( block->id() );
+//                     M->set_procs( block->procs() );
+
+//                     //
+//                     // insert into parent
+//                     //
+
+//                     auto  parent_M     = parent_mat[ M->id() ];
+//                     auto  parent_block = block->parent();
+
+//                     HLR_ASSERT( is_null( parent_block ) == is_null( parent_M ) );
+                    
+//                     if ( ! is_null( parent_block ) )
+//                     {
+//                         for ( uint  i = 0; i < parent_block->nrows(); ++i )
+//                         {
+//                             for ( uint  j = 0; j < parent_block->ncols(); ++j )
+//                             {
+//                                 if ( parent_block->son(i,j) == block )
+//                                 {
+//                                     parent_M->set_block( i, j, M.release() );
+//                                     break;
+//                                 }// if
+//                             }// for
+//                         }// for
+//                     }// if
+//                     else
+//                     {
+//                         //
+//                         // without parent => root
+//                         //
+
+//                         M_root = std::move( M );
+//                     }// else
+//                 }// for
+
+//                 //
+//                 // now construct cluster basis
+//                 //
+
+//                 if ( ! lrblocks.empty() )
+//                 {
+//                     //
+//                     // form U = ( U₀·R₀' U₁·R₁' U₂·R₁' … )
+//                     //
+            
+//                     size_t  nrows_U = rowcl->size();
+//                     size_t  ncols_U = 0;
+
+//                     for ( auto  R : lrblocks )
+//                         ncols_U += R->rank();
+
+//                     auto    U   = blas::matrix< value_t >( nrows_U, ncols_U );
+//                     size_t  pos = 0;
+
+//                     for ( auto  R : lrblocks )
+//                     {
+//                         // R = U·V' = W·T·X'
+//                         auto  U_i = R->U();
+//                         auto  V_i = blas::copy( R->V() );
+//                         auto  R_i = blas::matrix< value_t >();
+//                         auto  k   = R->rank();
+                
+//                         blas::qr( V_i, R_i, false );
+
+//                         auto  UR_i  = blas::prod( U_i, blas::adjoint( R_i ) );
+//                         auto  U_sub = blas::matrix< value_t >( U, blas::range::all, blas::range( pos, pos + k - 1 ) );
+
+//                         blas::copy( UR_i, U_sub );
+                
+//                         pos += k;
+//                     }// for
+
+//                     //
+//                     // QR of S and computation of row basis
+//                     //
+
+//                     auto  Us = blas::vector< real_t >();
+//                     auto  Un = basisapx.column_basis( U, acc, & Us );
+
+//                     rowcb->set_basis( Un, Us );
+//                 }// if
+//             }
+//         }// for
+//     }// while
+// }
 
 //
 // level-wise construction of uniform-H matrix from given H-matrix
@@ -2945,7 +3212,9 @@ template < typename value_t >
 void
 init_cluster_bases ( const Hpro::TMatrix< value_t > &   M,
                      shared_cluster_basis< value_t > &  rowcb,
-                     shared_cluster_basis< value_t > &  colcb )
+                     shared_cluster_basis< value_t > &  colcb,
+                     int &                              row_id,
+                     int &                              col_id )
 {
     if ( is_blocked( M ) )
     {
@@ -2996,10 +3265,14 @@ init_cluster_bases ( const Hpro::TMatrix< value_t > &   M,
                 auto  colcb_j = colcb.son( j );
                 
                 if ( ! is_null( B->block( i, j ) ) )
-                    init_cluster_bases( *B->block( i, j ), *rowcb_i, *colcb_j );
+                    init_cluster_bases( *B->block( i, j ), *rowcb_i, *colcb_j, row_id, col_id );
             }// for
         }// for
     }// if
+
+    // set IDs last to ensure id(parent) > id(sons)
+    if ( rowcb.id() == -1 ) rowcb->set_id( row_id++ );
+    if ( colcb.id() == -1 ) colcb->set_id( col_id++ );
 }
 
 //
