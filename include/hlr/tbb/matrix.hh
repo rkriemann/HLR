@@ -578,7 +578,12 @@ build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
                     const bool                   compress = false,
                     const size_t                 /* nseq */ = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
-    return detail::build_uniform_lvl( bct, coeff, lrapx, basisapx, acc, compress );
+    auto  [ rowcb, colcb, A ] = detail::build_uniform_lvl( bct, coeff, lrapx, basisapx, acc, compress );
+
+    { int  id = 0;  hlr::seq::matrix::detail::set_ids( *rowcb, id ); }
+    { int  id = 0;  hlr::seq::matrix::detail::set_ids( *colcb, id ); }
+
+    return { std::move( rowcb ), std::move( colcb ), std::move( A ) };
 }
 
 template < coefficient_function_type  coeff_t,
@@ -595,7 +600,12 @@ build_uniform_lvl_sep ( const Hpro::TBlockCluster *  bct,
                         const bool                   compress = false,
                         const size_t                 /* nseq */ = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
-    return detail::build_uniform_lvl_sep( bct, coeff, lrapx, basisapx, acc, compress );
+    auto  [ rowcb, colcb, A ] = detail::build_uniform_lvl_sep( bct, coeff, lrapx, basisapx, acc, compress );
+
+    { int  id = 0;  hlr::seq::matrix::detail::set_ids( *rowcb, id ); }
+    { int  id = 0;  hlr::seq::matrix::detail::set_ids( *colcb, id ); }
+
+    return { std::move( rowcb ), std::move( colcb ), std::move( A ) };
 }
 
 template < approx::approximation_type basisapx_t >

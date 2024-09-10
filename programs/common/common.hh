@@ -264,43 +264,43 @@ std::unique_ptr< Hpro::TBlockClusterTree >
 gen_bct ( Hpro::TClusterTree &  rowct,
           Hpro::TClusterTree &  colct )
 {
-    Hpro::TBCBuilder  bct_builder;
+    Hpro::TBCBuilder  bt_builder;
 
     if (( hlr::cmdline::adm == "std" ) || ( hlr::cmdline::adm == "strong" ))
     {
         Hpro::TStdGeomAdmCond  adm_cond( hlr::cmdline::eta, Hpro::use_min_diam );
         
-        return bct_builder.build( & rowct, & colct, & adm_cond );
+        return bt_builder.build( & rowct, & colct, & adm_cond );
     }// if
     else if ( hlr::cmdline::adm == "vertex" )
     {
         Hpro::TWeakStdGeomAdmCond  adm_cond;
         
-        return bct_builder.build( & rowct, & colct, & adm_cond );
+        return bt_builder.build( & rowct, & colct, & adm_cond );
     }// if
     else if ( hlr::cmdline::adm == "weak" )
     {
         Hpro::TWeakGeomAdmCond  adm_cond;
         
-        return bct_builder.build( & rowct, & colct, & adm_cond );
+        return bt_builder.build( & rowct, & colct, & adm_cond );
     }// if
     else if (( hlr::cmdline::adm == "hodlr" ) || ( hlr::cmdline::adm == "offdiag" ))
     {
         Hpro::TOffDiagAdmCond  adm_cond;
         
-        return bct_builder.build( & rowct, & colct, & adm_cond );
+        return bt_builder.build( & rowct, & colct, & adm_cond );
     }// if
     else if ( hlr::cmdline::adm == "hilo" )
     {
         Hpro::THiLoFreqGeomAdmCond  adm_cond( hlr::cmdline::kappa, 10 );
         
-        return bct_builder.build( & rowct, & colct, & adm_cond );
+        return bt_builder.build( & rowct, & colct, & adm_cond );
     }// if
     else if ( hlr::cmdline::adm == "none" )
     {
         Hpro::TStdGeomAdmCond  adm_cond( 0.0, Hpro::use_min_diam );
         
-        return bct_builder.build( & rowct, & colct, & adm_cond );
+        return bt_builder.build( & rowct, & colct, & adm_cond );
     }// if
     else
         HLR_ERROR( "unsupported admissibility : " + hlr::cmdline::adm );

@@ -240,6 +240,53 @@ program_main ()
         {
             runtime.clear();
             
+            std::cout << "  " << term::bullet << term::bold << "row wise (id based)" << term::reset << std::endl;
+        
+            auto  x = std::make_unique< vector::scalar_vector< value_t > >( A->col_is() );
+            auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
+
+            auto  cbmap    = impl::uniform::build_id2cb( *colcb );
+            auto  blockmap = impl::uniform::build_id2blocks( *rowcb, *A, false );
+            
+            x->fill( 1 );
+
+            for ( int i = 0; i < nbench; ++i )
+            {
+                tic = timer::now();
+    
+                for ( int j = 0; j < nmvm; ++j )
+                    impl::uniform::mul_vec_row< value_t >( 2.0, Hpro::apply_normal, *x, *y, *rowcb, *colcb, cbmap, blockmap );
+
+                toc = timer::since( tic );
+                runtime.push_back( toc.seconds() );
+        
+                std::cout << term::rollback << term::clearline << "      mvm in   " << format_time( toc ) << term::flush;
+
+                if ( i < nbench-1 )
+                    y->fill( 0 );
+            }// for
+        
+            if ( nbench > 1 )
+                std::cout << term::rollback << term::clearline << "      runtime = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime );
+            std::cout << std::endl;
+
+            std::cout << "      flops   = " << format_flops( flops_uh, min( runtime ) ) << std::endl;
+            
+            t_ref = min( runtime );
+            
+            auto  diff = y_ref->copy();
+
+            diff->axpy( value_t(-1), y.get() );
+
+            const auto  error = diff->norm2();
+            
+            std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
+        }
+
+        {
+            runtime.clear();
+            
             std::cout << "  " << term::bullet << term::bold << "level" << term::reset << std::endl;
         
             auto  A_hier   = matrix::build_level_hierarchy( *A );

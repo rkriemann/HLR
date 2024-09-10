@@ -1529,7 +1529,7 @@ template < typename value_t >
 void
 qr ( matrix< value_t > &  M,
      matrix< value_t > &  R,
-     const bool           comp_Q = true )
+     const bool           comp_Q )
 {
     // if ( M.nrows() > 2*M.ncols() ) // not efficient in general
     //    qrts( M, R, comp_Q );
@@ -1549,6 +1549,8 @@ qr ( const matrix< value_t > &  M )
 
     return { std::move( Q ), std::move( R ) };
 }
+
+using Hpro::BLAS::qr;
 
 //
 // compute QR factorisation A = Q·R with orthonormal Q
