@@ -17,6 +17,7 @@
 #include <hlr/matrix/print.hh>
 #include <hlr/matrix/sum.hh>
 #include <hlr/matrix/info.hh>
+#include <hlr/matrix/check.hh>
 #include <hlr/matrix/level_hierarchy.hh>
 #include <hlr/bem/aca.hh>
 #include <hlr/approx/randsvd.hh>
@@ -25,6 +26,54 @@
 #include "common-main.hh"
 
 using namespace hlr;
+
+void
+print_ids ( const auto &  bt )
+{
+    std::cout << bt.id();
+
+    if ( ! bt.is_leaf() )
+    {
+        std::cout << " : ";
+        for ( uint  i = 0; i < bt.nsons(); ++i )
+            std::cout << bt.son(i)->id() << ", ";
+    }// if
+
+    std::cout << std::endl;
+    
+    for ( uint  i = 0; i < bt.nsons(); ++i )
+        print_ids( * bt.son(i) );
+}
+
+template < typename value_t >
+void
+print_ids ( const Hpro::TMatrix< value_t > &  M )
+{
+    std::cout << M.id();
+
+    if ( is_blocked( M ) )
+    {
+        auto  B = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+        
+        std::cout << " : ";
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+                if ( ! is_null( B->block(i,j) ) )
+                    std::cout << B->block(i,j)->id() << ", ";
+    }// if
+
+    std::cout << std::endl;
+    
+    if ( is_blocked( M ) )
+    {
+        auto  B = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+                if ( ! is_null( B->block(i,j) ) )
+                    print_ids( * B->block(i,j) );
+    }// if
+}
 
 //
 // main function
@@ -43,13 +92,16 @@ program_main ()
     auto  problem = gen_problem< problem_t >();
     auto  coord   = problem->coordinates();
     auto  ct      = gen_ct( *coord );
-    auto  bct     = gen_bct( *ct, *ct );
-    
+    auto  bt      = gen_bct( *ct, *ct );
+
+    // print_ids( *(ct->root()) );
+    // print_ids( *(bt->root()) );
+
     if ( hpro::verbose( 3 ) )
     {
         io::vtk::print( *coord, "coord" );
         io::eps::print( *ct->root(), "ct" );
-        io::eps::print( *bct->root(), "bct" );
+        io::eps::print( *bt->root(), "bt", "id,innerid" );
     }// if
     
     auto  coeff  = problem->coeff_func();
@@ -58,9 +110,11 @@ program_main ()
 
     tic = timer::now();
 
-    auto  A = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, cmdline::compress );
+    auto  A = impl::matrix::build( bt->root(), pcoeff, lrapx, acc, cmdline::compress );
     
     toc = timer::since( tic );
+    
+    // print_ids( *A );
     
     std::cout << "    done in  " << format_time( toc ) << std::endl;
     std::cout << "    dims   = " << term::bold << A->nrows() << " × " << A->ncols() << term::reset << std::endl;
@@ -69,7 +123,7 @@ program_main ()
     matrix::print_mem_lvl( *A );
     
     // assign clusters since needed for cluster bases
-    seq::matrix::assign_cluster( *A, *bct->root() );
+    seq::matrix::assign_cluster( *A, *bt->root() );
     
     if ( hpro::verbose( 3 ) )
     {
@@ -151,6 +205,8 @@ program_main ()
         std::cout << "    done in  " << format_time( toc ) << std::endl;
         std::cout << "    mem    = " << format_mem( rowcb->byte_size(), colcb->byte_size(), A2->byte_size() ) << std::endl;
 
+        matrix::check( *A2 );
+        
         const auto  normA2 = hlr::norm::spectral( impl::arithmetic, *A2, 1e-4 );
 
         std::cout << "    |A|    = " << format_norm( norm::frobenius( *A2 ) ) << std::endl;
