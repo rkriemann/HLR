@@ -202,6 +202,57 @@ mul_vec_hier ( const value_t                                        alpha,
 }
 
 //
+// block row wise computation using IDs of involved objects
+//
+template < typename value_t >
+void
+mul_vec_row ( const value_t                                                         alpha,
+              const hpro::matop_t                                                   op_M,
+              const vector::scalar_vector< value_t > &                              x,
+              vector::scalar_vector< value_t > &                                    y,
+              const matrix::shared_cluster_basis< value_t > &                       rowcb,
+              const matrix::shared_cluster_basis< value_t > &                       colcb,
+              const std::vector< matrix::shared_cluster_basis< value_t > * > &      colcb_map,
+              const std::vector< std::list< const Hpro::TMatrix< value_t > * > > &  blockmap )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    auto  xcoeff = std::vector< blas::vector< value_t > >( colcb.id() + 1 );
+
+    detail::scalar_to_uniform( colcb, x, xcoeff );
+    detail::mul_vec_row< value_t >( alpha, op_M, rowcb, colcb_map, blockmap, xcoeff, x, y );
+}
+
+template < typename value_t >
+std::vector< matrix::shared_cluster_basis< value_t > * >
+build_id2cb ( matrix::shared_cluster_basis< value_t > &  cb )
+{
+    HLR_ASSERT( cb.id() != -1 );
+    
+    auto  idmap = std::vector< matrix::shared_cluster_basis< value_t > * >( cb.id() + 1 );
+
+    detail::build_id2cb( cb, idmap );
+
+    return idmap;
+}
+
+template < typename value_t >
+std::vector< std::list< const Hpro::TMatrix< value_t > * > >
+build_id2blocks ( const matrix::shared_cluster_basis< value_t > &  cb,
+                  const Hpro::TMatrix< value_t > &                 M,
+                  const bool                                       transposed )
+{
+    HLR_ASSERT( cb.id() != -1 );
+
+    auto  blockmap = std::vector< std::list< const Hpro::TMatrix< value_t > * > >( cb.id() + 1 );
+
+    detail::build_id2blocks( cb, M, blockmap, transposed );
+
+    return blockmap;
+}
+
+//
 // return FLOPs needed for computing y = y + α op( M ) x
 // (implicit vectors)
 //

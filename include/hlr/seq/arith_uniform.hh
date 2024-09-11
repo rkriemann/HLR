@@ -14,6 +14,9 @@ namespace hlr { namespace seq { namespace uniform {
 
 using hlr::uniform::mul_vec;
 using hlr::uniform::mul_vec_hier;
+using hlr::uniform::mul_vec_row;
+using hlr::uniform::build_id2cb;
+using hlr::uniform::build_id2blocks;
 using hlr::uniform::multiply;
 using hlr::uniform::lu;
 
