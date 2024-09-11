@@ -3757,7 +3757,8 @@ build_nested_cluster_basis ( nested_cluster_basis< value_t > &  cb,
                              const lr_mat_map_t< value_t > &    lrmat_map,
                              const coupling_map_t< value_t > &  coupling_map,
                              const lr_mat_list_t< value_t > &   parent_matrices,
-                             const bool                         transposed )
+                             const bool                         transposed,
+                             const bool                         compress )
 {
     using  real_t  = Hpro::real_type_t< value_t >;
 
@@ -3845,6 +3846,9 @@ build_nested_cluster_basis ( nested_cluster_basis< value_t > &  cb,
 
         cb.set_basis( std::move( W ), std::move( Ws ) );
 
+        if ( compress )
+            cb.compress( acc );
+
         return std::move( R );
     }// if
     else
@@ -3860,7 +3864,7 @@ build_nested_cluster_basis ( nested_cluster_basis< value_t > &  cb,
         {
             if ( ! is_null( cb.son( i ) ) )
             {
-                auto  R_i = build_nested_cluster_basis( *cb.son( i ), basisapx, acc, lrmat_map, coupling_map, mat_list, transposed );
+                auto  R_i = build_nested_cluster_basis( *cb.son( i ), basisapx, acc, lrmat_map, coupling_map, mat_list, transposed, compress );
 
                 nrows += R_i.nrows();
                 son_data[i]  = { cb.son(i), std::move( R_i ) };
@@ -3954,6 +3958,9 @@ build_nested_cluster_basis ( nested_cluster_basis< value_t > &  cb,
 
         cb.set_transfer( std::move( E ) );
 
+        if ( compress )
+            cb.compress( acc );
+        
         return std::move( R );
     }// else
 
@@ -3979,6 +3986,7 @@ build_h2 ( const Hpro::TBlockCluster *  bct,
                    "coefficient function and basis approximation must have equal value type" );
     
     HLR_ASSERT( bct != nullptr );
+    HLR_ERROR( "todo" );
 }
 
 //
@@ -3989,7 +3997,9 @@ template < typename value_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
 build_h2 ( const Hpro::TMatrix< value_t > &   A,
            nested_cluster_basis< value_t > &  rowcb,
-           nested_cluster_basis< value_t > &  colcb )
+           nested_cluster_basis< value_t > &  colcb,
+           const accuracy &                   acc,
+           const bool                         compress )
 {
     using namespace hlr::matrix;
 
@@ -4010,8 +4020,12 @@ build_h2 ( const Hpro::TMatrix< value_t > &   A,
         auto  W = rowcb.transform_forward( R->U() );
         auto  X = colcb.transform_forward( R->V() );
         auto  S = blas::prod( W, blas::adjoint( X ) );
+        auto  H = std::make_unique< h2_lrmatrix< value_t > >( A.row_is(), A.col_is(), rowcb, colcb, std::move( S ) );
 
-        M = std::make_unique< h2_lrmatrix< value_t > >( A.row_is(), A.col_is(), rowcb, colcb, std::move( S ) );
+        if ( compress )
+            H->compress( acc );
+
+        M = std::move( H );
     }// if
     else if ( is_blocked( A ) )
     {
@@ -4038,7 +4052,7 @@ build_h2 ( const Hpro::TMatrix< value_t > &   A,
 
                 if ( ! is_null( A_ij ) )
                 {
-                    auto  B_ij = build_h2( *A_ij, *rowcb_i, *colcb_j );
+                    auto  B_ij = build_h2( *A_ij, *rowcb_i, *colcb_j, acc, compress );
 
                     B->set_block( i, j, B_ij.release() );
                 }// if
@@ -4048,9 +4062,13 @@ build_h2 ( const Hpro::TMatrix< value_t > &   A,
     else if ( hlr::matrix::is_dense( A ) )
     {
         auto  D  = cptrcast( &A, dense_matrix< value_t > );
-        auto  DD = blas::copy( D->mat() );
+        auto  BD = blas::copy( D->mat() );
+        auto  DD = std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( BD ) );
 
-        M = std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
+        if ( compress )
+            DD->compress( acc );
+
+        M = std::move( DD );
     }// if
     else
         HLR_ERROR( "unsupported matrix type: " + A.typestr() );
@@ -4065,7 +4083,9 @@ template < typename value_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
 build_h2_sep ( const Hpro::TMatrix< value_t > &   A,
                nested_cluster_basis< value_t > &  rowcb,
-               nested_cluster_basis< value_t > &  colcb )
+               nested_cluster_basis< value_t > &  colcb,
+               const accuracy &                   acc,
+               const bool                         compress )
 {
     using namespace hlr::matrix;
 
@@ -4085,8 +4105,12 @@ build_h2_sep ( const Hpro::TMatrix< value_t > &   A,
         auto  R  = cptrcast( &A, lrmatrix< value_t > );
         auto  Sr = rowcb.transform_forward( R->U() );
         auto  Sc = colcb.transform_forward( R->V() );
+        auto  H  = std::make_unique< h2_lr2matrix< value_t > >( A.row_is(), A.col_is(), rowcb, colcb, std::move( Sr ), std::move( Sc ) );
+        
+        if ( compress )
+            H->compress( acc );
 
-        M = std::make_unique< h2_lr2matrix< value_t > >( A.row_is(), A.col_is(), rowcb, colcb, std::move( Sr ), std::move( Sc ) );
+        M = std::move( H );
     }// if
     else if ( is_blocked( A ) )
     {
@@ -4113,7 +4137,7 @@ build_h2_sep ( const Hpro::TMatrix< value_t > &   A,
 
                 if ( ! is_null( A_ij ) )
                 {
-                    auto  B_ij = build_h2_sep( *A_ij, *rowcb_i, *colcb_j );
+                    auto  B_ij = build_h2_sep( *A_ij, *rowcb_i, *colcb_j, acc, compress );
 
                     B->set_block( i, j, B_ij.release() );
                 }// if
@@ -4123,9 +4147,13 @@ build_h2_sep ( const Hpro::TMatrix< value_t > &   A,
     else if ( hlr::matrix::is_dense( A ) )
     {
         auto  D  = cptrcast( &A, dense_matrix< value_t > );
-        auto  DD = blas::copy( D->mat() );
+        auto  BD = blas::copy( D->mat() );
+        auto  DD = std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( BD ) );
 
-        M = std::make_unique< dense_matrix< value_t > >( D->row_is(), D->col_is(), std::move( DD ) );
+        if ( compress )
+            DD->compress( acc );
+
+        M = std::move( DD );
     }// if
     else
         HLR_ERROR( "unsupported matrix type: " + A.typestr() );

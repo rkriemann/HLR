@@ -154,8 +154,8 @@ build_mat_map ( const Hpro::TMatrix< value_t > &   A,
         //
         
         auto  R  = cptrcast( &A, hlr::matrix::lrmatrix< value_t > );
-        auto  W  = blas::copy( R->U_direct() );
-        auto  X  = blas::copy( R->V_direct() );
+        auto  W  = blas::copy( R->U() );
+        auto  X  = blas::copy( R->V() );
         auto  Cw = blas::matrix< value_t >();
         auto  Cx = blas::matrix< value_t >();
 
@@ -329,7 +329,8 @@ build_nested_cluster_basis ( nested_cluster_basis< value_t > &  cb,
                              const lr_mat_map_t< value_t > &    lrmat_map,
                              const coupling_map_t< value_t > &  coupling_map,
                              const lr_mat_list_t< value_t > &   parent_matrices,
-                             const bool                         transposed )
+                             const bool                         transposed,
+                             const bool                         compress )
 {
     using  real_t  = Hpro::real_type_t< value_t >;
 
@@ -352,16 +353,7 @@ build_nested_cluster_basis ( nested_cluster_basis< value_t > &  cb,
             mat_list.insert( mat_list.end(), access->second.begin(), access->second.end() );
     }
     
-    // if ( lrmat_map.find( cb.is() ) != lrmat_map.end() )
-    // {
-    //     const auto  local_mats = lrmat_map.at( cb.is() );
-        
-    //     mat_list.insert( mat_list.end(), local_mats.begin(), local_mats.end() );
-    // }// if
-
     mat_list.sort( is_sort );
-    
-    // std::cout << cb.is() << " : " << mat_list.size() << std::endl;
     
     //
     // determine local "rank"
@@ -377,12 +369,6 @@ build_nested_cluster_basis ( nested_cluster_basis< value_t > &  cb,
         coupling_map.find( access, R_i );
         ncols += access->second.nrows();
     }// for
-    // for ( const auto  R_i : mat_list )
-    // {
-    //     const auto  C_i = coupling_map.at( R_i );
-                
-    //     ncols += C_i.nrows();
-    // }// for
     
     //
     //
@@ -440,7 +426,10 @@ build_nested_cluster_basis ( nested_cluster_basis< value_t > &  cb,
 
         cb.set_basis( std::move( W ), std::move( Ws ) );
 
-        return std::move( R );
+        if ( compress )
+            cb.compress( acc );
+        
+        return R;
     }// if
     else
     {
@@ -458,7 +447,7 @@ build_nested_cluster_basis ( nested_cluster_basis< value_t > &  cb,
             {
                 if ( ! is_null( cb.son( i ) ) )
                 {
-                    auto  R_i = build_nested_cluster_basis( *cb.son( i ), basisapx, acc, lrmat_map, coupling_map, mat_list, transposed );
+                    auto  R_i = build_nested_cluster_basis( *cb.son( i ), basisapx, acc, lrmat_map, coupling_map, mat_list, transposed, compress );
                     
                     nrows += R_i.nrows();
                     son_data[i]  = { cb.son(i), std::move( R_i ) };
@@ -569,7 +558,10 @@ build_nested_cluster_basis ( nested_cluster_basis< value_t > &  cb,
 
         cb.set_transfer( std::move( E ) );
 
-        return std::move( R );
+        if ( compress )
+            cb.compress( acc );
+        
+        return R;
     }// else
 
     return blas::matrix< value_t >();
@@ -583,7 +575,9 @@ template < typename value_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
 build_h2 ( const Hpro::TMatrix< value_t > &   A,
            nested_cluster_basis< value_t > &  rowcb,
-           nested_cluster_basis< value_t > &  colcb )
+           nested_cluster_basis< value_t > &  colcb,
+           const accuracy &                   acc,
+           const bool                         compress )
 {
     using namespace hlr::matrix;
 
@@ -619,7 +613,7 @@ build_h2 ( const Hpro::TMatrix< value_t > &   A,
 
                         if ( ! is_null( A_ij ) )
                         {
-                            auto  B_ij = build_h2( *A_ij, *rowcb_i, *colcb_j );
+                            auto  B_ij = build_h2( *A_ij, *rowcb_i, *colcb_j, acc, compress );
                             
                             B->set_block( i, j, B_ij.release() );
                         }// if
@@ -634,7 +628,7 @@ build_h2 ( const Hpro::TMatrix< value_t > &   A,
     }// if
     else 
     {
-        return hlr::seq::matrix::detail::build_h2( A, rowcb, colcb );
+        return hlr::seq::matrix::detail::build_h2( A, rowcb, colcb, acc, compress );
     }// else
 }
 
@@ -642,7 +636,9 @@ template < typename value_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
 build_h2_sep ( const Hpro::TMatrix< value_t > &   A,
                nested_cluster_basis< value_t > &  rowcb,
-               nested_cluster_basis< value_t > &  colcb )
+               nested_cluster_basis< value_t > &  colcb,
+               const accuracy &                   acc,
+               const bool                         compress )
 {
     using namespace hlr::matrix;
 
@@ -678,7 +674,7 @@ build_h2_sep ( const Hpro::TMatrix< value_t > &   A,
 
                         if ( ! is_null( A_ij ) )
                         {
-                            auto  B_ij = build_h2_sep( *A_ij, *rowcb_i, *colcb_j );
+                            auto  B_ij = build_h2_sep( *A_ij, *rowcb_i, *colcb_j, acc, compress );
                             
                             B->set_block( i, j, B_ij.release() );
                         }// if
@@ -693,7 +689,7 @@ build_h2_sep ( const Hpro::TMatrix< value_t > &   A,
     }// if
     else 
     {
-        return hlr::seq::matrix::detail::build_h2_sep( A, rowcb, colcb );
+        return hlr::seq::matrix::detail::build_h2_sep( A, rowcb, colcb, acc, compress );
     }// else
 }
 

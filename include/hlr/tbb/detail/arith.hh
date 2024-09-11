@@ -828,7 +828,7 @@ mul_vec_hier ( const value_t                               alpha,
 
 //
 // compute y = y + α op( M ) x
-// - very basic algorithm for educational purposes
+// - using thread local storage as destination vector
 //
 template < typename value_t >
 void

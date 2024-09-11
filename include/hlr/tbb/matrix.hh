@@ -875,6 +875,7 @@ std::tuple< std::unique_ptr< hlr::matrix::nested_cluster_basis< typename basisap
 build_h2_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
                const basisapx_t &                                     basisapx,
                const Hpro::TTruncAcc &                                acc,
+               const bool                                             compress,
                const size_t                                           /* nseq */ = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
     using value_t       = typename basisapx_t::value_t;
@@ -917,15 +918,15 @@ build_h2_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
     auto  empty_list = detail::lr_mat_list_t< value_t >();
     
     ::tbb::parallel_invoke (
-        [&] () { detail::build_nested_cluster_basis( *rowcb, basisapx, acc, row_map, row_coupling, empty_list, false ); },
-        [&] () { detail::build_nested_cluster_basis( *colcb, basisapx, acc, col_map, col_coupling, empty_list, true ); }
+        [&,compress] () { detail::build_nested_cluster_basis( *rowcb, basisapx, acc, row_map, row_coupling, empty_list, false, compress ); },
+        [&,compress] () { detail::build_nested_cluster_basis( *colcb, basisapx, acc, col_map, col_coupling, empty_list, true,  compress ); }
     );
 
     //
     // construct uniform lowrank matrices with given cluster bases
     //
     
-    auto  M = detail::build_h2( A, *rowcb, *colcb );
+    auto  M = detail::build_h2( A, *rowcb, *colcb, acc, compress );
     
     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
 }
@@ -937,6 +938,7 @@ std::tuple< std::unique_ptr< hlr::matrix::nested_cluster_basis< typename basisap
 build_h2_rec_sep ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
                    const basisapx_t &                                     basisapx,
                    const Hpro::TTruncAcc &                                acc,
+                   const bool                                             compress,
                    const size_t                                           /* nseq */ = Hpro::CFG::Arith::max_seq_size ) // ignored
 {
     using value_t       = typename basisapx_t::value_t;
@@ -975,15 +977,15 @@ build_h2_rec_sep ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
     auto  empty_list = detail::lr_mat_list_t< value_t >();
     
     ::tbb::parallel_invoke (
-        [&] () { detail::build_nested_cluster_basis( *rowcb, basisapx, acc, row_map, row_coupling, empty_list, false ); },
-        [&] () { detail::build_nested_cluster_basis( *colcb, basisapx, acc, col_map, col_coupling, empty_list, true ); }
+        [&,compress] () { detail::build_nested_cluster_basis( *rowcb, basisapx, acc, row_map, row_coupling, empty_list, false, compress ); },
+        [&,compress] () { detail::build_nested_cluster_basis( *colcb, basisapx, acc, col_map, col_coupling, empty_list, true,  compress ); }
     );
 
     //
     // construct uniform lowrank matrices with given cluster bases
     //
     
-    auto  M = detail::build_h2_sep( A, *rowcb, *colcb );
+    auto  M = detail::build_h2_sep( A, *rowcb, *colcb, acc, compress );
     
     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
 }
