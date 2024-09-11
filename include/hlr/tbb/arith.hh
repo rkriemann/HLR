@@ -12,6 +12,7 @@
 #include <tbb/parallel_for.h>
 #include <tbb/blocked_range2d.h>
 #include <tbb/blocked_range3d.h>
+#include <tbb/enumerable_thread_specific.h>
 
 #include <hpro/matrix/TBlockMatrix.hh>
 #include <hpro/matrix/structure.hh>
@@ -154,7 +155,7 @@ mul_vec_cl2 ( const value_t                             alpha,
 template < typename value_t >
 void
 mul_vec_hier ( const value_t                               alpha,
-               const hpro::matop_t                         op_M,
+               const Hpro::matop_t                         op_M,
                const matrix::level_hierarchy< value_t > &  M,
                const vector::scalar_vector< value_t > &    x,
                vector::scalar_vector< value_t > &          y )
@@ -163,6 +164,47 @@ mul_vec_hier ( const value_t                               alpha,
         return;
 
     detail::mul_vec_hier( alpha, op_M, M, x, y );
+}
+
+template < typename value_t >
+void
+mul_vec_ts ( const value_t                               alpha,
+             const Hpro::matop_t                         op_M,
+             const Hpro::TMatrix< value_t > &          M,
+             const vector::scalar_vector< value_t > &    x,
+             vector::scalar_vector< value_t > &          y )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    //
+    // compute product to thread local vectors
+    //
+    
+    auto  y_ts = ::tbb::enumerable_thread_specific< blas::vector< value_t > >( M.nrows( op_M ) );
+    
+    detail::mul_vec_ts( alpha, op_M, M, blas::vec( x ), y_ts, M.row_ofs( op_M ), M.col_ofs( op_M ) );
+
+    //
+    // add local results to destination
+    //
+
+    auto &  sy = y.blas_vec();
+    
+    ::tbb::parallel_for(
+        ::tbb::blocked_range< size_t >( 0, sy.length(), 1024 ),
+        [&] ( const auto &  r )
+        {
+            auto  sub   = blas::range( r.begin(), r.end()-1 );
+            auto  y_sub = sy( sub );
+
+            for ( auto &  t : y_ts )
+            {
+                auto  t_sub = t( sub );
+                    
+                blas::add( value_t(1), t_sub, y_sub );
+            }// for
+        } );
 }
 
 template < typename value_t >

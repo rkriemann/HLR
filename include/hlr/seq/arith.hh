@@ -60,6 +60,18 @@ using hlr::setup_cluster_block_map;
 using hlr::build_cluster_blocks;
 using hlr::build_cluster_matrix;
 
+template < typename value_t >
+void
+mul_vec_ts ( const value_t                             alpha,
+             const Hpro::matop_t                       op_M,
+             const Hpro::TMatrix< value_t > &          M,
+             const vector::scalar_vector< value_t > &  x,
+             vector::scalar_vector< value_t > &        y )
+{
+    mul_vec( alpha, op_M, M, x, y );
+}
+
+
 //
 // compute C = C + α · A
 //

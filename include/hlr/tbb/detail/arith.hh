@@ -826,21 +826,48 @@ mul_vec_hier ( const value_t                               alpha,
     }// for
 }
 
-///////////////////////////////////////////////////////////////////////
 //
-// matrix-vector with reductions
+// compute y = y + α op( M ) x
+// - very basic algorithm for educational purposes
 //
-///////////////////////////////////////////////////////////////////////
-
 template < typename value_t >
 void
-mul_vec_reduce ( const value_t                    alpha,
-                 const matop_t                    op_M,
-                 const Hpro::TMatrix< value_t > & M,
-                 const blas::vector< value_t > &  x,
-                 blas::vector< value_t > &        y )
+mul_vec_ts ( const value_t                                                   alpha,
+             const Hpro::matop_t                                             op_M,
+             const Hpro::TMatrix< value_t > &                                M,
+             const blas::vector< value_t > &                                 x,
+             ::tbb::enumerable_thread_specific< blas::vector< value_t > > &  y,
+             const size_t                                                    ofs_rows,
+             const size_t                                                    ofs_cols )
 {
-    
+    if ( is_blocked( M ) )
+    {
+        auto  B = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< size_t >( 0, B->nblock_rows(),
+                                              0, B->nblock_cols() ),
+            [=,&x,&y] ( const auto &  r )
+            {
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        auto  B_ij = B->block( i, j );
+                        
+                        if ( ! is_null( B_ij ) )
+                            mul_vec_ts( alpha, op_M, *B_ij, x, y, ofs_rows, ofs_cols );
+                    }// for
+                }// for
+            } );
+    }// if
+    else
+    {
+        auto  x_is = x( M.col_is( op_M ) - ofs_cols );
+        auto  y_is = y.local()( M.row_is( op_M ) - ofs_rows );
+            
+        M.apply_add( alpha, x_is, y_is, op_M );
+    }// else
 }
 
 ////////////////////////////////////////////////////////////////////////////////
