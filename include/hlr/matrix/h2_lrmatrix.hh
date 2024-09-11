@@ -271,18 +271,24 @@ public:
     //
 
     // compute y ≔ β·y + α·op(M)·x, with M = this
-    virtual void mul_vec  ( const value_t                     alpha,
-                            const Hpro::TVector< value_t > *  x,
-                            const value_t                     beta,
-                            Hpro::TVector< value_t > *        y,
-                            const Hpro::matop_t               op = Hpro::apply_normal ) const;
+    virtual void mul_vec        ( const value_t                     alpha,
+                                  const Hpro::TVector< value_t > *  x,
+                                  const value_t                     beta,
+                                  Hpro::TVector< value_t > *        y,
+                                  const Hpro::matop_t               op = Hpro::apply_normal ) const;
     
     // same as above but for blas::vector
-    virtual void  apply_add   ( const value_t                    alpha,
-                                const blas::vector< value_t > &  x,
-                                blas::vector< value_t > &        y,
-                                const matop_t                    op = apply_normal ) const;
+    virtual void  apply_add     ( const value_t                     alpha,
+                                  const blas::vector< value_t > &   x,
+                                  blas::vector< value_t > &         y,
+                                  const matop_t                     op = apply_normal ) const;
     using Hpro::TMatrix< value_t >::apply_add;
+    
+    // matrix vector product in uniform format
+    void         uni_apply_add  ( const value_t                     alpha,
+                                  const blas::vector< value_t > &   ux, // uniform coefficients
+                                  blas::vector< value_t > &         uy,
+                                  const matop_t                     op = apply_normal ) const;
     
     // truncate matrix to accuracy \a acc
     virtual void truncate ( const accuracy & acc );
@@ -438,6 +444,39 @@ h2_lrmatrix< value_t >::apply_add ( const value_t                    alpha,
 
         blas::add( value_t(alpha), r, y );                  // y = y + r
     }// if
+}
+
+template < typename value_t >
+void
+h2_lrmatrix< value_t >::uni_apply_add ( const value_t                    alpha,
+                                        const blas::vector< value_t > &  ux,
+                                        blas::vector< value_t > &        uy,
+                                        const Hpro::matop_t              op ) const
+{
+    #if defined(HLR_HAS_ZBLAS_DIRECT)
+    if ( is_compressed() )
+    {
+        switch ( op )
+        {
+            case apply_normal     : compress::zblas::mulvec( row_rank(), col_rank(), op, alpha, _zS, ux.data(), uy.data() ); break;
+            case apply_conjugate  : { HLR_ASSERT( false ); }
+            case apply_transposed : { HLR_ASSERT( false ); }
+            case apply_adjoint    : compress::zblas::mulvec( row_rank(), col_rank(), op, alpha, _zS, ux.data(), uy.data() ); break;
+            default               : HLR_ERROR( "unsupported matrix operator" );
+        }// switch
+    }// if
+    else
+    #endif
+    {
+        switch ( op )
+        {
+            case apply_normal     : blas::mulvec( alpha, _S, ux, value_t(1), uy ); break;
+            case apply_conjugate  : HLR_ASSERT( false );
+            case apply_transposed : HLR_ASSERT( false );
+            case apply_adjoint    : blas::mulvec( alpha, blas::adjoint( _S ), ux, value_t(1), uy ); break;
+            default               : HLR_ERROR( "unsupported matrix operator" );
+        }// switch
+    }// else
 }
 
 //

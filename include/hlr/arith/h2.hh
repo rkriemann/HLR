@@ -25,6 +25,7 @@
 #include <hlr/matrix/nested_cluster_basis.hh>
 #include <hlr/matrix/dense_matrix.hh>
 #include <hlr/matrix/h2_lrmatrix.hh>
+#include <hlr/matrix/h2_lr2matrix.hh>
 #include <hlr/vector/uniform_vector.hh>
 #include <hlr/vector/scalar_vector.hh>
 
@@ -88,30 +89,38 @@ mul_vec ( const value_t                              alpha,
     {
         auto  R = cptrcast( &M, matrix::h2_lrmatrix< value_t > );
 
-        #if defined(HLR_HAS_ZBLAS_DIRECT)
-        if ( R->is_compressed() )
-        {
-            switch ( op_M )
-            {
-                case apply_normal     : compress::zblas::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoupling(), x.coeffs().data(), y.coeffs().data() ); break;
-                case apply_conjugate  : { HLR_ASSERT( false ); }
-                case apply_transposed : { HLR_ASSERT( false ); }
-                case apply_adjoint    : compress::zblas::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoupling(), x.coeffs().data(), y.coeffs().data() ); break;
-                default               : HLR_ERROR( "unsupported matrix operator" );
-            }// switch
-        }// if
-        else
-        #endif
-        {
-            switch ( op_M )
-            {
-                case Hpro::apply_normal     : blas::mulvec( alpha, R->coupling(), x.coeffs(), value_t(1), y.coeffs() ); break;
-                case Hpro::apply_conjugate  : HLR_ASSERT( false );
-                case Hpro::apply_transposed : HLR_ASSERT( false );
-                case Hpro::apply_adjoint    : blas::mulvec( alpha, blas::adjoint( R->coupling() ), x.coeffs(), value_t(1), y.coeffs() ); break;
-                default                     : HLR_ERROR( "unsupported matrix operator" );
-            }// switch
-        }// else
+        R->uni_apply_add( alpha, x.coeffs(), y.coeffs(), op_M );
+
+        // #if defined(HLR_HAS_ZBLAS_DIRECT)
+        // if ( R->is_compressed() )
+        // {
+        //     switch ( op_M )
+        //     {
+        //         case apply_normal     : compress::zblas::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoupling(), x.coeffs().data(), y.coeffs().data() ); break;
+        //         case apply_conjugate  : { HLR_ASSERT( false ); }
+        //         case apply_transposed : { HLR_ASSERT( false ); }
+        //         case apply_adjoint    : compress::zblas::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoupling(), x.coeffs().data(), y.coeffs().data() ); break;
+        //         default               : HLR_ERROR( "unsupported matrix operator" );
+        //     }// switch
+        // }// if
+        // else
+        // #endif
+        // {
+        //     switch ( op_M )
+        //     {
+        //         case Hpro::apply_normal     : blas::mulvec( alpha, R->coupling(), x.coeffs(), value_t(1), y.coeffs() ); break;
+        //         case Hpro::apply_conjugate  : HLR_ASSERT( false );
+        //         case Hpro::apply_transposed : HLR_ASSERT( false );
+        //         case Hpro::apply_adjoint    : blas::mulvec( alpha, blas::adjoint( R->coupling() ), x.coeffs(), value_t(1), y.coeffs() ); break;
+        //         default                     : HLR_ERROR( "unsupported matrix operator" );
+        //     }// switch
+        // }// else
+    }// if
+    else if ( matrix::is_h2_lowrank2( M ) )
+    {
+        auto  R = cptrcast( &M, matrix::h2_lr2matrix< value_t > );
+
+        R->uni_apply_add( alpha, x.coeffs(), y.coeffs(), op_M );
     }// if
     #if defined(HLR_HAS_H2)
     else if ( Hpro::is_uniform( &M ) )
@@ -443,6 +452,15 @@ mul_vec_flops ( const Hpro::matop_t               op_M,
             return FLOPS_ZGEMV( R->row_rank( op_M ), R->col_rank( op_M ) );
         else
             return FLOPS_DGEMV( R->row_rank( op_M ), R->col_rank( op_M ) );
+    }// if
+    else if ( matrix::is_h2_lowrank2( M ) )
+    {
+        const auto  R = cptrcast( &M, matrix::h2_lr2matrix< value_t > );
+        
+        if constexpr ( Hpro::is_complex_type_v< value_t > )
+            return FLOPS_ZGEMV( R->row_rank( op_M ), R->rank() ) + FLOPS_ZGEMV( R->col_rank( op_M ), R->rank() );
+        else
+            return FLOPS_DGEMV( R->row_rank( op_M ), R->rank() ) + FLOPS_DGEMV( R->col_rank( op_M ), R->rank() );
     }// if
     else if ( matrix::is_dense( M ) )
     {
