@@ -619,7 +619,7 @@ mul_vec_row ( const value_t                                                     
         auto  y_j   = blas::vector< value_t >( blas::vec( sy ), rowis - sy.ofs() );
         auto  t_j   = blas::vector< value_t >( y_j.length() );
         auto  s     = blas::vector< value_t >( rowcb.rank() );
-            
+
         for ( auto  M : blockrow )
         {
             if ( matrix::is_uniform_lowrank( M ) )
@@ -646,16 +646,16 @@ mul_vec_row ( const value_t                                                     
             }// if
             else
                 HLR_ERROR( "unsupported matrix type : " + M->typestr() );
-
-            //
-            // add uniform part to y
-            //
-            
-            if ( s.length() > 0 )
-                rowcb.transform_backward( s, t_j );
-            
-            blas::add( value_t(1), t_j, y_j );
         }// for
+
+        //
+        // add uniform part to y
+        //
+        
+        if ( s.length() > 0 )
+            rowcb.transform_backward( s, t_j );
+        
+        blas::add( value_t(1), t_j, y_j );
     }// if
 
     //

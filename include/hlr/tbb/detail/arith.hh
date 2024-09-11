@@ -161,87 +161,6 @@ mul_vec_chunk ( const value_t                    alpha,
                 }// for
             } );
     }// if
-    // else if ( matrix::is_lowrank( M ) && cptrcast( & M, matrix::lrmatrix< value_t > )->is_compressed() )
-    // {
-    //     auto  R    = cptrcast( & M, matrix::lrmatrix< value_t > );
-    //     auto  U    = blas::matrix< value_t >();
-    //     auto  V    = blas::matrix< value_t >();
-    //     auto  t    = blas::vector< value_t >();
-    //     auto  row_is = M.row_is( op_M );
-    //     auto  x_is = x( M.col_is( op_M ) - ofs_cols );
-    //     auto  y_is = y( row_is - ofs_rows );
-    //     auto  yt   = blas::vector< value_t >( y_is.length() );
-        
-    //     switch ( op_M )
-    //     {
-    //         case Hpro::apply_normal :
-    //         {
-    //             ::tbb::parallel_invoke(
-    //                 [&,alpha] ()
-    //                 {
-    //                     V = std::move( R->V() );
-    //                     t = std::move( blas::mulvec( blas::adjoint( V ), x_is ) );
-    //                     blas::scale( value_t(alpha), t );
-    //                 },
-                    
-    //                 [&] ()
-    //                 {
-    //                     U = std::move( R->U() );
-    //                 }
-    //             );
-            
-    //             blas::mulvec( U, t, yt );
-    //         }
-    //         break;
-
-    //         case Hpro::apply_transposed :
-    //         {
-    //             ::tbb::parallel_invoke(
-    //                 [&,alpha] ()
-    //                 {
-    //                     U = std::move( R->U() );
-    //                     t = std::move( blas::mulvec( blas::transposed( U ), x_is ) );
-    //                     blas::scale( value_t(alpha), t );
-    //                     blas::conj( t );
-    //                 },
-
-    //                 [&] ()
-    //                 {
-    //                     V = std::move( R->V() );
-    //                 }
-    //             );
-                
-    //             blas::mulvec( V, t, yt );
-    //             blas::conj( yt );
-    //         }
-    //         break;
-            
-    //         case Hpro::apply_adjoint :
-    //         {
-    //             ::tbb::parallel_invoke(
-    //                 [&,alpha] ()
-    //                 {
-    //                     U = std::move( R->U() );
-    //                     t = std::move( blas::mulvec( blas::adjoint( U ), x_is ) );
-    //                     blas::scale( value_t(alpha), t );
-    //                 },
-
-    //                 [&] ()
-    //                 {
-    //                     U = std::move( R->U() );
-    //                 }
-    //             );
-            
-    //             blas::mulvec( V, t, yt );
-    //         }
-    //         break;
-
-    //         default:
-    //             HLR_ERROR( "unsupported matrix op" )
-    //     }// switch
-        
-    //     update( row_is, yt, y_is, mtx_map );
-    // }// if
     else
     {
         const auto  row_is = M.row_is( op_M );
@@ -354,7 +273,7 @@ mul_vec_row ( const value_t                     alpha,
 
                     [&] ()
                     {
-                        U = std::move( R->U() );
+                        V = std::move( R->V() );
                     }
                 );
             

@@ -148,7 +148,7 @@ program_main ()
             x->fill( 1 );
             impl::uniform::mul_vec< value_t >( nmvm * 2.0, Hpro::apply_normal, *A, *x, *y_ref, *rowcb, *colcb );
         }
-        
+
         {
             runtime.clear();
             
