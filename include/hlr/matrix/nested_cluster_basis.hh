@@ -54,6 +54,9 @@ private:
     // associated indexset
     const indexset                          _is;
 
+    // unique ID within hierarchical cluster basis
+    int                                     _id;
+    
     // cluster basis of sub clusters
     std::vector< self_t * >                 _sons;
     
@@ -81,6 +84,7 @@ public:
     // construct cluster basis corresponding to cluster <cl>
     nested_cluster_basis ( const indexset &  ais )
             : _is( ais )
+            , _id(-1)
             , _rank( 0 )
     {}
 
@@ -89,6 +93,7 @@ public:
     nested_cluster_basis ( const indexset &                       ais,
                            const hlr::blas::matrix< value_t > &   V )
             : _is( ais )
+            , _id(-1)
             , _V( V )
             , _rank( _V.ncols() )
     {}
@@ -96,6 +101,7 @@ public:
     nested_cluster_basis ( const indexset &                       ais,
                            hlr::blas::matrix< value_t > &&        V )
             : _is( ais )
+            , _id(-1)
             , _V( std::move( V ) )
             , _rank( _V.ncols() )
     {}
@@ -106,6 +112,7 @@ public:
                            const std::vector< self_t * > &                 asons,
                            const std::vector< blas::matrix< value_t > > &  aE )
             : _is( ais )
+            , _id(-1)
             , _rank( 0 )
     {
         HLR_ASSERT( aE.size() == asons.size() );
@@ -134,6 +141,12 @@ public:
         for ( auto  cb : _sons )
             delete cb;
     }
+
+    // return ID
+    int   id         () const { return _id; }
+
+    // set ID
+    void  set_id     ( const int  aid ) { _id = aid; }
 
     //
     // access sons
@@ -259,26 +272,70 @@ public:
     //
     // transfer vector s to basis of i'th son
     //
-    blas::vector< value_t >  transfer_to_son ( const uint                       i,
-                                               const blas::vector< value_t > &  s ) const
+    blas::vector< value_t >
+    transfer_to_son ( const uint                       i,
+                      const blas::vector< value_t > &  s ) const
     {
-        HLR_ASSERT( nsons() > 0 );
-        HLR_ASSERT( i < nsons() );
+        HLR_ASSERT(( nsons() > 0 ) && ( i < nsons() ));
 
-        // check if there is no transfer
         if ( _E[i].nrows() == 0 )
             return blas::vector< value_t >();
-        
-        if ( is_compressed() )
+        else
         {
-            auto  Ei = blas::matrix< value_t >( _E[i].nrows(), rank() );
-            
-            compress::decompress< value_t >( _zE[i], Ei );
+            if ( is_compressed() )
+            {
+                #if defined(HLR_HAS_ZBLAS_DIRECT)
+                auto  t = blas::vector< value_t >( _E[i].nrows() );
+                
+                compress::zblas::mulvec( _E[i].nrows(), rank(), apply_normal, value_t(1), _zE[i], s.data(), t.data() );
 
-            return blas::mulvec( Ei, s );
-        }// if
-        
-        return blas::mulvec( _E[i], s );
+                return t;
+                #else
+                auto  E_i = transfer_mat( i );
+            
+                return blas::mulvec( E_i, s );
+                #endif
+            }// if
+            else
+            {
+                return blas::mulvec( _E[i], s );
+            }// else
+            auto  E_i = transfer_mat( i );
+        }// else
+    }
+
+    //
+    // transfer vector s from basis of i'th son
+    //
+    blas::vector< value_t >
+    transfer_from_son ( const uint                       i,
+                        const blas::vector< value_t > &  s ) const
+    {
+        HLR_ASSERT(( nsons() > 0 ) && ( i < nsons() ));
+
+        if ( _E[i].nrows() == 0 )
+            return blas::vector< value_t >();
+        else
+        {
+            if ( is_compressed() )
+            {
+                #if defined(HLR_HAS_ZBLAS_DIRECT)
+                auto  t = blas::vector< value_t >( rank() );
+                
+                compress::zblas::mulvec( _E[i].nrows(), rank(), apply_adjoint, value_t(1), _zE[i], s.data(), t.data() );
+
+                return t;
+                #else
+                auto  E_i = transfer_mat( i );
+            
+                return blas::mulvec( blas::adjoint( E_i ), s );
+                #endif
+            }// if
+            else
+            {
+                return blas::mulvec( blas::adjoint(_E[i] ), s );
+            }// else
+        }// else
     }
 
     //
@@ -341,11 +398,11 @@ public:
             
             if ( nsons() == 0 )
             {
-                auto  t = blas::vector< value_t >( k );
+                auto  s = blas::vector< value_t >( k );
 
-                compress::aplr::zblas::mulvec( _is.size(), k, apply_adjoint, value_t(1), _zV, v.data(), t.data() );
+                compress::aplr::zblas::mulvec( _is.size(), k, apply_adjoint, value_t(1), _zV, v.data(), s.data() );
 
-                return t;
+                return s;
             }// if
             else
             {
@@ -442,11 +499,11 @@ public:
             if ( nsons() == 0 )
             {
                 const auto  n = _is.size();
-                auto        t = blas::vector< value_t >( n );
+                auto        v = blas::vector< value_t >( n );
 
-                compress::aplr::zblas::mulvec( n, this->rank(), apply_normal, value_t(1), _zV, s.data(), t.data() );
+                compress::aplr::zblas::mulvec( n, this->rank(), apply_normal, value_t(1), _zV, s.data(), v.data() );
 
-                return t;
+                return v;
             }// if
             else
             {
@@ -536,6 +593,67 @@ public:
         }// else
     }
 
+    void
+    transform_backward  ( const blas::vector< value_t > &  s,
+                          blas::vector< value_t > &        v ) const
+    {
+        #if defined(HLR_HAS_ZBLAS_DIRECT) && defined(HLR_HAS_ZBLAS_APLR)
+        if ( is_compressed() )
+        {
+            if ( nsons() == 0 )
+            {
+                compress::aplr::zblas::mulvec( _is.size(), this->rank(), apply_normal, value_t(1), _zV, s.data(), v.data() );
+            }// if
+            else
+            {
+                //
+                // M ≔ V·s = ∑_i V_i·E_i·s = ∑_i transform_backward( son_i, E_i·s )
+                //
+
+                const auto  k = rank();
+            
+                for ( uint  i = 0; i < nsons(); ++i )
+                {
+                    auto  son_i = son( i );
+                    auto  s_i   = blas::vector< value_t >( _E[i].nrows() );
+                    
+                    compress::zblas::mulvec( _E[i].nrows(), k, apply_normal, value_t(1), _zE[i], s.data(), s_i.data() );
+
+                    auto  t_i   = son_i->transform_backward( s_i );
+                    auto  v_i   = blas::vector< value_t >( v, son_i->is() - is().first() );
+
+                    blas::copy( t_i, v_i );
+                }// for
+            }// else
+        }// if
+        else
+        #endif
+        {
+            if ( nsons() == 0 )
+            {
+                auto  V = basis();
+        
+                hlr::blas::mulvec( value_t(1), V, s, value_t(1), v );
+            }// if
+            else
+            {
+                //
+                // M ≔ V·s = ∑_i V_i·E_i·s = ∑_i transform_backward( son_i, E_i·s )
+                //
+
+                for ( uint  i = 0; i < nsons(); ++i )
+                {
+                    auto  son_i = son( i );
+                    auto  s_i   = blas::mulvec( transfer_mat(i), s );
+                    auto  t_i   = son_i->transform_backward( s_i );
+                    auto  v_i   = blas::vector< value_t >( v, son_i->is() - is().first() );
+
+                    blas::copy( t_i, v_i );
+                }// for
+            }// else
+        }// else
+    }
+    
     ///////////////////////////////////////////////////////
     //
     // misc.
@@ -547,6 +665,8 @@ public:
     {
         auto  cb = std::make_unique< nested_cluster_basis >( _is );
 
+        cb->set_id( _id );
+        
         if ( nsons() == 0 )
         {
             cb->set_basis( _V );
@@ -584,6 +704,7 @@ public:
     {
         auto  cb = std::make_unique< nested_cluster_basis >( _is );
 
+        cb->set_id( _id );
         cb->set_nsons( nsons() );
 
         for ( uint  i = 0; i < nsons(); ++i )
@@ -596,7 +717,7 @@ public:
     size_t
     byte_size () const
     {
-        size_t  n = ( sizeof(_is) + sizeof(nested_cluster_basis< value_t > *) * _sons.size() + _V.byte_size() + sizeof(_E));
+        size_t  n = ( sizeof(_is) + sizeof(_id) + sizeof(nested_cluster_basis< value_t > *) * _sons.size() + _V.byte_size() + sizeof(_E));
 
         for ( uint  i = 0; i < nsons(); ++i )
             n += _E[i].byte_size();

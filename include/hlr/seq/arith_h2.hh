@@ -13,6 +13,9 @@
 namespace hlr { namespace seq { namespace h2 {
 
 using hlr::h2::mul_vec;
+using hlr::h2::mul_vec_row;
+using hlr::h2::build_id2cb;
+using hlr::h2::build_id2blocks;
 
 template < typename value_t,
            typename cluster_basis_t >

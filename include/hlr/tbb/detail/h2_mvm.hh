@@ -80,27 +80,6 @@ mul_vec_mtx ( const value_t                              alpha,
         auto  lock = std::scoped_lock( y.mutex() );
 
         R->uni_apply_add( alpha, x.coeffs(), y.coeffs(), op_M );
-        
-        // if ( op_M == Hpro::apply_normal )
-        // {
-        //     std::scoped_lock  lock( y.mutex() );
-            
-        //     blas::mulvec( alpha, R->coupling(), x.coeffs(), value_t(1), y.coeffs() );
-        // }// if
-        // else if ( op_M == Hpro::apply_conjugate )
-        // {
-        //     HLR_ASSERT( false );
-        // }// if
-        // else if ( op_M == Hpro::apply_transposed )
-        // {
-        //     HLR_ASSERT( false );
-        // }// if
-        // else if ( op_M == Hpro::apply_adjoint )
-        // {
-        //     std::scoped_lock  lock( y.mutex() );
-            
-        //     blas::mulvec( alpha, blas::adjoint( R->coupling() ), x.coeffs(), value_t(1), y.coeffs() );
-        // }// if
     }// if
     else if ( matrix::is_h2_lowrank2( M ) )
     {
@@ -109,33 +88,6 @@ mul_vec_mtx ( const value_t                              alpha,
 
         R->uni_apply_add( alpha, x.coeffs(), y.coeffs(), op_M );
     }// if
-    #if defined(HLR_HAS_H2)
-    else if ( Hpro::is_uniform( &M ) )
-    {
-        auto  R = cptrcast( &M, Hpro::TUniformMatrix< value_t > );
-        
-        if ( op_M == Hpro::apply_normal )
-        {
-            std::scoped_lock  lock( y.mutex() );
-            
-            blas::mulvec( alpha, Hpro::coeff( R ), x.coeffs(), value_t(1), y.coeffs() );
-        }// if
-        else if ( op_M == Hpro::apply_conjugate )
-        {
-            HLR_ASSERT( false );
-        }// if
-        else if ( op_M == Hpro::apply_transposed )
-        {
-            HLR_ASSERT( false );
-        }// if
-        else if ( op_M == Hpro::apply_adjoint )
-        {
-            std::scoped_lock  lock( y.mutex() );
-            
-            blas::mulvec( alpha, blas::adjoint( Hpro::coeff( R ) ), x.coeffs(), value_t(1), y.coeffs() );
-        }// if
-    }// if
-    #endif
     else
         HLR_ERROR( "unsupported matrix type : " + M.typestr() );
 }
@@ -193,31 +145,6 @@ mul_vec_row ( const value_t                              alpha,
         auto  R = cptrcast( &M, matrix::h2_lrmatrix< value_t > );
 
         R->uni_apply_add( alpha, x.coeffs(), y.coeffs(), op_M );
-        
-        // #if defined(HLR_HAS_ZBLAS_DIRECT)
-        // if ( R->is_compressed() )
-        // {
-        //     switch ( op_M )
-        //     {
-        //         case apply_normal     : compress::zblas::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoupling(), x.coeffs().data(), y.coeffs().data() ); break;
-        //         case apply_conjugate  : { HLR_ASSERT( false ); }
-        //         case apply_transposed : { HLR_ASSERT( false ); }
-        //         case apply_adjoint    : compress::zblas::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoupling(), x.coeffs().data(), y.coeffs().data() ); break;
-        //         default               : HLR_ERROR( "unsupported matrix operator" );
-        //     }// switch
-        // }// if
-        // else
-        // #endif
-        // {
-        //     switch ( op_M )
-        //     {
-        //         case apply_normal     : blas::mulvec( alpha, R->coupling(), x.coeffs(), value_t(1), y.coeffs() ); break;
-        //         case apply_conjugate  : { HLR_ASSERT( false ); }
-        //         case apply_transposed : { HLR_ASSERT( false ); }
-        //         case apply_adjoint    : blas::mulvec( alpha, blas::adjoint(R->coupling()), x.coeffs(), value_t(1), y.coeffs() ); break;
-        //         default               : HLR_ERROR( "unsupported matrix operator" );
-        //     }// switch
-        // }// else
     }// if
     else if ( hlr::matrix::is_h2_lowrank2( M ) )
     {
@@ -260,40 +187,10 @@ scalar_to_uniform ( const cluster_basis_t &           cb,
     {
         //
         // s ≔ V'·v = (∑_i V_i E_i)' v = ∑_i E_i' V_i' v
+        // - first recurse, then sum up
+        // - lock free with sequential summation of coefficients
         //
 
-        #if 0
-
-        //
-        // summation of coefficients via mutex
-        //
-        
-        auto  s     = blas::vector< value_t >( cb.rank() );
-        auto  s_mtx = std::mutex();
-        
-        ::tbb::parallel_for< uint >(
-            uint(0), cb.nsons(),
-            [&] ( const uint  i )
-            {
-                auto  u_i = scalar_to_uniform( *cb.son(i), v );
-                
-                if ( cb.rank() > 0 )
-                {
-                    auto  lock = std::scoped_lock( s_mtx );
-                    
-                    blas::mulvec( blas::adjoint( cb.transfer_mat(i) ), u_i->coeffs(), s );
-                }// if
-                
-                u->set_block( i, u_i.release() );
-            } );
-
-        #else
-
-        //
-        // lock free with sequential summation of coefficients
-        //
-        
-        auto  s  = blas::vector< value_t >( cb.rank() );
         auto  Si = std::vector< blas::vector< value_t > >( cb.nsons() );
         
         ::tbb::parallel_for< uint >(
@@ -308,12 +205,15 @@ scalar_to_uniform ( const cluster_basis_t &           cb,
                 u->set_block( i, u_i.release() );
             } );
 
-        for ( auto  si : Si )
-            blas::add( 1, si, s );
+        if ( cb.rank() > 0 )
+        {
+            auto  s = blas::vector< value_t >( cb.rank() );
         
-        #endif
+            for ( auto  si : Si )
+                blas::add( 1, si, s );
         
-        u->set_coeffs( std::move( s ) );
+            u->set_coeffs( std::move( s ) );
+        }// if
     }// else
 
     return u;
@@ -397,6 +297,245 @@ build_mutex_map ( const cluster_basis_t &  cb,
         for ( uint  i = 0; i < cb.nsons(); ++i )
             build_mutex_map< cluster_basis_t >( *cb.son(i), mtx_map );
     }// else
+}
+
+//
+// construct mapping id -> clusterbasis
+//
+template < typename value_t >
+void
+build_id2cb ( matrix::nested_cluster_basis< value_t > &                   cb,
+              std::vector< matrix::nested_cluster_basis< value_t > * > &  idmap )
+{
+    HLR_ASSERT( cb.id() != -1 );
+    HLR_ASSERT( cb.id() < idmap.size() );
+
+    idmap[ cb.id() ] = & cb;
+
+    if ( cb.nsons() > 0 )
+    {
+        ::tbb::parallel_for< uint >(
+            0, cb.nsons(),
+            [&] ( const auto  i )
+            {
+                if ( ! is_null( cb.son( i ) ) )
+                    build_id2cb( * cb.son( i ), idmap );
+            } );
+    }// if
+}
+
+//
+// construct mapping cluster basis id (cluster) -> list of matrix blocks in M
+//
+template < typename value_t >
+void
+build_id2blocks ( const matrix::nested_cluster_basis< value_t > &                 cb,
+                  const Hpro::TMatrix< value_t > &                                M,
+                  std::vector< std::list< const Hpro::TMatrix< value_t > * > > &  blockmap,
+                  const bool                                                      transposed )
+{
+    HLR_ASSERT( cb.id() != -1 );
+    HLR_ASSERT( cb.id() < blockmap.size() );
+
+    if ( ! is_blocked( M ) )
+    {
+        blockmap[ cb.id() ].push_back( & M );
+    }// else
+    else
+    {
+        auto  op = ( transposed ? apply_transposed : apply_normal );
+        auto  B  = cptrcast( & M, Hpro::TBlockMatrix< value_t > );
+
+        HLR_ASSERT( B->nblock_rows( op ) == cb.nsons() );
+
+        for ( uint  i = 0; i < B->nblock_rows( op ); ++i )
+        {
+            auto  cb_i = cb.son( i );
+
+            HLR_ASSERT( ! is_null( cb_i ) );
+            
+            for ( uint  j = 0; j < B->nblock_cols( op ); ++j )
+            {
+                if ( ! is_null( B->block( i, j ) ) )
+                    build_id2blocks( *cb_i, * B->block( i, j ), blockmap, transposed );
+            }// for
+        }// if
+    }// else
+}
+
+//
+// no construction of explicit, hierarchical representation of uniform vector
+// but just store coefficients in std::vector indexed by cluster basis id
+//
+template < typename value_t >
+void
+scalar_to_uniform ( const matrix::nested_cluster_basis< value_t > &   cb,
+                    const vector::scalar_vector< value_t > &          v,
+                    std::vector< blas::vector< value_t > > &          vcoeff )
+{
+    if ( cb.nsons() == 0 )
+    {
+        if ( cb.rank() > 0 )
+        {
+            auto  v_cb = blas::vector< value_t >( blas::vec( v ), cb.is() - v.ofs() );
+
+            HLR_ASSERT( cb.id() < vcoeff.size() );
+            
+            vcoeff[ cb.id() ] = std::move( cb.transform_forward( v_cb ) );
+        }// if
+    }// if
+    else
+    {
+        if ( cb.rank() > 0 )
+        {
+            //
+            // recurse and transfer coefficients from sons
+            //
+            
+            auto  Si = std::vector< blas::vector< value_t > >( cb.nsons() );
+        
+            ::tbb::parallel_for< uint >(
+                0, cb.nsons(),
+                [&] ( const uint  i )
+                {
+                    auto  cb_i = cb.son(i);
+                    
+                    scalar_to_uniform( *cb.son(i), v, vcoeff );
+
+                    Si[i] = std::move( cb.transfer_from_son( i, vcoeff[ cb_i->id() ] ) );
+                } );
+
+            auto  s = blas::vector< value_t >( cb.rank() );
+        
+            for ( auto  s_i : Si )
+                blas::add( value_t(1), s_i, s );
+        
+            vcoeff[ cb.id() ] = std::move( s );
+        }// if
+        else
+        {
+            //
+            // just recurse (no transfer matrices)
+            //
+            
+            ::tbb::parallel_for< uint >(
+                0, cb.nsons(),
+                [&] ( const uint  i )
+                {
+                    scalar_to_uniform( *cb.son(i), v, vcoeff );
+                } );
+        }// else
+    }// else
+}
+
+template < typename value_t >
+void
+mul_vec_row ( const value_t                                                         alpha,
+              const Hpro::matop_t                                                   op_M,
+              const matrix::nested_cluster_basis< value_t > &                       rowcb,
+              const std::vector< matrix::nested_cluster_basis< value_t > * > &      colcb,
+              const std::vector< std::list< const Hpro::TMatrix< value_t > * > > &  blockmap,
+              const std::vector< blas::vector< value_t > > &                        xcoeff,
+              const blas::vector< value_t > &                                       y_parent,
+              const vector::scalar_vector< value_t > &                              sx,
+              vector::scalar_vector< value_t > &                                    sy )
+{
+    //
+    // start with coefficients from parent
+    //
+
+    auto  y_loc = blas::copy( y_parent );
+    auto  y_son = std::vector< blas::vector< value_t > >( rowcb.nsons() );
+
+    if (( y_loc.length() == 0 ) && ( rowcb.rank() != 0 ))
+        y_loc = std::move( blas::vector< value_t >( rowcb.rank() ) );
+
+    HLR_ASSERT( y_loc.length() == rowcb.rank() );
+    
+    //
+    // perform matvec with all blocks in block row
+    //
+
+    auto &  blockrow = blockmap[ rowcb.id() ];
+
+    if ( blockrow.size() > 0 )
+    {
+        auto  rowis  = rowcb.is();
+        auto  y_j    = blas::vector< value_t >( blas::vec( sy ), rowis - sy.ofs() );
+        auto  t_j    = blas::vector< value_t >( y_j.length() );
+        bool  update = false;
+            
+        for ( auto  M : blockrow )
+        {
+            if ( matrix::is_h2_lowrank( M ) )
+            {
+                auto    R       = cptrcast( M, matrix::h2_lrmatrix< value_t > );
+                auto &  colcb_R = R->col_cb();
+                auto    ux      = xcoeff[ colcb_R.id() ];
+
+                R->uni_apply_add( alpha, ux, y_loc, op_M );
+            }// if
+            else if ( matrix::is_h2_lowrank2( M ) )
+            {
+                auto    R       = cptrcast( M, matrix::h2_lr2matrix< value_t > );
+                auto &  colcb_R = R->col_cb();
+                auto    ux      = xcoeff[ colcb_R.id() ];
+
+                R->uni_apply_add( alpha, ux, y_loc, op_M );
+            }// if
+            else if ( matrix::is_dense( M ) )
+            {
+                auto  x_i = blas::vector< value_t >( blas::vec( sx ), M->col_is( op_M ) - sx.ofs() );
+                        
+                M->apply_add( alpha, x_i, t_j, op_M );
+                update = true;
+            }// if
+            else
+                HLR_ERROR( "unsupported matrix type : " + M->typestr() );
+        }// for
+
+        //
+        // handle local uniform part
+        //
+        
+        if ( y_loc.length() > 0 )
+        {
+            if ( rowcb.nsons() == 0 )
+            {
+                // apply to local update
+                rowcb.transform_backward( y_loc, t_j );
+                update = true;
+            }// if
+            else
+            {
+                // transfer local part to sons
+                for ( uint  i = 0; i < rowcb.nsons(); ++i )
+                    y_son[i] = std::move( rowcb.transfer_to_son( i, y_loc ) );
+            }// else
+        }// if
+
+        //
+        // finally add local update to destination
+        //
+
+        if ( update )
+            blas::add( value_t(1), t_j, y_j );
+    }// if
+
+    //
+    // recurse
+    //
+
+    if ( rowcb.nsons() > 0 )
+    {
+        ::tbb::parallel_for< uint >(
+            0, rowcb.nsons(),
+            [&] ( const auto  i )
+            {
+                if ( ! is_null( rowcb.son( i ) ) )
+                    mul_vec_row( alpha, op_M, * rowcb.son( i ), colcb, blockmap, xcoeff, y_son[i], sx, sy );
+            } );
+    }// if
 }
 
 }}}} // namespace hlr::tbb::h2::detail

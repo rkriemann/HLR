@@ -185,7 +185,7 @@ program_main ()
 
     tic = timer::now();
 
-    auto  [ rowcb, colcb, A ] = impl::matrix::build_h2_rec( *H, cbapx, h2acc );
+    auto  [ rowcb, colcb, A ] = impl::matrix::build_h2_rec( *H, cbapx, h2acc, false );
     
     toc = timer::since( tic );
 

@@ -1117,6 +1117,9 @@ build_h2_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
     detail::build_nested_cluster_basis( *rowcb, basisapx, acc, row_map, row_coupling, empty_list, false, compress );
     detail::build_nested_cluster_basis( *colcb, basisapx, acc, col_map, col_coupling, empty_list, true,  compress );
 
+    { int  id = 0;  detail::set_ids( *rowcb, id ); }
+    { int  id = 0;  detail::set_ids( *colcb, id ); }
+
     //
     // construct uniform lowrank matrices with given cluster bases
     //
@@ -1167,6 +1170,9 @@ build_h2_rec_sep ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
     
     detail::build_nested_cluster_basis( *rowcb, basisapx, acc, row_map, row_coupling, empty_list, false, compress );
     detail::build_nested_cluster_basis( *colcb, basisapx, acc, col_map, col_coupling, empty_list, true,  compress );
+
+    { int  id = 0;  detail::set_ids( *rowcb, id ); }
+    { int  id = 0;  detail::set_ids( *colcb, id ); }
 
     //
     // construct uniform lowrank matrices with given cluster bases

@@ -290,6 +290,8 @@ public:
     {
         auto  cb = std::make_unique< shared_cluster_basis >( _is, std::move( blas::copy( _V ) ) );
 
+        cb->set_id( _id );
+        
         if ( is_compressed() )
             cb->_zV = _zV;
 
@@ -309,6 +311,7 @@ public:
     {
         auto  cb = std::make_unique< shared_cluster_basis >( _is );
 
+        cb->set_id( _id );
         cb->set_nsons( nsons() );
 
         for ( uint  i = 0; i < nsons(); ++i )
@@ -321,7 +324,7 @@ public:
     size_t
     byte_size () const
     {
-        size_t  n = ( sizeof(_is) + sizeof(self_t *) * _sons.size() + _V.byte_size() );
+        size_t  n = ( sizeof(_is) + sizeof(_id) + sizeof(self_t *) * _sons.size() + _V.byte_size() );
 
         n += compress::aplr::byte_size( _zV );
         n += _sv.byte_size();

@@ -6,8 +6,6 @@
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
-#include <hpro/config.h>
-
 #include <hlr/arith/mulvec.hh>
 #include <hlr/arith/uniform.hh>
 #include <hlr/arith/h2.hh>

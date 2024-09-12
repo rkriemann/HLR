@@ -1000,10 +1000,10 @@ build_uniform_lvl_sep ( const Hpro::TBlockCluster *  bct,
              std::move( M_root ) };
 }
 
-template < typename value_t >
+template < typename cluster_basis_t >
 void
-set_ids ( shared_cluster_basis< value_t > &  cb,
-          int &                              id )
+set_ids ( cluster_basis_t &  cb,
+          int &              id )
 {
     if ( cb.nsons() > 0 )
     {
@@ -4105,7 +4105,7 @@ build_h2_sep ( const Hpro::TMatrix< value_t > &   A,
         auto  R  = cptrcast( &A, lrmatrix< value_t > );
         auto  Sr = rowcb.transform_forward( R->U() );
         auto  Sc = colcb.transform_forward( R->V() );
-        auto  H  = std::make_unique< h2_lr2matrix< value_t > >( A.row_is(), A.col_is(), rowcb, colcb, std::move( Sr ), std::move( Sc ) );
+        auto  H  = std::make_unique< h2_lr2matrix< value_t > >( rowcb, colcb, std::move( Sr ), std::move( Sc ) );
         
         if ( compress )
             H->compress( acc );

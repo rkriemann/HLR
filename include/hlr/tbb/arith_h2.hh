@@ -79,6 +79,58 @@ mul_vec_row ( const value_t                             alpha,
     detail::add_uniform_to_scalar( *uy, y, s );
 }
 
+//
+// block row wise computation using IDs of involved objects
+//
+template < typename value_t >
+void
+mul_vec_row ( const value_t                                                         alpha,
+              const hpro::matop_t                                                   op_M,
+              const vector::scalar_vector< value_t > &                              x,
+              vector::scalar_vector< value_t > &                                    y,
+              const matrix::nested_cluster_basis< value_t > &                       rowcb,
+              const matrix::nested_cluster_basis< value_t > &                       colcb,
+              const std::vector< matrix::nested_cluster_basis< value_t > * > &      colcb_map,
+              const std::vector< std::list< const Hpro::TMatrix< value_t > * > > &  blockmap )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    auto  xcoeff = std::vector< blas::vector< value_t > >( colcb.id() + 1 );
+    auto  ycoeff = blas::vector< value_t >();
+
+    detail::scalar_to_uniform( colcb, x, xcoeff );
+    detail::mul_vec_row< value_t >( alpha, op_M, rowcb, colcb_map, blockmap, xcoeff, ycoeff, x, y );
+}
+
+template < typename value_t >
+std::vector< matrix::nested_cluster_basis< value_t > * >
+build_id2cb ( matrix::nested_cluster_basis< value_t > &  cb )
+{
+    HLR_ASSERT( cb.id() != -1 );
+    
+    auto  idmap = std::vector< matrix::nested_cluster_basis< value_t > * >( cb.id() + 1 );
+
+    detail::build_id2cb( cb, idmap );
+
+    return idmap;
+}
+
+template < typename value_t >
+std::vector< std::list< const Hpro::TMatrix< value_t > * > >
+build_id2blocks ( const matrix::nested_cluster_basis< value_t > &  cb,
+                  const Hpro::TMatrix< value_t > &                 M,
+                  const bool                                       transposed )
+{
+    HLR_ASSERT( cb.id() != -1 );
+
+    auto  blockmap = std::vector< std::list< const Hpro::TMatrix< value_t > * > >( cb.id() + 1 );
+
+    detail::build_id2blocks( cb, M, blockmap, transposed );
+
+    return blockmap;
+}
+
 template < typename value_t,
            typename cluster_basis_t >
 void

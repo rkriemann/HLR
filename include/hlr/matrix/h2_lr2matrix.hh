@@ -82,7 +82,7 @@ public:
     {}
     
     h2_lr2matrix ( const indexset  arow_is,
-                  const indexset  acol_is )
+                   const indexset  acol_is )
             : Hpro::TMatrix< value_t >()
             , _row_is( arow_is )
             , _col_is( acol_is )
@@ -93,15 +93,13 @@ public:
         this->set_ofs( _row_is.first(), _col_is.first() );
     }
 
-    h2_lr2matrix ( const indexset                  arow_is,
-                   const indexset                  acol_is,
-                   cluster_basis_t &               arow_cb,
+    h2_lr2matrix ( cluster_basis_t &               arow_cb,
                    cluster_basis_t &               acol_cb,
                    hlr::blas::matrix< value_t > &  aSrow,
                    hlr::blas::matrix< value_t > &  aScol )
             : Hpro::TMatrix< value_t >()
-            , _row_is( arow_is )
-            , _col_is( acol_is )
+            , _row_is( arow_cb.is() )
+            , _col_is( acol_cb.is() )
             , _row_cb( &arow_cb )
             , _col_cb( &acol_cb )
             , _rank( aSrow.ncols() )
@@ -115,15 +113,13 @@ public:
         this->set_ofs( _row_is.first(), _col_is.first() );
     }
 
-    h2_lr2matrix ( const indexset                  arow_is,
-                   const indexset                   acol_is,
-                   cluster_basis_t &                arow_cb,
+    h2_lr2matrix ( cluster_basis_t &                arow_cb,
                    cluster_basis_t &                acol_cb,
                    hlr::blas::matrix< value_t > &&  aSrow,
                    hlr::blas::matrix< value_t > &&  aScol )
             : Hpro::TMatrix< value_t >()
-            , _row_is( arow_is )
-            , _col_is( acol_is )
+            , _row_is( arow_cb.is() )
+            , _col_is( acol_cb.is() )
             , _row_cb( &arow_cb )
             , _col_cb( &acol_cb )
             , _rank( aSrow.ncols() )
@@ -137,16 +133,14 @@ public:
         this->set_ofs( _row_is.first(), _col_is.first() );
     }
 
-    h2_lr2matrix ( const indexset       arow_is,
-                   const indexset       acol_is,
-                   cluster_basis_t &    arow_cb,
+    h2_lr2matrix ( cluster_basis_t &    arow_cb,
                    cluster_basis_t &    acol_cb,
                    const uint           arank,
                    compress::zarray &&  azSrow,
                    compress::zarray &&  azScol )
             : Hpro::TMatrix< value_t >()
-            , _row_is( arow_is )
-            , _col_is( acol_is )
+            , _row_is( arow_cb.is() )
+            , _col_is( acol_cb.is() )
             , _row_cb( &arow_cb )
             , _col_cb( &acol_cb )
             , _zS_row( std::move( azSrow ) )
@@ -534,9 +528,10 @@ h2_lr2matrix< value_t >::uni_apply_add ( const value_t                    alpha,
 {
     auto  t = blas::vector< value_t >( _rank );
     
-    #if defined(HLR_HAS_ZBLAS_DIRECT)
     if ( is_compressed() )
     {
+        #if defined(HLR_HAS_ZBLAS_DIRECT)
+        
         switch ( op )
         {
             case apply_normal     :
@@ -555,9 +550,34 @@ h2_lr2matrix< value_t >::uni_apply_add ( const value_t                    alpha,
             default :
                 HLR_ERROR( "unsupported matrix operator" );
         }// switch
+
+        #else
+
+        const auto  Sr = row_coupling();
+        const auto  Sc = col_coupling();
+        
+        switch ( op )
+        {
+            case apply_normal     :
+                blas::mulvec( value_t(1), blas::adjoint( Sc ), ux, value_t(1), t );
+                blas::mulvec( alpha, Sr, t, value_t(1), uy );
+                break;
+                    
+            case apply_conjugate  : { HLR_ASSERT( false ); }
+            case apply_transposed : { HLR_ASSERT( false ); }
+                    
+            case apply_adjoint    :
+                blas::mulvec( value_t(1), blas::adjoint( Sr ), ux, value_t(1), t );
+                blas::mulvec( alpha, Sc, t, value_t(1), uy );
+                break;
+                    
+            default               :
+                HLR_ERROR( "unsupported matrix operator" );
+        }// switch
+
+        #endif
     }// if
     else
-    #endif
     {
         switch ( op )
         {
@@ -604,8 +624,8 @@ h2_lr2matrix< value_t >::compress ( const accuracy &  acc )
     if ( this->nrows() * this->ncols() == 0 )
         return;
 
-    const auto  lacc = acc( this->row_is(), this->col_is() );
-    auto        tol  = lacc.abs_eps();
+    const auto  lacc     = acc( this->row_is(), this->col_is() );
+    auto        tol      = lacc.abs_eps();
     real_t      norm_row = real_t(1);
     real_t      norm_col = real_t(1);
 
@@ -626,7 +646,8 @@ h2_lr2matrix< value_t >::compress ( const accuracy &  acc )
     }// if
     else if ( lacc.rel_eps() != 0 )
     {
-        // nothing to do
+        tol = lacc.rel_eps();
+        // norms remain 1
     }// if
     else
         HLR_ERROR( "zero error" );
@@ -638,6 +659,32 @@ h2_lr2matrix< value_t >::compress ( const accuracy &  acc )
     auto          zS_col    = compress::compress( zcconf, _S_col );
     const auto    zmem      = compress::compressed_size( zS_row ) + compress::compressed_size( zS_col );
 
+    // {
+    //     // DEBUG
+    //     auto  S  = blas::prod( _S_row, blas::adjoint( _S_col ) );
+    //     auto  zR = blas::matrix< value_t >( _S_row.nrows(), _S_row.ncols() );
+    //     auto  zC = blas::matrix< value_t >( _S_col.nrows(), _S_col.ncols() );
+
+    //     compress::decompress< value_t >( zS_row, zR );
+    //     compress::decompress< value_t >( zS_col, zC );
+        
+    //     auto  zS = blas::prod( zR, blas::adjoint( zC ) );
+
+    //     auto  T1 = blas::copy( _S_row );
+    //     auto  T2 = blas::copy( _S_col );
+    //     auto  T3 = blas::copy( S );
+
+    //     blas::add( value_t(-1), zR, T1 );
+    //     blas::add( value_t(-1), zC, T2 );
+    //     blas::add( value_t(-1), zS, T3 );
+
+    //     std::cout << blas::norm_F( T1 ) << " / " << blas::norm_F( T2 ) << " / " << blas::norm_F( T3 ) << std::endl;
+    //     std::cout << blas::norm_F( T1 ) / blas::normF( _S_row ) << " / "
+    //               << blas::norm_F( T2 ) / blas::normF( _S_col ) << " / "
+    //               << blas::norm_F( T3 ) / blas::normF( S ) << std::endl;
+    //     // DEBUG
+    // }
+    
     if (( zmem > 0 ) && ( zmem < mem_dense ))
     {
         HLR_ASSERT( (( zS_row.size() == 0 ) || ( zS_row.data() != nullptr )) &&
@@ -681,14 +728,14 @@ h2_lr2matrix< value_t >::copy () const
         std::copy( _zS_row.begin(), _zS_row.end(), zS_row.begin() );
         std::copy( _zS_col.begin(), _zS_col.end(), zS_col.begin() );
         
-        auto  M = std::make_unique< h2_lr2matrix >( _row_is, _col_is, *_row_cb, *_col_cb, rank(), std::move( zS_row ), std::move( zS_col ) );
+        auto  M = std::make_unique< h2_lr2matrix >( *_row_cb, *_col_cb, rank(), std::move( zS_row ), std::move( zS_col ) );
 
         M->copy_struct_from( this );
         return M;
     }// if
     else
     {
-        auto  M = std::make_unique< h2_lr2matrix >( _row_is, _col_is, *_row_cb, *_col_cb, std::move( blas::copy( _S_row ) ), std::move( blas::copy( _S_col ) ) );
+        auto  M = std::make_unique< h2_lr2matrix >( *_row_cb, *_col_cb, std::move( blas::copy( _S_row ) ), std::move( blas::copy( _S_col ) ) );
 
         M->copy_struct_from( this );
         return M;

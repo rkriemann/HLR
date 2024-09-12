@@ -894,11 +894,7 @@ build_h2_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
         colcb->set_nsons( cptrcast( &A, Hpro::TBlockMatrix< value_t > )->nblock_cols() );
     }// if
     
-    #if 1
-
     detail::init_cluster_bases( A, *rowcb, *colcb );
-
-    #endif
     
     auto  row_map      = detail::lr_mat_map_t< value_t >();
     auto  row_coupling = detail::coupling_map_t< value_t >();
@@ -921,6 +917,9 @@ build_h2_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
         [&,compress] () { detail::build_nested_cluster_basis( *rowcb, basisapx, acc, row_map, row_coupling, empty_list, false, compress ); },
         [&,compress] () { detail::build_nested_cluster_basis( *colcb, basisapx, acc, col_map, col_coupling, empty_list, true,  compress ); }
     );
+
+    { int  id = 0;  hlr::seq::matrix::detail::set_ids( *rowcb, id ); }
+    { int  id = 0;  hlr::seq::matrix::detail::set_ids( *colcb, id ); }
 
     //
     // construct uniform lowrank matrices with given cluster bases
@@ -980,6 +979,9 @@ build_h2_rec_sep ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
         [&,compress] () { detail::build_nested_cluster_basis( *rowcb, basisapx, acc, row_map, row_coupling, empty_list, false, compress ); },
         [&,compress] () { detail::build_nested_cluster_basis( *colcb, basisapx, acc, col_map, col_coupling, empty_list, true,  compress ); }
     );
+
+    { int  id = 0;  hlr::seq::matrix::detail::set_ids( *rowcb, id ); }
+    { int  id = 0;  hlr::seq::matrix::detail::set_ids( *colcb, id ); }
 
     //
     // construct uniform lowrank matrices with given cluster bases

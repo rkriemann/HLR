@@ -453,9 +453,10 @@ h2_lrmatrix< value_t >::uni_apply_add ( const value_t                    alpha,
                                         blas::vector< value_t > &        uy,
                                         const Hpro::matop_t              op ) const
 {
-    #if defined(HLR_HAS_ZBLAS_DIRECT)
     if ( is_compressed() )
     {
+        #if defined(HLR_HAS_ZBLAS_DIRECT)
+        
         switch ( op )
         {
             case apply_normal     : compress::zblas::mulvec( row_rank(), col_rank(), op, alpha, _zS, ux.data(), uy.data() ); break;
@@ -464,9 +465,23 @@ h2_lrmatrix< value_t >::uni_apply_add ( const value_t                    alpha,
             case apply_adjoint    : compress::zblas::mulvec( row_rank(), col_rank(), op, alpha, _zS, ux.data(), uy.data() ); break;
             default               : HLR_ERROR( "unsupported matrix operator" );
         }// switch
+        
+        #else
+        
+        auto  S = coupling();
+        
+        switch ( op )
+        {
+            case apply_normal     : blas::mulvec( alpha, S, ux, value_t(1), uy ); break;
+            case apply_conjugate  : HLR_ASSERT( false );
+            case apply_transposed : HLR_ASSERT( false );
+            case apply_adjoint    : blas::mulvec( alpha, blas::adjoint( S ), ux, value_t(1), uy ); break;
+            default               : HLR_ERROR( "unsupported matrix operator" );
+        }// switch
+        
+        #endif
     }// if
     else
-    #endif
     {
         switch ( op )
         {

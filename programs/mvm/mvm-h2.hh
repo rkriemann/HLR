@@ -62,7 +62,7 @@ program_main ()
             auto  hca    = bem::hca( pcoeff, *hcagen, cmdline::eps / 100.0, 6 );
             auto  hcalr  = bem::hca_lrapx( hca );
                 
-            H = impl::matrix::build( bct->root(), pcoeff, hcalr, acc, cmdline::compress, nseq );
+            H = impl::matrix::build( bct->root(), pcoeff, hcalr, acc, false, nseq );
         }// if
         else
             cmdline::capprox = "default";
@@ -74,7 +74,7 @@ program_main ()
 
         auto  acalr = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
         
-        H = impl::matrix::build( bct->root(), pcoeff, acalr, acc, cmdline::compress, nseq );
+        H = impl::matrix::build( bct->root(), pcoeff, acalr, acc, false, nseq );
     }// else
         
     if ( cmdline::capprox == "dense" )
@@ -83,7 +83,7 @@ program_main ()
 
         auto  dense = bem::dense_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
         
-        H = impl::matrix::build( bct->root(), pcoeff, dense, acc, cmdline::compress, nseq );
+        H = impl::matrix::build( bct->root(), pcoeff, dense, acc, false, nseq );
     }// else
         
     toc = timer::since( tic );
@@ -98,7 +98,7 @@ program_main ()
     std::cout << "    |A|   = " << format_norm( norm_H ) << std::endl;
 
     if ( hpro::verbose( 3 ) )
-        io::eps::print( *H, "H", "noid" );
+        io::eps::print( *H, "H", "noinnerid" );
 
     //////////////////////////////////////////////////////////////////////
     //
@@ -117,9 +117,16 @@ program_main ()
     tic = timer::now();
 
     if ( sep_coup )
-        std::tie( rowcb, colcb, A ) = impl::matrix::build_h2_rec_sep( *H, cbapx, h2acc, cmdline::compress );
+        std::tie( rowcb, colcb, A ) = impl::matrix::build_h2_rec_sep( *H, cbapx, h2acc, false );
     else
-        std::tie( rowcb, colcb, A ) = impl::matrix::build_h2_rec( *H, cbapx, h2acc, cmdline::compress );
+        std::tie( rowcb, colcb, A ) = impl::matrix::build_h2_rec( *H, cbapx, h2acc, false );
+
+    if ( cmdline::compress )
+    {
+        impl::matrix::compress< matrix::shared_cluster_basis< value_t > >( *rowcb, acc );
+        impl::matrix::compress< matrix::shared_cluster_basis< value_t > >( *colcb, acc );
+        impl::matrix::compress( *A, acc );
+    }// if
     
     toc = timer::since( tic );
 
@@ -134,6 +141,13 @@ program_main ()
 
     if ( verbose( 3 ) )
         matrix::print_eps( *A, "A", "noid,nosize" );
+
+    {
+        auto  diff  = matrix::sum( 1, *H, -1, *A );
+        auto  error = impl::norm::spectral( *diff );
+
+        std::cout << "    error = " << format_error( error, error / norm_H ) << std::endl;
+    }
 
     {
         auto  error = impl::norm::frobenius( 1, *H, -1, *A );
@@ -260,52 +274,52 @@ program_main ()
             std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
-        // {
-        //     runtime.clear();
+        {
+            runtime.clear();
             
-        //     std::cout << "  " << term::bullet << term::bold << "row wise (id based)" << term::reset << std::endl;
+            std::cout << "  " << term::bullet << term::bold << "row wise (id based)" << term::reset << std::endl;
         
-        //     auto  x = std::make_unique< vector::scalar_vector< value_t > >( A->col_is() );
-        //     auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
+            auto  x = std::make_unique< vector::scalar_vector< value_t > >( A->col_is() );
+            auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
 
-        //     auto  cbmap    = impl::h2::build_id2cb( *colcb );
-        //     auto  blockmap = impl::h2::build_id2blocks( *rowcb, *A, false );
+            auto  cbmap    = impl::h2::build_id2cb( *colcb );
+            auto  blockmap = impl::h2::build_id2blocks( *rowcb, *A, false );
             
-        //     x->fill( 1 );
+            x->fill( 1 );
 
-        //     for ( int i = 0; i < nbench; ++i )
-        //     {
-        //         tic = timer::now();
+            for ( int i = 0; i < nbench; ++i )
+            {
+                tic = timer::now();
     
-        //         for ( int j = 0; j < nmvm; ++j )
-        //             impl::h2::mul_vec_row< value_t >( 2.0, Hpro::apply_normal, *x, *y, *rowcb, *colcb, cbmap, blockmap );
+                for ( int j = 0; j < nmvm; ++j )
+                    impl::h2::mul_vec_row< value_t >( 2.0, Hpro::apply_normal, *x, *y, *rowcb, *colcb, cbmap, blockmap );
 
-        //         toc = timer::since( tic );
-        //         runtime.push_back( toc.seconds() );
+                toc = timer::since( tic );
+                runtime.push_back( toc.seconds() );
         
-        //         std::cout << term::rollback << term::clearline << "      mvm in   " << format_time( toc ) << term::flush;
+                std::cout << term::rollback << term::clearline << "      mvm in   " << format_time( toc ) << term::flush;
 
-        //         if ( i < nbench-1 )
-        //             y->fill( 0 );
-        //     }// for
+                if ( i < nbench-1 )
+                    y->fill( 0 );
+            }// for
         
-        //     if ( nbench > 1 )
-        //         std::cout << term::rollback << term::clearline << "      runtime = "
-        //                   << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime );
-        //     std::cout << std::endl;
+            if ( nbench > 1 )
+                std::cout << term::rollback << term::clearline << "      runtime = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime );
+            std::cout << std::endl;
 
-        //     std::cout << "      flops   = " << format_flops( flops_h2, min( runtime ) ) << std::endl;
+            std::cout << "      flops   = " << format_flops( flops_h2, min( runtime ) ) << std::endl;
             
-        //     t_ref = min( runtime );
+            t_ref = min( runtime );
             
-        //     auto  diff = y_ref->copy();
+            auto  diff = y_ref->copy();
 
-        //     diff->axpy( value_t(-1), y.get() );
+            diff->axpy( value_t(-1), y.get() );
 
-        //     const auto  error = diff->norm2();
+            const auto  error = diff->norm2();
             
-        //     std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
-        // }
+            std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
+        }
 
         // {
         //     runtime.clear();
