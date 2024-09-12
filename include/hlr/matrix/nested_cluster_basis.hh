@@ -57,23 +57,25 @@ private:
     // cluster basis of sub clusters
     std::vector< self_t * >                 _sons;
     
+    // rank (either from V or from E)
+    uint                                    _rank;
+
+    // singular values corresponding to basis vectors
+    blas::vector< real_t >                  _sv;
+
     // basis
     hlr::blas::matrix< value_t >            _V;
 
     // transfer matrix per son
     std::vector< blas::matrix< value_t > >  _E;
 
-    // rank (either from V or from E)
-    uint                                    _rank;
+    // compressed data
+    compress::aplr::zarray                  _zV;
+    std::vector< compress::zarray >         _zE;
     
     // mutex for synchronised changes
     std::mutex                              _mtx;
 
-    // basis and corresponding singular values
-    compress::aplr::zarray                  _zV;
-    blas::vector< real_t >                  _sv;
-    std::vector< compress::zarray >         _zE;
-    
 public:
     
     // construct cluster basis corresponding to cluster <cl>

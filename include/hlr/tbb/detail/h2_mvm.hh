@@ -76,7 +76,8 @@ mul_vec_mtx ( const value_t                              alpha,
     }// if
     else if ( matrix::is_h2_lowrank( M ) )
     {
-        auto  R = cptrcast( &M, matrix::h2_lrmatrix< value_t > );
+        auto  R    = cptrcast( &M, matrix::h2_lrmatrix< value_t > );
+        auto  lock = std::scoped_lock( y.mutex() );
 
         R->uni_apply_add( alpha, x.coeffs(), y.coeffs(), op_M );
         
@@ -103,7 +104,8 @@ mul_vec_mtx ( const value_t                              alpha,
     }// if
     else if ( matrix::is_h2_lowrank2( M ) )
     {
-        auto  R = cptrcast( &M, matrix::h2_lr2matrix< value_t > );
+        auto  R    = cptrcast( &M, matrix::h2_lr2matrix< value_t > );
+        auto  lock = std::scoped_lock( y.mutex() );
 
         R->uni_apply_add( alpha, x.coeffs(), y.coeffs(), op_M );
     }// if
