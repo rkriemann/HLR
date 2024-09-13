@@ -42,9 +42,8 @@ mul_vec_mtx ( const value_t                             alpha,
     auto  uy = detail::make_uniform< value_t, cluster_basis_t >( op_M == Hpro::apply_normal ? rowcb : colcb );
     auto  s  = blas::vector< value_t >();
 
-    auto  mtx_map = detail::mutex_map_t();
+    auto  mtx_map = detail::mutex_map_t( rowcb.id() + 1 );
     
-    detail::build_mutex_map( rowcb, mtx_map );
     detail::mul_vec_mtx( alpha, op_M, M, *ux, *uy, x, y, mtx_map );
     detail::add_uniform_to_scalar( *uy, y, s );
 }

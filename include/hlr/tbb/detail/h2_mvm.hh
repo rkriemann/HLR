@@ -17,7 +17,7 @@ namespace hlr { namespace tbb { namespace h2 { namespace detail {
 using hlr::vector::uniform_vector;
 using hlr::vector::scalar_vector;
 
-using  mutex_map_t = std::unordered_map< indexset, std::unique_ptr< std::mutex >, indexset_hash >;
+using  mutex_map_t = std::vector< std::mutex >;
 
 //
 // compute mat-vec M·x = y with uniform vectors x,y.
@@ -69,8 +69,7 @@ mul_vec_mtx ( const value_t                              alpha,
     {
         auto  x_i  = blas::vector< value_t >( blas::vec( sx ), M.col_is( op_M ) - sx.ofs() );
         auto  y_j  = blas::vector< value_t >( blas::vec( sy ), M.row_is( op_M ) - sy.ofs() );
-        auto  mtx  = mtx_map[ M.row_is( op_M ) ].get();
-        auto  lock = std::scoped_lock( *mtx );
+        auto  lock = std::scoped_lock( mtx_map[ y.basis().id() ] );
         
         M.apply_add( alpha, x_i, y_j, op_M );
     }// if
@@ -277,25 +276,6 @@ add_uniform_to_scalar ( const uniform_vector< cluster_basis_t > &  u,
                 
                 add_uniform_to_scalar( *u_i, v, s_i );
             } );
-    }// else
-}
-
-//
-// generate mapping of index set to mutices for leaf clusters
-//
-template < typename cluster_basis_t >
-void
-build_mutex_map ( const cluster_basis_t &  cb,
-                  mutex_map_t &            mtx_map )
-{
-    if ( cb.nsons() == 0 )
-    {
-        mtx_map[ cb.is() ] = std::make_unique< std::mutex >();
-    }// if
-    else
-    {
-        for ( uint  i = 0; i < cb.nsons(); ++i )
-            build_mutex_map< cluster_basis_t >( *cb.son(i), mtx_map );
     }// else
 }
 
