@@ -142,6 +142,7 @@ program_main ()
     if ( verbose( 3 ) )
         matrix::print_eps( *A, "A", "noid,nosize" );
 
+    if ( false )
     {
         auto  diff  = matrix::sum( 1, *H, -1, *A );
         auto  error = impl::norm::spectral( *diff );
