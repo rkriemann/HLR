@@ -18,7 +18,7 @@ using indexset = Hpro::TIndexSet;
 //
 ///////////////////////////////////////////////////////////////////////
 
-using  mutex_map_t = std::map< idx_t, std::unique_ptr< std::mutex > >;
+using  mutex_map_t = std::vector< std::mutex >;
 
 constexpr size_t  CHUNK_SIZE = 64;
 
@@ -107,12 +107,12 @@ update ( const indexset &                 is,
 
     while ( start_idx <= end_idx )
     {
-        const indexset  chunk_is( start_idx, end_idx );
-        auto            t_i = blas::vector< value_t >( t, chunk_is - ofs );
-        auto            y_i = blas::vector< value_t >( y, chunk_is - ofs );
+        auto  chunk_is = indexset( start_idx, end_idx );
+        auto  t_i      = blas::vector< value_t >( t, chunk_is - ofs );
+        auto  y_i      = blas::vector< value_t >( y, chunk_is - ofs );
 
         {
-            std::scoped_lock  lock( * mtx_map[ chunk ] );
+            std::scoped_lock  lock( mtx_map[ chunk ] );
                 
             blas::add( value_t(1), t_i, y_i );
         }
@@ -125,6 +125,7 @@ update ( const indexset &                 is,
 
 //
 // compute y = y + α op( M ) x
+// - update vector by locked chunks of fixed size
 //
 template < typename value_t >
 void
