@@ -27,7 +27,7 @@ using hlr::vector::scalar_vector;
 using hlr::vector::uniform_vector;
 using hlr::vector::uniform_vector_hierarchy;
 
-using  mutex_map_t = std::unordered_map< indexset, std::unique_ptr< std::mutex >, indexset_hash >;
+using  mutex_map_t = std::vector< std::mutex >;
 
 //
 // compute mat-vec M·x = y with uniform vectors x,y.
@@ -77,8 +77,7 @@ mul_vec_mtx ( const value_t                                              alpha,
     {
         auto  x_i  = blas::vector< value_t >( blas::vec( sx ), M.col_is( op_M ) - sx.ofs() );
         auto  y_j  = blas::vector< value_t >( blas::vec( sy ), M.row_is( op_M ) - sy.ofs() );
-        auto  mtx  = mtx_map.at( M.row_is( op_M ) ).get();
-        auto  lock = std::scoped_lock( *mtx );
+        auto  lock = std::scoped_lock( mtx_map[ y.basis().id() ] );
         
         M.apply_add( alpha, x_i, y_j, op_M );
     }// if
@@ -88,86 +87,13 @@ mul_vec_mtx ( const value_t                                              alpha,
         auto  lock = std::scoped_lock( y.mutex() );
 
         R->uni_apply_add( alpha, x.coeffs(), y.coeffs(), op_M );
-        
-        // #if defined(HLR_HAS_ZBLAS_DIRECT)
-        // if ( R->is_compressed() )
-        // {
-        //     switch ( op_M )
-        //     {
-        //         case apply_normal     : compress::zblas::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoeff(), x.coeffs().data(), y.coeffs().data() ); break;
-        //         case apply_conjugate  : { HLR_ASSERT( false ); }
-        //         case apply_transposed : { HLR_ASSERT( false ); }
-        //         case apply_adjoint    : compress::zblas::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoeff(), x.coeffs().data(), y.coeffs().data() ); break;
-        //         default               : HLR_ERROR( "unsupported matrix operator" );
-        //     }// switch
-        // }// if
-        // else
-        // #endif
-        // {
-        //     switch ( op_M )
-        //     {
-        //         case apply_normal     : blas::mulvec( alpha, R->coeff(), x.coeffs(), value_t(1), y.coeffs() ); break;
-        //         case apply_conjugate  : { HLR_ASSERT( false ); }
-        //         case apply_transposed : { HLR_ASSERT( false ); }
-        //         case apply_adjoint    : blas::mulvec( alpha, blas::adjoint(R->coeff()), x.coeffs(), value_t(1), y.coeffs() ); break;
-        //         default               :
-        //             HLR_ERROR( "unsupported matrix operator" );
-        //     }// switch
-        // }// else
     }// if
     else if ( hlr::matrix::is_uniform_lowrank2( M ) )
     {
         auto  R    = cptrcast( &M, uniform_lr2matrix< value_t > );
-        // auto  k    = R->rank();
-        // auto  t    = blas::vector< value_t >( k );
         auto  lock = std::scoped_lock( y.mutex() );
 
         R->uni_apply_add( alpha, x.coeffs(), y.coeffs(), op_M );
-        
-        // #if defined(HLR_HAS_ZBLAS_DIRECT)
-        // if ( R->is_compressed() )
-        // {
-        //     switch ( op_M )
-        //     {
-        //         case apply_normal     :
-        //             compress::zblas::mulvec( R->col_rank(), k, apply_adjoint, value_t(1), R->zcol_coupling(), x.coeffs().data(), t.data() );
-        //             compress::zblas::mulvec( R->row_rank(), k, apply_normal,       alpha, R->zrow_coupling(), t.data(), y.coeffs().data() );
-        //             break;
-                    
-        //         case apply_conjugate  : { HLR_ASSERT( false ); }
-        //         case apply_transposed : { HLR_ASSERT( false ); }
-                    
-        //         case apply_adjoint    :
-        //             compress::zblas::mulvec( R->row_rank(), k, apply_adjoint, value_t(1), R->zrow_coupling(), x.coeffs().data(), t.data() );
-        //             compress::zblas::mulvec( R->col_rank(), k, apply_normal,       alpha, R->zcol_coupling(), t.data(), y.coeffs().data() );
-        //             break;
-                    
-        //         default :
-        //             HLR_ERROR( "unsupported matrix operator" );
-        //     }// switch
-        // }// if
-        // else
-        // #endif
-        // {
-        //     switch ( op_M )
-        //     {
-        //         case apply_normal     :
-        //             blas::mulvec( value_t(1), blas::adjoint( R->col_coupling() ), x.coeffs(), value_t(1), t );
-        //             blas::mulvec( alpha, R->row_coupling(), t, value_t(1), y.coeffs() );
-        //             break;
-                    
-        //         case apply_conjugate  : { HLR_ASSERT( false ); }
-        //         case apply_transposed : { HLR_ASSERT( false ); }
-                    
-        //         case apply_adjoint    :
-        //             blas::mulvec( value_t(1), blas::adjoint( R->row_coupling() ), x.coeffs(), value_t(1), t );
-        //             blas::mulvec( alpha, R->col_coupling(), t, value_t(1), y.coeffs() );
-        //             break;
-                    
-        //         default               :
-        //             HLR_ERROR( "unsupported matrix operator" );
-        //     }// switch
-        // }// else
     }// if
     else
         HLR_ERROR( "unsupported matrix type : " + M.typestr() );
@@ -401,20 +327,6 @@ add_uniform_to_scalar ( const uniform_vector< shared_cluster_basis< value_t > > 
             }
         );
     }// if
-}
-
-//
-// generate mapping of index set to mutices for leaf clusters
-//
-template < typename value_t >
-void
-build_mutex_map ( const shared_cluster_basis< value_t > &  cb,
-                  mutex_map_t &                            mtx_map )
-{
-    mtx_map[ cb.is() ] = std::make_unique< std::mutex >();
-
-    for ( uint  i = 0; i < cb.nsons(); ++i )
-        build_mutex_map( *cb.son(i), mtx_map );
 }
 
 //

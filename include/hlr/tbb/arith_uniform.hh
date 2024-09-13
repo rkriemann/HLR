@@ -131,9 +131,8 @@ mul_vec_mtx ( const value_t                                   alpha,
     // multiply
     //
     
-    detail::mutex_map_t  mtx_map;
+    auto  mtx_map = detail::mutex_map_t( rowcb.id() + 1 );
     
-    detail::build_mutex_map( rowcb, mtx_map );
     detail::mul_vec_mtx( alpha, op_M, M, *ux, *uy, x, y, mtx_map );
 
     //
