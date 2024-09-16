@@ -120,6 +120,70 @@ program_main ()
 
     //////////////////////////////////////////////////////////////////////
     //
+    // compare with H
+    //
+    //////////////////////////////////////////////////////////////////////
+
+    if ( cmdline::ref == "h" )
+    {
+        std::cout << term::bullet << term::bold
+                  << "reference"
+                  << term::reset << std::endl;
+        
+        auto  H = std::unique_ptr< Hpro::TMatrix< value_t > >();
+        
+        tic = timer::now();
+        
+        if ( cmdline::capprox == "hca" )
+        {
+            if constexpr ( problem_t::supports_hca )
+            {
+                std::cout << "    using HCA" << std::endl;
+                
+                auto  hcagen = problem->hca_gen_func( *ct );
+                auto  hca    = bem::hca( pcoeff, *hcagen, cmdline::eps / 100.0, 6 );
+                auto  hcalr  = bem::hca_lrapx( hca );
+
+                H = impl::matrix::build( bct->root(), pcoeff, hcalr, acc, false );
+            }// if
+            else
+                cmdline::capprox = "default";
+        }// if
+
+        if (( cmdline::capprox == "aca" ) || ( cmdline::capprox == "default" ))
+        {
+            std::cout << "    using ACA" << std::endl;
+
+            auto  acalr = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
+
+            H = impl::matrix::build( bct->root(), pcoeff, acalr, acc, false );
+        }// else
+        
+        if ( cmdline::capprox == "dense" )
+        {
+            std::cout << "    using dense" << std::endl;
+
+            auto  dense = bem::dense_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
+        
+            H = impl::matrix::build( bct->root(), pcoeff, dense, acc, false );
+        }// else
+        
+        toc = timer::since( tic );
+
+        const auto  mem_H  = H->byte_size();
+        const auto  norm_H = impl::norm::frobenius( *H );
+        
+        std::cout << "    done in " << format_time( toc ) << std::endl;
+        std::cout << "    mem   = " << format_mem( mem_H ) << std::endl;
+        std::cout << "    |A|   = " << format_norm( norm_H ) << std::endl;
+
+        auto  error = impl::norm::frobenius( 1, *H, -1, *A );
+
+        std::cout << "    error = " << format_error( error, error / norm_H ) << std::endl;
+    }// if
+    
+    //////////////////////////////////////////////////////////////////////
+    //
     // matrix vector multiplication
     //
     //////////////////////////////////////////////////////////////////////
