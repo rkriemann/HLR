@@ -24,7 +24,7 @@ CXX          = 'g++'
 CXXFLAGS     = '-std=c++20'
 CPUFLAGS     = 'cpuflags'
 
-DBGFLAGS     = '-g -march=native'
+DBGFLAGS     = '-g -frounding-math'
 RELDBGFLAGS  = '-g -O2 -march=native'
 RELFLAGS     = '-O3 -fomit-frame-pointer -ffast-math -funroll-loops -march=native'
 OPTFLAGS     = RELFLAGS

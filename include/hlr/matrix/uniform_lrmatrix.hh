@@ -176,6 +176,9 @@ public:
         _col_cb = & acol_cb;
     }
 
+    void set_row_basis_unsafe ( cluster_basis_t &  acb ) { _row_cb = & acb; }
+    void set_col_basis_unsafe ( cluster_basis_t &  acb ) { _col_cb = & acb; }
+
     // return decompressed local basis
     blas::matrix< value_t >
     coeff () const

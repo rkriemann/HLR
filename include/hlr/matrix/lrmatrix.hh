@@ -168,8 +168,6 @@ public:
     // access low-rank data
     //
 
-    #if 1
-
     blas::matrix< value_t >  U  () const
     {
         if ( is_compressed() )
@@ -214,26 +212,6 @@ public:
 
     const blas::matrix< value_t > &  U_direct  ( const Hpro::matop_t  op ) const { return ( op == apply_normal ? U_direct() : V_direct() ); }
     const blas::matrix< value_t > &  V_direct  ( const Hpro::matop_t  op ) const { return ( op == apply_normal ? V_direct() : U_direct() ); }
-
-    #else
-
-    //
-    // access lowrank factors as for Hpro::TRkMatrix without any compression
-    //
-    
-    blas::matrix< value_t > &        U  ()       { return _U; }
-    blas::matrix< value_t > &        V  ()       { return _V; }
-
-    const blas::matrix< value_t > &  U  () const { return _U; }
-    const blas::matrix< value_t > &  V  () const { return _V; }
-    
-    blas::matrix< value_t > &        U  ( const Hpro::matop_t  op )       { return ( op == apply_normal ? U() : V() ); }
-    blas::matrix< value_t > &        V  ( const Hpro::matop_t  op )       { return ( op == apply_normal ? V() : U() ); }
-
-    const blas::matrix< value_t > &  U  ( const Hpro::matop_t  op ) const { return ( op == apply_normal ? U() : V() ); }
-    const blas::matrix< value_t > &  V  ( const Hpro::matop_t  op ) const { return ( op == apply_normal ? V() : U() ); }
-    
-    #endif
 
     //
     // directly set low-rank factors

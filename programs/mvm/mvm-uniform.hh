@@ -49,6 +49,10 @@ program_main ()
     auto  coord   = problem->coordinates();
     auto  ct      = gen_ct( *coord );
     auto  bct     = gen_bct( *ct, *ct );
+
+    if ( hpro::verbose( 3 ) )
+        io::eps::print( * bct->root(), "bt", "id" );
+    
     auto  coeff   = problem->coeff_func();
     auto  pcoeff  = Hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
     auto  cbapx   = approx::SVD< value_t >();
@@ -87,7 +91,8 @@ program_main ()
         if ( sep_coup )
             std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_lvl_sep( bct->root(), pcoeff, acalr, cbapx, acc, cmdline::compress );
         else
-            std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_lvl( bct->root(), pcoeff, acalr, cbapx, acc, cmdline::compress );
+            // std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_lvl( bct->root(), pcoeff, acalr, cbapx, acc, cmdline::compress );
+            std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform( bct->root(), pcoeff, acalr, cbapx, acc, cmdline::compress );
     }// else
         
     if ( cmdline::capprox == "dense" )
@@ -116,7 +121,7 @@ program_main ()
     std::cout << "    |A|   = " << format_norm( norm_A ) << std::endl;
 
     if ( hpro::verbose( 3 ) )
-        io::eps::print( *A, "A", "noid" );
+        io::eps::print( *A, "A", "noinnerid" );
 
     //////////////////////////////////////////////////////////////////////
     //
