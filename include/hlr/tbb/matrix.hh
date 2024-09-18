@@ -594,61 +594,51 @@ build_uniform ( const Hpro::TBlockCluster *  bc,
     auto  col_coup   = std::vector< blas::matrix< value_t > >( bc->id() + 1 );
     auto  rowcb      = std::make_unique< shared_cluster_basis< value_t > >( * bc->rowcl() );
     auto  colcb      = std::make_unique< shared_cluster_basis< value_t > >( * bc->colcl() );
+    auto  mutex_H    = std::vector< std::mutex >( bc->id() + 1 );
+    auto  mutex_U    = std::vector< std::mutex >( bc->id() + 1 );
+    auto  mutex_coup = std::vector< std::mutex >( bc->id() + 1 );
 
     detail::collect_clusters( bc->rowcl(), row_cls );
     detail::collect_clusters( bc->colcl(), col_cls );
-    detail::build_block_map< value_t >( bc, row_map, col_map );
+    detail::build_block_map< value_t >( bc, row_map, col_map, mutex_H ); // using mutex array here assuming id(cl) < id(bc)
 
     //
     // intermix row/column clusters to free lowrank blocks as soon as possible
     //
 
     ::tbb::parallel_invoke(
-        [&] ()
+        [&,compress] ()
         {
             ::tbb::task_group  tg;
 
             for ( auto  rowcl : row_cls )
             {
-                tg.run( [&,rowcl]
+                tg.run( [&,rowcl,compress]
                 { 
                     auto  rowcb = std::make_unique< hlr::matrix::shared_cluster_basis< value_t > >( *rowcl );
             
                     rowcb->set_nsons( rowcl->nsons() );
                     rowcb->set_id( rowcl->id() );
                     row_cbs[ rowcb->id() ] = rowcb.get();
-                    
-                    // insert into hierarchy
-                    if ( ! is_null( rowcl->parent() ) )
-                    {
-                        auto  cl_parent = rowcl->parent();
-                        auto  cb_parent = row_cbs[ cl_parent->id() ];
 
-                        HLR_ASSERT( ! is_null( cb_parent ) );
-
-                        for ( uint  i = 0; i < cl_parent->nsons(); ++i )
-                            if ( cl_parent->son(i) == rowcl )
-                            {
-                                cb_parent->set_son( i, rowcb.get() );
-                                break;
-                            }// if
-                    }// if
-            
                     detail::build_uniform( rowcl, rowcb.release(),
                                            coeff, lrapx, basisapx, acc, compress,
                                            row_map, mat_map_H, mat_map_U, row_coup, col_coup,
-                                           apply_normal );
+                                           apply_normal,
+                                           mutex_H, mutex_U, mutex_coup );
                 } );
             }// for
+
+            tg.wait();
         },
 
-        [&] ()
+        [&,compress] ()
         {
             ::tbb::task_group  tg;
 
             for ( auto  colcl : col_cls )
             {
-                tg.run( [&,colcl]
+                tg.run( [&,colcl,compress]
                 { 
                     auto  colcb = std::make_unique< hlr::matrix::shared_cluster_basis< value_t > >( *colcl );
             
@@ -656,28 +646,15 @@ build_uniform ( const Hpro::TBlockCluster *  bc,
                     colcb->set_id( colcl->id() );
                     col_cbs[ colcb->id() ] = colcb.get();
             
-                    // insert into hierarchy
-                    if ( ! is_null( colcl->parent() ) )
-                    {
-                        auto  cl_parent = colcl->parent();
-                        auto  cb_parent = col_cbs[ cl_parent->id() ];
-
-                        HLR_ASSERT( ! is_null( cb_parent ) );
-
-                        for ( uint  i = 0; i < cl_parent->nsons(); ++i )
-                            if ( cl_parent->son(i) == colcl )
-                            {
-                                cb_parent->set_son( i, colcb.get() );
-                                break;
-                            }// if
-                    }// if
-
                     detail::build_uniform( colcl, colcb.release(),
                                            coeff, lrapx, basisapx, acc, compress,
                                            col_map, mat_map_H, mat_map_U, col_coup, row_coup,
-                                           apply_adjoint );
+                                           apply_adjoint,
+                                           mutex_H, mutex_U, mutex_coup );
                 } );
             }// for
+
+            tg.wait();
         }
     );
     
@@ -691,8 +668,14 @@ build_uniform ( const Hpro::TBlockCluster *  bc,
     auto  colcb_root = std::unique_ptr< hlr::matrix::shared_cluster_basis< value_t > >( col_cbs[ bc->colcl()->id() ] );
     auto  M_root     = std::unique_ptr< Hpro::TMatrix< value_t > >( mat_map_U[ bc->id() ] );
 
-    HLR_ASSERT( ! is_null( M_root ) );
+    HLR_ASSERT( ! is_null( M_root ) && ! is_null( rowcb_root ) && ! is_null( colcb_root ) );
 
+    ::tbb::parallel_invoke(
+        [&,bc] () { detail::fix_hierarchy( bc->rowcl(), rowcb_root.get(), row_cbs ); },
+        [&,bc] () { detail::fix_hierarchy( bc->colcl(), colcb_root.get(), col_cbs ); },
+        [&,bc] () { detail::fix_hierarchy( bc, M_root.get(), mat_map_U ); }
+    );
+    
     return { std::move( rowcb_root ), std::move( colcb_root ), std::move( M_root ) };
 }
 

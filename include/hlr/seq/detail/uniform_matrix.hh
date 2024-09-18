@@ -3971,6 +3971,9 @@ build_uniform ( const Hpro::TCluster *                                          
                     else
                         U->set_coupling( std::move( blas::prod( col_coup[ R->id() ], blas::adjoint( S_r ) ) ) );
 
+                    if ( compress )
+                        U->compress( acc );
+                    
                     // no longer needed
                     col_coup[ R->id() ] = std::move( blas::matrix< value_t >() );
 
@@ -3987,6 +3990,10 @@ build_uniform ( const Hpro::TCluster *                                          
                     // R->clear_U();
                 }// else
             }// for
+
+            // all uniform matrix blocks computed, so we can compress basis
+            if ( compress )
+                cb->compress( acc );
         }// if
     }
 }

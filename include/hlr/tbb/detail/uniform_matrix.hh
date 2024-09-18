@@ -239,24 +239,87 @@ template < typename value_t >
 void
 build_block_map ( const Hpro::TBlockCluster *                                bc,
                   std::vector< std::list< const Hpro::TBlockCluster * > > &  row_map,
-                  std::vector< std::list< const Hpro::TBlockCluster * > > &  col_map )
+                  std::vector< std::list< const Hpro::TBlockCluster * > > &  col_map,
+                  std::vector< std::mutex > &                                mtxs )
 {
     HLR_ASSERT( ! is_null( bc ) );
     
-    row_map[ bc->rowcl()->id() ].push_back( bc );
-    col_map[ bc->colcl()->id() ].push_back( bc );
+    {
+        auto  lock = std::scoped_lock( mtxs[ bc->rowcl()->id() ] );
+
+        row_map[ bc->rowcl()->id() ].push_back( bc );
+    }
+
+    {
+        auto  lock = std::scoped_lock( mtxs[ bc->colcl()->id() ] );
+
+        col_map[ bc->colcl()->id() ].push_back( bc );
+    }
 
     if ( ! bc->is_leaf() )
     {
-        for ( uint  i = 0; i < bc->nsons(); ++i )
-            if ( ! is_null( bc->son(i) ) )
-                build_block_map< value_t >( bc->son(i), row_map, col_map );
+        ::tbb::parallel_for< uint >(
+            0, bc->nsons(),
+            [&,bc] ( const auto  i )
+            {
+                if ( ! is_null( bc->son(i) ) )
+                    build_block_map< value_t >( bc->son(i), row_map, col_map, mtxs );
+            } );
+    }// if
+}
+
+//
+// fix hierarchy links
+//
+template < typename value_t >
+void
+fix_hierarchy ( const Hpro::TCluster *                                                 cl,
+                hlr::matrix::shared_cluster_basis< value_t > *                         cb,
+                const std::vector< hlr::matrix::shared_cluster_basis< value_t > * > &  cbs )
+{
+    HLR_ASSERT( cl->nsons() == cb->nsons() );
+
+    ::tbb::parallel_for< uint >(
+        0, cb->nsons(),
+        [cl,cb,&cbs] ( const auto  i )                         
+        {
+            cb->set_son( i, cbs[ cl->son(i)->id() ] );
+
+            fix_hierarchy( cl->son(i), cb->son(i), cbs );
+        } );
+}
+
+template < typename value_t >
+void
+fix_hierarchy ( const Hpro::TBlockCluster *                        bc,
+                Hpro::TMatrix< value_t > *                         M,
+                const std::vector< Hpro::TMatrix< value_t > * > &  mats )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  B = ptrcast( M, Hpro::TBlockMatrix< value_t > );
+        
+        HLR_ASSERT(( bc->nrows() == B->nblock_rows() ) && ( bc->ncols() == B->nblock_cols() ));
+    
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
+                                            0, B->nblock_cols() ),
+            [bc,&mats,B] ( const ::tbb::blocked_range2d< uint > &  r )
+            {
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        B->set_block( i, j, mats[ bc->son(i,j)->id() ] );
+
+                        fix_hierarchy( bc->son(i,j), B->block( i, j ), mats );
+                    }// for
+                }// for
+            } );
     }// if
 }
 
 using hlr::seq::matrix::detail::build_matrix;
-using hlr::seq::matrix::detail::add_to_parent;
-using hlr::seq::matrix::detail::replace_in_parent;
 
 template < typename coeff_t,
            typename lrapx_t,
@@ -274,7 +337,10 @@ build_uniform ( const Hpro::TCluster *                                          
                 std::vector< Hpro::TMatrix< typename coeff_t::value_t > * > &     mat_map_U,
                 std::vector< blas::matrix< typename coeff_t::value_t > > &        row_coup,
                 std::vector< blas::matrix< typename coeff_t::value_t > > &        col_coup,
-                const matop_t                                                     op )
+                const matop_t                                                     op,
+                std::vector< std::mutex > &                                       mutex_H,
+                std::vector< std::mutex > &                                       mutex_U,
+                std::vector< std::mutex > &                                       mutex_coup )
 {
     static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
                    "coefficient function and low-rank approximation must have equal value type" );
@@ -291,19 +357,40 @@ build_uniform ( const Hpro::TCluster *                                          
     // construct all blocks in current block row/column
     //
 
-    for ( auto  bc : block_map[ cl->id() ] )
-    {
-        // only compute, if not already done
-        if ( is_null( mat_map_H[ bc->id() ] ) )  // trylock "created_H"
-        {
-            auto  M = build_matrix( bc, coeff, lrapx, acc, compress );
-            
-            if ( is_blocked( *M ) )
-                mat_map_U[ bc->id() ] = M.get();
+    auto  cl_blocks = std::list< const Hpro::TBlockCluster * >();
 
-            mat_map_H[ bc->id() ] = M.get();
-            add_to_parent( bc, M.release(), mat_map_H );
+    // copy to local list
+    for ( auto  bc : block_map[ cl->id() ] )
+        cl_blocks.push_back( bc );
+
+    while ( ! cl_blocks.empty() )
+    {
+        auto  bc = behead( cl_blocks );
+
+        // try lock to see if block is already handled by other thread
+        if ( mutex_H[ bc->id() ].try_lock() )
+        {
+            // only compute, if not already done
+            if ( is_null( mat_map_H[ bc->id() ] ) )
+            {
+                // std::cout << cl->id() << " : matrix : " << bc->id() << std::endl;
+                
+                auto  M = build_matrix( bc, coeff, lrapx, acc, compress );
+
+                // needed for hierarchy
+                if ( ! hlr::matrix::is_lowrank( *M ) )
+                    mat_map_U[ bc->id() ] = M.get();
+
+                mat_map_H[ bc->id() ] = M.release();
+            }// if
+
+            mutex_H[ bc->id() ].unlock();
         }// if
+        else
+        {
+            // handle later to be sure that block was constructed
+            cl_blocks.push_back( bc );
+        }// else
     }// for
 
     //
@@ -318,6 +405,8 @@ build_uniform ( const Hpro::TCluster *                                          
 
         for ( auto  bc : block_map[ cl->id() ] )
         {
+            // std::cout << cl->id() << " : basis " << bc->id() << std::endl;
+            
             auto  M = mat_map_H[ bc->id() ];
         
             if ( hlr::matrix::is_lowrank( M ) )
@@ -385,22 +474,25 @@ build_uniform ( const Hpro::TCluster *                                          
                 // create uniform lr matrix, if not yet present
                 //
 
-                // also trylock "created_U"
+                hlr::matrix::uniform_lrmatrix< value_t > *  U = nullptr;
                 
-                auto  U = ptrcast( mat_map_U[ R->id() ], hlr::matrix::uniform_lrmatrix< value_t > );
-                
-                if ( is_null( U ) )
                 {
-                    auto  Up = std::make_unique< hlr::matrix::uniform_lrmatrix< value_t > >( R->row_is(), R->col_is() );
-
-                    U = Up.get();
-                    U->set_id( R->id() );
-                    U->set_procs( R->procs() );
+                    auto  lock = std::scoped_lock( mutex_U[ R->id() ] );
                     
-                    mat_map_U[ R->id() ] = U;
-                    replace_in_parent( R, Up.release() );
-                }// if
+                    U = ptrcast( mat_map_U[ R->id() ], hlr::matrix::uniform_lrmatrix< value_t > );
+                
+                    if ( is_null( U ) )
+                    {
+                        auto  Up = std::make_unique< hlr::matrix::uniform_lrmatrix< value_t > >( R->row_is(), R->col_is() );
 
+                        U = Up.get();
+                        U->set_id( R->id() );
+                        U->set_procs( R->procs() );
+                    
+                        mat_map_U[ R->id() ] = Up.release();
+                    }// if
+                }
+                
                 // already assign row basis ("unsafe" due to missing couplings)
                 if ( op == apply_normal ) U->set_row_basis_unsafe( *cb );
                 else                      U->set_col_basis_unsafe( *cb );
@@ -409,32 +501,38 @@ build_uniform ( const Hpro::TCluster *                                          
                 auto  U_i = R->U( op );
                 auto  S_r = blas::prod( blas::adjoint( cb->basis() ), U_i );
 
-                // trylock( finish_U )
+                {
+                    auto  lock = std::scoped_lock( mutex_coup[ R->id() ] );
                 
-                // finalize U if both couplings are present or otherwise just remember row coupling 
-                if ( col_coup[ R->id() ].nrows() != 0 )
-                {
-                    if ( op == apply_normal )
-                        U->set_coupling( std::move( blas::prod( S_r, blas::adjoint( col_coup[ R->id() ] ) ) ) );
+                    // finalize U if both couplings are present or otherwise just remember row coupling 
+                    if ( col_coup[ R->id() ].nrows() != 0 )
+                    {
+                        if ( op == apply_normal )
+                            U->set_coupling( std::move( blas::prod( S_r, blas::adjoint( col_coup[ R->id() ] ) ) ) );
+                        else
+                            U->set_coupling( std::move( blas::prod( col_coup[ R->id() ], blas::adjoint( S_r ) ) ) );
+
+                        if ( compress )
+                            U->compress( acc );
+                        
+                        // no longer needed
+                        col_coup[ R->id() ] = std::move( blas::matrix< value_t >() );
+                        
+                        // std::cout << cl->id() << " : delete " << R->id() << std::endl;
+                        mat_map_H[ R->id() ] = nullptr;
+                        delete R;
+                    }// if
                     else
-                        U->set_coupling( std::move( blas::prod( col_coup[ R->id() ], blas::adjoint( S_r ) ) ) );
-
-                    // no longer needed
-                    col_coup[ R->id() ] = std::move( blas::matrix< value_t >() );
-
-                    // std::cout << "deleting " << R->id() << std::endl;
-                    mat_map_H[ R->id() ] = nullptr;
-                    delete R;
-                }// if
-                else
-                {
-                    row_coup[ R->id() ] = std::move( S_r );
-
-                    // std::cout << "coupling " << R->id() << std::endl;
-                    // // reset matrix U in R
-                    // R->clear_U();
-                }// else
+                    {
+                        // std::cout << cl->id() << " : coupling " << R->id() << std::endl;
+                        row_coup[ R->id() ] = std::move( S_r );
+                    }// else
+                }
             }// for
+
+            // all uniform matrix blocks computed, so we can compress basis
+            if ( compress )
+                cb->compress( acc );
         }// if
     }
 }

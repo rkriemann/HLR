@@ -74,7 +74,7 @@ program_main ()
             if ( sep_coup )
                 std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_lvl_sep( bct->root(), pcoeff, hcalr, cbapx, acc, cmdline::compress );
             else
-                std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_lvl( bct->root(), pcoeff, hcalr, cbapx, acc, cmdline::compress );
+                std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform( bct->root(), pcoeff, hcalr, cbapx, acc, cmdline::compress );
         }// if
         else
             cmdline::capprox = "default";
@@ -91,7 +91,6 @@ program_main ()
         if ( sep_coup )
             std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_lvl_sep( bct->root(), pcoeff, acalr, cbapx, acc, cmdline::compress );
         else
-            // std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_lvl( bct->root(), pcoeff, acalr, cbapx, acc, cmdline::compress );
             std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform( bct->root(), pcoeff, acalr, cbapx, acc, cmdline::compress );
     }// else
         
@@ -106,18 +105,20 @@ program_main ()
         if ( sep_coup )
             std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_lvl_sep( bct->root(), pcoeff, dense, cbapx, acc, cmdline::compress );
         else
-            std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_lvl( bct->root(), pcoeff, dense, cbapx, acc, cmdline::compress );
+            std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform( bct->root(), pcoeff, dense, cbapx, acc, cmdline::compress );
     }// else
         
     toc = timer::since( tic );
     
-    const auto  mem_A  = A->byte_size();
-    const auto  norm_A = impl::norm::frobenius( *A );
+    const auto  mem_A   = A->byte_size();
+    const auto  mem_rcb = rowcb->byte_size();
+    const auto  mem_ccb = colcb->byte_size();
+    const auto  norm_A  = impl::norm::frobenius( *A );
         
     std::cout << "    dims  = " << A->nrows() << " × " << A->ncols() << std::endl;
     std::cout << "    done in " << format_time( toc ) << std::endl;
-    std::cout << "    mem   = " << format_mem( rowcb->byte_size(), colcb->byte_size(), mem_A ) << std::endl;
-    std::cout << "      idx = " << format_mem( mem_A / A->nrows() ) << std::endl;
+    std::cout << "    mem   = " << format_mem( mem_rcb, mem_ccb, mem_A, mem_rcb + mem_ccb + mem_A ) << std::endl;
+    std::cout << "      idx = " << format_mem( (mem_rcb + mem_ccb + mem_A) / A->nrows() ) << std::endl;
     std::cout << "    |A|   = " << format_norm( norm_A ) << std::endl;
 
     if ( hpro::verbose( 3 ) )
