@@ -19,7 +19,7 @@
 #include <hlr/matrix/h2_lrmatrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
 
-#include <hlr/seq/detail/matrix.hh>
+#include <hlr/seq/detail/h2_matrix.hh>
 
 #include <hlr/tbb/detail/uniform_basis.hh>
 
