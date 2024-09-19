@@ -3810,6 +3810,49 @@ replace_in_parent ( hlr::matrix::lrmatrix< value_t > *          R,
         B->replace_block( R, U );
 }
 
+//
+// fix hierarchy links
+//
+template < typename value_t >
+void
+fix_hierarchy ( const Hpro::TCluster *                                                 cl,
+                hlr::matrix::shared_cluster_basis< value_t > *                         cb,
+                const std::vector< hlr::matrix::shared_cluster_basis< value_t > * > &  cbs )
+{
+    HLR_ASSERT( cl->nsons() == cb->nsons() );
+
+    for ( uint  i = 0; i < cb->nsons(); ++i )
+    {
+        cb->set_son( i, cbs[ cl->son(i)->id() ] );
+        
+        fix_hierarchy( cl->son(i), cb->son(i), cbs );
+    }// for
+}
+
+template < typename value_t >
+void
+fix_hierarchy ( const Hpro::TBlockCluster *                        bc,
+                Hpro::TMatrix< value_t > *                         M,
+                const std::vector< Hpro::TMatrix< value_t > * > &  mats )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  B = ptrcast( M, Hpro::TBlockMatrix< value_t > );
+        
+        HLR_ASSERT(( bc->nrows() == B->nblock_rows() ) && ( bc->ncols() == B->nblock_cols() ));
+
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                B->set_block( i, j, mats[ bc->son(i,j)->id() ] );
+
+                fix_hierarchy( bc->son(i,j), B->block( i, j ), mats );
+            }// for
+        }// for
+    }// if
+}
+
 template < typename coeff_t,
            typename lrapx_t,
            typename basisapx_t >
@@ -3850,16 +3893,11 @@ build_uniform ( const Hpro::TCluster *                                          
         {
             auto  M = build_matrix( bc, coeff, lrapx, acc, compress );
         
-            // std::cout << "building " << bc->id() << std::endl;
-            
-            if ( is_blocked( *M ) )
+            if ( ! hlr::matrix::is_lowrank( *M ) )
                 mat_map_U[ bc->id() ] = M.get();
 
-            mat_map_H[ bc->id() ] = M.get();
-            add_to_parent( bc, M.release(), mat_map_H );
+            mat_map_H[ bc->id() ] = M.release();
         }// if
-        // else
-        //     std::cout << "exists " << bc->id() << std::endl;
     }// for
 
     //
@@ -3951,8 +3989,7 @@ build_uniform ( const Hpro::TCluster *                                          
                     U->set_id( R->id() );
                     U->set_procs( R->procs() );
                     
-                    mat_map_U[ R->id() ] = U;
-                    replace_in_parent( R, Up.release() );
+                    mat_map_U[ R->id() ] = Up.release();
                 }// if
 
                 // already assign row basis ("unsafe" due to missing couplings)
@@ -3977,18 +4014,185 @@ build_uniform ( const Hpro::TCluster *                                          
                     // no longer needed
                     col_coup[ R->id() ] = std::move( blas::matrix< value_t >() );
 
-                    // std::cout << "deleting " << R->id() << std::endl;
                     mat_map_H[ R->id() ] = nullptr;
                     delete R;
                 }// if
                 else
                 {
                     row_coup[ R->id() ] = std::move( S_r );
-
-                    // std::cout << "coupling " << R->id() << std::endl;
-                    // // reset matrix U in R
-                    // R->clear_U();
                 }// else
+            }// for
+
+            // all uniform matrix blocks computed, so we can compress basis
+            if ( compress )
+                cb->compress( acc );
+        }// if
+    }
+}
+
+template < typename coeff_t,
+           typename lrapx_t,
+           typename basisapx_t >
+void
+build_uniform_sep ( const Hpro::TCluster *                                            cl,
+                    hlr::matrix::shared_cluster_basis< typename coeff_t::value_t > *  cb,
+                    const coeff_t &                                                   coeff,
+                    const lrapx_t &                                                   lrapx,
+                    const basisapx_t &                                                basisapx,
+                    const accuracy &                                                  acc,
+                    const bool                                                        compress,
+                    std::vector< std::list< const Hpro::TBlockCluster * > > &         block_map,
+                    std::vector< Hpro::TMatrix< typename coeff_t::value_t > * > &     mat_map_H,
+                    std::vector< Hpro::TMatrix< typename coeff_t::value_t > * > &     mat_map_U,
+                    const matop_t                                                     op )
+{
+    static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
+                   "coefficient function and low-rank approximation must have equal value type" );
+    static_assert( std::is_same_v< typename coeff_t::value_t, typename basisapx_t::value_t >,
+                   "coefficient function and basis approximation must have equal value type" );
+
+    using value_t       = typename coeff_t::value_t;
+    using real_t        = Hpro::real_type_t< value_t >;
+    using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
+
+    HLR_ASSERT( cl->id() < block_map.size() );
+    
+    //
+    // construct all blocks in current block row/column
+    //
+
+    for ( auto  bc : block_map[ cl->id() ] )
+    {
+        // only compute, if not already done
+        if ( is_null( mat_map_H[ bc->id() ] ) )
+        {
+            // std::cout << cl->id() << " : matrix : " << bc->id() << std::endl;
+            
+            auto  M = build_matrix( bc, coeff, lrapx, acc, compress );
+        
+            if ( ! hlr::matrix::is_lowrank( *M ) )
+                mat_map_U[ bc->id() ] = M.get();
+
+            mat_map_H[ bc->id() ] = M.release();
+        }// if
+    }// for
+
+    //
+    // build row cluster basis
+    //
+
+    HLR_ASSERT( ! is_null( cb ) );
+
+    {
+        auto    lrmat   = std::list< hlr::matrix::lrmatrix< value_t > * >();
+        size_t  totrank = 0;
+
+        for ( auto  bc : block_map[ cl->id() ] )
+        {
+            auto  M = mat_map_H[ bc->id() ];
+        
+            if ( hlr::matrix::is_lowrank( M ) )
+            {
+                auto  R = ptrcast( M, hlr::matrix::lrmatrix< value_t > );
+            
+                totrank += R->rank();
+                lrmat.push_back( R );
+            }// if
+        }// for
+
+        if ( ! lrmat.empty() )
+        {
+            // form full cluster basis
+            //
+            //     U = ( M₀ M₁ M₂ … ) = ( U₀·V₀' U₁·V₁' U₂·V₂' … )
+            //
+            // in condensed form
+            //
+            //    ( U₀·C₀' U₁·C₁' U₂·C₁' … )
+            //
+            // with
+            //
+            //    C_i = R_i  and  qr(V_i) = Q_i R_i
+            //
+
+            size_t  nrows_U = cl->size();
+            auto    U       = blas::matrix< value_t >( cl->size(), totrank );
+            size_t  pos     = 0;
+        
+            for ( auto  R : lrmat )
+            {
+                auto  U_i = R->U( op );
+                auto  V_i = blas::copy( R->V( op ) );
+                auto  R_i = blas::matrix< value_t >();
+                auto  k   = R->rank();
+                
+                blas::qr( V_i, R_i, false );
+
+                auto  UR_i  = blas::prod( U_i, blas::adjoint( R_i ) );
+                auto  U_sub = blas::matrix< value_t >( U, blas::range::all, blas::range( pos, pos + k - 1 ) );
+
+                blas::copy( UR_i, U_sub );
+                
+                pos += k;
+            }// for
+
+            //
+            // approximate basis
+            //
+        
+            auto  Us = blas::vector< real_t >();
+            auto  Un = basisapx.column_basis( U, acc, & Us );
+
+            // finally assign to cluster basis object
+            cb->set_basis( std::move( Un ), std::move( Us ) );
+
+            //
+            // compute row coupling for all lowrank matrices in block row
+            //
+
+            for ( auto  R : lrmat )
+            {
+                //
+                // create uniform lr matrix, if not yet present
+                //
+                     
+                auto  U = ptrcast( mat_map_U[ R->id() ], hlr::matrix::uniform_lr2matrix< value_t > );
+                
+                if ( is_null( U ) )
+                {
+                    auto  Up = std::make_unique< hlr::matrix::uniform_lr2matrix< value_t > >( R->row_is(), R->col_is() );
+
+                    U = Up.get();
+                    U->set_id( R->id() );
+                    U->set_procs( R->procs() );
+                    
+                    mat_map_U[ R->id() ] = Up.release();
+                }// if
+
+                // already assign row basis ("unsafe" due to missing couplings)
+                if ( op == apply_normal ) U->set_row_basis_unsafe( *cb );
+                else                      U->set_col_basis_unsafe( *cb );
+
+                // compute row coupling
+                auto  U_i = R->U( op );
+                auto  S   = blas::prod( blas::adjoint( cb->basis() ), U_i );
+
+                // std::cout << cl->id() << " : coupling " << R->id() << std::endl;
+                
+                if ( op == apply_normal ) U->set_row_coupling_unsafe( std::move( S ) );
+                else                      U->set_col_coupling_unsafe( std::move( S ) );
+                
+                // finalize U if both couplings are present or otherwise just remember row coupling 
+                if ( U->has_row_coupling() && U->has_col_coupling() )
+                {
+                    if ( compress )
+                        U->compress( acc );
+                    
+                    // std::cout << cl->id() << " : delete " << R->id() << std::endl;
+                    
+                    mat_map_H[ R->id() ] = nullptr;
+                    delete R;
+                }// if
             }// for
 
             // all uniform matrix blocks computed, so we can compress basis

@@ -279,7 +279,7 @@ public:
     // return true if data is compressed
     virtual bool   is_compressed () const
     {
-        return ! is_null( _zM.data() );
+        return ! _zM.empty();
     }
 
     // access compression data

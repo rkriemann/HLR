@@ -176,6 +176,7 @@ public:
         _col_cb = & acol_cb;
     }
 
+    // sets basis without checks
     void set_row_basis_unsafe ( cluster_basis_t &  acb ) { _row_cb = & acb; }
     void set_col_basis_unsafe ( cluster_basis_t &  acb ) { _col_cb = & acb; }
 
@@ -332,7 +333,7 @@ public:
     // return true if data is compressed
     virtual bool   is_compressed () const
     {
-        return ! is_null( _zS.data() );
+        return ! _zS.empty();
     }
 
     //
@@ -474,9 +475,9 @@ uniform_lrmatrix< value_t >::uni_apply_add ( const value_t                    al
                                              blas::vector< value_t > &        uy,
                                              const Hpro::matop_t              op ) const
 {
-    #if defined(HLR_HAS_ZBLAS_DIRECT)
     if ( is_compressed() )
     {
+        #if defined(HLR_HAS_ZBLAS_DIRECT)
         switch ( op )
         {
             case apply_normal     : compress::zblas::mulvec( row_rank(), col_rank(), op, alpha, _zS, ux.data(), uy.data() ); break;
@@ -485,9 +486,20 @@ uniform_lrmatrix< value_t >::uni_apply_add ( const value_t                    al
             case apply_adjoint    : compress::zblas::mulvec( row_rank(), col_rank(), op, alpha, _zS, ux.data(), uy.data() ); break;
             default               : HLR_ERROR( "unsupported matrix operator" );
         }// switch
+        #else
+        auto  S = coupling();
+        
+        switch ( op )
+        {
+            case apply_normal     : blas::mulvec( alpha, S, ux, value_t(1), uy ); break;
+            case apply_conjugate  : HLR_ASSERT( false );
+            case apply_transposed : HLR_ASSERT( false );
+            case apply_adjoint    : blas::mulvec( alpha, blas::adjoint( S ), ux, value_t(1), uy ); break;
+            default               : HLR_ERROR( "unsupported matrix operator" );
+        }// switch
+        #endif
     }// if
     else
-    #endif
     {
         switch ( op )
         {
@@ -546,6 +558,19 @@ uniform_lrmatrix< value_t >::compress ( const accuracy &  acc )
     const size_t  mem_dense = sizeof(value_t) * _S.nrows() * _S.ncols();
     auto          zS        = compress::compress( zconfig, _S );
     const auto    zmem      = compress::compressed_size( zS );
+
+    // // DEBUG
+    // {
+    //     auto  Z = blas::matrix< value_t >( _S.nrows(), _S.ncols() );
+
+    //     io::matlab::write( _S, "S" );
+    //     compress::decompress( zS, Z );
+    //     io::matlab::write( Z, "Z" );
+    //     blas::add( value_t(-1), _S, Z );
+        
+    //     std::cout << blas::norm_F( Z ) / blas::norm_F( _S ) << std::endl;
+    // }
+    // // DEBUG
 
     if (( zmem > 0 ) && ( zmem < mem_dense ))
     {

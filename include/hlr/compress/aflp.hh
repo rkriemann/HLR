@@ -428,7 +428,7 @@ compress ( const double *  data,  // points to actual start of buffer
             sign[j] = ( aval != val );
             fbuf[j] = scale * aval + 1.0;
 
-            HLR_DBG_ASSERT( fbuf[j] >= double(2) );
+            HLR_DBG_ASSERT( zero[j] || ( fbuf[j] >= double(2) ));
         }// for
 
         // convert to compressed format

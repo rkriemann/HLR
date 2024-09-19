@@ -805,22 +805,6 @@ build_uniform ( const Hpro::TBlockCluster *  bc,
             rowcb->set_id( rowcl->id() );
             row_cbs[ rowcb->id() ] = rowcb.get();
             
-            // insert into hierarchy
-            if ( ! is_null( rowcl->parent() ) )
-            {
-                auto  cl_parent = rowcl->parent();
-                auto  cb_parent = row_cbs[ cl_parent->id() ];
-
-                HLR_ASSERT( ! is_null( cb_parent ) );
-
-                for ( uint  i = 0; i < cl_parent->nsons(); ++i )
-                    if ( cl_parent->son(i) == rowcl )
-                    {
-                        cb_parent->set_son( i, rowcb.get() );
-                        break;
-                    }// if
-            }// if
-            
             detail::build_uniform( rowcl, rowcb.release(),
                                    coeff, lrapx, basisapx, acc, compress,
                                    row_map, mat_map_H, mat_map_U, row_coup, col_coup,
@@ -838,22 +822,6 @@ build_uniform ( const Hpro::TBlockCluster *  bc,
             colcb->set_id( colcl->id() );
             col_cbs[ colcb->id() ] = colcb.get();
             
-            // insert into hierarchy
-            if ( ! is_null( colcl->parent() ) )
-            {
-                auto  cl_parent = colcl->parent();
-                auto  cb_parent = col_cbs[ cl_parent->id() ];
-
-                HLR_ASSERT( ! is_null( cb_parent ) );
-
-                for ( uint  i = 0; i < cl_parent->nsons(); ++i )
-                    if ( cl_parent->son(i) == colcl )
-                    {
-                        cb_parent->set_son( i, colcb.get() );
-                        break;
-                    }// if
-            }// if
-
             detail::build_uniform( colcl, colcb.release(),
                                    coeff, lrapx, basisapx, acc, compress,
                                    col_map, mat_map_H, mat_map_U, col_coup, row_coup,
@@ -873,8 +841,107 @@ build_uniform ( const Hpro::TBlockCluster *  bc,
     auto  colcb_root = std::unique_ptr< hlr::matrix::shared_cluster_basis< value_t > >( col_cbs[ bc->colcl()->id() ] );
     auto  M_root     = std::unique_ptr< Hpro::TMatrix< value_t > >( mat_map_U[ bc->id() ] );
 
-    HLR_ASSERT( ! is_null( M_root ) );
+    HLR_ASSERT( ! is_null( M_root ) && ! is_null( rowcb_root ) && ! is_null( colcb_root ) );
 
+    detail::fix_hierarchy( bc->rowcl(), rowcb_root.get(), row_cbs );
+    detail::fix_hierarchy( bc->colcl(), colcb_root.get(), col_cbs );
+    detail::fix_hierarchy( bc, M_root.get(), mat_map_U );
+    
+    return { std::move( rowcb_root ), std::move( colcb_root ), std::move( M_root ) };
+}
+
+template < coefficient_function_type coeff_t,
+           lowrank_approx_type lrapx_t,
+           approx::approximation_type basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
+            std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
+            std::unique_ptr< Hpro::TMatrix< Hpro::value_type_t< coeff_t > > > >
+build_uniform_sep ( const Hpro::TBlockCluster *  bc,
+                    const coeff_t &              coeff,
+                    const lrapx_t &              lrapx,
+                    const basisapx_t &           basisapx,
+                    const accuracy &             acc,
+                    const bool                   compress,
+                    const size_t                 /* nseq */ = 0 ) // ignored
+{
+    using value_t = typename coeff_t::value_t;
+
+    auto  row_cls    = std::list< const Hpro::TCluster * >();
+    auto  col_cls    = std::list< const Hpro::TCluster * >();
+    auto  row_map    = std::vector< std::list< const Hpro::TBlockCluster * > >( bc->rowcl()->id() + 1 );
+    auto  col_map    = std::vector< std::list< const Hpro::TBlockCluster * > >( bc->colcl()->id() + 1 );
+    auto  row_cbs    = std::vector< shared_cluster_basis< value_t > * >( bc->rowcl()->id() + 1 );
+    auto  col_cbs    = std::vector< shared_cluster_basis< value_t > * >( bc->colcl()->id() + 1 );
+    auto  mat_map_H  = std::vector< Hpro::TMatrix< value_t > * >( bc->id() + 1, nullptr );
+    auto  mat_map_U  = std::vector< Hpro::TMatrix< value_t > * >( bc->id() + 1, nullptr );
+    auto  rowcb      = std::make_unique< shared_cluster_basis< value_t > >( * bc->rowcl() );
+    auto  colcb      = std::make_unique< shared_cluster_basis< value_t > >( * bc->colcl() );
+
+    detail::collect_clusters( bc->rowcl(), row_cls );
+    detail::collect_clusters( bc->colcl(), col_cls );
+    detail::build_block_map< value_t >( bc, row_map, col_map );
+
+    //
+    // intermix row/column clusters to free lowrank blocks as soon as possible
+    //
+
+    auto  iter_rows = row_cls.begin();
+    auto  iter_cols = col_cls.begin();
+
+    while (( iter_rows != row_cls.end() ) &&
+           ( iter_cols != col_cls.end() ))
+    {
+        if ( iter_rows != row_cls.end() )
+        {
+            auto  rowcl = *iter_rows;
+            auto  rowcb = std::make_unique< hlr::matrix::shared_cluster_basis< value_t > >( *rowcl );
+            
+            rowcb->set_nsons( rowcl->nsons() );
+            rowcb->set_id( rowcl->id() );
+            row_cbs[ rowcb->id() ] = rowcb.get();
+            
+            detail::build_uniform_sep( rowcl, rowcb.release(),
+                                       coeff, lrapx, basisapx, acc, compress,
+                                       row_map, mat_map_H, mat_map_U,
+                                       apply_normal );
+            
+            ++iter_rows;
+        }// if
+
+        if ( iter_cols != col_cls.end() )
+        {
+            auto  colcl = *iter_cols;
+            auto  colcb = std::make_unique< hlr::matrix::shared_cluster_basis< value_t > >( *colcl );
+            
+            colcb->set_nsons( colcl->nsons() );
+            colcb->set_id( colcl->id() );
+            col_cbs[ colcb->id() ] = colcb.get();
+            
+            detail::build_uniform_sep( colcl, colcb.release(),
+                                       coeff, lrapx, basisapx, acc, compress,
+                                       col_map, mat_map_H, mat_map_U,
+                                       apply_adjoint );
+            
+            ++iter_cols;
+        }// if
+    }// while
+
+    // check if all low rank blocks are gone
+    for ( auto  M : mat_map_H )
+    {
+        HLR_ASSERT( ! hlr::matrix::is_lowrank( M ) );
+    }// for
+    
+    auto  rowcb_root = std::unique_ptr< hlr::matrix::shared_cluster_basis< value_t > >( row_cbs[ bc->rowcl()->id() ] );
+    auto  colcb_root = std::unique_ptr< hlr::matrix::shared_cluster_basis< value_t > >( col_cbs[ bc->colcl()->id() ] );
+    auto  M_root     = std::unique_ptr< Hpro::TMatrix< value_t > >( mat_map_U[ bc->id() ] );
+
+    HLR_ASSERT( ! is_null( M_root ) && ! is_null( rowcb_root ) && ! is_null( colcb_root ) );
+
+    detail::fix_hierarchy( bc->rowcl(), rowcb_root.get(), row_cbs );
+    detail::fix_hierarchy( bc->colcl(), colcb_root.get(), col_cbs );
+    detail::fix_hierarchy( bc, M_root.get(), mat_map_U );
+    
     return { std::move( rowcb_root ), std::move( colcb_root ), std::move( M_root ) };
 }
 

@@ -104,7 +104,7 @@ convert_to_lowrank ( const Hpro::TMatrix< value_t > &  M,
         
         return std::make_unique< lrmatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );
     }// if
-    else if ( matrix::is_uniform_lowrank( M ) )
+    else if ( matrix::is_uniform_lowrank2( M ) )
     {
         auto  R        = cptrcast( &M, uniform_lr2matrix< value_t > );
         auto  US       = blas::prod( R->row_basis(), R->row_coupling() );
@@ -271,6 +271,15 @@ convert_to_lowrank_sv ( const Hpro::TMatrix< value_t > &  M,
         auto  R           = cptrcast( &M, uniform_lrmatrix< value_t > );
         auto  US          = blas::prod( R->row_basis(), R->coupling() );
         auto  [ U, S, V ] = approx.approx_ortho( US, R->col_basis(), acc );
+        
+        return std::make_unique< lrsvmatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( S ), std::move( V ) );
+    }// if
+    else if ( matrix::is_uniform_lowrank2( M ) )
+    {
+        auto  R           = cptrcast( &M, uniform_lr2matrix< value_t > );
+        auto  Ur          = blas::prod( R->row_basis(), R->row_coupling() );
+        auto  Vc          = blas::prod( R->col_basis(), R->col_coupling() );
+        auto  [ U, S, V ] = approx.approx_ortho( Ur, Vc, acc );
         
         return std::make_unique< lrsvmatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( S ), std::move( V ) );
     }// if
@@ -468,6 +477,16 @@ convert_to_dense ( const Hpro::TMatrix< value_t > &  M )
         auto  R   = cptrcast( &M, uniform_lrmatrix< value_t > );
         auto  UxS = blas::prod( R->row_cb().basis(), R->coupling() );
         auto  D   = blas::prod( UxS, blas::adjoint( R->col_cb().basis() ) );
+        auto  DM  = std::make_unique< dense_matrix< value_t > >( M.row_is(), M.col_is(), std::move( D ) );
+        
+        return DM;
+    }// if
+    else if ( matrix::is_uniform_lowrank2( M ) )
+    {
+        auto  R   = cptrcast( &M, uniform_lr2matrix< value_t > );
+        auto  Ur  = blas::prod( R->row_basis(), R->row_coupling() );
+        auto  Vc  = blas::prod( R->col_basis(), R->col_coupling() );
+        auto  D   = blas::prod( Ur, blas::adjoint( Vc ) );
         auto  DM  = std::make_unique< dense_matrix< value_t > >( M.row_is(), M.col_is(), std::move( D ) );
         
         return DM;

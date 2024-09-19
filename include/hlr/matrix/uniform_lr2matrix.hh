@@ -195,6 +195,14 @@ public:
         _col_cb = & acol_cb;
     }
 
+    // unsafe (without checks) versions
+    void set_row_basis_unsafe ( cluster_basis_t &  acb ) { _row_cb = & acb; }
+    void set_col_basis_unsafe ( cluster_basis_t &  acb ) { _col_cb = & acb; }
+
+    // return true if row/column couplings are present
+    bool  has_row_coupling () const { return _S_row.nrows() != 0; }
+    bool  has_col_coupling () const { return _S_col.nrows() != 0; }
+            
     // return coupling matrices
     blas::matrix< value_t >
     row_coupling () const
@@ -265,13 +273,13 @@ public:
     compress::zarray  zrow_coupling () const { return _zS_row; }
     compress::zarray  zcol_coupling () const { return _zS_col; }
 
-    // set coupling matrix without bases consistency check
-    // (because cluster bases need to be adjusted later)
+    // unsafe (without checks) versions
     void
     set_row_coupling_unsafe ( const blas::matrix< value_t > &  aS )
     {
         HLR_ASSERT( ! is_compressed() );
         blas::copy( aS, _S_row );
+        _rank  = _S_row.ncols();
     }
     
     void
@@ -279,6 +287,7 @@ public:
     {
         HLR_ASSERT( ! is_compressed() );
         blas::copy( aS, _S_col );
+        _rank  = _S_col.ncols();
     }
     
     void
@@ -286,12 +295,14 @@ public:
     {
         HLR_ASSERT( ! is_compressed() );
         _S_row = std::move( aS );
+        _rank  = _S_row.ncols();
     }
     void
     set_col_coupling_unsafe ( blas::matrix< value_t > &&  aS )
     {
         HLR_ASSERT( ! is_compressed() );
         _S_col = std::move( aS );
+        _rank  = _S_col.ncols();
     }
 
     void
@@ -399,7 +410,7 @@ public:
     // return true if data is compressed
     virtual bool   is_compressed () const
     {
-        return ! is_null( _zS_row.data() );
+        return ! _zS_row.empty();
     }
 
     //
@@ -548,9 +559,10 @@ uniform_lr2matrix< value_t >::uni_apply_add ( const value_t                    a
 {
     auto  t = blas::vector< value_t >( _rank );
     
-    #if defined(HLR_HAS_ZBLAS_DIRECT)
     if ( is_compressed() )
     {
+        #if defined(HLR_HAS_ZBLAS_DIRECT)
+        
         switch ( op )
         {
             case apply_normal     :
@@ -569,9 +581,34 @@ uniform_lr2matrix< value_t >::uni_apply_add ( const value_t                    a
             default :
                 HLR_ERROR( "unsupported matrix operator" );
         }// switch
+        
+        #else
+        
+        auto  Sr = row_coupling();
+        auto  Sc = col_coupling();
+        
+        switch ( op )
+        {
+            case apply_normal     :
+                blas::mulvec( value_t(1), blas::adjoint( Sc ), ux, value_t(1), t );
+                blas::mulvec( alpha, Sr, t, value_t(1), uy );
+                break;
+                    
+            case apply_conjugate  : { HLR_ASSERT( false ); }
+            case apply_transposed : { HLR_ASSERT( false ); }
+                    
+            case apply_adjoint    :
+                blas::mulvec( value_t(1), blas::adjoint( Sr ), ux, value_t(1), t );
+                blas::mulvec( alpha, Sc, t, value_t(1), uy );
+                break;
+                    
+            default               :
+                HLR_ERROR( "unsupported matrix operator" );
+        }// switch
+        
+        #endif
     }// if
     else
-    #endif
     {
         switch ( op )
         {
@@ -640,7 +677,8 @@ uniform_lr2matrix< value_t >::compress ( const accuracy &  acc )
     }// if
     else if ( lacc.rel_eps() != 0 )
     {
-        // nothing to do
+        tol = lacc.rel_eps();
+        // no norm required
     }// if
     else
         HLR_ERROR( "zero error" );
@@ -652,6 +690,29 @@ uniform_lr2matrix< value_t >::compress ( const accuracy &  acc )
     auto          zS_col    = compress::compress( zconf_col, _S_col );
     const auto    zmem      = compress::compressed_size( zS_row ) + compress::compressed_size( zS_col );
 
+    // // DEBUG
+    // {
+    //     io::matlab::write( _S_row, "Sr" );
+    //     io::matlab::write( _S_col, "Sc" );
+
+    //     auto  Zr = blas::matrix< value_t >( _S_row.nrows(), _S_row.ncols() );
+    //     auto  Zc = blas::matrix< value_t >( _S_col.nrows(), _S_col.ncols() );
+
+    //     compress::decompress( zS_row, Zr );
+    //     compress::decompress( zS_col, Zc );
+        
+    //     io::matlab::write( Zr, "Zr" );
+    //     io::matlab::write( Zc, "Zc" );
+
+    //     auto  S = blas::prod( _S_row, blas::adjoint( _S_col ) );
+    //     auto  Z = blas::prod( Zr, blas::adjoint( Zc ) );
+
+    //     blas::add( value_t(-1), S, Z );
+        
+    //     std::cout << blas::norm_F( Z ) / blas::norm_F( S ) << std::endl;
+    // }
+    // // DEBUG
+    
     if (( zmem > 0 ) && ( zmem < mem_dense ))
     {
         HLR_ASSERT( (( zS_row.size() == 0 ) || ( zS_row.data() != nullptr )) &&

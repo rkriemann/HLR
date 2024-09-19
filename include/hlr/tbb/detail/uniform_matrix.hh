@@ -537,6 +537,210 @@ build_uniform ( const Hpro::TCluster *                                          
     }
 }
 
+template < typename coeff_t,
+           typename lrapx_t,
+           typename basisapx_t >
+void
+build_uniform_sep ( const Hpro::TCluster *                                            cl,
+                    hlr::matrix::shared_cluster_basis< typename coeff_t::value_t > *  cb,
+                    const coeff_t &                                                   coeff,
+                    const lrapx_t &                                                   lrapx,
+                    const basisapx_t &                                                basisapx,
+                    const accuracy &                                                  acc,
+                    const bool                                                        compress,
+                    std::vector< std::list< const Hpro::TBlockCluster * > > &         block_map,
+                    std::vector< Hpro::TMatrix< typename coeff_t::value_t > * > &     mat_map_H,
+                    std::vector< Hpro::TMatrix< typename coeff_t::value_t > * > &     mat_map_U,
+                    const matop_t                                                     op,
+                    std::vector< std::mutex > &                                       mutex_H,
+                    std::vector< std::mutex > &                                       mutex_U )
+{
+    static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
+                   "coefficient function and low-rank approximation must have equal value type" );
+    static_assert( std::is_same_v< typename coeff_t::value_t, typename basisapx_t::value_t >,
+                   "coefficient function and basis approximation must have equal value type" );
+
+    using value_t       = typename coeff_t::value_t;
+    using real_t        = Hpro::real_type_t< value_t >;
+    using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
+
+    HLR_ASSERT( cl->id() < block_map.size() );
+    
+    //
+    // construct all blocks in current block row/column
+    //
+
+    auto  cl_blocks = std::list< const Hpro::TBlockCluster * >();
+
+    // copy to local list
+    for ( auto  bc : block_map[ cl->id() ] )
+        cl_blocks.push_back( bc );
+
+    while ( ! cl_blocks.empty() )
+    {
+        auto  bc = behead( cl_blocks );
+
+        // try lock to see if block is already handled by other thread
+        if ( mutex_H[ bc->id() ].try_lock() )
+        {
+            // only compute, if not already done
+            if ( is_null( mat_map_H[ bc->id() ] ) )
+            {
+                // std::cout << cl->id() << " : matrix : " << bc->id() << std::endl;
+                
+                auto  M = build_matrix( bc, coeff, lrapx, acc, compress );
+
+                // needed for hierarchy
+                if ( ! hlr::matrix::is_lowrank( *M ) )
+                    mat_map_U[ bc->id() ] = M.get();
+
+                mat_map_H[ bc->id() ] = M.release();
+            }// if
+
+            mutex_H[ bc->id() ].unlock();
+        }// if
+        else
+        {
+            // handle later to be sure that block was constructed
+            cl_blocks.push_back( bc );
+        }// else
+    }// for
+
+    //
+    // build row cluster basis
+    //
+
+    HLR_ASSERT( ! is_null( cb ) );
+
+    {
+        auto    lrmat   = std::list< hlr::matrix::lrmatrix< value_t > * >();
+        size_t  totrank = 0;
+
+        for ( auto  bc : block_map[ cl->id() ] )
+        {
+            // std::cout << cl->id() << " : basis " << bc->id() << std::endl;
+            
+            auto  M = mat_map_H[ bc->id() ];
+        
+            if ( hlr::matrix::is_lowrank( M ) )
+            {
+                auto  R = ptrcast( M, hlr::matrix::lrmatrix< value_t > );
+            
+                totrank += R->rank();
+                lrmat.push_back( R );
+            }// if
+        }// for
+
+        if ( ! lrmat.empty() )
+        {
+            // form full cluster basis
+            //
+            //     U = ( M₀ M₁ M₂ … ) = ( U₀·V₀' U₁·V₁' U₂·V₂' … )
+            //
+            // in condensed form
+            //
+            //    ( U₀·C₀' U₁·C₁' U₂·C₁' … )
+            //
+            // with
+            //
+            //    C_i = R_i  and  qr(V_i) = Q_i R_i
+            //
+
+            size_t  nrows_U = cl->size();
+            auto    U       = blas::matrix< value_t >( cl->size(), totrank );
+            size_t  pos     = 0;
+        
+            for ( auto  R : lrmat )
+            {
+                auto  U_i = R->U( op );
+                auto  V_i = blas::copy( R->V( op ) );
+                auto  R_i = blas::matrix< value_t >();
+                auto  k   = R->rank();
+                
+                blas::qr( V_i, R_i, false );
+
+                auto  UR_i  = blas::prod( U_i, blas::adjoint( R_i ) );
+                auto  U_sub = blas::matrix< value_t >( U, blas::range::all, blas::range( pos, pos + k - 1 ) );
+
+                blas::copy( UR_i, U_sub );
+                
+                pos += k;
+            }// for
+
+            //
+            // approximate basis
+            //
+        
+            auto  Us = blas::vector< real_t >();
+            auto  Un = basisapx.column_basis( U, acc, & Us );
+
+            // finally assign to cluster basis object
+            cb->set_basis( std::move( Un ), std::move( Us ) );
+
+            //
+            // compute row coupling for all lowrank matrices in block row
+            //
+
+            for ( auto  R : lrmat )
+            {
+                //
+                // create uniform lr matrix, if not yet present
+                //
+
+                hlr::matrix::uniform_lr2matrix< value_t > *  U = nullptr;
+                
+                {
+                    auto  lock = std::scoped_lock( mutex_U[ R->id() ] );
+                    
+                    U = ptrcast( mat_map_U[ R->id() ], hlr::matrix::uniform_lr2matrix< value_t > );
+                
+                    if ( is_null( U ) )
+                    {
+                        auto  Up = std::make_unique< hlr::matrix::uniform_lr2matrix< value_t > >( R->row_is(), R->col_is() );
+
+                        U = Up.get();
+                        U->set_id( R->id() );
+                        U->set_procs( R->procs() );
+                    
+                        mat_map_U[ R->id() ] = Up.release();
+                    }// if
+                }
+                
+                // already assign row basis ("unsafe" due to missing couplings)
+                if ( op == apply_normal ) U->set_row_basis_unsafe( *cb );
+                else                      U->set_col_basis_unsafe( *cb );
+
+                // compute row coupling
+                auto  U_i = R->U( op );
+                auto  S   = blas::prod( blas::adjoint( cb->basis() ), U_i );
+
+                // set coupling matrices ("unsafe" due to first initialization)
+                if ( op == apply_normal ) U->set_row_coupling_unsafe( std::move( S ) );
+                else                      U->set_col_coupling_unsafe( std::move( S ) );
+                
+                {
+                    auto  lock = std::scoped_lock( U->mutex() );
+                
+                    // finalize U if both couplings are present or otherwise just remember row coupling 
+                    if ( U->has_row_coupling() && U->has_col_coupling() )
+                    {
+                        if ( compress )
+                            U->compress( acc );
+                        
+                        // std::cout << cl->id() << " : delete " << R->id() << std::endl;
+                        mat_map_H[ R->id() ] = nullptr;
+                        delete R;
+                    }// if
+                }
+            }// for
+
+            // all uniform matrix blocks computed, so we can compress basis
+            if ( compress )
+                cb->compress( acc );
+        }// if
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 // build uniform matrix level by level (of block tree)

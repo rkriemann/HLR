@@ -51,7 +51,7 @@ program_main ()
     auto  bct     = gen_bct( *ct, *ct );
 
     if ( hpro::verbose( 3 ) )
-        io::eps::print( * bct->root(), "bt", "id" );
+        io::eps::print( * bct->root(), "bt", "id,innerid" );
     
     auto  coeff   = problem->coeff_func();
     auto  pcoeff  = Hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
@@ -72,7 +72,7 @@ program_main ()
             auto  hcalr  = bem::hca_lrapx( hca );
 
             if ( sep_coup )
-                std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_lvl_sep( bct->root(), pcoeff, hcalr, cbapx, acc, cmdline::compress );
+                std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_sep( bct->root(), pcoeff, hcalr, cbapx, acc, cmdline::compress );
             else
                 std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform( bct->root(), pcoeff, hcalr, cbapx, acc, cmdline::compress );
         }// if
@@ -89,7 +89,7 @@ program_main ()
         auto  acalr = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
 
         if ( sep_coup )
-            std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_lvl_sep( bct->root(), pcoeff, acalr, cbapx, acc, cmdline::compress );
+            std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_sep( bct->root(), pcoeff, acalr, cbapx, acc, cmdline::compress );
         else
             std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform( bct->root(), pcoeff, acalr, cbapx, acc, cmdline::compress );
     }// else
@@ -103,11 +103,13 @@ program_main ()
         auto  dense = bem::dense_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
         
         if ( sep_coup )
-            std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_lvl_sep( bct->root(), pcoeff, dense, cbapx, acc, cmdline::compress );
+            std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_sep( bct->root(), pcoeff, dense, cbapx, acc, cmdline::compress );
         else
             std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform( bct->root(), pcoeff, dense, cbapx, acc, cmdline::compress );
     }// else
-        
+
+    // impl::matrix::compress( *A, acc );
+    
     toc = timer::since( tic );
     
     const auto  mem_A   = A->byte_size();
@@ -183,9 +185,19 @@ program_main ()
         std::cout << "    mem   = " << format_mem( mem_H ) << std::endl;
         std::cout << "    |A|   = " << format_norm( norm_H ) << std::endl;
 
-        auto  error = impl::norm::frobenius( 1, *H, -1, *A );
+        {
+            auto  error = impl::norm::frobenius( 1, *H, -1, *A );
 
-        std::cout << "    error = " << format_error( error, error / norm_H ) << std::endl;
+            std::cout << "    error = " << format_error( error, error / norm_H ) << std::endl;
+        }
+
+        // {
+        //     auto  n_H   = impl::norm::spectral( *H );
+        //     auto  diff  = matrix::sum( 1, *H, -1, *A );
+        //     auto  error = impl::norm::spectral( *diff );
+
+        //     std::cout << "    error = " << format_error( error, error / n_H ) << std::endl;
+        // }
     }// if
     
     //////////////////////////////////////////////////////////////////////

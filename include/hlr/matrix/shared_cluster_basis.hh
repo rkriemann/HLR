@@ -382,9 +382,7 @@ public:
     // return true if data is compressed
     virtual bool   is_compressed () const
     {
-        return _zV.size() > 0;
-        
-        return false;
+        return ! _zV.empty();
     }
 
 protected:
