@@ -722,7 +722,7 @@ build_uniform_sep ( const Hpro::TCluster *                                      
                     auto  lock = std::scoped_lock( U->mutex() );
                 
                     // finalize U if both couplings are present or otherwise just remember row coupling 
-                    if ( U->has_row_coupling() && U->has_col_coupling() )
+                    if ( U->has_row_coupling() && U->has_col_coupling() && ! is_null( mat_map_H[ U->id() ] ) )
                     {
                         if ( compress )
                             U->compress( acc );
