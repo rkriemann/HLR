@@ -346,13 +346,55 @@ program_main ()
         colcb_h2 = std::move( colcb );
     }
 
-    if ( true )
+    if ( false )
     {
         std::cout << term::bullet << term::bold << "H²-matrix (sep. coupling)" << term::reset << std::endl;
     
         tic = timer::now();
     
         auto  [ rowcb, colcb, A2 ] = impl::matrix::build_h2_rec_sep( *A, apx, acc, nseq );
+
+        toc = timer::since( tic );
+        std::cout << "    done in  " << format_time( toc ) << std::endl;
+        std::cout << "    mem    = " << format_mem( rowcb->byte_size(), colcb->byte_size(), A2->byte_size() ) << std::endl;
+
+        auto  [ row_min, row_avg, row_max ] = matrix::rank_info( *rowcb );
+        auto  [ col_min, col_avg, col_max ] = matrix::rank_info( *colcb );
+
+        std::cout << "    ranks  = "
+                  << row_min << " … " << row_avg << " … " << row_max << " / "
+                  << col_min << " … " << col_avg << " … " << col_max << std::endl;
+        
+        if ( hpro::verbose( 3 ) )
+        {
+            io::eps::print( *A2, "H2", "noid" );
+            io::eps::print( *rowcb, "rowcb_h2" );
+            io::eps::print( *colcb, "colcb_h2" );
+        }// if
+        
+        matrix::print_mem_lvl( *A2, *rowcb, *colcb );
+        
+        {
+            auto  diff  = matrix::sum( 1, *A, -1, *A2 );
+            auto  error = hlr::norm::spectral( impl::arithmetic, *diff, 1e-4 );
+        
+            std::cout << "    error  = " << format_error( error / normA ) << std::endl;
+        }
+        
+        {
+            auto  error = impl::norm::frobenius( 1, *A, -1, *A2 );
+
+            std::cout << "    error = " << format_error( error, error / normA ) << std::endl;
+        }
+    }
+
+    if ( true )
+    {
+        std::cout << term::bullet << term::bold << "H²-matrix (from uniform)" << term::reset << std::endl;
+    
+        tic = timer::now();
+    
+        auto  [ rowcb, colcb, A2 ] = impl::matrix::build_h2( *A_uni, *rowcb_uni, *colcb_uni, apx, acc, false );
 
         toc = timer::since( tic );
         std::cout << "    done in  " << format_time( toc ) << std::endl;

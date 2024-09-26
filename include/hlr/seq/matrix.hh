@@ -1376,6 +1376,45 @@ build_h2_rec_sep ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
 }
     
+template < typename basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::nested_cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< hlr::matrix::nested_cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
+build_h2 ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
+           const hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > &  srowcb,
+           const hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > &  scolcb,
+           const basisapx_t &                                                         basisapx,
+           const accuracy &                                                           acc,
+           const bool                                                                 compress,
+           const size_t                                                               /* nseq */ = 0 ) // ignored
+{
+    using value_t       = typename basisapx_t::value_t;
+    using cluster_basis = hlr::matrix::nested_cluster_basis< value_t >;
+
+    //
+    // build cluster bases
+    //
+
+    auto  nrowcb  = std::make_unique< cluster_basis >( A.row_is() );
+    auto  ncolcb  = std::make_unique< cluster_basis >( A.col_is() );
+    auto  Xp_row  = blas::matrix< value_t >( A.nrows(), 0 );
+    auto  Xp_col  = blas::matrix< value_t >( A.ncols(), 0 );
+    
+    detail::build_nested_cluster_basis( *nrowcb, srowcb, Xp_row, basisapx, acc, compress );
+    detail::build_nested_cluster_basis( *ncolcb, scolcb, Xp_col, basisapx, acc, compress );
+
+    { int  id = 0;  detail::set_ids( *nrowcb, id ); }
+    { int  id = 0;  detail::set_ids( *ncolcb, id ); }
+
+    //
+    // construct uniform lowrank matrices with given cluster bases
+    //
+    
+    auto  M = detail::build_h2( A, *nrowcb, *ncolcb, acc, compress );
+    
+    return  { std::move( nrowcb ), std::move( ncolcb ), std::move( M ) };
+}
+    
 //
 // assign block cluster to matrix
 //

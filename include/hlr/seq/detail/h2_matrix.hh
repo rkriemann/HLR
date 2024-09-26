@@ -357,6 +357,149 @@ build_nested_cluster_basis ( nested_cluster_basis< value_t > &  cb,
     return blas::matrix< value_t >();
 }
 
+//
+// build nested cluster basis out of shared cluster basis
+//
+template < typename value_t,
+           typename basisapx_t >
+blas::matrix< value_t >
+build_nested_cluster_basis ( nested_cluster_basis< value_t > &        ncb,
+                             const shared_cluster_basis< value_t > &  scb,
+                             blas::matrix< value_t > &                Xp,
+                             const basisapx_t &                       basisapx,
+                             const accuracy &                         acc,
+                             const bool                               compress )
+{
+    using  real_t  = Hpro::real_type_t< value_t >;
+
+    //
+    // set up total basis as parent basis plus local part
+    //
+
+    auto  Xt = blas::matrix< value_t >();
+
+    if ( scb.rank() > 0 )
+    {
+        auto  Xs    = scb.basis();
+        auto  nrows = scb.is.size();
+        auto  ncols = Xp.ncols() + Xs.ncols();
+
+        Xt = std::move( blas::matrix< value_t >( nrows, ncols ) );
+        
+        auto  Xt_p  = blas::matrix< value_t >( Xt, blas::range::all, blas::range( 0, Xp.ncols() - 1 ) );
+        auto  Xt_s  = blas::matrix< value_t >( Xt, blas::range::all, blas::range( Xp.ncols(), Xp.ncols() + Xs.ncols() - 1 ) );
+
+        blas::copy( Xp, Xt_p );
+        blas::copy( Xs, Xt_s );
+    }// if
+    else
+    {
+        Xt = std::move( blas::copy( Xp ) );
+    }// else
+        
+    //
+    // construct cluster basis
+    //
+
+    if ( scb.nsons() == 0 )
+    {
+        //
+        // compress total basis
+        //
+        
+        auto  Ws = blas::vector< real_t >(); // sing. val. for each basis vector
+        auto  W  = basisapx.column_basis( Xt, acc, & Ws );
+        auto  R  = blas::prod( blas::adjoint( W ), Xt );
+
+        ncb.set_basis( std::move( W ), std::move( Ws ) );
+
+        if ( compress )
+            ncb.compress( acc );
+
+        return std::move( R );
+    }// if
+    else
+    {
+        ncb->set_nsons( scb.nsons() );
+        
+        //
+        // recurse
+        //
+
+        size_t  ncols    = Xt.ncols();
+        size_t  nrows    = 0;
+        auto    ncb_sons = std::vector< nested_cluster_basis< value_t > * >( scb.nsons(), nullptr );
+        auto    R_sons   = std::vector< blas::matrix< value_t > >( scb.nsons() );
+        
+        for ( uint  i = 0; i < scb.nsons(); ++i )
+        {
+            auto  scb_i = scb.son( i );
+            
+            if ( ! is_null( scb_i ) )
+            {
+                auto  ncb_i = std::make_unique< nested_cluster_basis< value_t > >( scb_i->is() );
+                
+                // restrict total basis to part of son (TODO: copy part???)
+                auto  Xt_i  = blas::matrix< value_t >( Xt, scb_i->is() - scb.is().first(), blas::range::all );
+
+                // construct son basis
+                auto  R_i   = build_nested_cluster_basis( *ncb_i, *scb_i, Xt_i, basisapx, acc, compress );
+
+                nrows      += R_i.nrows();
+                ncb_sons[i] = ncb_i.release();
+                R_sons[i]   = std::move( R_i );
+            }// if
+        }// for
+
+        // check for empty basis
+        if (( nrows == 0 ) || ( ncols == 0 ))
+            return blas::matrix< value_t >();
+        
+        //
+        // compute transfer matrices by joining the R_i
+        //
+
+        auto  V   = blas::matrix< value_t >( nrows, ncols );
+        uint  pos = 0;
+
+        for ( uint  i = 0; i < scb.nsons(); ++i )
+        {
+            auto  ncb_i = ncb_sons[i];
+            auto  R_i   = R_sons[i];
+            auto  k_i   = R_i.nrows();
+            auto  V_i   = blas::matrix< value_t >( V, blas::range( pos, pos + k_i - 1 ), blas::range::all );
+                
+            blas::copy( R_i, V_i );
+
+            pos += k_i;
+        }// for
+
+        auto  [ Q, R ] = blas::factorise_ortho( V, acc );
+        auto  E        = std::vector< blas::matrix< value_t > >( scb.nsons() );
+
+        pos = 0;
+        for ( uint  i = 0; i < scb.nsons(); ++i )
+        {
+            const auto  R_i = R_sons[i];
+            const auto  k_i = R_i.nrows();
+            const auto  Q_i = blas::matrix< value_t >( Q, blas::range( pos, pos + k_i - 1 ), blas::range::all );
+
+            ncb->set_son( i, ncb_sons[i] );
+            E[i] = std::move( blas::copy( Q_i ) );
+            pos += k_i;
+        }// for
+
+        ncb.set_transfer( std::move( E ) );
+
+        if ( compress )
+            ncb.compress( acc );
+        
+        return std::move( R );
+    }// else
+
+    return blas::matrix< value_t >();
+}
+
 template < typename coeff_t,
            typename lrapx_t,
            typename basisapx_t >
@@ -411,6 +554,28 @@ build_h2 ( const Hpro::TMatrix< value_t > &   A,
         auto  X = colcb.transform_forward( R->V() );
         auto  S = blas::prod( W, blas::adjoint( X ) );
         auto  H = std::make_unique< h2_lrmatrix< value_t > >( A.row_is(), A.col_is(), rowcb, colcb, std::move( S ) );
+
+        if ( compress )
+            H->compress( acc );
+
+        M = std::move( H );
+    }// if
+    else if ( hlr::matrix::is_uniform_lowrank( A ) )
+    {
+        //
+        // compute coupling matrix as W'·U·S·(X'·V)'
+        // with cluster basis W and X
+        //
+        
+        auto  R   = cptrcast( &A, uniform_lrmatrix< value_t > );
+        auto  U   = R->row_basis();
+        auto  V   = R->col_basis();
+        auto  S   = R->coupling();
+        auto  W   = rowcb.transform_forward( U ); // todo: cache/precompute transformed basis
+        auto  X   = colcb.transform_forward( V );
+        auto  WS  = blas::prod( W, S );
+        auto  WSX = blas::prod( WS, blas::adjoint( X ) );
+        auto  H   = std::make_unique< h2_lrmatrix< value_t > >( A.row_is(), A.col_is(), rowcb, colcb, std::move( WSX ) );
 
         if ( compress )
             H->compress( acc );

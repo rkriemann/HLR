@@ -3274,8 +3274,8 @@ init_cluster_bases ( const Hpro::TMatrix< value_t > &   M,
     }// if
 
     // set IDs last to ensure id(parent) > id(sons)
-    if ( rowcb.id() == -1 ) rowcb->set_id( row_id++ );
-    if ( colcb.id() == -1 ) colcb->set_id( col_id++ );
+    if ( rowcb.id() == -1 ) rowcb.set_id( row_id++ );
+    if ( colcb.id() == -1 ) colcb.set_id( col_id++ );
 }
 
 //
