@@ -1090,6 +1090,9 @@ build_uniform_rec ( const Hpro::TBlockCluster *  bct,
     
     auto  M      = detail::build_uniform_rec( bct, coeff, lrapx, basisapx, acc, *rowcb, *colcb, rowmap, colmap );
 
+    { int  id = 0;  detail::set_ids( *rowcb, id ); }
+    { int  id = 0;  detail::set_ids( *colcb, id ); }
+    
     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
 }
     
@@ -1135,6 +1138,9 @@ build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
     
     detail::build_cluster_basis( *rowcb, basisapx, acc, row_map, false );
     detail::build_cluster_basis( *colcb, basisapx, acc, col_map, true );
+
+    { int  id = 0;  detail::set_ids( *rowcb, id ); }
+    { int  id = 0;  detail::set_ids( *colcb, id ); }
 
     //
     // construct uniform lowrank matrices with given cluster bases
@@ -1199,6 +1205,9 @@ build_uniform_rec_sep ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A
     
     detail::build_cluster_basis( *rowcb, basisapx, acc, row_map, false );
     detail::build_cluster_basis( *colcb, basisapx, acc, col_map, true );
+
+    { int  id = 0;  detail::set_ids( *rowcb, id ); }
+    { int  id = 0;  detail::set_ids( *colcb, id ); }
 
     //
     // construct uniform lowrank matrices with given cluster bases

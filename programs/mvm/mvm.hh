@@ -188,7 +188,7 @@ program_main ()
         {
             runtime.clear();
             
-            std::cout << "    " << term::bullet << term::bold << "row cluster lists (TtB)" << term::reset << std::endl;
+            std::cout << "    " << term::bullet << term::bold << "row cluster lists" << term::reset << std::endl;
         
             auto  x = std::make_unique< vector::scalar_vector< value_t > >( A->col_is() );
             auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );

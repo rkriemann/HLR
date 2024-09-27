@@ -17,6 +17,8 @@
 #include <hlr/matrix/dense_matrix.hh>
 #include <hlr/matrix/h2_lr2matrix.hh>
 
+#include <hlr/utils/io.hh> // DEBUG
+
 namespace hlr { namespace seq { namespace matrix { namespace detail {
 
 using namespace hlr::matrix;
@@ -374,9 +376,9 @@ build_uniform_map ( const Hpro::TMatrix< value_t > &                            
     {
         auto  B = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
 
-        for ( uint  i = 0; 0 < B->nblock_rows(); ++i )
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
         {
-            for ( uint  j = 0; 0 < B->nblock_cols(); ++j )
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
             {
                 if ( ! is_null( B->block(i,j) ) )
                     build_uniform_map( * B->block(i,j), * rowcb.son(i), * colcb.son(j), row_map, col_map );
@@ -403,6 +405,10 @@ build_nested_cluster_basis ( const shared_cluster_basis< value_t > &            
     using  real_t     = Hpro::real_type_t< value_t >;
     using  mat_list_t = std::remove_reference_t< decltype( pblocks ) >;
 
+    HLR_ASSERT( scb.id() != -1 );
+    
+    // std::cout << scb.id() << " " << scb.is().to_string() << std::endl;
+    
     //
     // set up empty cluster basis
     //
@@ -415,7 +421,7 @@ build_nested_cluster_basis ( const shared_cluster_basis< value_t > &            
     //
     // set up list of lowrank matrices contributing to local basis
     //
-    
+
     auto  op       = ( transposed ? apply_transposed : apply_normal );
     auto  mat_list = mat_list_t( pblocks );
     auto  lblocks  = lrblocks[ scb.id() ];
@@ -427,7 +433,7 @@ build_nested_cluster_basis ( const shared_cluster_basis< value_t > &            
     //
 
     // local rank is sum of row rank of lowrank blocks
-    auto  ncols = std::accumulate( mat_list.begin(), mat_list.end(), 0, [op] ( int v, auto  M ) { return v + M->row_rank( op ); } );
+    auto  ncols = std::accumulate( mat_list.begin(), mat_list.end(), 0, [op] ( int v, auto  M ) { return v + M->col_rank( op ); } );
     
     if ( scb.nsons() == 0 )
     {
@@ -452,7 +458,7 @@ build_nested_cluster_basis ( const shared_cluster_basis< value_t > &            
         for ( const auto  M_i : mat_list )
         {
             auto  S_i   = M_i->coupling();
-            auto  k_i   = M_i->row_rank( op );
+            auto  k_i   = M_i->col_rank( op );
             auto  U_i   = M_i->row_basis( op );
             auto  U_loc = blas::matrix< value_t >( U_i, scb.is() - M_i->row_ofs( op ), blas::range::all );
             auto  X_i   = blas::prod( U_loc, blas::mat_view( op, S_i ) );
@@ -496,6 +502,8 @@ build_nested_cluster_basis ( const shared_cluster_basis< value_t > &            
             auto  [ ncb_i, R_i ] = build_nested_cluster_basis( *scb_i, lrblocks, mat_list, basisapx, acc, compress, transposed );
 
             ncb->set_son( i, ncb_i.release() );
+
+            // io::matlab::write( R_i, Hpro::to_string( "R%d", i ) );
             
             nrows    += R_i.nrows();
             R_sons[i] = std::move( R_i );
@@ -511,7 +519,7 @@ build_nested_cluster_basis ( const shared_cluster_basis< value_t > &            
         //
 
         auto  V    = blas::matrix< value_t >( nrows, ncols );
-        uint  rpos = 0;
+        uint  rofs = 0;
 
         for ( uint  i = 0; i < scb.nsons(); ++i )
         {
@@ -523,41 +531,43 @@ build_nested_cluster_basis ( const shared_cluster_basis< value_t > &            
             //
 
             const auto  rows_R = blas::range( 0, idx_t( R_sons[i].nrows() ) - 1 );
-            const auto  rows_V = rows_R + rpos;
-            uint        ofs    = 0;
-            uint        cpos   = 0;
+            const auto  rows_V = rows_R + rofs;
+            uint        cofs   = 0;
             
             for ( auto  M_j : mat_list )
             {
                 const auto  rowis_j = M_j->row_is( op );
                 const auto  ncols_j = M_j->col_rank( op );
-                const auto  cols_R  = blas::range( ofs,  ofs  + ncols_j - 1 );
-                const auto  cols_V  = blas::range( cpos, cpos + ncols_j - 1 );
+                const auto  cols_R  = blas::range( cofs, cofs + ncols_j - 1 );
+                const auto  cols_V  = blas::range( cofs, cofs + ncols_j - 1 );
                 const auto  R_sub   = blas::matrix< value_t >( R_i, rows_R, cols_R );
                 auto        V_sub   = blas::matrix< value_t >( V,   rows_V, cols_V );
                 
                 blas::copy( R_sub, V_sub );
-                cpos += ncols_j;
+                cofs += ncols_j;
             }// for
             
-            rpos += R_i.nrows();
+            rofs += R_i.nrows();
         }// for
 
+        // io::matlab::write( V, "V" );
+        
         //
         // compute transfer matrices by joining the R_i
         //
 
         auto  [ Q, R ] = blas::factorise_ortho( V, acc );
         auto  E        = std::vector< blas::matrix< value_t > >( scb.nsons() );
-        uint  pos      = 0;
+
+        rofs = 0;
 
         for ( uint  i = 0; i < scb.nsons(); ++i )
         {
             const auto  k_i = R_sons[i].nrows();
-            const auto  Q_i = blas::matrix< value_t >( Q, blas::range( pos, pos + k_i - 1 ), blas::range::all );
+            const auto  Q_i = blas::matrix< value_t >( Q, blas::range( rofs, rofs + k_i - 1 ), blas::range::all );
 
-            E[i] = std::move( blas::copy( Q_i ) );
-            pos += k_i;
+            E[i]  = std::move( blas::copy( Q_i ) );
+            rofs += k_i;
         }// for
 
         ncb->set_transfer( std::move( E ) );
