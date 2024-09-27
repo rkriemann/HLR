@@ -1380,7 +1380,7 @@ template < typename basisapx_t >
 std::tuple< std::unique_ptr< hlr::matrix::nested_cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< hlr::matrix::nested_cluster_basis< typename basisapx_t::value_t > >,
             std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
-build_h2 ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
+build_h2 ( const Hpro::TMatrix< typename basisapx_t::value_t > &                      A,
            const hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > &  srowcb,
            const hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > &  scolcb,
            const basisapx_t &                                                         basisapx,
@@ -1395,16 +1395,14 @@ build_h2 ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
     // build cluster bases
     //
 
-    auto  nrowcb  = std::make_unique< cluster_basis >( A.row_is() );
-    auto  ncolcb  = std::make_unique< cluster_basis >( A.col_is() );
-    auto  Xp_row  = blas::matrix< value_t >( A.nrows(), 0 );
-    auto  Xp_col  = blas::matrix< value_t >( A.ncols(), 0 );
-    
-    detail::build_nested_cluster_basis( *nrowcb, srowcb, Xp_row, basisapx, acc, compress );
-    detail::build_nested_cluster_basis( *ncolcb, scolcb, Xp_col, basisapx, acc, compress );
+    auto  pblocks = std::list< const hlr::matrix::uniform_lrmatrix< value_t > * >();
+    auto  row_map = std::vector< std::list< const uniform_lrmatrix< value_t > * > >( srowcb.id() + 1 );
+    auto  col_map = std::vector< std::list< const uniform_lrmatrix< value_t > * > >( scolcb.id() + 1 );
 
-    { int  id = 0;  detail::set_ids( *nrowcb, id ); }
-    { int  id = 0;  detail::set_ids( *ncolcb, id ); }
+    detail::build_uniform_map( A, srowcb, scolcb, row_map, col_map );
+    
+    auto  [ nrowcb, Rr ] = detail::build_nested_cluster_basis( srowcb, row_map, pblocks, basisapx, acc, compress, false );
+    auto  [ ncolcb, Rc ] = detail::build_nested_cluster_basis( scolcb, col_map, pblocks, basisapx, acc, compress, true  );
 
     //
     // construct uniform lowrank matrices with given cluster bases
