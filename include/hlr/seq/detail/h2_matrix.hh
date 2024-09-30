@@ -448,7 +448,7 @@ build_nested_cluster_basis ( const shared_cluster_basis< value_t > &            
         //
         // where U_i is restricted to local row index set (e.g., of larger blocks)
         //
-        // TODO: collect couplings per shared bases
+        // TODO: collect couplings per shared bases??? same complexity but maybe faster
         //
 
         const uint  nrows = scb.is().size();

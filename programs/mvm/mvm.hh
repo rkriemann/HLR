@@ -48,7 +48,7 @@ program_main ()
     auto  ct      = gen_ct( *coord );
     auto  bct     = gen_bct( *ct, *ct );
 
-    io::eps::print( bct->root(), "bt" );
+    io::eps::print( * bct->root(), "bt" );
     
     auto  coeff   = problem->coeff_func();
     auto  pcoeff  = Hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
