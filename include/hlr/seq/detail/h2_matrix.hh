@@ -667,8 +667,6 @@ build_nested_cluster_basis_sep ( const shared_cluster_basis< value_t > &        
         //
         // where U_i is restricted to local row index set (e.g., of larger blocks)
         //
-        // TODO: collect couplings per shared bases??? same complexity but maybe faster
-        //
 
         const uint  nrows = scb.is().size();
         auto        X     = blas::matrix< value_t >( nrows, ncols );
@@ -680,7 +678,7 @@ build_nested_cluster_basis_sep ( const shared_cluster_basis< value_t > &        
             auto  k_i   = M_i->col_rank( op );
             auto  U_i   = M_i->row_basis( op );
             auto  U_loc = blas::matrix< value_t >( U_i, scb.is() - M_i->row_ofs( op ), blas::range::all );
-            auto  X_i   = blas::prod( U_loc, blas::mat_view( op, S_i ) );
+            auto  X_i   = blas::prod( U_loc, S_i );
             auto  X_sub = blas::matrix< value_t >( X, blas::range::all, blas::range( pos, pos + k_i - 1 ) );
 
             blas::copy( X_i, X_sub );
@@ -722,8 +720,6 @@ build_nested_cluster_basis_sep ( const shared_cluster_basis< value_t > &        
 
             ncb->set_son( i, ncb_i.release() );
 
-            // io::matlab::write( R_i, Hpro::to_string( "R%d", i ) );
-            
             nrows    += R_i.nrows();
             R_sons[i] = std::move( R_i );
         }// for
@@ -769,8 +765,6 @@ build_nested_cluster_basis_sep ( const shared_cluster_basis< value_t > &        
             rofs += R_i.nrows();
         }// for
 
-        // io::matlab::write( V, "V" );
-        
         //
         // compute transfer matrices by joining the R_i
         //
@@ -823,16 +817,48 @@ build_h2 ( const Hpro::TBlockCluster *  bct,
 }
 
 //
+// compute transformation from shared basis into nested basis
+//
+template < typename value_t >
+void
+compute_transform ( const shared_cluster_basis< value_t > &   scb,
+                    const nested_cluster_basis< value_t > &   ncb,
+                    std::vector< blas::matrix< value_t > > &  trans )
+{
+    if ( scb.rank() > 0 )
+    {
+        HLR_ASSERT( scb.id() != -1 );
+        HLR_ASSERT( scb.id() < trans.size() );
+        
+        trans[ scb.id() ] = std::move( ncb.transform_forward( scb.basis() ) );
+    }// if
+
+    HLR_ASSERT( scb.nsons() == ncb.nsons() );
+    
+    for ( uint  i = 0; i < scb.nsons(); ++i )
+    {
+        if ( ! is_null( scb.son( i ) ) )
+        {
+            HLR_ASSERT( ! is_null( ncb.son(i) ) );
+            
+            compute_transform( * scb.son(i), * ncb.son(i), trans );
+        }// if
+    }// for
+}
+
+//
 // build H² representation of A by converting all lowrank matrices
 // into uniform low-rank matrices using given cluster bases rowcb/colcb.
 //
 template < typename value_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
-build_h2 ( const Hpro::TMatrix< value_t > &   A,
-           nested_cluster_basis< value_t > &  rowcb,
-           nested_cluster_basis< value_t > &  colcb,
-           const accuracy &                   acc,
-           const bool                         compress )
+build_h2 ( const Hpro::TMatrix< value_t > &          A,
+           nested_cluster_basis< value_t > &         rowcb,
+           nested_cluster_basis< value_t > &         colcb,
+           std::vector< blas::matrix< value_t > > &  row_trans,
+           std::vector< blas::matrix< value_t > > &  col_trans,
+           const accuracy &                          acc,
+           const bool                                compress )
 {
     using namespace hlr::matrix;
 
@@ -871,10 +897,12 @@ build_h2 ( const Hpro::TMatrix< value_t > &   A,
         auto  U   = R->row_basis();
         auto  V   = R->col_basis();
         auto  S   = R->coupling();
-        auto  W   = rowcb.transform_forward( U ); // todo: cache/precompute transformed basis
-        auto  X   = colcb.transform_forward( V );
-        auto  WS  = blas::prod( W, S );
-        auto  WSX = blas::prod( WS, blas::adjoint( X ) );
+        // auto  W   = rowcb.transform_forward( U ); // todo: cache/precompute transformed basis
+        // auto  X   = colcb.transform_forward( V );
+        // auto  WS  = blas::prod( W, S );
+        // auto  WSX = blas::prod( WS, blas::adjoint( X ) );
+        auto  WS  = blas::prod( row_trans[ rowcb.id() ], S );
+        auto  WSX = blas::prod( WS, blas::adjoint( col_trans[ colcb.id() ] ) );
         auto  H   = std::make_unique< h2_lrmatrix< value_t > >( rowcb, colcb, std::move( WSX ) );
 
         if ( compress )
@@ -894,10 +922,12 @@ build_h2 ( const Hpro::TMatrix< value_t > &   A,
         auto  V   = R->col_basis();
         auto  Sr  = R->row_coupling();
         auto  Sc  = R->col_coupling();
-        auto  W   = rowcb.transform_forward( U ); // todo: cache/precompute transformed basis
-        auto  X   = colcb.transform_forward( V );
-        auto  WSr = blas::prod( W, Sr );
-        auto  XSc = blas::prod( X, Sc );
+        // auto  W   = rowcb.transform_forward( U ); // todo: cache/precompute transformed basis
+        // auto  X   = colcb.transform_forward( V );
+        // auto  WSr = blas::prod( W, Sr );
+        // auto  XSc = blas::prod( X, Sc );
+        auto  WSr = blas::prod( row_trans[ rowcb.id() ], Sr );
+        auto  XSc = blas::prod( col_trans[ colcb.id() ], Sc );
         auto  H   = std::make_unique< h2_lr2matrix< value_t > >( rowcb, colcb, std::move( WSr ), std::move( XSc ) );
 
         if ( compress )
@@ -930,7 +960,7 @@ build_h2 ( const Hpro::TMatrix< value_t > &   A,
 
                 if ( ! is_null( A_ij ) )
                 {
-                    auto  B_ij = build_h2( *A_ij, *rowcb_i, *colcb_j, acc, compress );
+                    auto  B_ij = build_h2( *A_ij, *rowcb_i, *colcb_j, row_trans, col_trans, acc, compress );
 
                     B->set_block( i, j, B_ij.release() );
                 }// if

@@ -1409,15 +1409,25 @@ build_h2 ( const Hpro::TMatrix< typename basisapx_t::value_t > &                
     auto  col_map = std::vector< std::list< const uniform_lrmatrix< value_t > * > >( scolcb.id() + 1 );
 
     detail::build_uniform_map( A, srowcb, scolcb, row_map, col_map );
-    
+
     auto  [ nrowcb, Rr ] = detail::build_nested_cluster_basis( srowcb, row_map, pblocks, basisapx, acc, compress, false );
     auto  [ ncolcb, Rc ] = detail::build_nested_cluster_basis( scolcb, col_map, pblocks, basisapx, acc, compress, true  );
+    
+    //
+    // precompute transformation from shared to nested cluster basis
+    //
 
+    auto  row_trans = std::vector< blas::matrix< value_t > >( srowcb.id() + 1 );
+    auto  col_trans = std::vector< blas::matrix< value_t > >( scolcb.id() + 1 );
+
+    detail::compute_transform( srowcb, *nrowcb, row_trans );
+    detail::compute_transform( scolcb, *ncolcb, col_trans );
+    
     //
     // construct uniform lowrank matrices with given cluster bases
     //
-    
-    auto  M = detail::build_h2( A, *nrowcb, *ncolcb, acc, compress );
+
+    auto  M = detail::build_h2( A, *nrowcb, *ncolcb, row_trans, col_trans, acc, compress );
     
     return  { std::move( nrowcb ), std::move( ncolcb ), std::move( M ) };
 }
@@ -1451,10 +1461,20 @@ build_h2_sep ( const Hpro::TMatrix< typename basisapx_t::value_t > &            
     auto  [ ncolcb, Rc ] = detail::build_nested_cluster_basis_sep( scolcb, col_map, pblocks, basisapx, acc, compress, true  );
 
     //
+    // precompute transformation from shared to nested cluster basis
+    //
+
+    auto  row_trans = std::vector< blas::matrix< value_t > >( srowcb.id() + 1 );
+    auto  col_trans = std::vector< blas::matrix< value_t > >( scolcb.id() + 1 );
+
+    detail::compute_transform( srowcb, *nrowcb, row_trans );
+    detail::compute_transform( scolcb, *ncolcb, col_trans );
+    
+    //
     // construct uniform lowrank matrices with given cluster bases
     //
     
-    auto  M = detail::build_h2( A, *nrowcb, *ncolcb, acc, compress );
+    auto  M = detail::build_h2( A, *nrowcb, *ncolcb, row_trans, col_trans, acc, compress );
     
     return  { std::move( nrowcb ), std::move( ncolcb ), std::move( M ) };
 }
