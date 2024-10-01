@@ -945,49 +945,49 @@ build_uniform_sep ( const Hpro::TBlockCluster *  bc,
     return { std::move( rowcb_root ), std::move( colcb_root ), std::move( M_root ) };
 }
 
-template < coefficient_function_type coeff_t,
-           lowrank_approx_type lrapx_t,
-           approx::approximation_type basisapx_t >
-std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
-            std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
-            std::unique_ptr< Hpro::TMatrix< Hpro::value_type_t< coeff_t > > > >
-build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
-                    const coeff_t &              coeff,
-                    const lrapx_t &              lrapx,
-                    const basisapx_t &           basisapx,
-                    const accuracy &             acc,
-                    const bool                   compress,
-                    const size_t                 /* nseq */ = 0 ) // ignored
-{
-    auto  [ rowcb, colcb, A ] = detail::build_uniform_lvl( bct, coeff, lrapx, basisapx, acc, compress );
+// template < coefficient_function_type coeff_t,
+//            lowrank_approx_type lrapx_t,
+//            approx::approximation_type basisapx_t >
+// std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
+//             std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
+//             std::unique_ptr< Hpro::TMatrix< Hpro::value_type_t< coeff_t > > > >
+// build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
+//                     const coeff_t &              coeff,
+//                     const lrapx_t &              lrapx,
+//                     const basisapx_t &           basisapx,
+//                     const accuracy &             acc,
+//                     const bool                   compress,
+//                     const size_t                 /* nseq */ = 0 ) // ignored
+// {
+//     auto  [ rowcb, colcb, A ] = detail::build_uniform_lvl( bct, coeff, lrapx, basisapx, acc, compress );
 
-    { int  id = 0;  detail::set_ids( *rowcb, id ); }
-    { int  id = 0;  detail::set_ids( *colcb, id ); }
+//     { int  id = 0;  detail::set_ids( *rowcb, id ); }
+//     { int  id = 0;  detail::set_ids( *colcb, id ); }
 
-    return { std::move( rowcb ), std::move( colcb ), std::move( A ) };
-}
+//     return { std::move( rowcb ), std::move( colcb ), std::move( A ) };
+// }
 
-template < coefficient_function_type coeff_t,
-           lowrank_approx_type lrapx_t,
-           approx::approximation_type basisapx_t >
-std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
-            std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
-            std::unique_ptr< Hpro::TMatrix< Hpro::value_type_t< coeff_t > > > >
-build_uniform_lvl_sep ( const Hpro::TBlockCluster *  bct,
-                        const coeff_t &              coeff,
-                        const lrapx_t &              lrapx,
-                        const basisapx_t &           basisapx,
-                        const accuracy &             acc,
-                        const bool                   compress,
-                        const size_t                 /* nseq */ = 0 ) // ignored
-{
-    auto  [ rowcb, colcb, A ] = detail::build_uniform_lvl_sep( bct, coeff, lrapx, basisapx, acc, compress );
+// template < coefficient_function_type coeff_t,
+//            lowrank_approx_type lrapx_t,
+//            approx::approximation_type basisapx_t >
+// std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
+//             std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
+//             std::unique_ptr< Hpro::TMatrix< Hpro::value_type_t< coeff_t > > > >
+// build_uniform_lvl_sep ( const Hpro::TBlockCluster *  bct,
+//                         const coeff_t &              coeff,
+//                         const lrapx_t &              lrapx,
+//                         const basisapx_t &           basisapx,
+//                         const accuracy &             acc,
+//                         const bool                   compress,
+//                         const size_t                 /* nseq */ = 0 ) // ignored
+// {
+//     auto  [ rowcb, colcb, A ] = detail::build_uniform_lvl_sep( bct, coeff, lrapx, basisapx, acc, compress );
 
-    { int  id = 0;  detail::set_ids( *rowcb, id ); }
-    { int  id = 0;  detail::set_ids( *colcb, id ); }
+//     { int  id = 0;  detail::set_ids( *rowcb, id ); }
+//     { int  id = 0;  detail::set_ids( *colcb, id ); }
 
-    return { std::move( rowcb ), std::move( colcb ), std::move( A ) };
-}
+//     return { std::move( rowcb ), std::move( colcb ), std::move( A ) };
+// }
 
 // template < coefficient_function_type coeff_t,
 //            lowrank_approx_type lrapx_t,
@@ -1019,36 +1019,36 @@ build_uniform_lvl_sep ( const Hpro::TBlockCluster *  bct,
 //                                                           row_blocks, col_blocks );
 // }
 
-template < typename basisapx_t >
-std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
-            std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
-            std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
-build_uniform_lvl ( const Hpro::TMatrix< typename basisapx_t::value_t > &    A,
-                    const basisapx_t &       basisapx,
-                    const accuracy &         acc,
-                    const size_t             /* nseq */ = 0 ) // ignored
-{
-    using value_t       = typename basisapx_t::value_t;
-    using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
+// template < typename basisapx_t >
+// std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
+//             std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
+//             std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
+// build_uniform_lvl ( const Hpro::TMatrix< typename basisapx_t::value_t > &    A,
+//                     const basisapx_t &       basisapx,
+//                     const accuracy &         acc,
+//                     const size_t             /* nseq */ = 0 ) // ignored
+// {
+//     using value_t       = typename basisapx_t::value_t;
+//     using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
 
-    auto  rowcb = std::make_unique< cluster_basis >( A.row_is() );
-    auto  colcb = std::make_unique< cluster_basis >( A.col_is() );
+//     auto  rowcb = std::make_unique< cluster_basis >( A.row_is() );
+//     auto  colcb = std::make_unique< cluster_basis >( A.col_is() );
 
-    if ( is_blocked( A ) )
-    {
-        rowcb->set_nsons( cptrcast( &A, Hpro::TBlockMatrix< value_t > )->nblock_rows() );
-        colcb->set_nsons( cptrcast( &A, Hpro::TBlockMatrix< value_t > )->nblock_cols() );
-    }// if
+//     if ( is_blocked( A ) )
+//     {
+//         rowcb->set_nsons( cptrcast( &A, Hpro::TBlockMatrix< value_t > )->nblock_rows() );
+//         colcb->set_nsons( cptrcast( &A, Hpro::TBlockMatrix< value_t > )->nblock_cols() );
+//     }// if
 
-    int  row_id = 0;
-    int  col_id = 0;
+//     int  row_id = 0;
+//     int  col_id = 0;
     
-    detail::init_cluster_bases( A, *rowcb, *colcb, row_id, col_id );
+//     detail::init_cluster_bases( A, *rowcb, *colcb, row_id, col_id );
 
-    auto  M = detail::build_uniform_lvl( A, basisapx, acc, *rowcb, *colcb );
+//     auto  M = detail::build_uniform_lvl( A, basisapx, acc, *rowcb, *colcb );
 
-    return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
-}
+//     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
+// }
 
 //
 // build representation of dense matrix with matrix structure defined by <bct>,
@@ -1056,167 +1056,167 @@ build_uniform_lvl ( const Hpro::TMatrix< typename basisapx_t::value_t > &    A,
 // - low-rank blocks are converted to uniform low-rank matrices and
 //   shared bases are constructed on-the-fly
 //
-template < coefficient_function_type coeff_t,
-           lowrank_approx_type lrapx_t,
-           approx::approximation_type basisapx_t >
-std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
-            std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
-            std::unique_ptr< Hpro::TMatrix< Hpro::value_type_t< coeff_t > > > >
-build_uniform_rec ( const Hpro::TBlockCluster *  bct,
-                    const coeff_t &              coeff,
-                    const lrapx_t &              lrapx,
-                    const basisapx_t &           basisapx,
-                    const accuracy &             acc,
-                    const size_t                 /* nseq */ = 0 ) // ignored
-{
-    static_assert( std::is_same_v< Hpro::value_type_t< coeff_t >, Hpro::value_type_t< lrapx_t > >,
-                   "coefficient function and low-rank approximation must have equal value type" );
-    static_assert( std::is_same_v< Hpro::value_type_t< coeff_t >, Hpro::value_type_t< basisapx_t > >,
-                   "coefficient function and basis approximation must have equal value type" );
+// template < coefficient_function_type coeff_t,
+//            lowrank_approx_type lrapx_t,
+//            approx::approximation_type basisapx_t >
+// std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
+//             std::unique_ptr< hlr::matrix::shared_cluster_basis< Hpro::value_type_t< coeff_t > > >,
+//             std::unique_ptr< Hpro::TMatrix< Hpro::value_type_t< coeff_t > > > >
+// build_uniform_rec ( const Hpro::TBlockCluster *  bct,
+//                     const coeff_t &              coeff,
+//                     const lrapx_t &              lrapx,
+//                     const basisapx_t &           basisapx,
+//                     const accuracy &             acc,
+//                     const size_t                 /* nseq */ = 0 ) // ignored
+// {
+//     static_assert( std::is_same_v< Hpro::value_type_t< coeff_t >, Hpro::value_type_t< lrapx_t > >,
+//                    "coefficient function and low-rank approximation must have equal value type" );
+//     static_assert( std::is_same_v< Hpro::value_type_t< coeff_t >, Hpro::value_type_t< basisapx_t > >,
+//                    "coefficient function and basis approximation must have equal value type" );
     
-    HLR_ASSERT( bct != nullptr );
+//     HLR_ASSERT( bct != nullptr );
 
-    using value_t       = Hpro::value_type_t< coeff_t >;
-    using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
+//     using value_t       = Hpro::value_type_t< coeff_t >;
+//     using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
 
-    auto  rowcb  = std::make_unique< cluster_basis >( bct->is().row_is() );
-    auto  colcb  = std::make_unique< cluster_basis >( bct->is().col_is() );
+//     auto  rowcb  = std::make_unique< cluster_basis >( bct->is().row_is() );
+//     auto  colcb  = std::make_unique< cluster_basis >( bct->is().col_is() );
 
-    rowcb->set_nsons( bct->rowcl()->nsons() );
-    colcb->set_nsons( bct->colcl()->nsons() );
+//     rowcb->set_nsons( bct->rowcl()->nsons() );
+//     colcb->set_nsons( bct->colcl()->nsons() );
     
-    auto  rowmap = detail::is_matrix_map_t< value_t >();
-    auto  colmap = detail::is_matrix_map_t< value_t >();
+//     auto  rowmap = detail::is_matrix_map_t< value_t >();
+//     auto  colmap = detail::is_matrix_map_t< value_t >();
     
-    auto  M      = detail::build_uniform_rec( bct, coeff, lrapx, basisapx, acc, *rowcb, *colcb, rowmap, colmap );
+//     auto  M      = detail::build_uniform_rec( bct, coeff, lrapx, basisapx, acc, *rowcb, *colcb, rowmap, colmap );
 
-    { int  id = 0;  detail::set_ids( *rowcb, id ); }
-    { int  id = 0;  detail::set_ids( *colcb, id ); }
+//     { int  id = 0;  detail::set_ids( *rowcb, id ); }
+//     { int  id = 0;  detail::set_ids( *colcb, id ); }
     
-    return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
-}
+//     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
+// }
     
 //
 // build uniform-H version from given H-matrix <A>
 // - low-rank blocks are converted to uniform low-rank matrices and
 //   shared bases are constructed on-the-fly
 //
-template < typename basisapx_t >
-std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
-            std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
-            std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
-build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
-                    const basisapx_t &           basisapx,
-                    const accuracy &             acc,
-                    const bool                   compress,
-                    const size_t                 /* nseq */ = 0 ) // ignored
-{
-    using value_t       = typename basisapx_t::value_t;
-    using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
+// template < typename basisapx_t >
+// std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
+//             std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
+//             std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
+// build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
+//                     const basisapx_t &           basisapx,
+//                     const accuracy &             acc,
+//                     const bool                   compress,
+//                     const size_t                 /* nseq */ = 0 ) // ignored
+// {
+//     using value_t       = typename basisapx_t::value_t;
+//     using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
 
-    //
-    // mapping of index sets to lowrank matrices 
-    //
+//     //
+//     // mapping of index sets to lowrank matrices 
+//     //
 
-    auto  rowcb  = std::make_unique< cluster_basis >( A.row_is() );
-    auto  colcb  = std::make_unique< cluster_basis >( A.col_is() );
+//     auto  rowcb  = std::make_unique< cluster_basis >( A.row_is() );
+//     auto  colcb  = std::make_unique< cluster_basis >( A.col_is() );
 
-    if ( is_blocked( A ) )
-    {
-        rowcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix< value_t > )->nblock_rows() );
-        colcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix< value_t > )->nblock_cols() );
-    }// if
+//     if ( is_blocked( A ) )
+//     {
+//         rowcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix< value_t > )->nblock_rows() );
+//         colcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix< value_t > )->nblock_cols() );
+//     }// if
 
-    auto  row_map = detail::lr_coupling_map_t< value_t >();
-    auto  col_map = detail::lr_coupling_map_t< value_t >();
+//     auto  row_map = detail::lr_coupling_map_t< value_t >();
+//     auto  col_map = detail::lr_coupling_map_t< value_t >();
     
-    detail::build_mat_map( A, *rowcb, *colcb, row_map, col_map );
+//     detail::build_mat_map( A, *rowcb, *colcb, row_map, col_map );
     
-    //
-    // build cluster bases
-    //
+//     //
+//     // build cluster bases
+//     //
     
-    detail::build_cluster_basis( *rowcb, basisapx, acc, row_map, false );
-    detail::build_cluster_basis( *colcb, basisapx, acc, col_map, true );
+//     detail::build_cluster_basis( *rowcb, basisapx, acc, row_map, false );
+//     detail::build_cluster_basis( *colcb, basisapx, acc, col_map, true );
 
-    { int  id = 0;  detail::set_ids( *rowcb, id ); }
-    { int  id = 0;  detail::set_ids( *colcb, id ); }
+//     { int  id = 0;  detail::set_ids( *rowcb, id ); }
+//     { int  id = 0;  detail::set_ids( *colcb, id ); }
 
-    //
-    // construct uniform lowrank matrices with given cluster bases
-    //
+//     //
+//     // construct uniform lowrank matrices with given cluster bases
+//     //
     
-    auto  M = detail::build_uniform( A, *rowcb, *colcb );
+//     auto  M = detail::build_uniform( A, *rowcb, *colcb );
     
-    return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
+//     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
 
-    // using value_t       = typename basisapx_t::value_t;
-    // using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
+//     // using value_t       = typename basisapx_t::value_t;
+//     // using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
 
-    // auto  rowcb  = std::make_unique< cluster_basis >( A.row_is() );
-    // auto  colcb  = std::make_unique< cluster_basis >( A.col_is() );
+//     // auto  rowcb  = std::make_unique< cluster_basis >( A.row_is() );
+//     // auto  colcb  = std::make_unique< cluster_basis >( A.col_is() );
 
-    // if ( is_blocked( A ) )
-    // {
-    //     rowcb->set_nsons( cptrcast( &A, Hpro::TBlockMatrix< value_t > )->nblock_rows() );
-    //     colcb->set_nsons( cptrcast( &A, Hpro::TBlockMatrix< value_t > )->nblock_cols() );
-    // }// if
+//     // if ( is_blocked( A ) )
+//     // {
+//     //     rowcb->set_nsons( cptrcast( &A, Hpro::TBlockMatrix< value_t > )->nblock_rows() );
+//     //     colcb->set_nsons( cptrcast( &A, Hpro::TBlockMatrix< value_t > )->nblock_cols() );
+//     // }// if
     
-    // auto  rowmap = detail::is_matrix_map_t< value_t >();
-    // auto  colmap = detail::is_matrix_map_t< value_t >();
-    // auto  M      = detail::build_uniform_rec( A, basisapx, acc, *rowcb, *colcb, rowmap, colmap );
+//     // auto  rowmap = detail::is_matrix_map_t< value_t >();
+//     // auto  colmap = detail::is_matrix_map_t< value_t >();
+//     // auto  M      = detail::build_uniform_rec( A, basisapx, acc, *rowcb, *colcb, rowmap, colmap );
 
-    // return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
-}
+//     // return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
+// }
 
-template < typename basisapx_t >
-std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
-            std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
-            std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
-build_uniform_rec_sep ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
-                        const basisapx_t &           basisapx,
-                        const accuracy &             acc,
-                        const size_t                 /* nseq */ = 0 ) // ignored
-{
-    using value_t       = typename basisapx_t::value_t;
-    using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
+// template < typename basisapx_t >
+// std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
+//             std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
+//             std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
+// build_uniform_rec_sep ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
+//                         const basisapx_t &           basisapx,
+//                         const accuracy &             acc,
+//                         const size_t                 /* nseq */ = 0 ) // ignored
+// {
+//     using value_t       = typename basisapx_t::value_t;
+//     using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
 
-    //
-    // mapping of index sets to lowrank matrices 
-    //
+//     //
+//     // mapping of index sets to lowrank matrices 
+//     //
 
-    auto  rowcb  = std::make_unique< cluster_basis >( A.row_is() );
-    auto  colcb  = std::make_unique< cluster_basis >( A.col_is() );
+//     auto  rowcb  = std::make_unique< cluster_basis >( A.row_is() );
+//     auto  colcb  = std::make_unique< cluster_basis >( A.col_is() );
 
-    if ( is_blocked( A ) )
-    {
-        rowcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix< value_t > )->nblock_rows() );
-        colcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix< value_t > )->nblock_cols() );
-    }// if
+//     if ( is_blocked( A ) )
+//     {
+//         rowcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix< value_t > )->nblock_rows() );
+//         colcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix< value_t > )->nblock_cols() );
+//     }// if
 
-    auto  row_map = detail::lr_coupling_map_t< value_t >();
-    auto  col_map = detail::lr_coupling_map_t< value_t >();
+//     auto  row_map = detail::lr_coupling_map_t< value_t >();
+//     auto  col_map = detail::lr_coupling_map_t< value_t >();
     
-    detail::build_mat_map( A, *rowcb, *colcb, row_map, col_map );
+//     detail::build_mat_map( A, *rowcb, *colcb, row_map, col_map );
     
-    //
-    // build cluster bases
-    //
+//     //
+//     // build cluster bases
+//     //
     
-    detail::build_cluster_basis( *rowcb, basisapx, acc, row_map, false );
-    detail::build_cluster_basis( *colcb, basisapx, acc, col_map, true );
+//     detail::build_cluster_basis( *rowcb, basisapx, acc, row_map, false );
+//     detail::build_cluster_basis( *colcb, basisapx, acc, col_map, true );
 
-    { int  id = 0;  detail::set_ids( *rowcb, id ); }
-    { int  id = 0;  detail::set_ids( *colcb, id ); }
+//     { int  id = 0;  detail::set_ids( *rowcb, id ); }
+//     { int  id = 0;  detail::set_ids( *colcb, id ); }
 
-    //
-    // construct uniform lowrank matrices with given cluster bases
-    //
+//     //
+//     // construct uniform lowrank matrices with given cluster bases
+//     //
     
-    auto  M = detail::build_uniform_sep( A, *rowcb, *colcb );
+//     auto  M = detail::build_uniform_sep( A, *rowcb, *colcb );
     
-    return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
-}
+//     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
+// }
 
 template < typename value_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
@@ -1277,113 +1277,113 @@ build_uniform ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
 
 }// namespace blr
 
-template < typename basisapx_t >
-std::tuple< std::unique_ptr< hlr::matrix::nested_cluster_basis< typename basisapx_t::value_t > >,
-            std::unique_ptr< hlr::matrix::nested_cluster_basis< typename basisapx_t::value_t > >,
-            std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
-build_h2_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
-               const basisapx_t &                                     basisapx,
-               const accuracy &                                       acc,
-               const bool                                             compress,
-               const size_t                                           /* nseq */ = 0 ) // ignored
-{
-    using value_t       = typename basisapx_t::value_t;
-    using cluster_basis = hlr::matrix::nested_cluster_basis< value_t >;
+// template < typename basisapx_t >
+// std::tuple< std::unique_ptr< hlr::matrix::nested_cluster_basis< typename basisapx_t::value_t > >,
+//             std::unique_ptr< hlr::matrix::nested_cluster_basis< typename basisapx_t::value_t > >,
+//             std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
+// build_h2_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
+//                const basisapx_t &                                     basisapx,
+//                const accuracy &                                       acc,
+//                const bool                                             compress,
+//                const size_t                                           /* nseq */ = 0 ) // ignored
+// {
+//     using value_t       = typename basisapx_t::value_t;
+//     using cluster_basis = hlr::matrix::nested_cluster_basis< value_t >;
 
-    //
-    // mapping of index sets to lowrank matrices 
-    //
+//     //
+//     // mapping of index sets to lowrank matrices 
+//     //
 
-    auto  rowcb  = std::make_unique< cluster_basis >( A.row_is() );
-    auto  colcb  = std::make_unique< cluster_basis >( A.col_is() );
+//     auto  rowcb  = std::make_unique< cluster_basis >( A.row_is() );
+//     auto  colcb  = std::make_unique< cluster_basis >( A.col_is() );
 
-    if ( is_blocked( A ) )
-    {
-        rowcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix< value_t > )->nblock_rows() );
-        colcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix< value_t > )->nblock_cols() );
-    }// if
+//     if ( is_blocked( A ) )
+//     {
+//         rowcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix< value_t > )->nblock_rows() );
+//         colcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix< value_t > )->nblock_cols() );
+//     }// if
 
-    auto  row_map      = detail::lr_mat_map_t< value_t >();
-    auto  row_coupling = detail::coupling_map_t< value_t >();
-    auto  col_map      = detail::lr_mat_map_t< value_t >();
-    auto  col_coupling = detail::coupling_map_t< value_t >();
+//     auto  row_map      = detail::lr_mat_map_t< value_t >();
+//     auto  row_coupling = detail::coupling_map_t< value_t >();
+//     auto  col_map      = detail::lr_mat_map_t< value_t >();
+//     auto  col_coupling = detail::coupling_map_t< value_t >();
     
-    detail::build_mat_map( A, *rowcb, *colcb, row_map, row_coupling, col_map, col_coupling );
+//     detail::build_mat_map( A, *rowcb, *colcb, row_map, row_coupling, col_map, col_coupling );
     
-    //
-    // build cluster bases
-    //
+//     //
+//     // build cluster bases
+//     //
 
-    auto  empty_list = detail::lr_mat_list_t< value_t >();
+//     auto  empty_list = detail::lr_mat_list_t< value_t >();
     
-    detail::build_nested_cluster_basis( *rowcb, basisapx, acc, row_map, row_coupling, empty_list, false, compress );
-    detail::build_nested_cluster_basis( *colcb, basisapx, acc, col_map, col_coupling, empty_list, true,  compress );
+//     detail::build_nested_cluster_basis( *rowcb, basisapx, acc, row_map, row_coupling, empty_list, false, compress );
+//     detail::build_nested_cluster_basis( *colcb, basisapx, acc, col_map, col_coupling, empty_list, true,  compress );
 
-    { int  id = 0;  detail::set_ids( *rowcb, id ); }
-    { int  id = 0;  detail::set_ids( *colcb, id ); }
+//     { int  id = 0;  detail::set_ids( *rowcb, id ); }
+//     { int  id = 0;  detail::set_ids( *colcb, id ); }
 
-    //
-    // construct uniform lowrank matrices with given cluster bases
-    //
+//     //
+//     // construct uniform lowrank matrices with given cluster bases
+//     //
     
-    auto  M = detail::build_h2( A, *rowcb, *colcb, acc, compress );
+//     auto  M = detail::build_h2( A, *rowcb, *colcb, acc, compress );
     
-    return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
-}
+//     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
+// }
     
-template < typename basisapx_t >
-std::tuple< std::unique_ptr< hlr::matrix::nested_cluster_basis< typename basisapx_t::value_t > >,
-            std::unique_ptr< hlr::matrix::nested_cluster_basis< typename basisapx_t::value_t > >,
-            std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
-build_h2_rec_sep ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
-                   const basisapx_t &                                     basisapx,
-                   const accuracy &                                       acc,
-                   const bool                                             compress,
-                   const size_t                                           /* nseq */ = 0 ) // ignored
-{
-    using value_t       = typename basisapx_t::value_t;
-    using cluster_basis = hlr::matrix::nested_cluster_basis< value_t >;
+// template < typename basisapx_t >
+// std::tuple< std::unique_ptr< hlr::matrix::nested_cluster_basis< typename basisapx_t::value_t > >,
+//             std::unique_ptr< hlr::matrix::nested_cluster_basis< typename basisapx_t::value_t > >,
+//             std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
+// build_h2_rec_sep ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
+//                    const basisapx_t &                                     basisapx,
+//                    const accuracy &                                       acc,
+//                    const bool                                             compress,
+//                    const size_t                                           /* nseq */ = 0 ) // ignored
+// {
+//     using value_t       = typename basisapx_t::value_t;
+//     using cluster_basis = hlr::matrix::nested_cluster_basis< value_t >;
 
-    //
-    // mapping of index sets to lowrank matrices 
-    //
+//     //
+//     // mapping of index sets to lowrank matrices 
+//     //
 
-    auto  rowcb  = std::make_unique< cluster_basis >( A.row_is() );
-    auto  colcb  = std::make_unique< cluster_basis >( A.col_is() );
+//     auto  rowcb  = std::make_unique< cluster_basis >( A.row_is() );
+//     auto  colcb  = std::make_unique< cluster_basis >( A.col_is() );
 
-    if ( is_blocked( A ) )
-    {
-        rowcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix< value_t > )->nblock_rows() );
-        colcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix< value_t > )->nblock_cols() );
-    }// if
+//     if ( is_blocked( A ) )
+//     {
+//         rowcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix< value_t > )->nblock_rows() );
+//         colcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix< value_t > )->nblock_cols() );
+//     }// if
 
-    auto  row_map      = detail::lr_mat_map_t< value_t >();
-    auto  row_coupling = detail::coupling_map_t< value_t >();
-    auto  col_map      = detail::lr_mat_map_t< value_t >();
-    auto  col_coupling = detail::coupling_map_t< value_t >();
+//     auto  row_map      = detail::lr_mat_map_t< value_t >();
+//     auto  row_coupling = detail::coupling_map_t< value_t >();
+//     auto  col_map      = detail::lr_mat_map_t< value_t >();
+//     auto  col_coupling = detail::coupling_map_t< value_t >();
     
-    detail::build_mat_map( A, *rowcb, *colcb, row_map, row_coupling, col_map, col_coupling );
+//     detail::build_mat_map( A, *rowcb, *colcb, row_map, row_coupling, col_map, col_coupling );
     
-    //
-    // build cluster bases
-    //
+//     //
+//     // build cluster bases
+//     //
 
-    auto  empty_list = detail::lr_mat_list_t< value_t >();
+//     auto  empty_list = detail::lr_mat_list_t< value_t >();
     
-    detail::build_nested_cluster_basis( *rowcb, basisapx, acc, row_map, row_coupling, empty_list, false, compress );
-    detail::build_nested_cluster_basis( *colcb, basisapx, acc, col_map, col_coupling, empty_list, true,  compress );
+//     detail::build_nested_cluster_basis( *rowcb, basisapx, acc, row_map, row_coupling, empty_list, false, compress );
+//     detail::build_nested_cluster_basis( *colcb, basisapx, acc, col_map, col_coupling, empty_list, true,  compress );
 
-    { int  id = 0;  detail::set_ids( *rowcb, id ); }
-    { int  id = 0;  detail::set_ids( *colcb, id ); }
+//     { int  id = 0;  detail::set_ids( *rowcb, id ); }
+//     { int  id = 0;  detail::set_ids( *colcb, id ); }
 
-    //
-    // construct uniform lowrank matrices with given cluster bases
-    //
+//     //
+//     // construct uniform lowrank matrices with given cluster bases
+//     //
     
-    auto  M = detail::build_h2_sep( A, *rowcb, *colcb, acc, compress );
+//     auto  M = detail::build_h2_sep( A, *rowcb, *colcb, acc, compress );
     
-    return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
-}
+//     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
+// }
     
 template < typename basisapx_t >
 std::tuple< std::unique_ptr< hlr::matrix::nested_cluster_basis< typename basisapx_t::value_t > >,
@@ -1412,6 +1412,43 @@ build_h2 ( const Hpro::TMatrix< typename basisapx_t::value_t > &                
     
     auto  [ nrowcb, Rr ] = detail::build_nested_cluster_basis( srowcb, row_map, pblocks, basisapx, acc, compress, false );
     auto  [ ncolcb, Rc ] = detail::build_nested_cluster_basis( scolcb, col_map, pblocks, basisapx, acc, compress, true  );
+
+    //
+    // construct uniform lowrank matrices with given cluster bases
+    //
+    
+    auto  M = detail::build_h2( A, *nrowcb, *ncolcb, acc, compress );
+    
+    return  { std::move( nrowcb ), std::move( ncolcb ), std::move( M ) };
+}
+    
+template < typename basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::nested_cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< hlr::matrix::nested_cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
+build_h2_sep ( const Hpro::TMatrix< typename basisapx_t::value_t > &                      A,
+               const hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > &  srowcb,
+               const hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > &  scolcb,
+               const basisapx_t &                                                         basisapx,
+               const accuracy &                                                           acc,
+               const bool                                                                 compress,
+               const size_t                                                               /* nseq */ = 0 ) // ignored
+{
+    using value_t       = typename basisapx_t::value_t;
+    using cluster_basis = hlr::matrix::nested_cluster_basis< value_t >;
+
+    //
+    // build cluster bases
+    //
+
+    auto  pblocks = std::list< const hlr::matrix::uniform_lr2matrix< value_t > * >();
+    auto  row_map = std::vector< std::list< const uniform_lr2matrix< value_t > * > >( srowcb.id() + 1 );
+    auto  col_map = std::vector< std::list< const uniform_lr2matrix< value_t > * > >( scolcb.id() + 1 );
+
+    detail::build_uniform_sep_map( A, srowcb, scolcb, row_map, col_map );
+    
+    auto  [ nrowcb, Rr ] = detail::build_nested_cluster_basis_sep( srowcb, row_map, pblocks, basisapx, acc, compress, false );
+    auto  [ ncolcb, Rc ] = detail::build_nested_cluster_basis_sep( scolcb, col_map, pblocks, basisapx, acc, compress, true  );
 
     //
     // construct uniform lowrank matrices with given cluster bases

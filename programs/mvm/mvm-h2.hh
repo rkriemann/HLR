@@ -65,7 +65,10 @@ program_main ()
             auto  hca    = bem::hca( pcoeff, *hcagen, cmdline::eps / 100.0, 6 );
             auto  lrapx  = bem::hca_lrapx( hca );
                 
-            std::tie( U_rowcb, U_colcb, U ) = impl::matrix::build_uniform( bct->root(), pcoeff, lrapx, cbapx, acc, cmdline::compress );
+            if ( sep_coup )
+                std::tie( U_rowcb, U_colcb, U ) = impl::matrix::build_uniform_sep( bct->root(), pcoeff, lrapx, cbapx, acc, cmdline::compress );
+            else
+                std::tie( U_rowcb, U_colcb, U ) = impl::matrix::build_uniform( bct->root(), pcoeff, lrapx, cbapx, acc, cmdline::compress );
         }// if
         else
             cmdline::capprox = "default";
@@ -76,8 +79,11 @@ program_main ()
         std::cout << "    using ACA" << std::endl;
 
         auto  lrapx = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
-        
-        std::tie( U_rowcb, U_colcb, U ) = impl::matrix::build_uniform( bct->root(), pcoeff, lrapx, cbapx, acc, cmdline::compress );
+
+        if ( sep_coup )
+            std::tie( U_rowcb, U_colcb, U ) = impl::matrix::build_uniform_sep( bct->root(), pcoeff, lrapx, cbapx, acc, cmdline::compress );
+        else
+            std::tie( U_rowcb, U_colcb, U ) = impl::matrix::build_uniform( bct->root(), pcoeff, lrapx, cbapx, acc, cmdline::compress );
     }// else
         
     toc = timer::since( tic );
@@ -111,9 +117,9 @@ program_main ()
 
     tic = timer::now();
 
-    // if ( sep_coup )
-    //     std::tie( rowcb, colcb, A ) = impl::matrix::build_h2_rec_sep( *H, cbapx, h2acc, false );
-    // else
+    if ( sep_coup )
+        std::tie( rowcb, colcb, A ) = impl::matrix::build_h2_sep( *U, *U_rowcb, *U_colcb, cbapx, acc, false );
+    else
         std::tie( rowcb, colcb, A ) = impl::matrix::build_h2( *U, *U_rowcb, *U_colcb, cbapx, acc, false );
 
     if ( cmdline::compress )
