@@ -212,6 +212,20 @@ public:
 
         return _S_col;
     }
+
+    hlr::blas::matrix< value_t >
+    row_coupling ( const matop_t  op ) const
+    {
+        if ( op == apply_normal ) return row_coupling();
+        else                      return col_coupling();
+    }
+    
+    hlr::blas::matrix< value_t >
+    col_coupling ( const matop_t  op ) const
+    {
+        if ( op == apply_normal ) return col_coupling();
+        else                      return row_coupling();
+    }
     
     void
     set_row_coupling ( const blas::matrix< value_t > &  aS )

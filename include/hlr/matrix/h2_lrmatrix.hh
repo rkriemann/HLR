@@ -85,14 +85,12 @@ public:
         this->set_ofs( _row_is.first(), _col_is.first() );
     }
 
-    h2_lrmatrix ( const indexset                     arow_is,
-                  const indexset                     acol_is,
-                  cluster_basis_t &  arow_cb,
-                  cluster_basis_t &  acol_cb,
-                  hlr::blas::matrix< value_t > &     aS )
+    h2_lrmatrix ( cluster_basis_t &               arow_cb,
+                  cluster_basis_t &               acol_cb,
+                  hlr::blas::matrix< value_t > &  aS )
             : Hpro::TMatrix< value_t >()
-            , _row_is( arow_is )
-            , _col_is( acol_is )
+            , _row_is( arow_cb.is() )
+            , _col_is( acol_cb.is() )
             , _row_cb( &arow_cb )
             , _col_cb( &acol_cb )
             , _S( blas::copy( aS ) )
@@ -103,14 +101,12 @@ public:
         this->set_ofs( _row_is.first(), _col_is.first() );
     }
 
-    h2_lrmatrix ( const indexset                     arow_is,
-                  const indexset                     acol_is,
-                  cluster_basis_t &  arow_cb,
-                  cluster_basis_t &  acol_cb,
-                  hlr::blas::matrix< value_t > &&    aS )
+    h2_lrmatrix ( cluster_basis_t &                arow_cb,
+                  cluster_basis_t &                acol_cb,
+                  hlr::blas::matrix< value_t > &&  aS )
             : Hpro::TMatrix< value_t >()
-            , _row_is( arow_is )
-            , _col_is( acol_is )
+            , _row_is( arow_cb.is() )
+            , _col_is( acol_cb.is() )
             , _row_cb( &arow_cb )
             , _col_cb( &acol_cb )
             , _S( std::move( aS ) )
@@ -121,14 +117,12 @@ public:
         this->set_ofs( _row_is.first(), _col_is.first() );
     }
 
-    h2_lrmatrix ( const indexset       arow_is,
-                  const indexset       acol_is,
-                  cluster_basis_t &    arow_cb,
+    h2_lrmatrix ( cluster_basis_t &    arow_cb,
                   cluster_basis_t &    acol_cb,
                   compress::zarray &&  azS )
             : Hpro::TMatrix< value_t >()
-            , _row_is( arow_is )
-            , _col_is( acol_is )
+            , _row_is( arow_cb.is() )
+            , _col_is( acol_cb.is() )
             , _row_cb( &arow_cb )
             , _col_cb( &acol_cb )
             , _zS( std::move( azS ) )
@@ -575,14 +569,14 @@ h2_lrmatrix< value_t >::copy () const
         
         std::copy( _zS.begin(), _zS.end(), zM.begin() );
         
-        auto  M = std::make_unique< h2_lrmatrix >( _row_is, _col_is, *_row_cb, *_col_cb, std::move( zM ) );
+        auto  M = std::make_unique< h2_lrmatrix >( *_row_cb, *_col_cb, std::move( zM ) );
 
         M->copy_struct_from( this );
         return M;
     }// if
     else
     {
-        auto  M = std::make_unique< h2_lrmatrix >( _row_is, _col_is, *_row_cb, *_col_cb, std::move( blas::copy( _S ) ) );
+        auto  M = std::make_unique< h2_lrmatrix >( *_row_cb, *_col_cb, std::move( blas::copy( _S ) ) );
 
         M->copy_struct_from( this );
         return M;
