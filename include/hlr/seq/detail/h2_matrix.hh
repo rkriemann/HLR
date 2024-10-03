@@ -427,7 +427,6 @@ build_nested_cluster_basis ( const shared_cluster_basis< value_t > &            
                              const std::list< const uniform_lrmatrix< value_t > * > &                 pblocks,
                              const basisapx_t &                                                       basisapx,
                              const accuracy &                                                         acc,
-                             const bool                                                               compress,
                              const bool                                                               transposed )
 {
     using  real_t     = Hpro::real_type_t< value_t >;
@@ -506,9 +505,6 @@ build_nested_cluster_basis ( const shared_cluster_basis< value_t > &            
 
         ncb->set_basis( std::move( W ), std::move( Ws ) );
 
-        if ( compress )
-            ncb->compress( acc );
-
         return { std::move( ncb ), std::move( R ) };
     }// if
     else
@@ -527,7 +523,7 @@ build_nested_cluster_basis ( const shared_cluster_basis< value_t > &            
             HLR_ASSERT( ! is_null( scb.son(i) ) );
             
             // construct son basis
-            auto  [ ncb_i, R_i ] = build_nested_cluster_basis( *scb_i, lrblocks, mat_list, basisapx, acc, compress, transposed );
+            auto  [ ncb_i, R_i ] = build_nested_cluster_basis( *scb_i, lrblocks, mat_list, basisapx, acc, transposed );
 
             ncb->set_son( i, ncb_i.release() );
 
@@ -600,9 +596,6 @@ build_nested_cluster_basis ( const shared_cluster_basis< value_t > &            
 
         ncb->set_transfer( std::move( E ) );
 
-        if ( compress )
-            ncb->compress( acc );
-        
         return { std::move( ncb ), std::move( R ) };
     }// else
 
@@ -618,7 +611,6 @@ build_nested_cluster_basis_sep ( const shared_cluster_basis< value_t > &        
                                  const std::list< const uniform_lr2matrix< value_t > * > &                 pblocks,
                                  const basisapx_t &                                                        basisapx,
                                  const accuracy &                                                          acc,
-                                 const bool                                                                compress,
                                  const bool                                                                transposed )
 {
     using  real_t     = Hpro::real_type_t< value_t >;
@@ -695,9 +687,6 @@ build_nested_cluster_basis_sep ( const shared_cluster_basis< value_t > &        
 
         ncb->set_basis( std::move( W ), std::move( Ws ) );
 
-        if ( compress )
-            ncb->compress( acc );
-
         return { std::move( ncb ), std::move( R ) };
     }// if
     else
@@ -716,7 +705,7 @@ build_nested_cluster_basis_sep ( const shared_cluster_basis< value_t > &        
             HLR_ASSERT( ! is_null( scb.son(i) ) );
             
             // construct son basis
-            auto  [ ncb_i, R_i ] = build_nested_cluster_basis_sep( *scb_i, lrblocks, mat_list, basisapx, acc, compress, transposed );
+            auto  [ ncb_i, R_i ] = build_nested_cluster_basis_sep( *scb_i, lrblocks, mat_list, basisapx, acc, transposed );
 
             ncb->set_son( i, ncb_i.release() );
 
@@ -785,9 +774,6 @@ build_nested_cluster_basis_sep ( const shared_cluster_basis< value_t > &        
 
         ncb->set_transfer( std::move( E ) );
 
-        if ( compress )
-            ncb->compress( acc );
-        
         return { std::move( ncb ), std::move( R ) };
     }// else
 

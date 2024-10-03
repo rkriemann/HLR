@@ -66,9 +66,9 @@ program_main ()
             auto  lrapx  = bem::hca_lrapx( hca );
                 
             if ( sep_coup )
-                std::tie( U_rowcb, U_colcb, U ) = impl::matrix::build_uniform_sep( bct->root(), pcoeff, lrapx, cbapx, acc, cmdline::compress );
+                std::tie( U_rowcb, U_colcb, U ) = impl::matrix::build_uniform_sep( bct->root(), pcoeff, lrapx, cbapx, acc, false );
             else
-                std::tie( U_rowcb, U_colcb, U ) = impl::matrix::build_uniform( bct->root(), pcoeff, lrapx, cbapx, acc, cmdline::compress );
+                std::tie( U_rowcb, U_colcb, U ) = impl::matrix::build_uniform( bct->root(), pcoeff, lrapx, cbapx, acc, false );
         }// if
         else
             cmdline::capprox = "default";
@@ -81,9 +81,9 @@ program_main ()
         auto  lrapx = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
 
         if ( sep_coup )
-            std::tie( U_rowcb, U_colcb, U ) = impl::matrix::build_uniform_sep( bct->root(), pcoeff, lrapx, cbapx, acc, cmdline::compress );
+            std::tie( U_rowcb, U_colcb, U ) = impl::matrix::build_uniform_sep( bct->root(), pcoeff, lrapx, cbapx, acc, false );
         else
-            std::tie( U_rowcb, U_colcb, U ) = impl::matrix::build_uniform( bct->root(), pcoeff, lrapx, cbapx, acc, cmdline::compress );
+            std::tie( U_rowcb, U_colcb, U ) = impl::matrix::build_uniform( bct->root(), pcoeff, lrapx, cbapx, acc, false );
     }// else
         
     toc = timer::since( tic );
@@ -118,16 +118,16 @@ program_main ()
     tic = timer::now();
 
     if ( sep_coup )
-        std::tie( rowcb, colcb, A ) = impl::matrix::build_h2_sep( *U, *U_rowcb, *U_colcb, cbapx, acc, false );
+        std::tie( rowcb, colcb, A ) = impl::matrix::build_h2_sep( *U, *U_rowcb, *U_colcb, cbapx, h2acc, cmdline::compress );
     else
-        std::tie( rowcb, colcb, A ) = impl::matrix::build_h2( *U, *U_rowcb, *U_colcb, cbapx, acc, false );
+        std::tie( rowcb, colcb, A ) = impl::matrix::build_h2( *U, *U_rowcb, *U_colcb, cbapx, h2acc, cmdline::compress );
 
-    if ( cmdline::compress )
-    {
-        impl::matrix::compress< matrix::nested_cluster_basis< value_t > >( *rowcb, acc );
-        impl::matrix::compress< matrix::nested_cluster_basis< value_t > >( *colcb, acc );
-        impl::matrix::compress( *A, acc );
-    }// if
+    // if ( cmdline::compress )
+    // {
+    //     impl::matrix::compress< matrix::nested_cluster_basis< value_t > >( *rowcb, acc );
+    //     impl::matrix::compress< matrix::nested_cluster_basis< value_t > >( *colcb, acc );
+    //     impl::matrix::compress( *A, acc );
+    // }// if
     
     toc = timer::since( tic );
 
@@ -141,7 +141,7 @@ program_main ()
     std::cout << "      vs U  " << boost::format( "%.3f" ) % ( double(mem_rcb + mem_ccb + mem_A) / double(mem_U_rcb + mem_U_ccb + mem_U) ) << std::endl;
 
     if ( verbose( 3 ) )
-        matrix::print_eps( *A, "A", "noid,nosize" );
+        io::eps::print( *A, "A", "noinnerid" );
 
     if ( false )
     {
@@ -156,6 +156,11 @@ program_main ()
 
         std::cout << "    error = " << format_error( error, error / norm_U ) << std::endl;
     }
+
+    // not needed anymore
+    U.reset( nullptr );
+    U_rowcb.reset( nullptr );
+    U_colcb.reset( nullptr );
     
     //////////////////////////////////////////////////////////////////////
     //
