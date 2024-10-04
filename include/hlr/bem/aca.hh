@@ -19,9 +19,6 @@
 
 namespace hlr { namespace bem {
 
-// represents array of pivot elements
-using  pivot_arr_t    = std::vector< std::pair< Hpro::idx_t, Hpro::idx_t > >;
-
 //////////////////////////////////////////////////////////////////////
 //
 // lowrank approximation class for Hpro
@@ -87,7 +84,11 @@ public:
 // precision <eps>
 //
 template < typename value_t >
-pivot_arr_t
+std::tuple<
+    std::vector< Hpro::idx_t >,
+    std::vector< Hpro::idx_t >,
+    blas::matrix< value_t >,
+    blas::matrix< value_t > >
 aca_full_pivots  ( blas::matrix< value_t > &                    M,
                    const typename Hpro::real_type_t< value_t >  eps )
 {
@@ -98,15 +99,19 @@ aca_full_pivots  ( blas::matrix< value_t > &                    M,
     // and compute next rank-1 matrix for low-rank approximation
     //
     
-    const size_t             max_rank    = std::min( M.nrows(), M.ncols() );
-    size_t                   k           = 0;
-    const auto               almost_zero = std::numeric_limits< real_t >::epsilon();
-    real_t                   apr         = eps;
-    blas::vector< value_t >  row( M.ncols() );
-    blas::vector< value_t >  col( M.nrows() );
-    pivot_arr_t              pivots;
+    const size_t   max_rank    = std::min( M.nrows(), M.ncols() );
+    size_t         k           = 0;
+    const auto     almost_zero = std::numeric_limits< real_t >::epsilon();
+    real_t         apr         = eps;
+    auto           row         = blas::vector< value_t >( M.ncols() );
+    auto           col         = blas::vector< value_t >( M.nrows() );
+    auto           row_pivots  = std::vector< Hpro::idx_t >();
+    auto           col_pivots  = std::vector< Hpro::idx_t >();
+    auto           Us          = std::list< blas::vector< value_t > >();
+    auto           Vs          = std::list< blas::vector< value_t > >();
                 
-    pivots.reserve( max_rank );
+    row_pivots.reserve( max_rank );
+    col_pivots.reserve( max_rank );
     
     while ( k < max_rank )
     {
@@ -118,11 +123,11 @@ aca_full_pivots  ( blas::matrix< value_t > &                    M,
 
         blas::max_idx( M, pivot_row, pivot_col );
 
-        const value_t  pivot_val = M( pivot_row, pivot_col );
+        const auto  pivot_val = M( pivot_row, pivot_col );
 
         // stop if maximal element is almost 0
         if ( std::abs( pivot_val ) < almost_zero )
-            return pivots;
+            break;
         
         //
         // copy row and column into A/B and update M
@@ -143,7 +148,10 @@ aca_full_pivots  ( blas::matrix< value_t > &                    M,
             
         const auto  norm = blas::norm2( col ) * blas::norm2( row );
                 
-        pivots.push_back( { pivot_row, pivot_col } );
+        row_pivots.push_back( pivot_row );
+        col_pivots.push_back( pivot_col );
+        Us.push_back( std::move( blas::copy( col ) ) );
+        Vs.push_back( std::move( blas::copy( row ) ) );
         ++k;
             
         if ( k == 1 )
@@ -153,7 +161,7 @@ aca_full_pivots  ( blas::matrix< value_t > &                    M,
         }// if
         else if ( norm < apr ) 
         {
-            return pivots;
+            break;
         }// else
 
         //
@@ -163,7 +171,31 @@ aca_full_pivots  ( blas::matrix< value_t > &                    M,
         blas::add_r1( value_t(-1), col, row, M );
     }// while
 
-    return pivots;
+    //
+    // copy vectors to matrix
+    //
+    
+    auto  U   = blas::matrix< value_t >( M.nrows(), k );
+    auto  V   = blas::matrix< value_t >( M.ncols(), k );
+    uint  pos = 0;
+
+    for ( auto  u : Us )
+    {
+        auto  Ui = U.column( pos++ );
+
+        blas::copy( u, Ui );
+    }// for
+
+    pos = 0;
+    for ( auto  v : Vs )
+    {
+        auto  Vi = V.column( pos++ );
+
+        blas::copy( v, Vi );
+    }// for
+    blas::conj( V );
+    
+    return { std::move( row_pivots ), std::move( col_pivots ), std::move( U ), std::move( V ) };
 }
 
 }}// namespace hlr::bem

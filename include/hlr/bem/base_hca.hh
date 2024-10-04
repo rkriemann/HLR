@@ -96,7 +96,11 @@ public:
     // compute ACA(-Full) pivots for approximating the generator function
     // in local block as defined by row- and column grid
     //
-    pivot_arr_t
+    std::tuple<
+        std::vector< Hpro::idx_t >,
+        std::vector< Hpro::idx_t >,
+        blas::matrix< value_t >,
+        blas::matrix< value_t > >
     comp_aca_pivots ( const tensor_grid< real_t > &  row_grid,
                       const tensor_grid< real_t > &  col_grid,
                       const real_t                   eps ) const
@@ -168,20 +172,21 @@ public:
     // compute generator matrix G
     //
     blas::matrix< value_t >
-    compute_G ( const pivot_arr_t &            pivots,
-                const tensor_grid< real_t > &  row_grid,
-                const tensor_grid< real_t > &  col_grid ) const
+    compute_G ( const std::vector< Hpro::idx_t > &  row_pivots,
+                const std::vector< Hpro::idx_t > &  col_pivots,
+                const tensor_grid< real_t > &       row_grid,
+                const tensor_grid< real_t > &       col_grid ) const
     {
-        const auto               k = pivots.size();
+        const auto               k = row_pivots.size();
         blas::matrix< value_t >  G( k, k );
     
         for ( idx_t  j = 0; j < idx_t(k); j++ )
         {
-            const auto  y  = col_grid( col_grid.fold( pivots[j].second ) );
+            const auto  y  = col_grid( col_grid.fold( col_pivots[j] ) );
         
             for ( idx_t  i = 0; i < idx_t(k); i++ )
             {
-                const auto  x  = row_grid( row_grid.fold( pivots[i].first ) );
+                const auto  x  = row_grid( row_grid.fold( row_pivots[i] ) );
             
                 G(i,j) = _generator_fn.eval( x, y );
             }// for

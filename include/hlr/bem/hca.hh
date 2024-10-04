@@ -12,6 +12,9 @@
 
 #include <hlr/bem/base_hca.hh>
 
+#include <hlr/utils/io.hh> // DEBUG
+#include <hlr/utils/timer.hh> // DEBUG
+
 namespace hlr { namespace bem {
 
 //////////////////////////////////////////////////////////////////////
@@ -58,41 +61,65 @@ struct hca : public base_hca< T_coeff, T_generator_fn >
              const Hpro::TGeomCluster &  colcl,
              const Hpro::TTruncAcc &     acc ) const 
     {
-        if (( rowcl.bbox().max().dim() != 3 ) ||
-            ( colcl.bbox().max().dim() != 3 ))
+        if (( rowcl.bbox().dim() != 3 ) || ( colcl.bbox().dim() != 3 ))
             HLR_ERROR( "unsupported dimension of cluster" );
 
         // generate grid for local clusters for evaluation of kernel generator function
         const auto  row_grid = tensor_grid< real_t >( rowcl.bbox(), base_class::ipol_order(), base_class::ipol_func() );
         const auto  col_grid = tensor_grid< real_t >( colcl.bbox(), base_class::ipol_order(), base_class::ipol_func() );
-
+        
         // determine ACA pivot elements for the kernel generator matrix
-        const auto  pivots   = base_class::comp_aca_pivots( row_grid, col_grid, base_class::aca_eps() );
-        const auto  k        = pivots.size();
+        const auto  [ row_pivots, col_pivots, W, X ] = base_class::comp_aca_pivots( row_grid, col_grid, base_class::aca_eps() );
+        const auto  k                                = row_pivots.size();
 
         // immediately return empty matrix
         if ( k == 0 )
             return std::make_unique< matrix::lrmatrix< value_t > >( rowcl, colcl );
-    
+        
+        #if 1
+
         //
         // compute G = (S|_pivot_row,pivot_col)^-1
         //
     
-        const auto  G = base_class::compute_G( pivots, row_grid, col_grid );
+        const auto  G = base_class::compute_G( row_pivots, col_pivots, row_grid, col_grid );
 
         //
         // compute low-rank matrix as U×G×V^H
         //
 
-        auto  U = compute_U( rowcl, k, pivots, col_grid );
-        auto  V = compute_V( colcl, k, pivots, row_grid );
+        auto  U = compute_U( rowcl, k, col_pivots, col_grid );
+        auto  V = compute_V( colcl, k, row_pivots, row_grid );
 
         auto  UG = blas::prod( U, G );
         auto  R  = std::make_unique< matrix::lrmatrix< value_t > >( rowcl, colcl, std::move( UG ), std::move( V ) );
 
         R->truncate( acc );
+        
+        return R;
+
+        #else
+
+        //
+        // R = U · (W_k X_k')^-1 · V'
+        //   = (U.(X_k')^-1 (V·(W_k^-1)')'
+        //
+        
+        auto  Wk = copy_lower( W, row_pivots ); // ACA leads to triangular shape if ordered w.r.t. pivots
+        auto  Xk = copy_upper( X, col_pivots ); // (W is also unit diagonal)
+        auto  U  = compute_U( rowcl, k, col_pivots, col_grid );
+        auto  V  = compute_V( colcl, k, row_pivots, row_grid );
+        
+        blas::solve_tri( blas::from_right, blas::upper_triangular, blas::general_diag, value_t(1), blas::adjoint( Xk ), U );
+        blas::solve_tri( blas::from_right, blas::lower_triangular, blas::general_diag, value_t(1), blas::adjoint( Wk ), V );
+        
+        auto  R  = std::make_unique< matrix::lrmatrix< value_t > >( rowcl, colcl, std::move( U ), std::move( V ) );
+
+        R->truncate( acc );
 
         return R;
+
+        #endif
     }
 
     //
@@ -101,15 +128,15 @@ struct hca : public base_hca< T_coeff, T_generator_fn >
     //
 
     blas::matrix< value_t >
-    compute_U  ( const Hpro::TIndexSet &          rowis,
-                 const size_t                     rank,
-                 const pivot_arr_t &              pivots,
-                 const tensor_grid< real_t > &    col_grid ) const
+    compute_U  ( const Hpro::TIndexSet &             rowis,
+                 const size_t                        rank,
+                 const std::vector< Hpro::idx_t > &  pivots,
+                 const tensor_grid< real_t > &       col_grid ) const
     {
         auto  y_pts = std::vector< Hpro::T3Point >( rank );
 
         for ( size_t j = 0; j < rank; j++ )
-            y_pts[j] = col_grid( col_grid.fold( pivots[j].second ) );
+            y_pts[j] = col_grid( col_grid.fold( pivots[j] ) );
 
         auto  U = blas::matrix< value_t >( rowis.size(), rank );
 
@@ -119,15 +146,15 @@ struct hca : public base_hca< T_coeff, T_generator_fn >
     }
 
     blas::matrix< value_t >
-    compute_V  ( const Hpro::TIndexSet &        colis,
-                 const size_t                   rank,
-                 const pivot_arr_t &            pivots,
-                 const tensor_grid< real_t > &  row_grid ) const
+    compute_V  ( const Hpro::TIndexSet &             colis,
+                 const size_t                        rank,
+                 const std::vector< Hpro::idx_t > &  pivots,
+                 const tensor_grid< real_t > &       row_grid ) const
     {
         auto  x_pts = std::vector< Hpro::T3Point >( rank );
 
         for ( size_t j = 0; j < rank; j++ )
-            x_pts[j] = row_grid( row_grid.fold( pivots[j].first ) );
+            x_pts[j] = row_grid( row_grid.fold( pivots[j] ) );
 
         auto  V = blas::matrix< value_t >( colis.size(), rank );
 
@@ -135,6 +162,44 @@ struct hca : public base_hca< T_coeff, T_generator_fn >
         blas::conj( V );
 
         return V;
+    }
+
+    blas::matrix< value_t >
+    copy_lower ( const blas::matrix< value_t > &     M,
+                 const std::vector< Hpro::idx_t > &  pivots ) const
+    {
+        auto  k  = pivots.size();
+        auto  Mk = blas::matrix< value_t >( k, M.ncols() );
+
+        for ( uint  i = 0; i < k; ++i )
+        {
+            auto  pi = pivots[i];
+            
+            for ( uint  j = 0; j < i+1; ++j )
+                // for ( uint  j = 0; j < M.ncols(); ++j )
+                Mk(i,j) = M(pi,j );
+        }// for
+
+        return  Mk;
+    }
+
+    blas::matrix< value_t >
+    copy_upper ( const blas::matrix< value_t > &     M,
+                 const std::vector< Hpro::idx_t > &  pivots ) const
+    {
+        auto  k  = pivots.size();
+        auto  Mk = blas::matrix< value_t >( k, M.ncols() );
+
+        for ( uint  i = 0; i < k; ++i )
+        {
+            auto  pi = pivots[i];
+            
+            for ( uint  j = i; j < M.ncols(); ++j )
+                // for ( uint  j = 0; j < M.ncols(); ++j )
+                Mk(i,j) = M(pi,j );
+        }// for
+
+        return  Mk;
     }
 };
 
