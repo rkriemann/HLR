@@ -516,6 +516,8 @@ struct zarray
 
     byte_t *  begin () const { return nullptr; }
     byte_t *  end   () const { return nullptr; }
+
+    bool      empty () const { return true; }
 };
 
 template < typename value_t >
