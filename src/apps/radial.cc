@@ -108,7 +108,7 @@ make_vertices ( const std::string &  gridfile )
         {
             vertices.reserve( nsize * nsize * nsize );
             
-            const double  h = 1.0 / double(nsize);
+            const double  h = 1.0 / double(nsize-1);
 
             for ( size_t  x = 0; x < nsize; ++x )
                 for ( size_t  y = 0; y < nsize; ++y )
@@ -119,7 +119,7 @@ make_vertices ( const std::string &  gridfile )
         {
             vertices.reserve( nsize * nsize * nsize );
             
-            const double                      h = 1.0 / double(nsize);
+            const double                      h = 1.0 / double(nsize-1);
             std::mt19937_64                   generator{ 1 };
             std::uniform_real_distribution<>  distr{ -h/2.0, h/2.0 };
 

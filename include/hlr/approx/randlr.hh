@@ -27,6 +27,32 @@ namespace detail
 {
 
 //
+// determine "singular values" of R by looking at
+// norms of R(i:·,i:·) for all i
+//
+template < typename value_t >
+blas::vector< Hpro::real_type_t< value_t > >
+get_singular_values ( const blas::matrix< value_t > &  R )
+{
+    using  real_t = Hpro::real_type_t< value_t >;
+
+    HLR_ASSERT( R.nrows() == R.ncols() );
+    
+    const idx_t  n = idx_t( R.nrows() );
+    auto         S = blas::vector< real_t >( n );
+    
+    for ( int  i = 0; i < n; ++i )
+    {
+        auto  rest = blas::range( i, n-1 );
+        auto  R_i  = blas::matrix< value_t >( R, rest, rest );
+        
+        S( i ) = blas::normF( R_i );
+    }// for
+
+    return S;
+}
+
+//
 // compute basis for column space (range) of M
 //
 template < typename operator_t >
@@ -35,7 +61,8 @@ rand_column_basis ( const operator_t &  M,
                     const accuracy &    acc,
                     const uint          block_size,
                     const uint          power_steps,
-                    const uint          oversampling )
+                    const uint          oversampling,
+                    blas::vector< Hpro::real_type_t< typename operator_t::value_t > > *  sv = nullptr )
 {
     using  value_t = typename operator_t::value_t;
     using  real_t  = Hpro::real_type_t< value_t >;
@@ -83,6 +110,17 @@ rand_column_basis ( const operator_t &  M,
             }// for
         }// if
 
+        if ( ! is_null( sv ) )
+        {
+            auto  S = get_singular_values( R );
+
+            if ( sv->length() != k )
+                *sv = std::move( blas::vector< real_t >( k ) );
+            
+            for ( uint  i = 0; i < k; ++i )
+                (*sv)(i) = S(i);
+        }// if
+        
         return Q;
     }// if
     else
@@ -98,7 +136,8 @@ rand_column_basis ( const operator_t &  M,
         auto        TQ_i    = blas::matrix< value_t >( nrows_M, bsize );
         auto        R       = blas::matrix< value_t >( bsize,   bsize );
         auto        MtQ     = blas::matrix< value_t >( ncols_M, bsize );
-
+        auto        S       = std::list< real_t >();
+        
         for ( uint  i = 0; i < nblocks; ++i )
         {
             //
@@ -185,6 +224,14 @@ rand_column_basis ( const operator_t &  M,
             
             if (( norm_Qi <= abs_eps ) || (( norm_Qi ) <= rel_eps * norm_M ))
                 break;
+
+            if ( ! is_null( sv ) )
+            {
+                auto  S_i = get_singular_values( R );
+
+                for ( uint  j = 0; j < S_i.length(); ++j )
+                    S.push_back( S_i(j) );
+            }// if
         }// for
         
         //
@@ -202,6 +249,17 @@ rand_column_basis ( const operator_t &  M,
             pos += bsize;
         }// for
 
+        if ( ! is_null( sv ) )
+        {
+            if ( sv->length() != S.size() )
+                *sv = std::move( blas::vector< real_t >( S.size() ) );
+
+            uint  i = 0;
+            
+            for ( auto  s_i : S )
+                (*sv)(i++) = s_i;
+        }// if
+        
         return Q;
     }// else
 }

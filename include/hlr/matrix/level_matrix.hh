@@ -29,7 +29,8 @@ class level_matrix : public Hpro::TBlockMatrix< T_value >
 {
 public:
     using  value_t      = T_value;
-    using  matrix_map_t = std::map< Hpro::idx_t, Hpro::TMatrix< value_t > * >;
+    using  matrix_t     = Hpro::TMatrix< value_t >;
+    using  matrix_map_t = std::map< Hpro::idx_t, matrix_t * >;
     
 private:
     // pointers to level matrices above and below
@@ -67,15 +68,15 @@ public:
 
     //! return matrix at index (i,j)
     auto  block ( const uint  i,
-                  const uint  j ) -> Hpro::TMatrix< value_t > *
+                  const uint  j ) -> matrix_t *
     {
         return _block_rows[ i ][ j ];
     }
 
     //! set matrix block at block index (\a i,\a j) to matrix \a A
-    void  set_block ( const uint       i,
-                      const uint       j,
-                      Hpro::TMatrix< value_t > *  A )
+    void  set_block ( const uint  i,
+                      const uint  j,
+                      matrix_t *  A )
     {
         _block_rows[ i ][ j ] = A;
         _block_cols[ j ][ i ] = A;
@@ -127,7 +128,7 @@ public:
     
     // return block row/column of A
     std::pair< uint, uint >
-    get_index ( const Hpro::TMatrix< value_t > *  A )
+    get_index ( const matrix_t *  A )
     {
         for ( uint  i = 0; i < this->nblock_rows(); ++i )
         {
@@ -143,7 +144,7 @@ public:
         return { this->nblock_rows(), this->nblock_cols() };
     }
     std::pair< uint, uint >
-    get_index ( const Hpro::TMatrix< value_t > &  A )
+    get_index ( const matrix_t &  A )
     {
         return get_index( & A );
     }
@@ -155,7 +156,7 @@ public:
     HPRO_RTTI_DERIVED( level_matrix, Hpro::TBlockMatrix< value_t > )
 
     //! return matrix of same class (but no content)
-    virtual auto create () const -> std::unique_ptr< Hpro::TMatrix< value_t > >
+    virtual auto create () const -> std::unique_ptr< matrix_t >
     {
         return std::make_unique< level_matrix >();
     }

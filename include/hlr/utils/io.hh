@@ -24,6 +24,8 @@
 #include <hpro/io/TMatrixIO.hh>
 #include <hpro/io/TClusterVis.hh>
 #include <hpro/io/TCoordVis.hh>
+#include <hpro/io/TGridVis.hh>
+#include <hpro/io/TGridIO.hh>
 
 #if defined(HLR_USE_H2)
 #  include <hpro/io/TClusterBasisVis.hh>
@@ -76,6 +78,20 @@ read ( const std::string &  filename )
 
     return mio.read< value_t >( filename );
 }
+
+//
+// write matrix M to file <filename>
+//
+inline
+void
+write ( const Hpro::TGrid &  grid,
+        const std::string &  filename )
+{
+    Hpro::THproGridIO  gio;
+
+    gio.write( &grid, filename );
+}
+
 
 }// namespace hpro
 
@@ -366,15 +382,10 @@ print ( const Hpro::TCluster &  cl,
 //
 // print blockcluster <cl> to file <filename>
 //
-inline
 void
 print ( const Hpro::TBlockCluster &  cl,
-        const std::string &          filename )
-{
-    Hpro::TPSBlockClusterVis  vis;
-
-    vis.print( & cl, filename );
-}
+        const std::string &          filename,
+        const std::string &          options = "default" );
 
 //
 // print matrix <M> to file <filename>
@@ -467,6 +478,16 @@ print ( const Hpro::TClusterBasis< value_t > &  cb,
 namespace vtk
 {
 
+inline
+void
+print ( const Hpro::TGrid &  grid,
+        const std::string &  filename )
+{
+    Hpro::TVTKGridVis  vis;
+
+    vis.print( & grid, filename );
+}
+
 //
 // print coordinates
 //
@@ -478,6 +499,45 @@ print ( const Hpro::TCoordinate &  coord,
     Hpro::TVTKCoordVis  vis;
 
     vis.print( & coord, filename );
+}
+
+inline
+void
+print ( const Hpro::TCoordinate &    coord,
+        const std::vector< uint > &  label,
+        const std::string &          filename )
+{
+    Hpro::TVTKCoordVis  vis;
+
+    vis.print( & coord, label, filename );
+}
+
+//
+// print (bounding boxes of geometric) clusters
+// - up to <lvl> sub levels are printed
+//
+inline
+void
+print ( const Hpro::TCluster &  cl,
+        const uint              lvl,
+        const std::string &     filename )
+{
+    detail::vtk_print_cluster( cl, lvl, filename );
+}
+
+//
+// print coordinates labeled according to clusters
+// in cluster tree on a particular level
+//
+inline
+void
+print ( const Hpro::TCoordinate &   coord,
+        const Hpro::TCluster &      ct,
+        const Hpro::TPermutation &  i2e,
+        const uint                  lvl,
+        const std::string &         filename )
+{
+    detail::vtk_print_cluster( coord, ct, i2e, lvl, filename );
 }
 
 //

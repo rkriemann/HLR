@@ -25,7 +25,7 @@ public:
     using  value_t = std::complex< double >;
 
     // signal support for HCA based construction
-    static constexpr bool supports_hca = false;
+    static constexpr bool supports_hca = true;
 
 private:
     // BEM data
@@ -36,7 +36,8 @@ private:
 public:
     // ctor with grid name (plus refinement levels)
     helmholtz_slp ( const std::complex< double >  kappa,
-                    const std::string &           grid );
+                    const std::string &           grid,
+                    const double                  quad_error );
     
     // dtor
     virtual ~helmholtz_slp () {}

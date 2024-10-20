@@ -436,6 +436,7 @@ template < typename T_value >
 struct RRQR
 {
     using  value_t = T_value;
+    using  real_t  = Hpro::real_type_t< value_t >;
     
     // signal support for general lin. operators
     static constexpr bool supports_general_operator = false;
@@ -519,7 +520,8 @@ struct RRQR
     
     blas::matrix< value_t >
     column_basis ( blas::matrix< value_t > &  M,
-                   const accuracy &           acc ) const
+                   const accuracy &           acc,
+                   blas::vector< real_t > *   sv = nullptr ) const
     {
         // see "rrqr" above for comments
 
@@ -533,9 +535,19 @@ struct RRQR
 
         blas::qrp( M, R, P );
 
-        auto  k  = detail::trunc_rank( R, acc );
+        auto  S  = detail::singular_values( R );
+        auto  k  = acc.trunc_rank( S );
         auto  Qk = blas::matrix< value_t >( M, blas::range::all, blas::range( 0, k-1 ) );
 
+        if ( ! is_null( sv ) )
+        {
+            if ( sv->length() != k )
+                *sv = std::move( blas::vector< real_t >( k ) );
+            
+            for ( uint  i = 0; i < k; ++i )
+                (*sv)(i) = S(i);
+        }// if
+        
         return blas::copy( Qk );
     }
 

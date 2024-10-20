@@ -369,13 +369,13 @@ struct accumulator
                     // just update with U·R·V'
                     //
                     if ( is_null( matrix ) )
-                        matrix = std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(),
-                                                                      std::move( blas::prod( alpha, U, R ) ),
-                                                                      std::move( blas::copy( V ) ) );
+                        matrix = std::make_unique< matrix::lrmatrix< value_t > >( M.row_is(), M.col_is(),
+                                                                                  std::move( blas::prod( alpha, U, R ) ),
+                                                                                  std::move( blas::copy( V ) ) );
                     else
                     {
                         auto  US = blas::prod( U, R );
-                        auto  T  = Hpro::TRkMatrix< value_t >( M.row_is(), M.col_is(), US, V );
+                        auto  T  = matrix::lrmatrix< value_t >( M.row_is(), M.col_is(), US, V );
                 
                         hlr::add( alpha, T, *matrix, acc, approx );
                     }// else
@@ -387,11 +387,11 @@ struct accumulator
                 if ( is_null( matrix ) )
                 {
                     blas::scale( alpha, Z );
-                    matrix = std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( blas::copy( U ) ), std::move( Z ) );
+                    matrix = std::make_unique< matrix::lrmatrix< value_t > >( M.row_is(), M.col_is(), std::move( blas::copy( U ) ), std::move( Z ) );
                 }// if
                 else
                 {
-                    auto  T = Hpro::TRkMatrix< value_t >( M.row_is(), M.col_is(), U, Z );
+                    auto  T = matrix::lrmatrix< value_t >( M.row_is(), M.col_is(), U, Z );
                     
                     hlr::add( alpha, T, *matrix, acc, approx );
                 }// else
@@ -402,11 +402,11 @@ struct accumulator
                 if ( is_null( matrix ) )
                 {
                     blas::scale( alpha, Y );
-                    matrix = std::make_unique< Hpro::TRkMatrix< value_t > >( M.row_is(), M.col_is(), std::move( Y ), std::move( blas::copy( V ) ) );
+                    matrix = std::make_unique< matrix::lrmatrix< value_t > >( M.row_is(), M.col_is(), std::move( Y ), std::move( blas::copy( V ) ) );
                 }// if
                 else
                 {
-                    auto  T = Hpro::TRkMatrix< value_t >( M.row_is(), M.col_is(), Y, V );
+                    auto  T = matrix::lrmatrix< value_t >( M.row_is(), M.col_is(), Y, V );
                     
                     hlr::add( alpha, T, *matrix, acc, approx );
                 }// else
@@ -464,10 +464,10 @@ struct accumulator
 
         for ( auto  [ op_A, A, op_B, B ] : pending )
         {
-            if ( is_blocked_all( *A, *B, M ) )
+            if ( hlr::is_blocked_all( *A, *B, M ) )
                 continue;
         
-            if ( is_blocked_all( A, B ) )
+            if ( hlr::is_blocked_all( *A, *B ) )
             {
                 //
                 // if M is a leaf and A _and_ B are blocked, a temporary matrix
@@ -478,7 +478,7 @@ struct accumulator
                     continue;
                 
                 // TODO: non low-rank M
-                if ( ! ( is_lowrank( M ) || hlr::matrix::is_lowrankS( M ) || is_uniform_lowrank( M ) ) )
+                if ( ! ( matrix::is_lowrank( M ) || matrix::is_lowrankS( M ) || is_uniform_lowrank( M ) ) )
                     HLR_ERROR( "unsupported matrix type: " + M.typestr() );
                 
                 auto  BA = cptrcast( A, Hpro::TBlockMatrix< value_t > );
@@ -883,7 +883,6 @@ struct rec_matrix_mult
             ::tbb::parallel_for(
                 ::tbb::blocked_range2d< uint >( 0, BM->nblock_rows(),
                                                 0, BM->nblock_cols() ),
-
                 [&,alpha] ( const auto &  r )
                 {
                     for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
@@ -907,7 +906,7 @@ struct rec_matrix_mult
             auto    U     = ptrcast( &M, hlr::matrix::uniform_lrmatrix< value_t > );
             auto &  rowcb = U->row_cb();
             auto &  colcb = U->col_cb();
-            auto    R     = Hpro::TRkMatrix< value_t >( U->row_is(), U->col_is() );
+            auto    R     = matrix::lrmatrix< value_t >( U->row_is(), U->col_is() );
 
             {
                 std::scoped_lock  lock( U->mutex(), rowcb.mutex(), colcb.mutex() );
@@ -923,8 +922,8 @@ struct rec_matrix_mult
             // now replace M by R and update row/column bases
             //
 
-            auto  W  = std::move( blas::mat_U< value_t >( R ) );
-            auto  X  = std::move( blas::mat_V< value_t >( R ) );
+            auto  W  = R.U(); // std::move( blas::mat_U< value_t >( R ) );
+            auto  X  = R.V(); // std::move( blas::mat_V< value_t >( R ) );
             auto  RW = blas::matrix< value_t >();
             auto  RX = blas::matrix< value_t >();
 
@@ -1074,7 +1073,7 @@ struct rec_lu_factorization
             //
 
             auto  UM = ptrcast( &M, hlr::matrix::uniform_lrmatrix< value_t > );
-            auto  R  = Hpro::TRkMatrix< value_t >( M.row_is(), M.col_is() );
+            auto  R  = matrix::lrmatrix< value_t >( M.row_is(), M.col_is() );
 
             {
                 std::scoped_lock  lock( M.mutex(), rowcb.mutex(), colcb.mutex() );
@@ -1098,8 +1097,8 @@ struct rec_lu_factorization
 
             trace::region_start( "basis" );
         
-            auto  W  = std::move( blas::mat_U< value_t >( R ) );
-            auto  X  = std::move( blas::mat_V< value_t >( R ) );
+            auto  W  = R.U(); // std::move( blas::mat_U< value_t >( R ) );
+            auto  X  = R.V(); // std::move( blas::mat_V< value_t >( R ) );
             auto  RW = blas::matrix< value_t >();
             auto  RX = blas::matrix< value_t >();
 
@@ -1237,7 +1236,7 @@ struct rec_lu_factorization
             //
 
             auto  UM = ptrcast( &M, uniform_lrmatrix< value_t > );
-            auto  R  = Hpro::TRkMatrix< value_t >( M.row_is(), M.col_is() );
+            auto  R  = matrix::lrmatrix< value_t >( M.row_is(), M.col_is() );
                                              
             {
                 std::scoped_lock  lock( M.mutex(), rowcb.mutex(), colcb.mutex() );
@@ -1261,8 +1260,8 @@ struct rec_lu_factorization
 
             trace::region_start( "basis" );
         
-            auto  W  = std::move( blas::mat_U< value_t >( R ) );
-            auto  X  = std::move( blas::mat_V< value_t >( R ) );
+            auto  W  = R.U(); // std::move( blas::mat_U< value_t >( R ) );
+            auto  X  = R.V(); // std::move( blas::mat_V< value_t >( R ) );
             auto  RW = blas::matrix< value_t >();
             auto  RX = blas::matrix< value_t >();
 

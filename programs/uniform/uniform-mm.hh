@@ -51,10 +51,7 @@ program_main ()
 
     auto  tic    = timer::now();
     auto  A      = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, nseq );
-    // auto  A      = io::hpro::read< value_t >( "A.hm" );
     auto  toc    = timer::since( tic );
-
-    // io::hpro::write( *A, "A.hm" );
     
     std::cout << "    done in  " << format_time( toc ) << std::endl;
     std::cout << "    dims   = " << A->nrows() << " × " << A->ncols() << std::endl;
@@ -70,7 +67,7 @@ program_main ()
         io::eps::print_lvl( *A, "L" );
     }// if
 
-    const auto  normA = hlr::norm::spectral( *A, 1e-4 );
+    const auto  normA = impl::norm::spectral( *A );
     
     //////////////////////////////////////////////////////////////////////
     //
@@ -92,8 +89,8 @@ program_main ()
     std::cout << "    mem    = " << format_mem( A2->byte_size(), rowcb->byte_size(), colcb->byte_size() ) << std::endl;
 
     {
-        auto  diff  = matrix::sum( value_t(1), *A, value_t(-1), *A2 );
-        auto  error = hlr::seq::norm::spectral( *diff, 1e-4 );
+        auto  diff  = matrix::sum( 1, *A, -1, *A2 );
+        auto  error = impl::norm::spectral( *diff );
         
         std::cout << "    error  = " << format_error( error / normA ) << std::endl;
     }
@@ -134,7 +131,7 @@ program_main ()
 
         auto  diff = matrix::sum( 1.0, *AxA, -1.0, *B );
 
-        std::cout << "    error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
+        std::cout << "    error  = " << format_error( impl::norm::spectral( *diff ) / norm_AxA ) << std::endl;
 
         if ( false )
         {
@@ -143,7 +140,7 @@ program_main ()
             auto  B2    = impl::matrix::copy_uniform< value_t >( *B, *rowcb, *colcb );
             auto  diff2 = matrix::sum( 1.0, *AxA, -1.0, *B2 );
                     
-            std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff2 ) / norm_AxA ) << std::endl;
+            std::cout << "      error  = " << format_error( impl::norm::spectral( *diff2 ) / norm_AxA ) << std::endl;
         }// if
     }// if
 
@@ -179,7 +176,7 @@ program_main ()
 
         auto  diff = matrix::sum( 1.0, *AxA, -1.0, *B );
 
-        std::cout << "    error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
+        std::cout << "    error  = " << format_error( impl::norm::spectral( *diff ) / norm_AxA ) << std::endl;
 
         if ( false )
         {
@@ -188,7 +185,7 @@ program_main ()
             auto  B2    = impl::matrix::copy_uniform< value_t >( *B, *rowcb, *colcb );
             auto  diff2 = matrix::sum( value_t(1), *AxA, value_t(-1), *B2 );
                     
-            std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff2 ) / norm_AxA ) << std::endl;
+            std::cout << "      error  = " << format_error( impl::norm::spectral( *diff2 ) / norm_AxA ) << std::endl;
         }// if
 
         if ( false )
@@ -199,7 +196,7 @@ program_main ()
             auto  diff2                = matrix::sum( value_t(1), *AxA, value_t(-1), *B2 );
         
             std::cout << "      mem    = " << format_mem( B2->byte_size(), rowcb->byte_size(), colcb->byte_size() ) << std::endl;
-            std::cout << "      error  = " << format_error( hlr::norm::spectral( *diff2 ) / norm_AxA ) << std::endl;
+            std::cout << "      error  = " << format_error( impl::norm::spectral( *diff2 ) / norm_AxA ) << std::endl;
         }// if
 
         if ( hpro::verbose( 3 ) )
@@ -239,7 +236,7 @@ program_main ()
 
         //     auto  diff = hpro::matrix_sum( hpro::real(1.0), AxA.get(), hpro::real(-1.0), B.get() );
 
-        //     std::cout << "    error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
+        //     std::cout << "    error  = " << format_error( impl::norm::spectral( *diff ) / norm_AxA ) << std::endl;
         // }// if
 
         if ( false )
@@ -264,7 +261,7 @@ program_main ()
 
             auto  diff = matrix::sum( value_t(1), *AxA, value_t(-1), *B );
 
-            std::cout << "    error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
+            std::cout << "    error  = " << format_error( impl::norm::spectral( *diff ) / norm_AxA ) << std::endl;
 
             if ( hpro::verbose( 3 ) )
             {
@@ -309,7 +306,7 @@ program_main ()
 
             auto  diff = matrix::sum( value_t(1), *AxA, value_t(-1), *B );
 
-            std::cout << "    error  = " << format_error( hlr::norm::spectral( *diff ) / norm_AxA ) << std::endl;
+            std::cout << "    error  = " << format_error( impl::norm::spectral( *diff ) / norm_AxA ) << std::endl;
 
             if ( hpro::verbose( 3 ) )
             {

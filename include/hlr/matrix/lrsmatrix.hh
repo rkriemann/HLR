@@ -12,7 +12,8 @@
 #include <hpro/vector/TScalarVector.hh>
 
 #include <hlr/arith/blas.hh>
-#include <hlr/utils/compression.hh>
+#include <hlr/compress/compressible.hh>
+#include <hlr/compress/direct.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
 
@@ -46,8 +47,6 @@ private:
     //
     // compressed storage based on underlying floating point type
     //
-    #if HLR_HAS_COMPRESSION == 1
-
     struct compressed_factors
     {
         compress::zarray  U, V;
@@ -57,8 +56,6 @@ private:
     };
 
     using  compressed_storage = compressed_factors;
-    
-    #endif
 
 private:
     // local index set of matrix
@@ -67,10 +64,8 @@ private:
     // low-rank factors
     blas::matrix< value_t >  _U, _S, _V;
 
-    #if HLR_HAS_COMPRESSION == 1
     // optional: stores compressed data
     compressed_storage       _zdata;
-    #endif
     
 public:
     //
@@ -292,11 +287,7 @@ public:
     // return true if data is compressed
     virtual bool   is_compressed () const
     {
-        #if HLR_HAS_COMPRESSION == 1
         return ! is_null( _zdata.U.data() );
-        #else
-        return false;
-        #endif
     }
     
     //
@@ -310,12 +301,10 @@ protected:
     // remove compressed storage (standard storage not restored!)
     virtual void   remove_compressed ()
     {
-        #if HLR_HAS_COMPRESSION == 1
         _zdata.U = compress::zarray();
         _zdata.V = compress::zarray();
         #if defined(COMPRESS_S)
         _zdata.S = compress::zarray();
-        #endif
         #endif
     }
 };
@@ -362,8 +351,6 @@ lrsmatrix< value_t >::apply_add  ( const value_t                    alpha,
                 (  op == Hpro::apply_adjoint    ) ||
                 (( op == Hpro::apply_transposed ) && ! Hpro::is_complex_type_v< value_t > ) );
 
-    #if HLR_HAS_COMPRESSION == 1
-
     if ( is_compressed() )
     {
         auto  uU = blas::matrix< value_t >( this->nrows(), this->row_rank() );
@@ -387,8 +374,6 @@ lrsmatrix< value_t >::apply_add  ( const value_t                    alpha,
         #endif
     }// if
     else
-
-    #endif
     {
         blas::mulvec_lr( alpha, U(), S(), V(), op, x, y );
     }// else
@@ -489,8 +474,6 @@ lrsmatrix< value_t >::copy () const
 
     auto  R = ptrcast( M.get(), lrsmatrix< value_t > );
 
-    #if HLR_HAS_COMPRESSION == 1
-
     if ( is_compressed() )
     {
         R->_zdata.U = compress::zarray( _zdata.U.size() );
@@ -505,8 +488,6 @@ lrsmatrix< value_t >::copy () const
         std::copy( _zdata.S.begin(), _zdata.S.end(), R->_zdata.S.begin() );
         #endif
     }// if
-
-    #endif
     
     return M;
 }
@@ -553,14 +534,10 @@ lrsmatrix< value_t >::copy_to ( Hpro::TMatrix< value_t > *  A ) const
 
     HLR_ASSERT( IS_TYPE( A, lrsmatrix ) );
 
-    #if HLR_HAS_COMPRESSION == 1
-
     if ( is_compressed() )
     {
         HLR_ERROR( "TODO" );
     }// if
-
-    #endif
 }
 
 //
@@ -583,8 +560,6 @@ template < typename value_t >
 void
 lrsmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
 {
-    #if HLR_HAS_COMPRESSION == 1
-        
     if ( is_compressed() )
         return;
 
@@ -599,10 +574,10 @@ lrsmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
     auto          oS       = this->S();
     auto          zS       = compress::compress< value_t >( zconfig, oS.data(), oS.nrows(), oS.ncols() );
     const size_t  mem_lr   = sizeof(value_t) * ( orowrank * oU.nrows() + ocolrank * oV.nrows() + orowrank * ocolrank );
-    const size_t  mem_z    = compress::byte_size( zU ) + compress::byte_size( zV ) + compress::byte_size( zS );
+    const size_t  mem_z    = compress::compressed_size( zU ) + compress::compressed_size( zV ) + compress::compressed_size( zS );
     #else
     const size_t  mem_lr   = sizeof(value_t) * ( orowrank * oU.nrows() + ocolrank * oV.nrows() );
-    const size_t  mem_z    = compress::byte_size( zU ) + compress::byte_size( zV );
+    const size_t  mem_z    = compress::compressed_size( zU ) + compress::compressed_size( zV );
     #endif
 
     // const auto  vmin = blas::min_abs_val( oU );
@@ -623,8 +598,6 @@ lrsmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
         _zdata.S  = std::move( zS );
         #endif
     }// if
-
-    #endif
 }
 
 template < typename value_t >
@@ -650,8 +623,6 @@ template < typename value_t >
 void
 lrsmatrix< value_t >::decompress ()
 {
-    #if HLR_HAS_COMPRESSION == 1
-        
     if ( ! is_compressed() )
         return;
 
@@ -672,8 +643,6 @@ lrsmatrix< value_t >::decompress ()
     #endif
 
     remove_compressed();
-        
-    #endif
 }
 
 //
@@ -688,15 +657,11 @@ lrsmatrix< value_t >::byte_size () const
     size += sizeof(_row_is) + sizeof(_col_is);
     size += _U.byte_size() + _S.byte_size() + _V.byte_size();
 
-    #if HLR_HAS_COMPRESSION == 1
-
     size += hlr::compress::byte_size( _zdata.U );
     size += hlr::compress::byte_size( _zdata.V );
 
     #if defined(COMPRESS_S)
     size += hlr::compress::byte_size( _zdata.S );
-    #endif
-    
     #endif
     
     return size;

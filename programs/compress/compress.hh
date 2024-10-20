@@ -10,6 +10,7 @@
 #include <hlr/approx/svd.hh>
 #include <hlr/approx/accuracy.hh>
 #include <hlr/arith/norm.hh>
+#include <hlr/arith/mulvec.hh>
 #include <hlr/bem/aca.hh>
 #include <hlr/bem/hca.hh>
 #include <hlr/bem/dense.hh>
@@ -17,18 +18,20 @@
 #include "common.hh"
 #include "common-main.hh"
 
+#include <hpro/io/TGridIO.hh>
+
 using namespace hlr;
 
 using indexset = Hpro::TIndexSet;
 
-struct local_accuracy : public Hpro::TTruncAcc
+struct local_accuracy : public accuracy
 {
     local_accuracy ( const double  abs_eps )
-            : Hpro::TTruncAcc( 0.0, abs_eps )
+            : accuracy( 0.0, abs_eps )
     {}
     
-    virtual const TTruncAcc  acc ( const indexset &  rowis,
-                                   const indexset &  colis ) const
+    virtual const accuracy  acc ( const indexset &  rowis,
+                                  const indexset &  colis ) const
     {
         return Hpro::absolute_prec( abs_eps() * std::sqrt( double(rowis.size() * colis.size()) ) );
     }
@@ -43,6 +46,116 @@ program_main ()
 {
     using value_t = typename problem_t::value_t;
 
+    // if ( false )
+    // {
+    //     auto  tic     = timer::now();
+    //     auto  toc     = timer::since( tic );
+        
+    //     size_t  n = 4;
+    //     auto    M = blas::matrix< value_t >( n, n );
+
+    //     for ( int i = 0; i < n*n; ++i )
+    //         M.data()[i] = i+1;
+
+    //     for ( int i = 0; i < n; ++i )
+    //     {
+    //         for ( int j = 0; j < n; ++j )
+    //             std::cout << M(i,j) << ", ";
+    //         std::cout << std::endl;
+    //     }// for
+        
+    //     auto  x = blas::vector< value_t >( M.ncols() );
+    //     auto  y1 = blas::vector< value_t >( M.nrows() );
+    //     auto  y2 = blas::vector< value_t >( M.nrows() );
+    //     auto  y3 = blas::vector< value_t >( M.nrows() );
+
+    //     for ( int i = 0; i < M.ncols(); ++i )
+    //         x(i) = i+1;
+
+    //     auto  zcfg = compress::get_config( 1e-4 );
+    //     auto  zM   = compress::compress( zcfg, M.data(), M.nrows(), M.ncols() );
+
+    //     tic = timer::now();
+    //     blas::mulvec( value_t(0.5), blas::adjoint( M ), x, value_t(1), y1 );
+    //     toc = timer::since( tic );
+    //     std::cout << toc.seconds() << std::endl;
+        
+    //     std::cout << y1(0) << " / " << y1(1) << " / " << y1(2) << std::endl;
+        
+    //     tic = timer::now();
+    //     compress::blas::mulvec( M.nrows(), M.ncols(), apply_adjoint, 0.5, zM, x.data(), y2.data() );
+    //     toc = timer::since( tic );
+    //     std::cout << toc.seconds() << std::endl;
+
+    //     std::cout << y2(0) << " / " << y2(1) << " / " << y2(2) << std::endl;
+
+    //     return;
+    // }
+    
+    // if ( false )
+    // {
+    //     auto  tic     = timer::now();
+    //     auto  toc     = timer::since( tic );
+        
+    //     size_t  n = 6;
+    //     size_t  k = 4;
+    //     auto    M = blas::matrix< value_t >( n, k );
+
+    //     for ( int i = 0; i < n*k; ++i )
+    //         M.data()[i] = i+1;
+
+    //     for ( int i = 0; i < M.nrows(); ++i )
+    //     {
+    //         for ( int j = 0; j < M.ncols(); ++j )
+    //             std::cout << M(i,j) << ", ";
+    //         std::cout << std::endl;
+    //     }// for
+
+    //     auto  op = apply_adjoint;
+    //     auto  x  = blas::vector< value_t >( op == apply_normal ? M.ncols() : M.nrows() );
+    //     auto  y1 = blas::vector< value_t >( op == apply_normal ? M.nrows() : M.ncols() );
+    //     auto  y2 = blas::vector< value_t >( op == apply_normal ? M.nrows() : M.ncols() );
+    //     auto  y3 = blas::vector< value_t >( op == apply_normal ? M.nrows() : M.ncols() );
+
+    //     for ( int i = 0; i < x.length(); ++i )
+    //         x(i) = i+1;
+
+    //     auto  S = blas::vector< value_t >( k );
+
+    //     S(0) = 1e-8;
+    //     S(1) = 1e-7;
+    //     S(2) = 1e-6;
+    //     S(3) = 1e-5;
+        
+    //     auto  zM   = compress::aplr::compress_lr( M, S );
+
+    //     blas::mulvec( value_t(1), blas::mat_view( op, M ), x, value_t(1), y1 );
+
+    //     // for ( uint  i = 0; i < k; ++i )
+    //     //     y1(i) *= S(i);
+        
+    //     std::cout << y1(0) << " / " << y1(1) << " / " << y1(2) << std::endl;
+        
+    //     compress::aplr::zblas::mulvec( M.nrows(), M.ncols(), op, 1.0, zM, x.data(), y2.data() );
+
+    //     // for ( uint  i = 0; i < k; ++i )
+    //     //     y2(i) *= S(i);
+
+    //     std::cout << y2(0) << " / " << y2(1) << " / " << y2(2) << std::endl;
+
+    //     return;
+    // }
+
+    // {
+    //     auto  grid = Hpro::read_grid( cmdline::gridfile );
+
+    //     grid->rotate( Hpro::T3Point( 0, 0, 1 ), 3.1415926 * 45 / 180.0 );
+    //     grid->rotate( Hpro::T3Point( 0, 1, 0 ), 3.1415926 * 45 / 180.0 );
+        
+    //     io::vtk::print( *grid, "grid" );
+    //     io::hpro::write( *grid, "rot-" + cmdline::gridfile );
+    // }
+    
     auto  tic     = timer::now();
     auto  toc     = timer::since( tic );
     auto  runtime = std::vector< double >();
@@ -73,28 +186,26 @@ program_main ()
                 auto  hca    = bem::hca( pcoeff, *hcagen, cmdline::eps / 100.0, 6 );
                 auto  hcalr  = bem::hca_lrapx( hca );
                 
-                A = impl::matrix::build( bct->root(), pcoeff, hcalr, acc, nseq );
+                A = impl::matrix::build( bct->root(), pcoeff, hcalr, acc, false, nseq );
             }// if
             else
                 cmdline::capprox = "default";
         }// if
-
-        if (( cmdline::capprox == "aca" ) || ( cmdline::capprox == "default" ))
+        else if (( cmdline::capprox == "aca" ) || ( cmdline::capprox == "default" ))
         {
             std::cout << "    using ACA" << std::endl;
 
             auto  acalr = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
         
-            A = impl::matrix::build( bct->root(), pcoeff, acalr, acc, nseq );
+            A = impl::matrix::build( bct->root(), pcoeff, acalr, acc, false, nseq );
         }// else
-        
-        if ( cmdline::capprox == "dense" )
+        else if ( cmdline::capprox == "dense" )
         {
             std::cout << "    using dense" << std::endl;
 
             auto  dense = bem::dense_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
         
-            A = impl::matrix::build( bct->root(), pcoeff, dense, acc, nseq );
+            A = impl::matrix::build( bct->root(), pcoeff, dense, acc, false, nseq );
         }// else
         
         toc = timer::since( tic );
@@ -110,20 +221,18 @@ program_main ()
         toc = timer::since( tic );
     }// else
 
+    const auto  mem_A  = A->byte_size();
+    const auto  norm_A = impl::norm::frobenius( *A );
+        
     std::cout << "    dims  = " << A->nrows() << " × " << A->ncols() << std::endl;
     std::cout << "    done in " << format_time( toc ) << std::endl;
-
-    const auto  mem_A = A->byte_size();
-    
     std::cout << "    mem   = " << format_mem( mem_A ) << std::endl;
+    std::cout << "      idx = " << format_mem( mem_A / A->nrows() ) << std::endl;
+    std::cout << "    |A|   = " << format_norm( norm_A ) << std::endl;
 
-    if ( verbose( 3 ) )
-        matrix::print_eps( *A, "A", "noid,nosize" );
+    if ( hpro::verbose( 3 ) )
+        io::eps::print( *A, "A", "noid" );
 
-    const auto  norm_A = impl::norm::frobenius( *A );
-    
-    std::cout << "    norm  = " << format_norm( norm_A ) << std::endl;
-    
     //////////////////////////////////////////////////////////////////////
     //
     // coarsen matrix
@@ -196,8 +305,8 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
-    auto        zA     = impl::matrix::copy_compressible( *A );
-    const auto  delta  = cmdline::eps; // norm_A * cmdline::eps / std::sqrt( double(A->nrows()) * double(A->ncols()) );
+    auto        zA    = impl::matrix::copy_compressible( *A );
+    const auto  delta = cmdline::eps; // norm_A * cmdline::eps / std::sqrt( double(A->nrows()) * double(A->ncols()) );
     
     std::cout << "  "
               << term::bullet << term::bold
@@ -218,7 +327,6 @@ program_main ()
         {
             tic = timer::now();
     
-            // impl::matrix::compress( *B, Hpro::fixed_prec( norm_A * acc.rel_eps() ) );
             impl::matrix::compress( *zA, lacc );
 
             toc = timer::since( tic );
@@ -247,7 +355,7 @@ program_main ()
         matrix::print_eps( *zA, "zA", "noid,norank,nosize" );
 
     {
-        auto  error = impl::norm::frobenius( value_t(1), *A, value_t(-1), *zA );
+        auto  error = impl::norm::frobenius( 1, *A, -1, *zA );
 
         std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
     }
@@ -285,14 +393,14 @@ program_main ()
                       << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
                       << std::endl;
 
-        auto  error = impl::norm::frobenius( value_t(1), *A, value_t(-1), *zB );
+        auto  error = impl::norm::frobenius( 1, *A, -1, *zB );
         
         std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
     }
 
     //////////////////////////////////////////////////////////////////////
     //
-    // H-matrix matrix vector multiplication
+    // H-matrix vector multiplication
     //
     //////////////////////////////////////////////////////////////////////
 
@@ -302,9 +410,22 @@ program_main ()
                   << "mat-vec"
                   << term::reset << std::endl;
 
+        const uint  nmvm    = 50;
+        const auto  flops_h = nmvm * hlr::mul_vec_flops( apply_normal, *A );
+        const auto  bytes_h = nmvm * hlr::mul_vec_datasize( apply_normal, *A );
+        const auto  bytes_z = nmvm * hlr::mul_vec_datasize( apply_normal, *zA );
+    
+        std::cout << "  " << term::bullet << term::bold << "FLOPs/byte " << term::reset() << std::endl;
+        std::cout << "    H    = " << format_flops( flops_h ) << ", " << flops_h / bytes_h << std::endl;
+        std::cout << "    zH   = " << format_flops( flops_h ) << ", " << flops_h / bytes_z << std::endl;
+    
         double  t_orig       = 0.0;
         double  t_compressed = 0.0;
         auto    y_ref        = std::unique_ptr< vector::scalar_vector< value_t > >();
+
+        //
+        // uncompressed
+        //
         
         {
             runtime.clear();
@@ -323,7 +444,7 @@ program_main ()
             {
                 tic = timer::now();
     
-                for ( int j = 0; j < 50; ++j )
+                for ( int j = 0; j < nmvm; ++j )
                     impl::mul_vec< value_t >( 2.0, Hpro::apply_normal, *A, *x, *y );
 
                 toc = timer::since( tic );
@@ -342,15 +463,23 @@ program_main ()
 
             t_orig = min( runtime );
             
+            std::cout << "    flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
+            
             y_ref = std::move( y );
         }
 
+        //
+        // compressed
+        //
         {
             runtime.clear();
             
             std::cout << "  "
                       << term::bullet << term::bold
                       << "compressed"
+                      #if defined(HLR_HAS_ZBLAS_DIRECT)
+                      << " (zblas)"
+                      #endif
                       << term::reset << std::endl;
         
             auto  x = std::make_unique< vector::scalar_vector< value_t > >( zA->col_is() );
@@ -362,7 +491,7 @@ program_main ()
             {
                 tic = timer::now();
     
-                for ( int j = 0; j < 50; ++j )
+                for ( int j = 0; j < nmvm; ++j )
                     impl::mul_vec< value_t >( 2.0, Hpro::apply_normal, *zA, *x, *y );
 
                 toc = timer::since( tic );
@@ -383,6 +512,8 @@ program_main ()
 
             std::cout << "    ratio  = " << boost::format( "%.02f" ) % ( t_compressed / t_orig ) << std::endl;
 
+            std::cout << "    flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
+            
             auto  diff = y_ref->copy();
 
             diff->axpy( value_t(-1), y.get() );

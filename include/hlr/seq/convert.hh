@@ -14,7 +14,7 @@
 #include <hlr/matrix/lrmatrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
-#include <hlr/utils/compression.hh>
+#include <hlr/compress/compressible.hh>
 
 namespace hlr { namespace seq { namespace matrix {
 

@@ -12,7 +12,7 @@
 
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/tensor.hh>
-#include <hlr/utils/compression.hh>
+#include <hlr/compress/direct.hh>
 
 #include <hlr/tensor/base_tensor.hh>
 
@@ -655,7 +655,7 @@ tucker_tensor3< value_t >::decompress ()
 // type tests
 //
 bool
-is_tucker ( const with_value_type auto &  t )
+is_tucker ( const has_value_type auto &  t )
 {
     using type_t  = std::remove_cv_t< std::remove_reference_t< decltype( t ) > >;
     using value_t = typename type_t::value_t;

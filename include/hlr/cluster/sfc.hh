@@ -29,9 +29,9 @@ using  admissibility     = Hpro::TAdmCondition;
 // cluster set of coordinates with minimal block size <ntile>
 //
 std::unique_ptr< cluster_tree >
-cluster      ( const cluster_type_t  cl_type,
-               coordinates &         coords,
-               const size_t          ntile );
+cluster      ( const cluster_type_t     cl_type,
+               coordinates &            coords,
+               const size_t             ntile );
 
 //
 // build block cluster tree based on given row/column cluster trees

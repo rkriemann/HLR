@@ -18,7 +18,6 @@
 #include <hlr/matrix/lrsvmatrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
-#include <hlr/utils/compression.hh>
 
 #include <hlr/seq/convert.hh>
 

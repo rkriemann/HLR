@@ -165,7 +165,7 @@ construct_basis ( const cluster_tree &         ct,
     {
         cb->set_nsons( ct.nsons() );
 
-        ::tbb::parallel_for( uint(0), ct.nsons(),
+        ::tbb::parallel_for( size_t(0), ct.nsons(),
                              [&,adjoint] ( const uint  i )
                              {
                                  auto  cb_i = construct_basis< value_t >( *ct.son(i), mat_map, acc, adjoint );

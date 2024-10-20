@@ -50,15 +50,22 @@ inline
 std::string
 mem_usage ()
 {
-    return hlr::term::yellow( " [" + hpro::Mem::to_string( hpro::Mem::usage() ) + "]" );
+    return hlr::term::yellow( " [" + Hpro::Mem::to_string( Hpro::Mem::usage() ) + "]" );
 }
 
 // return default formated memory string
 inline
 std::string
+format_mem_base ( const size_t  m )
+{
+    return hlr::term::blue( Hpro::Mem::to_string( m ) );
+}
+
+inline
+std::string
 format_mem ( const size_t  m )
 {
-    return hlr::term::black( hpro::Mem::to_string( m ) ) + "\t" + mem_usage();
+    return format_mem_base( m ) + "\t" + mem_usage();
 }
 
 template < typename ... T_size >
@@ -66,7 +73,7 @@ std::string
 format_mem ( const size_t    m,
              const T_size... ms )
 {
-    return hlr::term::black( hpro::Mem::to_string( m ) ) + " / " + format_mem( ms... );
+    return format_mem_base( m ) + " / " + format_mem( ms... );
 }
 
 // return default formated timing string
@@ -123,10 +130,17 @@ format_norm ( const double  e, const T... es )
 // return default formated string for FLOPs
 inline
 std::string
+format_flops ( const double  f )
+{
+    return str( boost::format( "%.2f MFlop" ) % ( f / 1e6 ) );
+}
+
+inline
+std::string
 format_flops ( const double  f,
                const double  t )
 {
-    return str( boost::format( "%.0f / %.2f GFlops" ) % f % ( f / ( 1e9 * t ) ) );
+    return str( boost::format( "%.2f MFlop/s" ) % ( f / ( 1e6 * t ) ) );
 }
 
 inline
@@ -161,11 +175,11 @@ median ( const std::vector< T > &  vec )
 // generate accuracy
 //
 inline
-hpro::TTruncAcc
+Hpro::TTruncAcc
 gen_accuracy ()
 {
-    if ( hlr::cmdline::eps < 0 ) return hpro::fixed_rank( hlr::cmdline::k );
-    else                         return hpro::fixed_prec( hlr::cmdline::eps );
+    if ( hlr::cmdline::eps < 0 ) return Hpro::fixed_rank( hlr::cmdline::k );
+    else                         return Hpro::fixed_prec( hlr::cmdline::eps );
 }
 
 //
@@ -175,20 +189,39 @@ inline
 bool
 verbose ( const int  lvl )
 {
-    return hpro::verbose( lvl );
+    return Hpro::verbose( lvl );
 }
 
 //
 // cluser given coordinate set
 //
-std::unique_ptr< hpro::TClusterTree >
-gen_ct ( hpro::TCoordinate &  coord )
+std::unique_ptr< Hpro::TClusterTree >
+gen_ct ( Hpro::TCoordinate &  coord )
 {
     using  hlr::cmdline::cluster;
+
+    //
+    // choose partitioning strategy
+    //
+
+    auto  part = std::unique_ptr< Hpro::TBSPPartStrat >();
+
+    if      ( hlr::cmdline::part == "bsp"      ) part = std::make_unique< Hpro::TCardBSPPartStrat >( Hpro::adaptive_split_axis );
+    else if ( hlr::cmdline::part == "bsp-card" ) part = std::make_unique< Hpro::TCardBSPPartStrat >( Hpro::adaptive_split_axis );
+    else if ( hlr::cmdline::part == "bsp-vol"  ) part = std::make_unique< Hpro::TGeomBSPPartStrat >( Hpro::adaptive_split_axis );
+    else if ( hlr::cmdline::part == "pca"      ) part = std::make_unique< Hpro::TPCABSPPartStrat >( true );
+    else if ( hlr::cmdline::part == "pca-card" ) part = std::make_unique< Hpro::TPCABSPPartStrat >( true );
+    else if ( hlr::cmdline::part == "pca-vol"  ) part = std::make_unique< Hpro::TPCABSPPartStrat >( false );
+    else
+        HLR_ERROR( "unsupported partitioning strategy: " + hlr::cmdline::part );
+
+    //
+    // actually cluster
+    //
     
     if (( cluster == "tlr" ) || ( cluster == "blr" ))
     {
-        return hlr::cluster::tlr::cluster( coord, hlr::cmdline::ntile );
+        return hlr::cluster::tlr::cluster( coord, *part, hlr::cmdline::ntile );
     }// if
     else if (( cluster == "mblr" ) ||
              (( cluster.size() >= 6 ) && ( cluster.substr( 0, 5 ) == "mblr-" )))
@@ -196,7 +229,7 @@ gen_ct ( hpro::TCoordinate &  coord )
         if ( cluster.size() >= 6 )
             hlr::cmdline::nlvl = std::stoi( cluster.substr( 5, string::npos ) );
             
-        return hlr::cluster::mblr::cluster( coord, hlr::cmdline::ntile, hlr::cmdline::nlvl );
+        return hlr::cluster::mblr::cluster( coord, *part, hlr::cmdline::ntile, hlr::cmdline::nlvl );
     }// if
     else if (( cluster == "tileh" ) ||
              (( cluster.size() >= 7 ) && ( cluster.substr( 0, 6 ) == "tileh-" )))
@@ -204,11 +237,11 @@ gen_ct ( hpro::TCoordinate &  coord )
         if ( cluster.size() >= 7 )
             hlr::cmdline::nlvl = std::stoi( cluster.substr( 6, string::npos ) );
         
-        return hlr::cluster::tileh::cluster( coord, hlr::cmdline::ntile, hlr::cmdline::nlvl );
+        return hlr::cluster::tileh::cluster( coord, *part, hlr::cmdline::ntile, hlr::cmdline::nlvl );
     }// if
     else if (( cluster == "bsp" ) || ( cluster == "h" ))
     {
-        return hlr::cluster::h::cluster( coord, hlr::cmdline::ntile );
+        return hlr::cluster::h::cluster( coord, *part, hlr::cmdline::ntile );
     }// if
     else if (( cluster == "sfc" ) ||
              (( cluster.size() > 3 ) && ( cluster.substr( 0, 4 ) == "sfc-" )))
@@ -227,41 +260,47 @@ gen_ct ( hpro::TCoordinate &  coord )
         HLR_ERROR( "unsupported clustering : " + cluster );
 }
 
-std::unique_ptr< hpro::TBlockClusterTree >
-gen_bct ( hpro::TClusterTree &  rowct,
-          hpro::TClusterTree &  colct )
+std::unique_ptr< Hpro::TBlockClusterTree >
+gen_bct ( Hpro::TClusterTree &  rowct,
+          Hpro::TClusterTree &  colct )
 {
-    hpro::TBCBuilder  bct_builder;
+    Hpro::TBCBuilder  bt_builder;
 
-    if ( hlr::cmdline::adm == "std" )
+    if (( hlr::cmdline::adm == "std" ) || ( hlr::cmdline::adm == "strong" ))
     {
-        hpro::TStdGeomAdmCond  adm_cond( hlr::cmdline::eta, hpro::use_min_diam );
+        Hpro::TStdGeomAdmCond  adm_cond( hlr::cmdline::eta, Hpro::use_min_diam );
         
-        return bct_builder.build( & rowct, & colct, & adm_cond );
+        return bt_builder.build( & rowct, & colct, & adm_cond );
+    }// if
+    else if ( hlr::cmdline::adm == "vertex" )
+    {
+        Hpro::TWeakStdGeomAdmCond  adm_cond;
+        
+        return bt_builder.build( & rowct, & colct, & adm_cond );
     }// if
     else if ( hlr::cmdline::adm == "weak" )
     {
-        hpro::TWeakStdGeomAdmCond  adm_cond;
+        Hpro::TWeakGeomAdmCond  adm_cond;
         
-        return bct_builder.build( & rowct, & colct, & adm_cond );
+        return bt_builder.build( & rowct, & colct, & adm_cond );
     }// if
-    else if ( hlr::cmdline::adm == "hodlr" or hlr::cmdline::adm == "offdiag" )
+    else if (( hlr::cmdline::adm == "hodlr" ) || ( hlr::cmdline::adm == "offdiag" ))
     {
-        hpro::TOffDiagAdmCond  adm_cond;
+        Hpro::TOffDiagAdmCond  adm_cond;
         
-        return bct_builder.build( & rowct, & colct, & adm_cond );
+        return bt_builder.build( & rowct, & colct, & adm_cond );
     }// if
     else if ( hlr::cmdline::adm == "hilo" )
     {
-        hpro::THiLoFreqGeomAdmCond  adm_cond( hlr::cmdline::kappa, 10 );
+        Hpro::THiLoFreqGeomAdmCond  adm_cond( hlr::cmdline::kappa, 10 );
         
-        return bct_builder.build( & rowct, & colct, & adm_cond );
+        return bt_builder.build( & rowct, & colct, & adm_cond );
     }// if
     else if ( hlr::cmdline::adm == "none" )
     {
-        hpro::TStdGeomAdmCond  adm_cond( 0.0, hpro::use_min_diam );
+        Hpro::TStdGeomAdmCond  adm_cond( 0.0, Hpro::use_min_diam );
         
-        return bct_builder.build( & rowct, & colct, & adm_cond );
+        return bt_builder.build( & rowct, & colct, & adm_cond );
     }// if
     else
         HLR_ERROR( "unsupported admissibility : " + hlr::cmdline::adm );

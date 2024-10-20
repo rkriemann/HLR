@@ -10,10 +10,11 @@
 
 #include <hpro/matrix/TBlockMatrix.hh>
 #include <hpro/matrix/structure.hh>
-#include <hpro/matrix/TMatrixProduct.hh>
+// #include <hpro/matrix/TMatrixProduct.hh>
 
 #include "hlr/arith/multiply.hh"
 #include "hlr/matrix/lrsmatrix.hh"
+#include "hlr/matrix/product.hh"
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/log.hh"
 #include "hlr/utils/io.hh"
@@ -566,7 +567,7 @@ struct lazy_accumulator
 
                     if ( ! apply_to_accu && ! is_null( accumulator ) )
                     {
-                        auto  op_AxB = Hpro::matrix_product( alpha, accumulator.get() );
+                        auto  op_AxB = matrix::product( alpha, *accumulator );
                         
                         deleted.push_back( op_AxB.get() );
                         op_list.push_back( op_AxB.release() );
@@ -578,14 +579,14 @@ struct lazy_accumulator
                         {
                             HLR_ASSERT( is_null( B ) );
                         
-                            auto  op_AxB = Hpro::matrix_product( alpha, A );
+                            auto  op_AxB = matrix::product( alpha, *A );
                         
                             deleted.push_back( op_AxB.get() );
                             op_list.push_back( op_AxB.release() );
                         }// if
                         else
                         {
-                            auto  op_AxB = Hpro::matrix_product( alpha, A, value_t(1), B );
+                            auto  op_AxB = matrix::product( alpha, *A, 1, *B );
                         
                             deleted.push_back( op_AxB.get() );
                             op_list.push_back( op_AxB.release() );
@@ -781,7 +782,7 @@ solve_lower_tri ( const eval_side_t                 side,
                   const Hpro::TTruncAcc &           acc,
                   const approx_t &                  approx )
 {
-    if ( is_blocked_all( L, M ) )
+    if ( hlr::is_blocked_all( L, M ) )
     {
         auto  BL = cptrcast( &L, Hpro::TBlockMatrix< value_t > );
         auto  BM =  ptrcast( &M, Hpro::TBlockMatrix< value_t > );
@@ -837,7 +838,7 @@ solve_upper_tri ( const eval_side_t                 side,
                   const Hpro::TTruncAcc &           acc,
                   const approx_t &                  approx )
 {
-    if ( is_blocked_all( U, M ) )
+    if ( hlr::is_blocked_all( U, M ) )
     {
         auto  BU = cptrcast( &U, Hpro::TBlockMatrix< value_t > );
         auto  BM =  ptrcast( &M, Hpro::TBlockMatrix< value_t > );

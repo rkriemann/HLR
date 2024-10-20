@@ -16,7 +16,7 @@
 #include <hpro/vector/TScalarVector.hh>
 
 #include <hlr/matrix/nested_cluster_basis.hh>
-#include <hlr/utils/compression.hh>
+#include <hlr/compress/direct.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
 
@@ -58,10 +58,8 @@ private:
     // local coupling matrix
     blas::matrix< value_t >  _S;
     
-    #if HLR_HAS_COMPRESSION == 1
     // stores compressed data
     compress::zarray         _zS;
-    #endif
     
 public:
     //
@@ -123,7 +121,6 @@ public:
         this->set_ofs( _row_is.first(), _col_is.first() );
     }
 
-    #if HLR_HAS_COMPRESSION == 1
     h2_lrmatrix ( const indexset       arow_is,
                   const indexset       acol_is,
                   cluster_basis_t &    arow_cb,
@@ -138,7 +135,6 @@ public:
     {
         this->set_ofs( _row_is.first(), _col_is.first() );
     }
-    #endif
     
     // dtor
     virtual ~h2_lrmatrix ()
@@ -176,8 +172,6 @@ public:
     // return decompressed local coupling matrix
     hlr::blas::matrix< value_t >  coupling () const
     {
-        #if HLR_HAS_COMPRESSION == 1
-
         if ( is_compressed() )
         {
             auto  S = blas::matrix< value_t >( row_rank(), col_rank() );
@@ -186,8 +180,6 @@ public:
 
             return S;
         }// if
-
-        #endif
 
         return _S;
     }
@@ -227,9 +219,9 @@ public:
     }
     
     void
-    set_matrix_data ( cluster_basis_t &  arow_cb,
-                      const blas::matrix< value_t > &    aS,
-                      cluster_basis_t &  acol_cb )
+    set_matrix_data ( cluster_basis_t &                arow_cb,
+                      const blas::matrix< value_t > &  aS,
+                      cluster_basis_t &                acol_cb )
     {
         HLR_ASSERT(( aS.nrows() == arow_cb.rank() ) &&
                    ( aS.ncols() == acol_cb.rank() ));
@@ -240,9 +232,9 @@ public:
     }
 
     void
-    set_matrix_data ( cluster_basis_t &  arow_cb,
-                      blas::matrix< value_t > &&         aS,
-                      cluster_basis_t &  acol_cb )
+    set_matrix_data ( cluster_basis_t &           arow_cb,
+                      blas::matrix< value_t > &&  aS,
+                      cluster_basis_t &           acol_cb )
     {
         HLR_ASSERT(( aS.nrows() == arow_cb.rank() ) &&
                    ( aS.ncols() == acol_cb.rank() ));
@@ -251,6 +243,8 @@ public:
         _row_cb = & arow_cb;
         _col_cb = & acol_cb;
     }
+
+    compress::zarray zcoupling () const { return _zS; }
 
     //
     // matrix data
@@ -277,21 +271,27 @@ public:
     //
 
     // compute y ≔ β·y + α·op(M)·x, with M = this
-    virtual void mul_vec  ( const value_t                     alpha,
-                            const Hpro::TVector< value_t > *  x,
-                            const value_t                     beta,
-                            Hpro::TVector< value_t > *        y,
-                            const Hpro::matop_t               op = Hpro::apply_normal ) const;
+    virtual void mul_vec        ( const value_t                     alpha,
+                                  const Hpro::TVector< value_t > *  x,
+                                  const value_t                     beta,
+                                  Hpro::TVector< value_t > *        y,
+                                  const Hpro::matop_t               op = Hpro::apply_normal ) const;
     
     // same as above but for blas::vector
-    virtual void  apply_add   ( const value_t                    alpha,
-                                const blas::vector< value_t > &  x,
-                                blas::vector< value_t > &        y,
-                                const matop_t                    op = apply_normal ) const;
+    virtual void  apply_add     ( const value_t                     alpha,
+                                  const blas::vector< value_t > &   x,
+                                  blas::vector< value_t > &         y,
+                                  const matop_t                     op = apply_normal ) const;
     using Hpro::TMatrix< value_t >::apply_add;
     
+    // matrix vector product in uniform format
+    void         uni_apply_add  ( const value_t                     alpha,
+                                  const blas::vector< value_t > &   ux, // uniform coefficients
+                                  blas::vector< value_t > &         uy,
+                                  const matop_t                     op = apply_normal ) const;
+    
     // truncate matrix to accuracy \a acc
-    virtual void truncate ( const Hpro::TTruncAcc & acc );
+    virtual void truncate ( const accuracy & acc );
 
     // scale matrix by alpha
     virtual void scale    ( const value_t  alpha )
@@ -303,12 +303,8 @@ public:
     // compression
     //
 
-    // compress internal data based on given configuration
-    // - may result in non-compression if storage does not decrease
-    virtual void   compress      ( const compress::zconfig_t &  zconfig );
-
     // compress internal data based on given accuracy
-    virtual void   compress      ( const Hpro::TTruncAcc &  acc );
+    virtual void   compress      ( const accuracy &  acc );
 
     // decompress internal data
     virtual void   decompress    ();
@@ -316,11 +312,7 @@ public:
     // return true if data is compressed
     virtual bool   is_compressed () const
     {
-        #if HLR_HAS_COMPRESSION == 1
         return ! is_null( _zS.data() );
-        #else
-        return false;
-        #endif
     }
 
     //
@@ -340,8 +332,8 @@ public:
     virtual auto   copy         () const -> std::unique_ptr< Hpro::TMatrix< value_t > >;
 
     // return copy matrix wrt. given accuracy; if \a do_coarsen is set, perform coarsening
-    virtual auto   copy         ( const Hpro::TTruncAcc &  acc,
-                                  const bool               do_coarsen = false ) const -> std::unique_ptr< Hpro::TMatrix< value_t > >;
+    virtual auto   copy         ( const accuracy &  acc,
+                                  const bool        do_coarsen = false ) const -> std::unique_ptr< Hpro::TMatrix< value_t > >;
 
     // return structural copy of matrix
     virtual auto   copy_struct  () const -> std::unique_ptr< Hpro::TMatrix< value_t > >;
@@ -351,7 +343,7 @@ public:
 
     // copy matrix data to \a A and truncate w.r.t. \acc with optional coarsening
     virtual void   copy_to      ( Hpro::TMatrix< value_t > *  A,
-                                  const Hpro::TTruncAcc &     acc,
+                                  const accuracy &     acc,
                                   const bool                  do_coarsen = false ) const;
     
     //
@@ -359,15 +351,16 @@ public:
     //
 
     // return size in bytes used by this object
-    virtual size_t byte_size  () const;
+    virtual size_t byte_size      () const;
 
+    // return size of (floating point) data in bytes handled by this object
+    virtual size_t data_byte_size () const;
+    
 protected:
     // remove compressed storage (standard storage not restored!)
     virtual void   remove_compressed ()
     {
-        #if HLR_HAS_COMPRESSION == 1
         _zS = compress::zarray();
-        #endif
     }
 };
 
@@ -453,12 +446,60 @@ h2_lrmatrix< value_t >::apply_add ( const value_t                    alpha,
     }// if
 }
 
+template < typename value_t >
+void
+h2_lrmatrix< value_t >::uni_apply_add ( const value_t                    alpha,
+                                        const blas::vector< value_t > &  ux,
+                                        blas::vector< value_t > &        uy,
+                                        const Hpro::matop_t              op ) const
+{
+    if ( is_compressed() )
+    {
+        #if defined(HLR_HAS_ZBLAS_DIRECT)
+        
+        switch ( op )
+        {
+            case apply_normal     : compress::zblas::mulvec( row_rank(), col_rank(), op, alpha, _zS, ux.data(), uy.data() ); break;
+            case apply_conjugate  : { HLR_ASSERT( false ); }
+            case apply_transposed : { HLR_ASSERT( false ); }
+            case apply_adjoint    : compress::zblas::mulvec( row_rank(), col_rank(), op, alpha, _zS, ux.data(), uy.data() ); break;
+            default               : HLR_ERROR( "unsupported matrix operator" );
+        }// switch
+        
+        #else
+        
+        auto  S = coupling();
+        
+        switch ( op )
+        {
+            case apply_normal     : blas::mulvec( alpha, S, ux, value_t(1), uy ); break;
+            case apply_conjugate  : HLR_ASSERT( false );
+            case apply_transposed : HLR_ASSERT( false );
+            case apply_adjoint    : blas::mulvec( alpha, blas::adjoint( S ), ux, value_t(1), uy ); break;
+            default               : HLR_ERROR( "unsupported matrix operator" );
+        }// switch
+        
+        #endif
+    }// if
+    else
+    {
+        switch ( op )
+        {
+            case apply_normal     : blas::mulvec( alpha, _S, ux, value_t(1), uy ); break;
+            case apply_conjugate  : HLR_ASSERT( false );
+            case apply_transposed : HLR_ASSERT( false );
+            case apply_adjoint    : blas::mulvec( alpha, blas::adjoint( _S ), ux, value_t(1), uy ); break;
+            default               : HLR_ERROR( "unsupported matrix operator" );
+        }// switch
+    }// else
+}
+
 //
 // truncate matrix to accuracy <acc>
 //
 template < typename value_t >
 void
-h2_lrmatrix< value_t >::truncate ( const Hpro::TTruncAcc & )
+h2_lrmatrix< value_t >::truncate ( const accuracy & )
 {
 }
 
@@ -467,13 +508,35 @@ h2_lrmatrix< value_t >::truncate ( const Hpro::TTruncAcc & )
 //
 template < typename value_t >
 void
-h2_lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
+h2_lrmatrix< value_t >::compress ( const accuracy &  acc )
 {
-    #if HLR_HAS_COMPRESSION == 1
-        
     if ( is_compressed() )
         return;
 
+    if ( this->nrows() * this->ncols() == 0 )
+        return;
+
+    const auto  lacc = acc( this->row_is(), this->col_is() );
+    auto        tol  = lacc.abs_eps();
+
+    if ( lacc.abs_eps() != 0 )
+    {
+        if      ( lacc.norm_mode() == Hpro::spectral_norm  ) tol = lacc.abs_eps() / blas::norm_2( _S );
+        else if ( lacc.norm_mode() == Hpro::frobenius_norm ) tol = lacc.abs_eps() / blas::norm_F( _S );
+        else
+            HLR_ERROR( "unsupported norm mode" );
+    }// if
+    else if ( lacc.rel_eps() != 0 )
+    {
+        if      ( lacc.norm_mode() == Hpro::spectral_norm  ) tol = lacc.rel_eps();
+        else if ( lacc.norm_mode() == Hpro::frobenius_norm ) tol = lacc.rel_eps();
+        else
+            HLR_ERROR( "unsupported norm mode" );
+    }// if
+    else
+        HLR_ERROR( "zero error" );
+        
+    const auto    zconfig   = compress::get_config( tol );
     const size_t  mem_dense = sizeof(value_t) * _S.nrows() * _S.ncols();
     auto          zS        = compress::compress( zconfig, _S );
 
@@ -482,24 +545,6 @@ h2_lrmatrix< value_t >::compress ( const compress::zconfig_t &  zconfig )
         _zS = std::move( zS );
         _S  = std::move( blas::matrix< value_t >( 0, 0 ) );
     }// if
-
-    #endif
-}
-
-template < typename value_t >
-void
-h2_lrmatrix< value_t >::compress ( const Hpro::TTruncAcc &  acc )
-{
-    #if HLR_HAS_COMPRESSION == 1
-        
-    HLR_ASSERT( acc.rel_eps() == 0 );
-
-    if ( this->nrows() * this->ncols() == 0 )
-        return;
-        
-    compress( compress::get_config( acc( this->row_is(), this->col_is() ).abs_eps() ) );
-
-    #endif
 }
 
 //
@@ -509,16 +554,12 @@ template < typename value_t >
 void
 h2_lrmatrix< value_t >::decompress ()
 {
-    #if HLR_HAS_COMPRESSION == 1
-        
     if ( ! is_compressed() )
         return;
 
     _S = std::move( coupling() );
 
     remove_compressed();
-
-    #endif
 }
 
 //
@@ -528,8 +569,6 @@ template < typename value_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
 h2_lrmatrix< value_t >::copy () const
 {
-    #if HLR_HAS_COMPRESSION == 1
-
     if ( is_compressed() )
     {
         auto  zM = compress::zarray( _zS.size() );
@@ -542,7 +581,6 @@ h2_lrmatrix< value_t >::copy () const
         return M;
     }// if
     else
-    #endif
     {
         auto  M = std::make_unique< h2_lrmatrix >( _row_is, _col_is, *_row_cb, *_col_cb, std::move( blas::copy( _S ) ) );
 
@@ -556,7 +594,7 @@ h2_lrmatrix< value_t >::copy () const
 //
 template < typename value_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
-h2_lrmatrix< value_t >::copy ( const Hpro::TTruncAcc &,
+h2_lrmatrix< value_t >::copy ( const accuracy &,
                                const bool       ) const
 {
     return copy();
@@ -591,12 +629,8 @@ h2_lrmatrix< value_t >::copy_to ( Hpro::TMatrix< value_t > *  A ) const
     R->_col_cb = _col_cb;
     R->_S      = std::move( blas::copy( _S ) );
 
-    #if HLR_HAS_COMPRESSION == 1
-
     R->_zS = compress::zarray( _zS.size() );
     std::copy( _zS.begin(), _zS.end(), R->_zS.begin() );
-
-    #endif
 }
 
 //
@@ -605,7 +639,7 @@ h2_lrmatrix< value_t >::copy_to ( Hpro::TMatrix< value_t > *  A ) const
 template < typename value_t >
 void
 h2_lrmatrix< value_t >::copy_to ( Hpro::TMatrix< value_t > *  A,
-                                  const Hpro::TTruncAcc &,
+                                  const accuracy &,
                                   const bool  ) const
 {
     return copy_to( A );
@@ -623,14 +657,22 @@ h2_lrmatrix< value_t >::byte_size () const
     size += sizeof(_row_is) + sizeof(_col_is);
     size += sizeof(_row_cb) + sizeof(_col_cb);
     size += _S.byte_size();
-
-    #if HLR_HAS_COMPRESSION == 1
-
     size += compress::byte_size( _zS );
-
-    #endif
     
     return size;
+}
+
+//
+// return size of (floating point) data in bytes handled by this object
+//
+template < typename value_t >
+size_t
+h2_lrmatrix< value_t >::data_byte_size () const
+{
+    if ( is_compressed() )
+        return hlr::compress::byte_size( _zS );
+    else
+        return sizeof( value_t ) * row_rank() * col_rank();
 }
 
 //

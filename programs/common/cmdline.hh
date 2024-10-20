@@ -31,6 +31,7 @@ size_t  k          = 16;           // constant rank
 double  eps        = 1e-4;         // constant precision
 double  tol        = 0;            // tolerance
 string  appl       = "logkernel";  // application
+string  kernel     = "newton";     // (radial) kernel to use
 string  distr      = "cyclic2d";   // block distribution
 uint    nthreads   = 0;            // number of threads to use (prefer "taskset" or "numactl")
 uint    verbosity  = 1;            // verbosity level
@@ -53,15 +54,17 @@ uint    nbench     = 1;            // perform computations <nbench> times (at mo
 double  tbench     = 1;            // minimal time for benchmark runs
 string  ref        = "";           // reference matrix, algorithm, etc.
 string  cluster    = "h";          // clustering technique (h,tlr,mblr,hodlr)
-string  adm        = "weak";       // admissibility (std,weak,hodlr)
+string  part       = "bsp-card";   // partitioning strategy (bsp-card/vol,pca-card/vol)
+string  adm        = "strong";     // admissibility (strong,vertex,weak,offdiagonal)
 double  eta        = 2.0;          // admissibility parameter
 string  capprox    = "default";    // construction low-rank approximation method (aca,hca,dense)
 string  aapprox    = "default";    // arithmetic low-rank approximation method (svd,rrqr,randsvd,randlr,aca,lanczos)
 string  tapprox    = "default";    // tensor low-rank approximation method (hosvd,sthosvd,ghosvd,hhosvd,tcafull)
 string  arith      = "std";        // which kind of arithmetic to use
-double  compress   = 0;            // apply SZ/ZFP compression with rate (1…, ZFP only) or accuracy (0,1] (0 = off)
+bool    compress   = false;        // apply FP compression to matrix data
 auto    kappa      = std::complex< double >( 2, 0 ); // wave number for helmholtz problems
 double  sigma      = 1;            // parameter for matern covariance and gaussian kernel
+bool    sep_coup   = false;        // use separate row/column couplings for Uni-H and H²
 
 void
 read_config ( const std::string &  filename )
@@ -77,10 +80,12 @@ read_config ( const std::string &  filename )
     boost::property_tree::ini_parser::read_ini( filename, cfg );
 
     appl       = cfg.get( "app.appl",    appl );
+    kernel     = cfg.get( "app.kernel",  kernel );
     n          = cfg.get( "app.n",       n );
     adm        = cfg.get( "app.adm",     adm );
     eta        = cfg.get( "app.eta",     eta );
     cluster    = cfg.get( "app.cluster", cluster );
+    part       = cfg.get( "app.part",    part );
     gridfile   = cfg.get( "app.grid",    gridfile );
     kappa      = cfg.get( "app.kappa",   kappa );
     sigma      = cfg.get( "app.sigma",   sigma );
@@ -129,9 +134,11 @@ parse ( int argc, char ** argv )
         ;
 
     app_opts.add_options()
-        ( "adm",         value<string>(), ": admissibility (std,weak,offdiag,hodlr)" )
+        ( "adm",         value<string>(), ": admissibility (strong,vertex,weak,offdiag)" )
         ( "app",         value<string>(), ": application type (logkernel,matern,laplaceslp,helmholtzslp,exp)" )
+        ( "kernel",      value<string>(), ": kernel to use (newton,log,exp,...)" )
         ( "cluster",     value<string>(), ": clustering technique (tlr,blr,mblr(-n),tileh,bsp,h,sfc)" )
+        ( "part",        value<string>(), ": partitioning strategy (bsp-/pca-card,bsp-/pca-vol)" )
         ( "data",        value<string>(), ": data file to use" )
         ( "eta",         value<double>(), ": admissibility parameter for \"std\" and \"weak\"" )
         ( "grid",        value<string>(), ": grid file to use (intern: sphere,sphere2,cube,square)" )
@@ -140,10 +147,11 @@ parse ( int argc, char ** argv )
         ( "matrix",      value<string>(), ": matrix file to use" )
         ( "nprob,n",     value<int>(),    ": set problem size" )
         ( "sparse",      value<string>(), ": sparse matrix file to use" )
-        ( "compress",    value<double>(), ": apply SZ/ZFP compression with rate [1,…; ZFP only) or accuracy (0,1) (default: 0 = off)" )
+        ( "compress",                     ": apply FP compression to matrix data" )
         ( "coarsen",                      ": coarsen matrix structure" )
         ( "tohodlr",                      ": convert matrix to HODLR format" )
         ( "capprox",     value<string>(), ": LR approximation to use (aca,hca,dense)" )
+        ( "sepcoup",                      ": use separate row/column couplings for Uni-H and H²" )
         ;
 
     ari_opts.add_options()
@@ -224,6 +232,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "eps"        ) ) eps        = vm["eps"].as<double>();
     if ( vm.count( "tol"        ) ) tol        = vm["tol"].as<double>();
     if ( vm.count( "app"        ) ) appl       = vm["app"].as<string>();
+    if ( vm.count( "kernel"     ) ) kernel     = vm["kernel"].as<string>();
     if ( vm.count( "grid"       ) ) gridfile   = vm["grid"].as<string>();
     if ( vm.count( "matrix"     ) ) matrixfile = vm["matrix"].as<string>();
     if ( vm.count( "sparse"     ) ) sparsefile = vm["sparse"].as<string>();
@@ -246,9 +255,11 @@ parse ( int argc, char ** argv )
     if ( vm.count( "kappa"      ) ) kappa      = vm["kappa"].as<double>();
     if ( vm.count( "sigma"      ) ) sigma      = vm["sigma"].as<double>();
     if ( vm.count( "cluster"    ) ) cluster    = vm["cluster"].as<string>();
+    if ( vm.count( "part"       ) ) part       = vm["part"].as<string>();
     if ( vm.count( "adm"        ) ) adm        = vm["adm"].as<string>();
     if ( vm.count( "eta"        ) ) eta        = vm["eta"].as<double>();
-    if ( vm.count( "compress"   ) ) compress   = vm["compress"].as<double>();
+    if ( vm.count( "compress"   ) ) compress   = true;
+    if ( vm.count( "sepcoup"    ) ) sep_coup   = true;
 
     if ( appl == "help" )
     {
@@ -342,12 +353,24 @@ parse ( int argc, char ** argv )
         std::exit( 0 );
     }// if
     
+    if ( part == "help" )
+    {
+        std::cout << "Partitioning Strategies:" << std::endl
+                  << "  - bsp-*   : binary space partitioning" << std::endl
+                  << "  - pca-*   : principle component analysis" << std::endl
+                  << "  - *-card  : with cardinality balancing" << std::endl
+                  << "  - *-vol   : with volume balancing" << std::endl;
+
+        std::exit( 0 );
+    }// if
+    
     if ( adm == "help" )
     {
         std::cout << "Admissibility Conditions:" << std::endl
-                  << "  - std           : standard geometric admissibility min(diam(t),diam(s)) ≤ η dist(t,s)" << std::endl
-                  << "  - weak          : weak geometric admissibility" << std::endl
-                  << "  - offdiag/hodlr : off-diagonal addmissibility" << std::endl
+                  << "  - strong/std    : standard geometric admissibility (min(diam(t),diam(s)) ≤ η dist(t,s))" << std::endl
+                  << "  - vertex        : vertex geometric admissibility" << std::endl
+                  << "  - weak          : weak geometric admissibility (dist(t,s) > 0)" << std::endl
+                  << "  - offdiag/hodlr : off-diagonal addmissibility (t ≠ s)"<< std::endl
                   << "  - hilo          : Hi/Low frequency addmissibility" << std::endl
                   << "  - none          : nothing admissible" << std::endl;
 

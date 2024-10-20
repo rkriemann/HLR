@@ -14,7 +14,9 @@
 #include <hlr/arith/solve.hh>
 #include <hlr/arith/invert.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
+#include <hlr/matrix/uniform_lr2matrix.hh>
 #include <hlr/matrix/convert.hh>
+#include <hlr/matrix/level_hierarchy.hh>
 #include <hlr/vector/scalar_vector.hh>
 #include <hlr/vector/uniform_vector.hh>
 #include <hlr/utils/hash.hh>
@@ -30,10 +32,15 @@ namespace hlr { namespace uniform { namespace detail {
 ////////////////////////////////////////////////////////////////////////////////
 
 using matrix::shared_cluster_basis;
+using matrix::shared_cluster_basis_hierarchy;
 using matrix::uniform_lrmatrix;
+using matrix::uniform_lr2matrix;
 using matrix::is_uniform_lowrank;
+using matrix::is_uniform_lowrank2;
+using matrix::level_hierarchy;
 using vector::scalar_vector;
 using vector::uniform_vector;
+using vector::uniform_vector_hierarchy;
 
 using indexset = Hpro::TIndexSet;
 
@@ -84,16 +91,23 @@ mul_vec ( const value_t                                              alpha,
     }// if
     else if ( matrix::is_uniform_lowrank( M ) )
     {
+        //
+        // y = U S V^H x
+        //
+
         auto  R = cptrcast( &M, uniform_lrmatrix< value_t > );
 
-        switch ( op_M )
-        {
-            case Hpro::apply_normal     : blas::mulvec( alpha, R->coupling(), x.coeffs(), value_t(1), y.coeffs() ); break;
-            case Hpro::apply_conjugate  : HLR_ASSERT( false );
-            case Hpro::apply_transposed : HLR_ASSERT( false );
-            case Hpro::apply_adjoint    : blas::mulvec( alpha, blas::adjoint( R->coupling() ), x.coeffs(), value_t(1), y.coeffs() ); break;
-            default                     : HLR_ERROR( "unsupported matrix operator" );
-        }// switch
+        R->uni_apply_add( alpha, x.coeffs(), y.coeffs(), op_M );
+    }// if
+    else if ( matrix::is_uniform_lowrank2( M ) )
+    {
+        //
+        // y = U S_r S_c^H V^H x
+        //
+
+        auto  R = cptrcast( &M, uniform_lr2matrix< value_t > );
+
+        R->uni_apply_add( alpha, x.coeffs(), y.coeffs(), op_M );
     }// if
     else
         HLR_ERROR( "unsupported matrix type : " + M.typestr() );
@@ -160,10 +174,9 @@ add_uniform_to_scalar ( const uniform_vector< shared_cluster_basis< value_t > > 
 {
     if ( u.basis().rank() > 0 )
     {
-        auto  x   = u.basis().transform_backward( u.coeffs() );
         auto  v_u = blas::vector< value_t >( blas::vec( v ), u.is() - v.ofs() );
-            
-        blas::add( value_t(1), x, v_u );
+
+        u.basis().transform_backward( u.coeffs(), v_u );
     }// if
 
     if ( u.nblocks() > 0 )
@@ -263,6 +276,406 @@ mul_vec2 ( const value_t                         alpha,
             blas::add( value_t(1), t, y_j );
         }// if
     }// for
+}
+
+//
+// uniform mat-vec with level-wise approach
+//
+template < typename value_t >
+std::unique_ptr< uniform_vector_hierarchy< shared_cluster_basis< value_t > > >
+scalar_to_uniform ( const shared_cluster_basis_hierarchy< value_t > &  cb,
+                    const scalar_vector< value_t > &                   v )
+{
+    auto        hier = std::make_unique< uniform_vector_hierarchy< shared_cluster_basis< value_t > > >();
+    const auto  nlvl = cb.hierarchy().size();
+    
+    hier->set_nlevel( nlvl );
+
+    for ( uint  lvl = 0; lvl < nlvl; ++lvl )
+    {
+        const auto  ncb = cb.hierarchy()[lvl].size();
+        
+        hier->hierarchy()[lvl].resize( ncb );
+
+        for ( uint  i = 0; i < ncb; ++i )
+        {
+            auto  cb_i = cb.hierarchy()[lvl][i];
+
+            if ( ! is_null( cb_i ) && ( cb_i->rank() > 0 ))
+            {
+                auto  u_i  = std::make_unique< uniform_vector< shared_cluster_basis< value_t > > >( *cb_i );
+                auto  v_cb = blas::vector< value_t >( blas::vec( v ), cb_i->is() - v.ofs() );
+                auto  s    = cb_i->transform_forward( v_cb );
+
+                u_i->set_coeffs( std::move( s ) );
+                hier->hierarchy()[lvl][i] = u_i.release();
+            }// if
+        }// for
+    }// for
+    
+    return hier;
+}
+
+template < typename value_t >
+void
+mul_vec_hier ( const value_t                                                        alpha,
+               const Hpro::matop_t                                                  op_M,
+               const level_hierarchy< value_t > &                                   M,
+               const uniform_vector_hierarchy< shared_cluster_basis< value_t > > &  x,
+               const scalar_vector< value_t > &                                     sx,
+               scalar_vector< value_t > &                                           sy,
+               const shared_cluster_basis_hierarchy< value_t > &                    rowcb )
+{
+    using  cb_t = shared_cluster_basis< value_t >;
+    
+    HLR_ASSERT( op_M == apply_normal );
+    
+    const auto  nlvl = M.nlevel();
+
+    for ( uint  lvl = 0; lvl < nlvl; ++lvl )
+    {
+        for ( uint  row = 0; row < M.row_ptr[lvl].size()-1; ++row )
+        {
+            const auto  lb = M.row_ptr[lvl][row];
+            const auto  ub = M.row_ptr[lvl][row+1];
+
+            if ( lb == ub )
+                continue;
+            
+            cb_t *  ycb = nullptr;
+            auto    s   = blas::vector< value_t >();
+            auto    y_j = blas::vector< value_t >( blas::vec( sy ), M.row_mat[lvl][lb]->row_is( op_M ) - sy.ofs() );
+
+            for ( uint  j = lb; j < ub; ++j )
+            {
+                auto  col_idx = M.col_idx[lvl][j];
+                auto  mat     = M.row_mat[lvl][j];
+
+                if ( matrix::is_uniform_lowrank( mat ) )
+                {
+                    auto  R  = cptrcast( mat, uniform_lrmatrix< value_t > );
+                    auto  ux = x.hierarchy()[lvl][col_idx];
+                    
+                    if ( is_null( ycb ) )
+                    {
+                        ycb = rowcb.hierarchy()[lvl][row];
+                        s   = blas::vector< value_t >( ycb->rank() );
+                    }// if
+
+                    R->uni_apply_add( alpha, ux->coeffs(), s, op_M );
+                }// if
+                else if ( matrix::is_uniform_lowrank2( mat ) )
+                {
+                    auto        R  = cptrcast( mat, uniform_lr2matrix< value_t > );
+                    auto        ux = x.hierarchy()[lvl][col_idx];
+                    // const auto  k  = R->rank();
+                    // auto        t  = blas::vector< value_t >( k );
+                    
+                    if ( is_null( ycb ) )
+                    {
+                        ycb = rowcb.hierarchy()[lvl][row];
+                        s   = blas::vector< value_t >( ycb->rank() );
+                    }// if
+
+                    R->uni_apply_add( alpha, ux->coeffs(), s, op_M );
+                }// if
+                else if ( matrix::is_dense( mat ) )
+                {
+                    auto  x_i = blas::vector< value_t >( blas::vec( sx ), mat->col_is( op_M ) - sx.ofs() );
+        
+                    mat->apply_add( alpha, x_i, y_j, op_M );
+                }// if
+                else
+                    HLR_ERROR( "unsupported matrix type : " + mat->typestr() );
+            }// for
+
+            //
+            // add uniform part to y
+            //
+
+            if ( ! is_null( ycb ) )
+            {
+                ycb->transform_backward( s, y_j );
+            }// if
+        }// for
+    }// for
+}
+
+//
+// construct mapping id -> clusterbasis
+//
+template < typename value_t >
+void
+build_id2cb ( shared_cluster_basis< value_t > &                   cb,
+              std::vector< shared_cluster_basis< value_t > * > &  idmap )
+{
+    HLR_ASSERT( cb.id() != -1 );
+    HLR_ASSERT( cb.id() < idmap.size() );
+
+    idmap[ cb.id() ] = & cb;
+
+    if ( cb.nsons() > 0 )
+    {
+        for ( uint  i = 0; i < cb.nsons(); ++i )
+        {
+            if ( ! is_null( cb.son( i ) ) )
+                build_id2cb( * cb.son( i ), idmap );
+        }// for
+    }// if
+}
+
+//
+// construct mapping cluster basis id (cluster) -> list of matrix blocks in M
+//
+template < typename value_t >
+void
+build_id2blocks ( const shared_cluster_basis< value_t > &                         cb,
+                  const Hpro::TMatrix< value_t > &                                M,
+                  std::vector< std::list< const Hpro::TMatrix< value_t > * > > &  blockmap,
+                  const bool                                                      transposed )
+{
+    HLR_ASSERT( cb.id() != -1 );
+    HLR_ASSERT( cb.id() < blockmap.size() );
+
+    if ( ! is_blocked( M ) )
+    {
+        blockmap[ cb.id() ].push_back( & M );
+    }// else
+    else
+    {
+        auto  op = ( transposed ? apply_transposed : apply_normal );
+        auto  B  = cptrcast( & M, Hpro::TBlockMatrix< value_t > );
+
+        HLR_ASSERT( B->nblock_rows( op ) == cb.nsons() );
+
+        for ( uint  i = 0; i < B->nblock_rows( op ); ++i )
+        {
+            auto  cb_i = cb.son( i );
+
+            HLR_ASSERT( ! is_null( cb_i ) );
+            
+            for ( uint  j = 0; j < B->nblock_cols( op ); ++j )
+            {
+                if ( ! is_null( B->block( i, j ) ) )
+                    build_id2blocks( *cb_i, * B->block( i, j ), blockmap, transposed );
+            }// for
+        }// if
+    }// else
+}
+
+template < typename value_t >
+void
+scalar_to_uniform ( const shared_cluster_basis< value_t > &   cb,
+                    const scalar_vector< value_t > &          v,
+                    std::vector< blas::vector< value_t > > &  vcoeff )
+{
+    if ( cb.rank() > 0 )
+    {
+        auto  v_cb = blas::vector< value_t >( blas::vec( v ), cb.is() - v.ofs() );
+        
+        HLR_ASSERT( cb.id() < vcoeff.size() );
+        
+        vcoeff[ cb.id() ] = std::move( cb.transform_forward( v_cb ) );
+    }// if
+
+    for ( uint  i = 0; i < cb.nsons(); ++i )
+    {
+        if ( ! is_null( cb.son(i) ) )
+            scalar_to_uniform( *cb.son(i), v, vcoeff );
+    }// for
+}
+
+template < typename value_t >
+void
+mul_vec_row ( const value_t                                                         alpha,
+              const Hpro::matop_t                                                   op_M,
+              const shared_cluster_basis< value_t > &                               rowcb,
+              const std::vector< shared_cluster_basis< value_t > * > &              colcb,
+              const std::vector< std::list< const Hpro::TMatrix< value_t > * > > &  blockmap,
+              const std::vector< blas::vector< value_t > > &                        xcoeff,
+              const scalar_vector< value_t > &                                      sx,
+              scalar_vector< value_t > &                                            sy )
+{
+    //
+    // perform matvec with all blocks in block row
+    //
+
+    auto &  blockrow = blockmap[ rowcb.id() ];
+
+    if ( blockrow.size() > 0 )
+    {
+        auto  rowis = rowcb.is();
+        auto  y_j   = blas::vector< value_t >( blas::vec( sy ), rowis - sy.ofs() );
+        auto  t_j   = blas::vector< value_t >( y_j.length() );
+        auto  s     = blas::vector< value_t >( rowcb.rank() );
+
+        for ( auto  M : blockrow )
+        {
+            if ( matrix::is_uniform_lowrank( M ) )
+            {
+                auto    R       = cptrcast( M, matrix::uniform_lrmatrix< value_t > );
+                auto &  colcb_R = R->col_cb();
+                auto    ux      = xcoeff[ colcb_R.id() ];
+
+                R->uni_apply_add( alpha, ux, s, op_M );
+            }// if
+            else if ( matrix::is_uniform_lowrank2( M ) )
+            {
+                auto    R       = cptrcast( M, matrix::uniform_lr2matrix< value_t > );
+                auto &  colcb_R = R->col_cb();
+                auto    ux      = xcoeff[ colcb_R.id() ];
+
+                R->uni_apply_add( alpha, ux, s, op_M );
+            }// if
+            else if ( matrix::is_dense( M ) )
+            {
+                auto  x_i = blas::vector< value_t >( blas::vec( sx ), M->col_is( op_M ) - sx.ofs() );
+                        
+                M->apply_add( alpha, x_i, t_j, op_M );
+            }// if
+            else
+                HLR_ERROR( "unsupported matrix type : " + M->typestr() );
+        }// for
+
+        //
+        // add uniform part to y
+        //
+        
+        if ( s.length() > 0 )
+            rowcb.transform_backward( s, t_j );
+        
+        blas::add( value_t(1), t_j, y_j );
+    }// if
+
+    //
+    // recurse
+    //
+
+    if ( rowcb.nsons() > 0 )
+    {
+        for ( uint  i = 0; i < rowcb.nsons(); ++i )
+        {
+            if ( ! is_null( rowcb.son( i ) ) )
+                mul_vec_row( alpha, op_M, * rowcb.son( i ), colcb, blockmap, xcoeff, sx, sy );
+        }// for
+    }// if
+}
+
+//
+// return FLOPs needed to convert vector into uniform basis
+//
+template < typename cluster_basis_t >
+flops_t
+scalar_to_uniform_flops ( const cluster_basis_t &  cb )
+{
+    flops_t  flops = 0;
+    
+    if ( cb.rank() > 0 )
+    {
+        if constexpr ( Hpro::is_complex_type_v< Hpro::value_type_t< cluster_basis_t > > )
+            flops += FLOPS_ZGEMV( cb.rank(), cb.is().size() );
+        else
+            flops += FLOPS_DGEMV( cb.rank(), cb.is().size() );
+    }// if
+
+    if ( cb.nsons() > 0 )
+    {
+        for ( uint  i = 0; i < cb.nsons(); ++i )
+            flops += scalar_to_uniform_flops( *cb.son(i) );
+    }// if
+
+    return flops;
+}
+
+//
+// return FLOPs needed for computing y = y + α op( M ) x
+// with M in uniform-H format
+//
+template < typename value_t >
+flops_t
+mul_vec_flops ( const Hpro::matop_t               op_M,
+                const Hpro::TMatrix< value_t > &  M )
+{
+    using namespace hlr::matrix;
+    
+    if ( is_blocked( M ) )
+    {
+        auto        B       = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+        const auto  row_ofs = M.row_is( op_M ).first();
+        const auto  col_ofs = M.col_is( op_M ).first();
+        flops_t     flops   = 0;
+    
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                auto  B_ij = B->block( i, j );
+            
+                if ( ! is_null( B_ij ) )
+                    flops += mul_vec_flops( op_M, *B_ij );
+            }// for
+        }// for
+
+        return flops;
+    }// if
+    else if ( matrix::is_uniform_lowrank( M ) )
+    {
+        const auto  R = cptrcast( &M, matrix::uniform_lrmatrix< value_t > );
+        
+        if constexpr ( Hpro::is_complex_type_v< value_t > )
+            return FLOPS_ZGEMV( R->row_rank( op_M ), R->col_rank( op_M ) );
+        else
+            return FLOPS_DGEMV( R->row_rank( op_M ), R->col_rank( op_M ) );
+    }// if
+    else if ( matrix::is_uniform_lowrank2( M ) )
+    {
+        const auto  R = cptrcast( &M, matrix::uniform_lr2matrix< value_t > );
+        
+        if constexpr ( Hpro::is_complex_type_v< value_t > )
+            return FLOPS_ZGEMV( R->row_rank( op_M ), R->rank() ) + FLOPS_ZGEMV( R->col_rank( op_M ), R->rank() );
+        else
+            return FLOPS_DGEMV( R->row_rank( op_M ), R->rank() ) + FLOPS_DGEMV( R->col_rank( op_M ), R->rank() );
+    }// if
+    else if ( matrix::is_dense( M ) )
+    {
+        const auto  nrows = M.nrows( op_M );
+        const auto  ncols = M.ncols( op_M );
+        
+        if constexpr ( Hpro::is_complex_type_v< value_t > )
+            return FLOPS_ZGEMV( nrows, ncols );
+        else
+            return FLOPS_DGEMV( nrows, ncols );
+    }// if
+    else
+        HLR_ERROR( "unsupported matrix type: " + M.typestr() );
+
+    return 0;
+}
+
+//
+// return FLOPs for adding vector in uniform cluster basis to scalar vector
+//
+template < typename cluster_basis_t >
+flops_t
+add_uniform_to_scalar_flops ( const cluster_basis_t &  cb )
+{
+    flops_t  flops = 0;
+    
+    if ( cb.rank() > 0 )
+    {
+        if constexpr ( Hpro::is_complex_type_v< Hpro::value_type_t< cluster_basis_t > > )
+            flops += FLOPS_ZGEMV( cb.is().size(), cb.rank() );
+        else
+            flops += FLOPS_DGEMV( cb.is().size(), cb.rank() );
+    }// if
+
+    if ( cb.nsons() > 0 )
+    {
+        for ( uint  i = 0; i < cb.nsons(); ++i )
+            flops += add_uniform_to_scalar_flops( *cb.son(i) );
+    }// if
+
+    return flops;
 }
 
 }// namespace detail

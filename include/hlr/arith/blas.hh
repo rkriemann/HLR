@@ -438,6 +438,23 @@ join_col ( const std::list< matrix< value_t > > &  matrices )
 }
 
 //
+// convert given vector into diagonal matrix
+//
+template < typename valueM_t,
+           typename valueD_t >
+matrix< valueM_t >
+diag ( const vector< valueD_t > &  d )
+{
+    const auto  n = d.length();
+    auto        M = matrix< valueM_t >( n, n );
+
+    for ( size_t  i = 0; i < n; ++i )
+        M(i,i) = d(i);
+    
+    return M;
+}
+
+//
 // construct block-diagonal matrix out of given matrices M_i
 //
 template < typename value_t >
@@ -747,7 +764,7 @@ sqnorm_F ( const matrix< value_t > &  U,
             auto  u_l = U.column( l );
             auto  v_l = V.column( l );
 
-            res += dot( u_k, u_l ) * dot( v_k, v_l );
+            res += std::abs( dot( u_k, u_l ) * dot( v_k, v_l ) );
         }// for
     }// for
 
@@ -1512,7 +1529,7 @@ template < typename value_t >
 void
 qr ( matrix< value_t > &  M,
      matrix< value_t > &  R,
-     const bool           comp_Q = true )
+     const bool           comp_Q )
 {
     // if ( M.nrows() > 2*M.ncols() ) // not efficient in general
     //    qrts( M, R, comp_Q );
@@ -1532,6 +1549,8 @@ qr ( const matrix< value_t > &  M )
 
     return { std::move( Q ), std::move( R ) };
 }
+
+using Hpro::BLAS::qr;
 
 //
 // compute QR factorisation A = Q·R with orthonormal Q
@@ -2106,12 +2125,13 @@ using Hpro::BLAS::eigen;
 //
 template < matrix_type matrix_t >
 std::pair< matrix< typename matrix_t::value_t >,
-           vector< typename matrix_t::value_t > >
+           vector< real_type_t< typename matrix_t::value_t > > >
 eigen_herm ( matrix_t &  M )
 {
     using value_t = typename matrix_t::value_t;
+    using real_t  = real_type_t< typename matrix_t::value_t >;
     
-    auto  E = vector< value_t >();
+    auto  E = vector< real_t >();
     auto  V = matrix< value_t >();
 
     Hpro::BLAS::eigen_herm( M, E, V );

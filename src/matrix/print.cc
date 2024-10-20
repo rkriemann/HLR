@@ -18,13 +18,10 @@
 #include <hpro/matrix/TDenseMatrix.hh>
 #include <hpro/matrix/TRkMatrix.hh>
 
-#if defined(USE_LIC_CHECK)  // hack to test for full HLIBpro
-#include <hpro/matrix/TUniformMatrix.hh>
-#endif
-
 #include <hlr/matrix/lrmatrix.hh>
 #include <hlr/matrix/lrsvmatrix.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
+#include <hlr/matrix/uniform_lr2matrix.hh>
 #include <hlr/matrix/h2_lrmatrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
 #include <hlr/matrix/sparse_matrix.hh>
@@ -32,6 +29,27 @@
 #include <hlr/utils/tools.hh>
 
 #include <hlr/matrix/print.hh>
+
+namespace hlr { namespace io { namespace eps {
+
+void
+print ( const Hpro::TBlockCluster &  cl,
+        const std::string &          filename,
+        const std::string &          options )
+{
+    std::vector< std::string >  optarr;
+
+    boost::split( optarr, options, [] ( char c ) { return c == ','; } );
+
+    Hpro::TPSBlockClusterVis  vis;
+
+    if ( contains( optarr, "id" ) )      vis.id( true );
+    if ( contains( optarr, "innerid" ) ) vis.inner_id( true );
+    
+    vis.print( & cl, filename );
+}
+
+}}}// hlr::io::eps
 
 namespace hlr { namespace matrix {
 
@@ -294,9 +312,88 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
                 }// if
             }// if
         }// if
+        else if ( matrix::is_lowrank_sv( M ) )
+        {
+            auto  R    = cptrcast( &M, matrix::lrsvmatrix< value_t > );
+            auto  rank = R->rank();
+
+            if ( ! contains( options, "nonempty" ) || ( rank > 0 ))
+            {
+                if ( R->is_compressed() ) prn.set_rgb( colors[HLR_COLOR_BG_LOWRANK_COMPRESSED] );
+                else                      prn.set_rgb( colors[HLR_COLOR_BG_LOWRANK] );
+
+                prn.fill_rect( M.col_ofs(),
+                               M.row_ofs(),
+                               M.col_ofs() + M.ncols(),
+                               M.row_ofs() + M.nrows() );
+
+                if ( contains( options, "sv" ) )
+                {
+                    auto  S = R->S();
+
+                    if ( S.length() > 0 )
+                    {
+                        prn.set_gray( 128 );
+                        print_sv( prn, M, S );
+                    }// if
+                }// if
+
+                if ( ! contains( options, "norank" ) )
+                {
+                    prn.save();
+                    prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 4.0 ) );
+                    
+                    prn.set_rgb( colors[HLR_COLOR_FG_RANK] );
+                    prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
+                                   double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
+                                   Hpro::to_string( "%d", rank ) );
+                    
+                    prn.restore();
+                }// if
+
+                if ( contains( options, "pattern" ) )
+                {
+                    auto  D = blas::prod( R->U(), blas::adjoint( R->V() ) );
+                    
+                    prn.set_gray( 0 );
+                
+                    for ( uint  i = 0; i < D.nrows(); ++i )
+                        for ( uint  j = 0; j < D.ncols(); ++j )
+                            if ( D(i,j) != value_t(0) )
+                                prn.fill_rect( j     + M.col_ofs(), i     + M.row_ofs(),
+                                               j + 1 + M.col_ofs(), i + 1 + M.row_ofs() );
+                }// if
+            }// if
+        }// if
         else if ( matrix::is_uniform_lowrank( M ) )
         {
             auto  R = cptrcast( &M, matrix::uniform_lrmatrix< value_t > );
+
+            // background
+            if ( R->is_compressed() ) prn.set_rgb( colors[HLR_COLOR_BG_UNIFORM_COMPRESSED] );
+            else                      prn.set_rgb( colors[HLR_COLOR_BG_UNIFORM] );
+
+            prn.fill_rect( M.col_ofs(),
+                           M.row_ofs(),
+                           M.col_ofs() + M.ncols(),
+                           M.row_ofs() + M.nrows() );
+
+            if ( ! contains( options, "norank" ) )
+            {
+                prn.save();
+                prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 4.0 ) );
+                
+                prn.set_rgb( colors[HLR_COLOR_FG_RANK] );
+                prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
+                               double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
+                               Hpro::to_string( "%dx%d", R->row_rank(), R->col_rank() ) );
+                
+                prn.restore();
+            }// if
+        }// if
+        else if ( matrix::is_uniform_lowrank2( M ) )
+        {
+            auto  R = cptrcast( &M, matrix::uniform_lr2matrix< value_t > );
 
             // background
             if ( R->is_compressed() ) prn.set_rgb( colors[HLR_COLOR_BG_UNIFORM_COMPRESSED] );
@@ -345,31 +442,6 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
                 prn.restore();
             }// if
         }// if
-        #if defined(USE_LIC_CHECK)
-        else if ( Hpro::is_uniform( &M ) )
-        {
-            auto  R = cptrcast( &M, Hpro::TUniformMatrix< value_t > );
-
-            prn.set_rgb( colors[HLR_COLOR_BG_H2] );
-            prn.fill_rect( M.col_ofs(),
-                           M.row_ofs(),
-                           M.col_ofs() + M.ncols(),
-                           M.row_ofs() + M.nrows() );
-
-            if ( ! contains( options, "norank" ) )
-            {
-                prn.save();
-                prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 4.0 ) );
-                
-                prn.set_rgb( colors[HLR_COLOR_FG_RANK] );
-                prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
-                               double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
-                               Hpro::to_string( "%dx%d", R->row_rank(), R->col_rank() ) );
-                
-                prn.restore();
-            }// if
-        }// if
-        #endif
         else if ( is_sparse( M ) )
         {
             auto  S = cptrcast( &M, Hpro::TSparseMatrix< value_t > );

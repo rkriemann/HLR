@@ -11,22 +11,13 @@
 #include <deque>
 
 #include <tbb/parallel_for.h>
-#include "tbb/partitioner.h"
-#include "tbb/task_group.h"
+#include <tbb/partitioner.h>
+#include <tbb/task_group.h>
 
-#include "hlr/utils/log.hh"
-#include "hlr/tbb/dag.hh"
+#include <hlr/utils/log.hh>
+#include <hlr/tbb/dag.hh>
 
-namespace hlr
-{
-
-namespace hpro = HLIB;
-
-namespace tbb
-{
-
-namespace dag
-{
+namespace hlr { namespace tbb { namespace dag {
 
 using hlr::dag::node;
 using hlr::dag::graph;
@@ -199,7 +190,7 @@ refine ( node *                            root,
                 }// if
                 else if ( snsize > 0 )
                 {
-                    // log( 0, hpro::to_string( "copying %d", nset.size() ) );
+                    // log( 0, Hpro::to_string( "copying %d", nset.size() ) );
                     new_sets.push_back( std::move( subnodes[i] ) );
                 }// if
             }// for
@@ -254,7 +245,7 @@ namespace
 //
 void
 execute ( node *                   node,
-          const hpro::TTruncAcc &  acc,
+          const Hpro::TTruncAcc &  acc,
           ::tbb::task_group &      tg )
 {
     node->run( acc );
@@ -275,7 +266,7 @@ execute ( node *                   node,
 //
 void
 run ( graph &                  dag,
-      const hpro::TTruncAcc &  acc )
+      const Hpro::TTruncAcc &  acc )
 {
     assert( dag.end().size() == 1 );
 
@@ -289,8 +280,4 @@ run ( graph &                  dag,
     tg.wait();
 }
 
-}// namespace dag
-
-}// namespace tbb
-
-}// namespace hlr
+}}}// namespace hlr::tbb::dag

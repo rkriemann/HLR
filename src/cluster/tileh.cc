@@ -17,7 +17,7 @@
 
 namespace hlr { namespace cluster { namespace tileh {
 
-using namespace HLIB;
+using namespace Hpro;
 
 namespace
 {
@@ -102,15 +102,15 @@ flatten ( TCluster *  cl,
 //
 // cluster set of coordinates with minimal block size <ntile>
 //
-std::unique_ptr< HLIB::TClusterTree >
-cluster ( HLIB::TCoordinate &   coords,
-          const size_t          ntile,
-          const size_t          nlvl )
+std::unique_ptr< Hpro::TClusterTree >
+cluster ( Hpro::TCoordinate &          coords,
+          const Hpro::TBSPPartStrat &  part,
+          const size_t                 ntile,
+          const size_t                 nlvl )
 {
-    TCardBSPPartStrat  part_strat( adaptive_split_axis );
-    TBSPCTBuilder      ct_builder( & part_strat, ntile );
+    TBSPCTBuilder      ct_builder( & part, ntile );
 
-    ct_builder.adjust_bb( true );
+    ct_builder.adjust_bvol( true );
     
     auto  ct = ct_builder.build( &coords );
 
@@ -124,9 +124,9 @@ cluster ( HLIB::TCoordinate &   coords,
 //
 // build block cluster tree based on given row/column cluster trees
 //
-std::unique_ptr< HLIB::TBlockClusterTree >
-blockcluster ( HLIB::TClusterTree &  rowct,
-               HLIB::TClusterTree &  colct )
+std::unique_ptr< Hpro::TBlockClusterTree >
+blockcluster ( Hpro::TClusterTree &  rowct,
+               Hpro::TClusterTree &  colct )
 {
     TWeakStdGeomAdmCond  adm_cond;
     TBCBuilder           bct_builder;

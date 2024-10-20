@@ -179,6 +179,125 @@ mul_vec2 ( const value_t                              alpha,
     // std::cout << t1 << " / " << t2 << std::endl;
 }
 
+template < typename value_t >
+void
+mul_vec_hier ( const value_t                                        alpha,
+               const hpro::matop_t                                  op_M,
+               const matrix::level_hierarchy< value_t > &           M,
+               const vector::scalar_vector< value_t > &             x,
+               vector::scalar_vector< value_t > &                   y,
+               matrix::shared_cluster_basis_hierarchy< value_t > &  rowcb,
+               matrix::shared_cluster_basis_hierarchy< value_t > &  colcb )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    //
+    // construct uniform representation of x and y
+    //
+
+    auto  ux = detail::scalar_to_uniform( ( op_M == hpro::apply_normal ? colcb : rowcb ), x );
+
+    detail::mul_vec_hier( alpha, op_M, M, *ux, x, y, ( op_M == hpro::apply_normal ? rowcb : colcb ) );
+}
+
+//
+// block row wise computation using IDs of involved objects
+//
+template < typename value_t >
+void
+mul_vec_row ( const value_t                                                         alpha,
+              const hpro::matop_t                                                   op_M,
+              const vector::scalar_vector< value_t > &                              x,
+              vector::scalar_vector< value_t > &                                    y,
+              const matrix::shared_cluster_basis< value_t > &                       rowcb,
+              const matrix::shared_cluster_basis< value_t > &                       colcb,
+              const std::vector< matrix::shared_cluster_basis< value_t > * > &      colcb_map,
+              const std::vector< std::list< const Hpro::TMatrix< value_t > * > > &  blockmap )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    auto  xcoeff = std::vector< blas::vector< value_t > >( colcb.id() + 1 );
+
+    detail::scalar_to_uniform( colcb, x, xcoeff );
+    detail::mul_vec_row< value_t >( alpha, op_M, rowcb, colcb_map, blockmap, xcoeff, x, y );
+}
+
+template < typename value_t >
+std::vector< matrix::shared_cluster_basis< value_t > * >
+build_id2cb ( matrix::shared_cluster_basis< value_t > &  cb )
+{
+    HLR_ASSERT( cb.id() != -1 );
+    
+    auto  idmap = std::vector< matrix::shared_cluster_basis< value_t > * >( cb.id() + 1 );
+
+    detail::build_id2cb( cb, idmap );
+
+    return idmap;
+}
+
+template < typename value_t >
+std::vector< std::list< const Hpro::TMatrix< value_t > * > >
+build_id2blocks ( const matrix::shared_cluster_basis< value_t > &  cb,
+                  const Hpro::TMatrix< value_t > &                 M,
+                  const bool                                       transposed )
+{
+    HLR_ASSERT( cb.id() != -1 );
+
+    auto  blockmap = std::vector< std::list< const Hpro::TMatrix< value_t > * > >( cb.id() + 1 );
+
+    detail::build_id2blocks( cb, M, blockmap, transposed );
+
+    return blockmap;
+}
+
+//
+// return FLOPs needed for computing y = y + α op( M ) x
+// (implicit vectors)
+//
+template < typename value_t,
+           typename cluster_basis_t >
+flops_t
+mul_vec_flops ( const Hpro::matop_t               op_M,
+                const Hpro::TMatrix< value_t > &  M,
+                const cluster_basis_t &           rowcb,
+                const cluster_basis_t &           colcb )
+{
+    flops_t  flops = 0;
+
+    flops += detail::scalar_to_uniform_flops( ( op_M == apply_normal ? colcb : rowcb ) );
+    flops += detail::mul_vec_flops( op_M, M );
+    flops += detail::add_uniform_to_scalar_flops( ( op_M == apply_normal ? rowcb : colcb ) );
+
+    return flops;
+}
+
+//
+// return size of data involved in computing y = y + α op( M ) x
+//
+template < typename value_t,
+           typename cluster_basis_t >
+flops_t
+mul_vec_datasize ( const Hpro::matop_t               op_M,
+                   const Hpro::TMatrix< value_t > &  M,
+                   const cluster_basis_t &           rowcb,
+                   const cluster_basis_t &           colcb )
+{
+    size_t  dsize = 0;
+
+    // scalar to uniform: cluster basis and vector
+    dsize += ( op_M == apply_normal ? colcb : rowcb ).data_byte_size() + sizeof( value_t ) * M.ncols( op_M );
+
+    // actual matvec: matrix size
+    dsize += M.data_byte_size();
+
+    // uniform to scalar: cluster basis and vector
+    dsize += ( op_M == apply_normal ? rowcb : colcb ).data_byte_size() + sizeof( value_t ) * M.nrows( op_M );
+
+    return dsize;
+}
+
 //
 // matrix multiplication (eager version)
 //
@@ -444,6 +563,28 @@ lu ( hpro::TMatrix< value_t > &                 A,
 
 namespace tlr
 {
+
+//
+// mat-vec : y = y + α op( M ) x
+//
+template < typename value_t >
+void
+mul_vec ( const value_t                              alpha,
+          const hpro::matop_t                        op_M,
+          const hpro::TMatrix< value_t > &           M,
+          const vector::scalar_vector< value_t > &   x,
+          vector::scalar_vector< value_t > &         y,
+          matrix::shared_cluster_basis< value_t > &  rowcb,
+          matrix::shared_cluster_basis< value_t > &  colcb )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    if ( op_M == apply_normal )
+        detail::mul_vec( alpha, op_M, M, x, y, rowcb, colcb );
+    else
+        detail::mul_vec( alpha, op_M, M, x, y, colcb, rowcb );
+}
 
 //
 // add global low-rank matrix W·X' to H²-matrix M

@@ -8,6 +8,8 @@
 // Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
 //
 
+#include <concepts>
+
 #include <hpro/config.h>
 
 #if HPRO_USE_GSL == 1
@@ -20,6 +22,7 @@
 #include <hpro/matrix/TCoeffFn.hh>
 #include <hpro/base/TPoint.hh>
 
+#include <hlr/utils/traits.hh>
 #include <hlr/utils/math.hh>
 
 namespace hlr { namespace matrix {
@@ -97,9 +100,49 @@ public:
 ////////////////////////////////////////////////////////////
 
 //
+//  log(r)
+//
+template < real_or_complex_number T_value = double >
+struct log_function
+{
+    using  value_t = T_value;
+
+    log_function ()
+    {}
+
+    value_t  operator () ( const value_t  r ) const
+    {
+        if ( r < std::numeric_limits< value_t >::epsilon() )
+            return value_t(0);
+        else
+            return math::log( r );
+    }
+};
+
+//
+//  1/r
+//
+template < real_or_complex_number T_value = double >
+struct newton_function
+{
+    using  value_t = T_value;
+
+    newton_function ()
+    {}
+
+    value_t  operator () ( const value_t  r ) const
+    {
+        if ( r < std::numeric_limits< value_t >::epsilon() )
+            return value_t(0);
+        else
+            return value_t(1) / r;
+    }
+};
+
+//
 //  exp(-εr)
 //
-template < typename T_value = double >
+template < real_or_complex_number T_value = double >
 struct exponential_function
 {
     using  value_t = T_value;
@@ -121,7 +164,7 @@ struct exponential_function
 //
 //  exp( - εr² )
 //
-template < typename T_value = double >
+template < real_or_complex_number T_value = double >
 struct gaussian_function
 {
     using  value_t = T_value;
@@ -143,7 +186,7 @@ struct gaussian_function
 //  ___________
 // √ 1 + (εr)²
 //
-template < typename T_value = double >
+template < real_or_complex_number T_value = double >
 struct multiquadric_function
 {
     using  value_t = T_value;
@@ -165,7 +208,7 @@ struct multiquadric_function
 //      ___________
 // 1 / √ 1 + (εr)²
 //
-template < typename T_value = double >
+template < real_or_complex_number T_value = double >
 struct inverse_multiquadric_function
 {
     using  value_t = T_value;
@@ -187,7 +230,7 @@ struct inverse_multiquadric_function
 // 
 // (εr)² log(εr)
 //
-template < typename T_value = double >
+template < real_or_complex_number T_value = double >
 struct thin_plate_spline_function
 {
     using  value_t = T_value;
@@ -202,7 +245,10 @@ struct thin_plate_spline_function
     {
         const auto  er = epsilon * r;
         
-        return math::square( er ) * math::log( er );
+        if ( er < std::numeric_limits< value_t >::epsilon() )
+            return value_t(0);
+        else
+            return math::square( er ) * math::log( er );
     }
 };
 
@@ -214,7 +260,7 @@ struct thin_plate_spline_function
 //  ⎜1 + ───⎟
 //  ⎝    αl²⎠
 //
-template < typename T_value = double >
+template < real_or_complex_number T_value = double >
 struct rational_quadratic_function
 {
     using  value_t = T_value;
@@ -245,7 +291,7 @@ struct rational_quadratic_function
 //  σ² ──── ⎜─── d⎟ K ⎜─── d⎟
 //     Γ(ν) ⎝ l   ⎠  ν⎝ l   ⎠
 //
-template < typename T_value = double >
+template < real_or_complex_number T_value = double >
 struct matern_covariance_function
 {
     using  value_t = T_value;

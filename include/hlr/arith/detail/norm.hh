@@ -19,6 +19,7 @@
 #include <hlr/matrix/lrsvmatrix.hh>
 #include <hlr/matrix/tiled_lrmatrix.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
+#include <hlr/matrix/uniform_lr2matrix.hh>
 #include <hlr/matrix/h2_lrmatrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
 #include <hlr/matrix/convert.hh>
@@ -129,8 +130,8 @@ frobenius_squared ( const Hpro::TMatrix< value_t > &  A )
                     const auto  U_k = (*U_i).second.column( k );
                     const auto  V_k = (*V_i).second.column( k );
                     
-                    dot_U += blas::dot( U_l, U_k );
-                    dot_V += blas::dot( V_l, V_k );
+                    dot_U += std::abs( blas::dot( U_l, U_k ) );
+                    dot_V += std::abs( blas::dot( V_l, V_k ) );
                 }// for
 
                 val += dot_U * dot_V;
@@ -150,7 +151,22 @@ frobenius_squared ( const Hpro::TMatrix< value_t > &  A )
         auto  val = result_t(0);
 
         for ( size_t  i = 0; i < C.nrows()*C.ncols(); ++i )
-            val += math::square( C.data()[ i ] );
+            val += std::abs( math::square( C.data()[ i ] ) );
+
+        return val;
+    }// if
+    else if ( hlr::matrix::is_uniform_lowrank2( A ) )
+    {
+        //
+        // |A| = | U S_r S_c' V' | = |U||S_r·S_c||V| = |S_r · S_c| with orthogonal U/V
+        //
+
+        auto  R   = cptrcast( &A, hlr::matrix::uniform_lr2matrix< value_t > );
+        auto  S   = blas::prod( R->row_coupling(), blas::adjoint( R->col_coupling() ) );
+        auto  val = result_t(0);
+
+        for ( size_t  i = 0; i < S.nrows()*S.ncols(); ++i )
+            val += std::abs( math::square( S.data()[ i ] ) );
 
         return val;
     }// if
@@ -165,7 +181,7 @@ frobenius_squared ( const Hpro::TMatrix< value_t > &  A )
         auto  val = result_t(0);
 
         for ( size_t  i = 0; i < C.nrows()*C.ncols(); ++i )
-            val += math::square( C.data()[ i ] );
+            val += std::abs( math::square( C.data()[ i ] ) );
 
         return val;
     }// if
@@ -175,7 +191,7 @@ frobenius_squared ( const Hpro::TMatrix< value_t > &  A )
         auto  val = result_t(0);
 
         for ( size_t  i = 0; i < M.nrows()*M.ncols(); ++i )
-            val += math::square( M.data()[ i ] );
+            val += std::abs( math::square( M.data()[ i ] ) );
 
         return val;
     }// if
@@ -203,38 +219,42 @@ frobenius_squared ( const alpha_t                     alpha,
     using  result_t = long double;
 
     HLR_ASSERT( A.block_is() == B.block_is() );
+
+    result_t  val = 0.0;
     
-    auto  lrdot = [] ( const auto &  U1,
-                       const auto &  V1,
-                       const auto &  U2,
-                       const auto &  V2 )
-    {
-        const auto  rank1 = U1.ncols();
-        const auto  rank2 = U2.ncols();
-        result_t    val   = 0.0;
+    //
+    // special lowrank function (see below)
+    //
+    // auto  lrdot = [] ( const auto &  U1,
+    //                    const auto &  V1,
+    //                    const auto &  U2,
+    //                    const auto &  V2 )
+    // {
+    //     const auto  rank1 = U1.ncols();
+    //     const auto  rank2 = U2.ncols();
+    //     result_t    val   = 0.0;
                               
-        for ( size_t  l = 0; l < rank1; l++ )
-        {
-            const auto  U1_l = U1.column( l );
-            const auto  V1_l = V1.column( l );
+    //     for ( size_t  l = 0; l < rank1; l++ )
+    //     {
+    //         const auto  U1_l = U1.column( l );
+    //         const auto  V1_l = V1.column( l );
                                   
-            for ( size_t  k = 0; k < rank2; k++ )
-            {
-                const auto  U2_k = U2.column( k );
-                const auto  V2_k = V2.column( k );
+    //         for ( size_t  k = 0; k < rank2; k++ )
+    //         {
+    //             const auto  U2_k = U2.column( k );
+    //             const auto  V2_k = V2.column( k );
                                       
-                val += blas::dot( U1_l, U2_k ) * blas::dot( V1_l, V2_k );
-            }// for
-        }// for
+    //             val += blas::dot( U1_l, U2_k ) * blas::dot( V1_l, V2_k );
+    //         }// for
+    //     }// for
 
-        return val;
-    };
+    //     return val;
+    // };
 
-    if ( is_blocked_all( A, B ) )
+    if ( hlr::is_blocked_all( A, B ) )
     {
         auto      BA  = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
         auto      BB  = cptrcast( &B, Hpro::TBlockMatrix< value_t > );
-        result_t  val = 0.0;
 
         HLR_ASSERT(( BA->nblock_rows() == BB->block_rows() ) &&
                    ( BA->nblock_cols() == BB->block_cols() ));
@@ -261,7 +281,13 @@ frobenius_squared ( const alpha_t                     alpha,
             }// for
         }// for
 
-        return std::abs( val );
+        if ( ! std::isfinite( val ) )
+        {
+            if ( std::isinf( val ) ) std::cout << "(B) inf value for " << A.block_is() << std::endl;
+            if ( std::isnan( val ) ) std::cout << "(B) nan value for " << A.block_is() << std::endl;
+        }// if
+        
+        val = std::abs( val );
     }// if
     else if (( matrix::is_lowrank(    A ) && matrix::is_lowrank(    B ) ) ||
              ( matrix::is_lowrank(    A ) && matrix::is_lowrank_sv( B ) ) ||
@@ -304,6 +330,11 @@ frobenius_squared ( const alpha_t                     alpha,
         //
         // version 1: compute singular values and sum up
         //
+
+        HLR_ASSERT(( UA.nrows() > 0 ) && ( UA.ncols() > 0 ) &&
+                   ( VA.nrows() > 0 ) && ( VA.ncols() > 0 ) &&
+                   ( UB.nrows() > 0 ) && ( UB.ncols() > 0 ) &&
+                   ( VB.nrows() > 0 ) && ( VB.ncols() > 0 ) );
         
         auto  k1 = UA.ncols();
         auto  k2 = UB.ncols();
@@ -327,12 +358,14 @@ frobenius_squared ( const alpha_t                     alpha,
 
         blas::sv( U, V, S );
         
-        auto  val = result_t(0);
-
         for ( size_t  i = 0; i < S.length(); ++i )
             val += math::square( S(i) );
 
-        return val;
+        if ( ! std::isfinite( val ) )
+        {
+            if ( std::isinf( val ) ) std::cout << "(R) inf value for " << A.block_is() << std::endl;
+            if ( std::isnan( val ) ) std::cout << "(R) nan value for " << A.block_is() << std::endl;
+        }// if
 
         //
         // version 2: use "lrdot" above (has problems below 1e-8)
@@ -343,7 +376,7 @@ frobenius_squared ( const alpha_t                     alpha,
         //                     alpha * beta  * lrdot( UB, VB, UA, VA ) +
         //                     beta  * beta  * lrdot( UB, VB, UB, VB ) );
         
-        // return std::abs( sqn );
+        // val = std::abs( sqn );
 
         //
         // version 3: convert to dense (for debugging)
@@ -360,70 +393,47 @@ frobenius_squared ( const alpha_t                     alpha,
         // for ( size_t  i = 0; i < M1.nrows()*M1.ncols(); ++i )
         //     val += math::square( M1.data()[ i ] );
 
-        // return val;
+        // val = val;
         
     }// if
-    else if ( matrix::is_uniform_lowrank( A ) )
-    {
-        auto  RA = matrix::convert_to_lowrank( A );
-
-        return frobenius_squared( alpha, *RA, beta, B );
-    }// if
-    else if ( matrix::is_uniform_lowrank( B ) )
-    {
-        auto  RB = matrix::convert_to_lowrank( B );
-
-        return frobenius_squared( alpha, A, beta, *RB );
-    }// if
-    else if ( matrix::is_h2_lowrank( A ) )
-    {
-        auto  RA = matrix::convert_to_lowrank( A );
-
-        return frobenius_squared( alpha, *RA, beta, B );
-    }// if
-    else if ( matrix::is_h2_lowrank( B ) )
-    {
-        auto  RB = matrix::convert_to_lowrank( B );
-
-        return frobenius_squared( alpha, A, beta, *RB );
-    }// if
+    else if ( matrix::is_uniform_lowrank(  A ) ) { auto  RA = matrix::convert_to_lowrank( A ); val = frobenius_squared( alpha, *RA, beta,   B ); }
+    else if ( matrix::is_uniform_lowrank(  B ) ) { auto  RB = matrix::convert_to_lowrank( B ); val = frobenius_squared( alpha,   A, beta, *RB ); }
+    else if ( matrix::is_uniform_lowrank2( A ) ) { auto  RA = matrix::convert_to_lowrank( A ); val = frobenius_squared( alpha, *RA, beta,   B ); }
+    else if ( matrix::is_uniform_lowrank2( B ) ) { auto  RB = matrix::convert_to_lowrank( B ); val = frobenius_squared( alpha,   A, beta, *RB ); }
+    else if ( matrix::is_h2_lowrank( A ) )       { auto  RA = matrix::convert_to_lowrank( A ); val = frobenius_squared( alpha, *RA, beta,   B ); }
+    else if ( matrix::is_h2_lowrank( B ) )       { auto  RB = matrix::convert_to_lowrank( B ); val = frobenius_squared( alpha,   A, beta, *RB ); }
+    else if ( matrix::is_h2_lowrank2( A ) )      { auto  RA = matrix::convert_to_lowrank( A ); val = frobenius_squared( alpha, *RA, beta,   B ); }
+    else if ( matrix::is_h2_lowrank2( B ) )      { auto  RB = matrix::convert_to_lowrank( B ); val = frobenius_squared( alpha,   A, beta, *RB ); }
     else if ( matrix::is_dense_all( A, B ) )
     {
         auto  MA = cptrcast( &A, matrix::dense_matrix< value_t > )->mat();
         auto  MB = cptrcast( &B, matrix::dense_matrix< value_t > )->mat();
         
-        result_t     val = 0;
-        const idx_t  n   = idx_t(MA.nrows());
-        const idx_t  m   = idx_t(MA.ncols());
+        const idx_t  n = idx_t(MA.nrows());
+        const idx_t  m = idx_t(MA.ncols());
     
         for ( idx_t j = 0; j < m; ++j )
         {
             for ( idx_t i = 0; i < n; ++i )
             {
-                const auto  a_ij = alpha * MA(i,j) + beta * MB(i,j);
+                const auto  a_ij = value_t(alpha) * MA(i,j) + value_t(beta) * MB(i,j);
                 
                 val += std::abs( math::square( a_ij ) );
             }// for
         }// for
-            
-        return val;
+
+        if ( ! std::isfinite( val ) )
+        {
+            if ( std::isinf( val ) ) std::cout << "(D) inf value for " << A.block_is() << std::endl;
+            if ( std::isnan( val ) ) std::cout << "(D) nan value for " << A.block_is() << std::endl;
+        }// if
     }// if
-    else if ( matrix::is_dense( A ) && matrix::is_lowrank( B ) )
-    {
-        auto  DB = matrix::convert_to_dense( B );
-        
-        return frobenius_squared( alpha, A, beta, *DB );
-    }// if
-    else if ( matrix::is_dense( B ) && matrix::is_lowrank( A ) )
-    {
-        auto  DA = matrix::convert_to_dense( A );
-        
-        return frobenius_squared( alpha, *DA, beta, B );
-    }// if
+    else if ( matrix::is_dense( A ) && matrix::is_lowrank( B ) ) { auto  DB = matrix::convert_to_dense( B ); val = frobenius_squared( alpha, A, beta, *DB ); }
+    else if ( matrix::is_dense( B ) && matrix::is_lowrank( A ) ) { auto  DA = matrix::convert_to_dense( A ); val = frobenius_squared( alpha, *DA, beta, B ); }
     else
         HLR_ERROR( "unsupported matrix types: " + A.typestr() + " and " + B.typestr() );
 
-    return 0;
+    return val;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

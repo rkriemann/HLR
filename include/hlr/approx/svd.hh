@@ -187,7 +187,7 @@ svd_ortho ( const blas::matrix< value_t > &  U,
         auto  OV = blas::prod( value_t(1), QV, Vk );
         
         // restrict S
-        auto  Sk = blas::vector( Ss, orank_is );
+        auto  Sk = blas::vector< real_t >( Ss, orank_is );
         auto  OS = blas::copy( Sk );
         
         return { std::move( OU ), std::move( OS ), std::move( OV ) };
@@ -529,7 +529,7 @@ template < typename T_value >
 struct SVD
 {
     using  value_t = T_value;
-    using  real_t  = typename Hpro::real_type< value_t >::type_t;
+    using  real_t  = Hpro::real_type_t< value_t >;
 
     // signal support for general lin. operators
     static constexpr bool supports_general_operator = false;
@@ -616,6 +616,9 @@ struct SVD
                    const accuracy &                 acc,
                    blas::vector< real_t > *         sv = nullptr ) const
     {
+        if ( M.ncols() == 0 )
+            return blas::matrix< value_t >( M.nrows(), 0 );
+        
         if ( M.ncols() > 2 * M.nrows() )
         {
             //
@@ -624,7 +627,7 @@ struct SVD
             
             auto  G        = blas::prod( M, blas::adjoint( M ) );
             auto  [ V, E ] = blas::eigen_herm( G );
-            auto  perm     = std::vector< std::pair< value_t, uint > >( E.length() );
+            auto  perm     = std::vector< std::pair< real_t, uint > >( E.length() );
             
             for ( uint  i = 0; i < E.length(); ++i )
                 perm.push_back({ E(i), i });

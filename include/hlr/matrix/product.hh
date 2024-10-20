@@ -50,6 +50,12 @@ public:
 
     linop_product ( const value_t    alpha0,
                     const matop_t    op0,
+                    const linop_t &  A0 )
+            : _factors{ { &A0, alpha0, op0 } }
+    {}
+    
+    linop_product ( const value_t    alpha0,
+                    const matop_t    op0,
                     const linop_t &  A0,
                     const value_t    alpha1,
                     const matop_t    op1,
@@ -58,7 +64,6 @@ public:
                         { &A1, alpha1, op1 } }
     {}
     
-
     linop_product ( const value_t    alpha0,
                     const matop_t    op0,
                     const linop_t &  A0,
@@ -460,7 +465,80 @@ linop_product< value_t >::apply_add   ( const value_t                    alpha,
                                         blas::matrix< value_t > &        Y,
                                         const matop_t                    op ) const
 {
-    HLR_ERROR( "TODO" );
+    const auto  n_fac = _factors.size();
+
+    if ( n_fac == 1 )
+    {
+        _factors[0].linop->apply_add( _factors[0].scale * alpha, X, Y, blas::apply_op( op, _factors[0].op ) );
+    }// if
+    else
+    {
+        auto  TX = blas::matrix< value_t >();
+        auto  TY = blas::matrix< value_t >();
+        
+        if ( op == apply_normal )
+        {
+            {
+                auto  p   = _factors[n_fac-1];
+                auto  pop = blas::apply_op( op, p.op );
+                
+                if ( pop == apply_normal ) TY = std::move( blas::matrix< value_t >( p.linop->range_dim(),  X.ncols() ) );
+                else                       TY = std::move( blas::matrix< value_t >( p.linop->domain_dim(), X.ncols() ) );
+                
+                p.linop->apply_add( p.scale, X, TY, blas::apply_op( op, p.op ) );
+            }
+        
+            for ( int  i = int(n_fac-2); i >= 1; --i )
+            {
+                auto  p   = _factors[i];
+                auto  pop = blas::apply_op( op, p.op );
+                
+                TX = std::move( TY );
+
+                if ( pop == apply_normal ) TY = std::move( blas::matrix< value_t >( p.linop->range_dim(),  X.ncols() ) );
+                else                       TY = std::move( blas::matrix< value_t >( p.linop->domain_dim(), X.ncols() ) );
+
+                p.linop->apply_add( p.scale, TX, TY, pop );
+            }// for
+
+            {
+                auto  p = _factors[0];
+                
+                p.linop->apply_add( p.scale * alpha, TY, Y, blas::apply_op( op, p.op ) );
+            }
+        }// if
+        else
+        {
+            {
+                auto  p   = _factors[0];
+                auto  pop = blas::apply_op( op, p.op );
+                
+                if ( pop == apply_normal ) TY = std::move( blas::matrix< value_t >( p.linop->range_dim(),  X.ncols() ) );
+                else                       TY = std::move( blas::matrix< value_t >( p.linop->domain_dim(), X.ncols() ) );
+                
+                p.linop->apply_add( p.scale, X, TY, blas::apply_op( op, p.op ) );
+            }
+        
+            for ( size_t  i = 1; i < n_fac-1; ++i )
+            {
+                auto  p   = _factors[i];
+                auto  pop = blas::apply_op( op, p.op );
+                
+                TX = std::move( TY );
+
+                if ( pop == apply_normal ) TY = std::move( blas::matrix< value_t >( p.linop->range_dim(),  X.ncols() ) );
+                else                       TY = std::move( blas::matrix< value_t >( p.linop->domain_dim(), X.ncols() ) );
+
+                p.linop->apply_add( p.scale, TX, TY, pop );
+            }// for
+
+            {
+                auto  p = _factors[n_fac-1];
+                
+                p.linop->apply_add( p.scale * alpha, TY, Y, blas::apply_op( op, p.op ) );
+            }
+        }// else
+    }// else
 }
 
 template < typename value_t >
@@ -554,6 +632,23 @@ linop_product< value_t >::apply_add   ( arithmetic_t &&                  arithme
 //
 // functions to create product objects
 //
+template < typename value_t >
+std::unique_ptr< linop_product< value_t > >
+product ( const Hpro::TLinearOperator< value_t > &  A0 )
+{
+    return std::make_unique< linop_product< value_t > >( value_t(1), apply_normal, A0 );
+}
+                 
+template < typename alpha0_t,
+           typename value_t >
+requires ( ( std::convertible_to< alpha0_t, value_t > ) )
+std::unique_ptr< linop_product< value_t > >
+product ( const alpha0_t                            alpha0,
+          const Hpro::TLinearOperator< value_t > &  A0 )
+{
+    return std::make_unique< linop_product< value_t > >( value_t(alpha0), apply_normal, A0 );
+}
+                 
 template < typename value_t >
 std::unique_ptr< linop_product< value_t > >
 product ( const Hpro::TLinearOperator< value_t > &  A0,
