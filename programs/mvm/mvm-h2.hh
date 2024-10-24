@@ -40,8 +40,10 @@ program_main ()
 
     blas::reset_flops();
     
-    auto  acc   = gen_accuracy();
-    auto  H     = std::unique_ptr< Hpro::TMatrix< value_t > >();
+    auto  acc     = gen_accuracy();
+    auto  U       = std::unique_ptr< Hpro::TMatrix< value_t > >();
+    auto  U_rowcb = std::unique_ptr< matrix::shared_cluster_basis< value_t > >();
+    auto  U_colcb = std::unique_ptr< matrix::shared_cluster_basis< value_t > >();
 
     auto  problem = gen_problem< problem_t >();
     auto  coord   = problem->coordinates();
@@ -49,6 +51,7 @@ program_main ()
     auto  bct     = gen_bct( *ct, *ct );
     auto  coeff   = problem->coeff_func();
     auto  pcoeff  = Hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
+    auto  cbapx   = approx::SVD< value_t >();
         
     tic = timer::now();
         
@@ -60,9 +63,12 @@ program_main ()
                 
             auto  hcagen = problem->hca_gen_func( *ct );
             auto  hca    = bem::hca( pcoeff, *hcagen, cmdline::eps / 100.0, 6 );
-            auto  hcalr  = bem::hca_lrapx( hca );
+            auto  lrapx  = bem::hca_lrapx( hca );
                 
-            H = impl::matrix::build( bct->root(), pcoeff, hcalr, acc, false, nseq );
+            if ( sep_coup )
+                std::tie( U_rowcb, U_colcb, U ) = impl::matrix::build_uniform_sep( bct->root(), pcoeff, lrapx, cbapx, acc, false );
+            else
+                std::tie( U_rowcb, U_colcb, U ) = impl::matrix::build_uniform( bct->root(), pcoeff, lrapx, cbapx, acc, false );
         }// if
         else
             cmdline::capprox = "default";
@@ -72,33 +78,29 @@ program_main ()
     {
         std::cout << "    using ACA" << std::endl;
 
-        auto  acalr = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
-        
-        H = impl::matrix::build( bct->root(), pcoeff, acalr, acc, false, nseq );
-    }// else
-        
-    if ( cmdline::capprox == "dense" )
-    {
-        std::cout << "    using dense" << std::endl;
+        auto  lrapx = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
 
-        auto  dense = bem::dense_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
-        
-        H = impl::matrix::build( bct->root(), pcoeff, dense, acc, false, nseq );
+        if ( sep_coup )
+            std::tie( U_rowcb, U_colcb, U ) = impl::matrix::build_uniform_sep( bct->root(), pcoeff, lrapx, cbapx, acc, false );
+        else
+            std::tie( U_rowcb, U_colcb, U ) = impl::matrix::build_uniform( bct->root(), pcoeff, lrapx, cbapx, acc, false );
     }// else
         
     toc = timer::since( tic );
     
-    const auto  mem_H  = H->byte_size();
-    const auto  norm_H = impl::norm::frobenius( *H );
+    const auto  mem_U     = U->byte_size();
+    const auto  mem_U_rcb = U_rowcb->byte_size();
+    const auto  mem_U_ccb = U_colcb->byte_size();
+    const auto  norm_U    = impl::norm::frobenius( *U );
         
-    std::cout << "    dims  = " << H->nrows() << " × " << H->ncols() << std::endl;
+    std::cout << "    dims  = " << U->nrows() << " × " << U->ncols() << std::endl;
     std::cout << "    done in " << format_time( toc ) << std::endl;
-    std::cout << "    mem   = " << format_mem( mem_H ) << std::endl;
-    std::cout << "      idx = " << format_mem( mem_H / H->nrows() ) << std::endl;
-    std::cout << "    |A|   = " << format_norm( norm_H ) << std::endl;
+    std::cout << "    mem   = " << format_mem( mem_U_rcb, mem_U_ccb, mem_U, mem_U_rcb + mem_U_ccb + mem_U ) << std::endl;
+    std::cout << "      idx = " << format_mem( (mem_U_rcb + mem_U_ccb + mem_U) / U->nrows() ) << std::endl;
+    std::cout << "    |A|   = " << format_norm( norm_U ) << std::endl;
 
     if ( hpro::verbose( 3 ) )
-        io::eps::print( *H, "H", "noinnerid" );
+        io::eps::print( *U, "U", "noinnerid" );
 
     //////////////////////////////////////////////////////////////////////
     //
@@ -109,7 +111,6 @@ program_main ()
     std::cout << term::bullet << term::bold << "H²-matrix" << term::reset << std::endl;
 
     auto  h2acc = fixed_prec( 0.4 * cmdline::eps );
-    auto  cbapx = approx::SVD< value_t >();
     auto  A     = std::unique_ptr< Hpro::TMatrix< value_t > >();
     auto  rowcb = std::unique_ptr< matrix::nested_cluster_basis< value_t > >();
     auto  colcb = std::unique_ptr< matrix::nested_cluster_basis< value_t > >();
@@ -117,16 +118,16 @@ program_main ()
     tic = timer::now();
 
     if ( sep_coup )
-        std::tie( rowcb, colcb, A ) = impl::matrix::build_h2_rec_sep( *H, cbapx, h2acc, false );
+        std::tie( rowcb, colcb, A ) = impl::matrix::build_h2_sep( *U, *U_rowcb, *U_colcb, cbapx, h2acc, cmdline::compress );
     else
-        std::tie( rowcb, colcb, A ) = impl::matrix::build_h2_rec( *H, cbapx, h2acc, false );
+        std::tie( rowcb, colcb, A ) = impl::matrix::build_h2( *U, *U_rowcb, *U_colcb, cbapx, h2acc, cmdline::compress );
 
-    if ( cmdline::compress )
-    {
-        impl::matrix::compress< matrix::shared_cluster_basis< value_t > >( *rowcb, acc );
-        impl::matrix::compress< matrix::shared_cluster_basis< value_t > >( *colcb, acc );
-        impl::matrix::compress( *A, acc );
-    }// if
+    // if ( cmdline::compress )
+    // {
+    //     impl::matrix::compress< matrix::nested_cluster_basis< value_t > >( *rowcb, acc );
+    //     impl::matrix::compress< matrix::nested_cluster_basis< value_t > >( *colcb, acc );
+    //     impl::matrix::compress( *A, acc );
+    // }// if
     
     toc = timer::since( tic );
 
@@ -137,24 +138,103 @@ program_main ()
     const auto  mem_ccb = colcb->byte_size();
     
     std::cout << "    mem   = " << format_mem( mem_rcb, mem_ccb, mem_A, mem_rcb + mem_ccb + mem_A ) << std::endl;
-    std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_rcb + mem_ccb + mem_A) / double(mem_H) ) << std::endl;
+    std::cout << "      vs U  " << boost::format( "%.3f" ) % ( double(mem_rcb + mem_ccb + mem_A) / double(mem_U_rcb + mem_U_ccb + mem_U) ) << std::endl;
 
     if ( verbose( 3 ) )
-        matrix::print_eps( *A, "A", "noid,nosize" );
+        io::eps::print( *A, "A", "noinnerid" );
 
     if ( false )
     {
-        auto  diff  = matrix::sum( 1, *H, -1, *A );
+        auto  diff  = matrix::sum( 1, *U, -1, *A );
         auto  error = impl::norm::spectral( *diff );
 
-        std::cout << "    error = " << format_error( error, error / norm_H ) << std::endl;
+        std::cout << "    error = " << format_error( error, error / norm_U ) << std::endl;
     }
 
     {
-        auto  error = impl::norm::frobenius( 1, *H, -1, *A );
+        auto  error = impl::norm::frobenius( 1, *U, -1, *A );
 
-        std::cout << "    error = " << format_error( error, error / norm_H ) << std::endl;
+        std::cout << "    error = " << format_error( error, error / norm_U ) << std::endl;
     }
+
+    // not needed anymore
+    U.reset( nullptr );
+    U_rowcb.reset( nullptr );
+    U_colcb.reset( nullptr );
+    
+    //////////////////////////////////////////////////////////////////////
+    //
+    // compare with H
+    //
+    //////////////////////////////////////////////////////////////////////
+
+    if ( cmdline::ref == "h" )
+    {
+        std::cout << term::bullet << term::bold
+                  << "reference"
+                  << term::reset << std::endl;
+        
+        auto  H = std::unique_ptr< Hpro::TMatrix< value_t > >();
+        
+        tic = timer::now();
+        
+        if ( cmdline::capprox == "hca" )
+        {
+            if constexpr ( problem_t::supports_hca )
+            {
+                std::cout << "    using HCA" << std::endl;
+                
+                auto  hcagen = problem->hca_gen_func( *ct );
+                auto  hca    = bem::hca( pcoeff, *hcagen, cmdline::eps / 100.0, 6 );
+                auto  lrapx  = bem::hca_lrapx( hca );
+
+                H = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, false );
+            }// if
+            else
+                cmdline::capprox = "default";
+        }// if
+
+        if (( cmdline::capprox == "aca" ) || ( cmdline::capprox == "default" ))
+        {
+            std::cout << "    using ACA" << std::endl;
+
+            auto  lrapx = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
+
+            H = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, false );
+        }// else
+        
+        if ( cmdline::capprox == "dense" )
+        {
+            std::cout << "    using dense" << std::endl;
+
+            auto  dense = bem::dense_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
+        
+            H = impl::matrix::build( bct->root(), pcoeff, dense, acc, false );
+        }// else
+        
+        toc = timer::since( tic );
+
+        const auto  mem_H  = H->byte_size();
+        const auto  norm_H = impl::norm::frobenius( *H );
+        
+        std::cout << "    done in " << format_time( toc ) << std::endl;
+        std::cout << "    mem   = " << format_mem( mem_H ) << std::endl;
+        std::cout << "    |A|   = " << format_norm( norm_H ) << std::endl;
+
+        {
+            auto  error = impl::norm::frobenius( 1, *H, -1, *A );
+
+            std::cout << "    error = " << format_error( error, error / norm_H ) << std::endl;
+        }
+
+        // {
+        //     auto  n_H   = impl::norm::spectral( *H );
+        //     auto  diff  = matrix::sum( 1, *H, -1, *A );
+        //     auto  error = impl::norm::spectral( *diff );
+
+        //     std::cout << "    error = " << format_error( error, error / n_H ) << std::endl;
+        // }
+    }// if
     
     //////////////////////////////////////////////////////////////////////
     //
@@ -231,6 +311,7 @@ program_main ()
             std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
+        if ( false )
         {
             runtime.clear();
             
