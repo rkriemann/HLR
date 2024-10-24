@@ -387,6 +387,8 @@ convert_to_hodlr ( const Hpro::TMatrix< value_t > &  M,
                 }// for
             }// for
 
+            // std::cout << M.row_is().size() << " x " << M.col_is().size() << " x " << k_sum << std::endl;
+            
             auto  [ U, V ] = approx( U_sum, V_sum, acc );
 
             return std::make_unique< matrix::lrmatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( V ) );

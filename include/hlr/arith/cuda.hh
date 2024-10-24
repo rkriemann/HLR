@@ -688,10 +688,10 @@ GESVDJ( cuDoubleComplex, cusolverDnZgesvdj )
 //
 template < typename value_t >
 void
-svd ( handle               handle,
-      matrix< value_t > &  M,
-      vector< typename Hpro::real_type< value_t >::type_t > &  S,
-      matrix< value_t > &  VH )
+svd ( handle                                    handle,
+      matrix< value_t > &                       M,
+      vector< Hpro::real_type_t< value_t > > &  S,
+      matrix< value_t > &                       VH )
 {
     using cuda_t = typename cuda_type< value_t >::type_t;
     using real_t = typename cuda::real_type< cuda_t >::type_t;

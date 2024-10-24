@@ -1015,7 +1015,27 @@ recompress ( tensor3< value_t > &  G,
 
     return { std::move(G2), std::move(W0), std::move(W1), std::move(W2) };
 }
-    
+
+//
+// return difference D - G ×₀ X₀ ×₁ X₁ ×₂ X₂ 
+//
+template < typename value_t >
+tensor3< value_t >
+tucker_diff ( const tensor3< value_t > &  D,
+              const tensor3< value_t > &  G,
+              const matrix< value_t > &   X0,
+              const matrix< value_t > &   X1,
+              const matrix< value_t > &   X2 )
+{
+    auto  T0 = tensor_product( G,  X0, 0 );
+    auto  T1 = tensor_product( T0, X1, 1 );
+    auto  Y  = tensor_product( T1, X2, 2 );
+        
+    add( -1, D, Y );
+
+    return Y;
+}
+
 //
 // error of Tucker decomposition D - G ×₀ X₀ ×₁ X₁ ×₂ X₂ 
 //
@@ -1027,11 +1047,7 @@ tucker_error ( const tensor3< value_t > &  D,
                const matrix< value_t > &   X1,
                const matrix< value_t > &   X2 )
 {
-    auto  T0 = tensor_product( G,  X0, 0 );
-    auto  T1 = tensor_product( T0, X1, 1 );
-    auto  Y  = tensor_product( T1, X2, 2 );
-        
-    add( -1, D, Y );
+    auto  Y = tucker_diff( D, G, X0, X1, X2 );
 
     return norm_F( Y );
 }
