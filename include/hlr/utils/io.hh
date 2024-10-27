@@ -533,11 +533,24 @@ inline
 void
 print ( const Hpro::TCoordinate &   coord,
         const Hpro::TCluster &      ct,
-        const Hpro::TPermutation &  i2e,
+        const Hpro::TPermutation &  pi2e,
         const uint                  lvl,
         const std::string &         filename )
 {
-    detail::vtk_print_cluster( coord, ct, i2e, lvl, filename );
+    detail::vtk_print_cluster( coord, ct, pi2e, lvl, filename );
+}
+
+//
+// print bounding box and coordinates of given block cluster
+//
+inline
+void
+print ( const Hpro::TBlockCluster &  bc,
+        const Hpro::TCoordinate &    coord,
+        const Hpro::TPermutation &   pi2e,
+        const std::string &          filename )
+{
+    detail::vtk_print_cluster( bc, coord, pi2e, filename );
 }
 
 //
