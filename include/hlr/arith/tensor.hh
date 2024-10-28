@@ -386,6 +386,12 @@ public:
         return sizeof( value_t ) * _length[0] * _length[1] * _length[2] + sizeof(_length) + sizeof(_stride) + sizeof(super_t);
     }
 
+    // return size of (floating point) data in bytes handled by this object
+    size_t  data_byte_size () const
+    {
+        return sizeof( value_t ) * _length[0] * _length[1] * _length[2];
+    }
+
     //
     // tests
     //

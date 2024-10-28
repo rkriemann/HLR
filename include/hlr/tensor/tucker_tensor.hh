@@ -22,7 +22,7 @@ namespace hlr { namespace tensor {
 // implements tensor using Tucker decomposition
 //
 template < typename T_value >
-class tucker_tensor3 : public base_tensor3< T_value >, public compress::compressible
+class tucker_tensor3 : public base_tensor3< T_value >
 {
 public:
     static constexpr uint  dimension = 3;
@@ -42,11 +42,9 @@ private:
     // ranks of G (and X)
     std::array< size_t, dimension >  _rank;
     
-    #if HLR_HAS_COMPRESSION == 1
     // compressed data
     compress::zarray                           _zG;
     std::array< compress::zarray, dimension >  _zX;
-    #endif
 
 public:
     //
@@ -123,17 +121,15 @@ public:
     uint  rank ( const uint  d ) const { HLR_ASSERT( d < dimension ); return _rank[ d ]; }
 
     // TODO: replace by set_* functions to update rank data
-    blas::tensor3< value_t > &        G ()                     { return _G; }
-    blas::matrix< value_t > &         X ( const uint d )       { HLR_ASSERT(( d < dimension ) && ! is_compressed()); return _X[d]; }
+    // blas::tensor3< value_t > &        G ()                     { return _G; }
+    // blas::matrix< value_t > &         X ( const uint d )       { HLR_ASSERT(( d < dimension ) && ! is_compressed()); return _X[d]; }
     
-    const blas::tensor3< value_t > &  G () const               { return _G; }
-    const blas::matrix< value_t > &   X ( const uint d ) const { HLR_ASSERT(( d < dimension ) && ! is_compressed()); return _X[d]; }
+    // const blas::tensor3< value_t > &  G () const               { return _G; }
+    // const blas::matrix< value_t > &   X ( const uint d ) const { HLR_ASSERT(( d < dimension ) && ! is_compressed()); return _X[d]; }
     
     blas::tensor3< value_t >
-    G_decompressed () const
+    G () const
     {
-        #if HLR_HAS_COMPRESSION == 1
-        
         if ( is_compressed() )
         {
             auto  dG = blas::tensor3< value_t >( _rank[0], _rank[1], _rank[2] );
@@ -142,19 +138,15 @@ public:
             
             return dG;
         }// if
-
-        #endif
             
         return _G;
     }
 
     blas::matrix< value_t >
-    X_decompressed ( const uint  d ) const
+    X ( const uint  d ) const
     {
         HLR_ASSERT( d < dimension );
                    
-        #if HLR_HAS_COMPRESSION == 1
-        
         if ( is_compressed() )
         {
             auto  dX = blas::matrix< value_t >( this->dim(d), _rank[d] );
@@ -163,8 +155,6 @@ public:
             
             return dX;
         }// if
-
-        #endif
             
         return _X[d];
     }
@@ -172,10 +162,6 @@ public:
     //
     // compression
     //
-
-    // compress internal data based on given configuration
-    // - may result in non-compression if storage does not decrease
-    virtual void   compress      ( const compress::zconfig_t &  zconfig );
 
     // same but compress based on given accuracy
     virtual void   compress      ( const Hpro::TTruncAcc &  acc );
@@ -186,11 +172,7 @@ public:
     // return true if data is compressed
     virtual bool   is_compressed () const
     {
-        #if HLR_HAS_COMPRESSION == 1
-        return ! is_null( _zG.data() );
-        #else
-        return false;
-        #endif
+        return ! _zG.empty();
     }
 
     //
@@ -210,8 +192,6 @@ public:
         for ( uint  i = 0; i < dimension; ++i )
             X->_X[i] = blas::copy( _X[i] );
         
-        #if HLR_HAS_COMPRESSION == 1
-
         X->_zG = compress::zarray( _zG.size() );
         std::copy( _zG.begin(), _zG.end(), X->_zG.begin() );
         
@@ -220,8 +200,6 @@ public:
             X->_zX[i] = compress::zarray( _zX[i].size() );
             std::copy( _zX[i].begin(), _zX[i].end(), X->_zX[i].begin() );
         }// for
-        
-        #endif
         
         return T;
     }
@@ -242,18 +220,37 @@ public:
         for ( uint  i = 0; i < dimension; ++i )
             s += _X[i].byte_size();
 
-        #if HLR_HAS_COMPRESSION == 1
-
         s += hlr::compress::byte_size( _zG );
         
         for ( uint  i = 0; i < dimension; ++i )
             s += hlr::compress::byte_size( _zX[i] );
 
         s += sizeof( _rank );
-        
-        #endif
 
         return s;
+    }
+
+    // return size of (floating point) data in bytes handled by this object
+    virtual size_t data_byte_size () const
+    {
+        size_t  s = 0;
+        
+        if ( is_compressed() )
+        {
+            s += hlr::compress::byte_size( _zG );
+            
+            for ( uint  i = 0; i < dimension; ++i )
+                s += hlr::compress::byte_size( _zX[i] );
+        }// if
+        else
+        {
+            s += _G.data_byte_size();
+
+            for ( uint  i = 0; i < dimension; ++i )
+                s += _X[i].data_byte_size();
+        }// else
+
+        return  s;
     }
 
     // return name of type
@@ -263,12 +260,10 @@ protected:
     // remove compressed storage (standard storage not restored!)
     virtual void  remove_compressed ()
     {
-        #if HLR_HAS_COMPRESSION == 1
         _zG = compress::zarray();
 
         for ( uint  i = 0; i < dimension; ++i )
             _zX[i] = compress::zarray();
-        #endif
     }
 };
 
@@ -278,21 +273,24 @@ protected:
 //
 template < typename value_t >
 void
-tucker_tensor3< value_t >::compress ( const compress::zconfig_t &  zconfig )
+tucker_tensor3< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 {
-    #if HLR_HAS_COMPRESSION == 1
-        
     if ( is_compressed() )
         return;
 
+    HLR_ASSERT( acc.is_fixed_prec() );
+
+    const auto  eps   = acc.rel_eps();
+    // const auto  eps   = acc( this->is(0), this->is(1), this->is(2) ).rel_eps();
+    const auto  zconf = compress::get_config( eps );
     const size_t  mem = sizeof(value_t) * ( _G.size(0) * _G.size(1) * _G.size(2) +
                                             _X[0].nrows() + _X[0].ncols() +
                                             _X[1].nrows() + _X[1].ncols() +
                                             _X[2].nrows() + _X[2].ncols() );
-    auto          zG  = compress::compress< value_t >( zconfig, _G );
-    auto          zX0 = compress::compress< value_t >( zconfig, _X[0] );
-    auto          zX1 = compress::compress< value_t >( zconfig, _X[1] );
-    auto          zX2 = compress::compress< value_t >( zconfig, _X[2] );
+    auto          zG  = compress::compress< value_t >( zconf, _G );
+    auto          zX0 = compress::compress< value_t >( zconf, _X[0] );
+    auto          zX1 = compress::compress< value_t >( zconf, _X[1] );
+    auto          zX2 = compress::compress< value_t >( zconf, _X[2] );
     
     // // DEBUG
     // {
@@ -355,20 +353,6 @@ tucker_tensor3< value_t >::compress ( const compress::zconfig_t &  zconfig )
         _X[1]  = std::move( blas::matrix< value_t >() );
         _X[2]  = std::move( blas::matrix< value_t >() );
     }// if
-
-    #endif
-}
-
-template < typename value_t >
-void
-tucker_tensor3< value_t >::compress ( const Hpro::TTruncAcc &  acc )
-{
-    HLR_ASSERT( acc.is_fixed_prec() );
-
-    const auto  eps   = acc.rel_eps();
-    // const auto  eps   = acc( this->is(0), this->is(1), this->is(2) ).rel_eps();
-        
-    compress( compress::get_config( eps ) );
 }
 
 //
@@ -378,19 +362,15 @@ template < typename value_t >
 void
 tucker_tensor3< value_t >::decompress ()
 {
-    #if HLR_HAS_COMPRESSION == 1
-        
     if ( ! is_compressed() )
         return;
 
-    this->_G = std::move( G_decompressed() );
+    this->_G = std::move( G() );
 
     for ( uint  i = 0; i < dimension; ++i )
-        this->_X[i] = std::move( X_decompressed(i) );
+        this->_X[i] = std::move( X(i) );
 
     remove_compressed();
-
-    #endif
 }
 
 //

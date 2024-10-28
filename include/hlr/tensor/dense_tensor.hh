@@ -25,7 +25,7 @@ namespace hlr { namespace tensor {
 // - storage layout is column-major
 //
 template < typename T_value >
-class dense_tensor3 : public base_tensor3< T_value >, public compress::compressible
+class dense_tensor3 : public base_tensor3< T_value >
 {
 public:
     using  value_t = T_value;
@@ -38,10 +38,8 @@ private:
     // tensor data
     blas::tensor3< value_t >   _tensor;
 
-    #if HLR_HAS_COMPRESSION == 1
     // compressed data
     compress::zarray           _ztensor;
-    #endif
     
 public:
     //
@@ -126,8 +124,6 @@ public:
     blas::tensor3< value_t >
     tensor_decompressed () const
     {
-        #if HLR_HAS_COMPRESSION == 1
-        
         if ( is_compressed() )
         {
             auto  dT = blas::tensor3< value_t >( this->dim(0),
@@ -138,8 +134,6 @@ public:
             
             return dT;
         }// if
-
-        #endif
 
         return _tensor;
     }
@@ -183,11 +177,7 @@ public:
     // return true if data is compressed
     virtual bool   is_compressed () const
     {
-        #if HLR_HAS_COMPRESSION == 1
-        return ! is_null( _ztensor.data() );
-        #else
-        return false;
-        #endif
+        return ! _ztensor.empty();
     }
 
     //
@@ -204,12 +194,8 @@ public:
 
         X->_tensor  = blas::copy( _tensor );
 
-        #if HLR_HAS_COMPRESSION == 1
-        
         X->_ztensor = compress::zarray( _ztensor.size() );
         std::copy( _ztensor.begin(), _ztensor.end(), X->_ztensor.begin() );
-
-        #endif
         
         return T;
     }
@@ -225,13 +211,18 @@ public:
     // return size in bytes used by this object
     virtual size_t  byte_size () const
     {
-        #if HLR_HAS_COMPRESSION == 1
         return super_t::byte_size() + _tensor.byte_size() + hlr::compress::byte_size( _ztensor );
-        #else
-        return super_t::byte_size() + _tensor.byte_size();
-        #endif
     }
 
+    // return size of (floating point) data in bytes handled by this object
+    virtual size_t data_byte_size () const
+    {
+        if ( is_compressed() )
+            return hlr::compress::byte_size( _ztensor );
+        else
+            return _tensor.data_byte_size();
+    }
+    
     // return name of type
     virtual std::string  typestr () const { return "dense_tensor3"; }
 
@@ -239,9 +230,7 @@ protected:
     // remove compressed storage (standard storage not restored!)
     virtual void  remove_compressed ()
     {
-        #if HLR_HAS_COMPRESSION == 1
         _ztensor = compress::zarray();
-        #endif
     }
 };
 
@@ -253,8 +242,6 @@ template < typename value_t >
 void
 dense_tensor3< value_t >::compress ( const compress::zconfig_t &  zconfig )
 {
-    #if HLR_HAS_COMPRESSION == 1
-        
     if ( is_compressed() )
         return;
 
@@ -301,8 +288,6 @@ dense_tensor3< value_t >::compress ( const compress::zconfig_t &  zconfig )
         _ztensor = std::move( zT );
         _tensor  = std::move( blas::tensor3< value_t >() );
     }// if
-
-    #endif
 }
 
 template < typename value_t >
@@ -327,16 +312,12 @@ template < typename value_t >
 void
 dense_tensor3< value_t >::decompress ()
 {
-    #if HLR_HAS_COMPRESSION == 1
-        
     if ( ! is_compressed() )
         return;
 
     this->_tensor = std::move( tensor_decompressed() );
 
     remove_compressed();
-
-    #endif
 }
 
 //

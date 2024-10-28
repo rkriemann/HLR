@@ -165,6 +165,45 @@ public:
     }
     
     //
+    // compression
+    //
+
+    // same but compress based on given accuracy
+    virtual void   compress      ( const Hpro::TTruncAcc &  acc )
+    {
+        for ( auto  b : _blocks )
+        {
+            if ( ! is_null( b ) )
+                b->compress( acc );
+        }// if
+    }
+
+    // decompress internal data
+    virtual void   decompress    ()
+    {
+        for ( auto  b : _blocks )
+        {
+            if ( ! is_null( b ) )
+                b->decompress();
+        }// if
+    }
+
+    // return true if data is compressed
+    virtual bool   is_compressed () const
+    {
+        bool  c = false;
+        
+        for ( auto  b : _blocks )
+        {
+            if ( ! is_null( b ) )
+                if ( b->is_compressed() )
+                    c = true;
+        }// if
+
+        return  c;
+    }
+
+    //
     // misc
     //
     
@@ -205,6 +244,18 @@ public:
         return s;
     }
 
+    // return size of (floating point) data in bytes handled by this object
+    virtual size_t data_byte_size () const
+    {
+        size_t  s = 0;
+
+        for ( auto  b : _blocks )
+            if ( ! is_null( b ) )
+                s += b->data_byte_size();
+
+        return s;
+    }
+    
     // return name of type
     virtual std::string  typestr () const { return "structured_tensor3"; }
 };
