@@ -745,8 +745,30 @@ vtk_print_full_tensor ( const blas::tensor3< value_t > &  t,
         //
         // write all directly
         //
+
+        if constexpr ( std::same_as< value_t, double > )
+        {
+            out.write( reinterpret_cast< const char * >( t.data() ), t.size(0) * t.size(1) * t.size(2) * sizeof(value_t) );
+        }// if
+        else
+        {
+            //
+            // convert to double
+            //
         
-        out.write( reinterpret_cast< const char * >( t.data() ), t.size(0) * t.size(1) * t.size(2) * sizeof(value_t) );
+            auto  buf = std::vector< double >( t.size(0) );
+    
+            for ( size_t  l = 0; l < t.size(2); ++l )
+            {
+                for ( size_t  j = 0; j < t.size(1); ++j )
+                {
+                    for ( size_t  i = 0; i < t.size(0); ++i )
+                        buf[i] = double( t(i,j,l) );
+
+                    out.write( reinterpret_cast< const char * >( buf.data() ), buf.size() * sizeof(double) );
+                }// for
+            }// for
+        }// else
     }// if
     else
     {
@@ -775,7 +797,7 @@ vtk_print_full_tensor ( const blas::tensor3< value_t > &  t,
                 for ( size_t  i = 0; i < t.size(0); ++i )
                     buf[i] = change_endian( t(i,j,l) );
 
-                out.write( reinterpret_cast< const char * >( buf.data() ), t.size(0) * sizeof(value_t) );
+                out.write( reinterpret_cast< const char * >( buf.data() ), buf.size() * sizeof(double) );
             }// for
         }// for
     }// else
