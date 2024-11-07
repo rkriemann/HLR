@@ -278,19 +278,35 @@ tucker_tensor3< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     if ( is_compressed() )
         return;
 
-    HLR_ASSERT( acc.is_fixed_prec() );
+    auto  tol_G = acc.abs_eps();
+    auto  tol_X = acc.abs_eps();
 
-    const auto  eps   = acc.rel_eps();
-    // const auto  eps   = acc( this->is(0), this->is(1), this->is(2) ).rel_eps();
-    const auto  zconf = compress::get_config( eps );
+    if ( acc.abs_eps() != 0 )
+    {
+        if      ( acc.norm_mode() == Hpro::spectral_norm  ) tol_G = acc.abs_eps() / blas::norm_F( _G ); // TODO
+        else if ( acc.norm_mode() == Hpro::frobenius_norm ) tol_G = acc.abs_eps() / blas::norm_F( _G );
+        else
+            HLR_ERROR( "unsupported norm mode" );
+    }// if
+    else if ( acc.rel_eps() != 0 )
+    {
+        tol_G = acc.rel_eps();
+        tol_X = acc.rel_eps();
+    }// if
+    else
+        HLR_ERROR( "zero error" );
+
+    const auto  zconf_G = compress::get_config( tol_G );
+    const auto  zconf_X = compress::get_config( tol_X );
+
     const size_t  mem = sizeof(value_t) * ( _G.size(0) * _G.size(1) * _G.size(2) +
                                             _X[0].nrows() + _X[0].ncols() +
                                             _X[1].nrows() + _X[1].ncols() +
                                             _X[2].nrows() + _X[2].ncols() );
-    auto          zG  = compress::compress< value_t >( zconf, _G );
-    auto          zX0 = compress::compress< value_t >( zconf, _X[0] );
-    auto          zX1 = compress::compress< value_t >( zconf, _X[1] );
-    auto          zX2 = compress::compress< value_t >( zconf, _X[2] );
+    auto          zG  = compress::compress< value_t >( zconf_G, _G );
+    auto          zX0 = compress::compress< value_t >( zconf_X, _X[0] );
+    auto          zX1 = compress::compress< value_t >( zconf_X, _X[1] );
+    auto          zX2 = compress::compress< value_t >( zconf_X, _X[2] );
     
     // // DEBUG
     // {
