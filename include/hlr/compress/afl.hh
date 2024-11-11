@@ -141,7 +141,7 @@ compress ( const float *   data,
 
             zero[j] = ( aval == float(0) );
             sign[j] = ( aval != val );
-            fbuf[j] = std::max( scale * aval + 1, 2.f ); // prevent rounding issues when converting from fp64
+            fbuf[j] = std::max( aval / scale + 1, 2.f ); // prevent rounding issues when converting from fp64
 
             HLR_DBG_ASSERT( fbuf[j] >= float(2) );
         }// for
@@ -196,7 +196,7 @@ compress ( const float *   data,
         if ( std::abs( val ) != float(0) )
         {
             const bool      zsign = ( val < 0 );
-            const float     sval  = std::max( scale * std::abs(val) + 1, 2.f ); // prevent rounding issues when converting from fp64
+            const float     sval  = std::max( std::abs(val) / scale + 1, 2.f ); // prevent rounding issues when converting from fp64
             const uint32_t  isval = (*reinterpret_cast< const uint32_t * >( & sval ) );
             const uint32_t  sexp  = ( isval >> FP32::mant_bits ) & ((1u << FP32::exp_bits) - 1);
             const uint32_t  smant = ( isval & ((1u << FP32::mant_bits) - 1) );
@@ -299,7 +299,7 @@ decompress ( float *         data,
             const uint32_t  irval = (uint32_t(exp | FP32::exp_highbit) << FP32::mant_bits) | (uint32_t(mant) << prec_ofs);
 
             zero[j] = ( zval == zero_val );
-            fbuf[j] = double( (sign ? -1 : 1 ) * ( * reinterpret_cast< const float * >( & irval ) - 1 ) / scale );
+            fbuf[j] = double( (sign ? -1 : 1 ) * ( * reinterpret_cast< const float * >( & irval ) - 1 ) * scale );
         }// for
 
         // correct zeroes
@@ -342,7 +342,7 @@ decompress ( float *         data,
             const uint32_t  exp   = (zval >> prec_bits) & exp_mask;
             const bool      sign  = zval >> sign_shift;
             const uint32_t  irval = ((exp | FP32::exp_highbit) << FP32::mant_bits) | (mant << prec_ofs);
-            const float     rval  = (sign ? -1 : 1 ) * ( * reinterpret_cast< const float * >( & irval ) - 1 ) / scale;
+            const float     rval  = (sign ? -1 : 1 ) * ( * reinterpret_cast< const float * >( & irval ) - 1 ) * scale;
                 
             data[i] = double( rval );
         }// else
@@ -407,7 +407,7 @@ compress ( const double *  data,
 
             zero[j] = ( aval == double(0) );
             sign[j] = ( aval != val );
-            fbuf[j] = scale * aval + 1;
+            fbuf[j] = aval / scale + 1;
 
             HLR_DBG_ASSERT( fbuf[j] >= double(2) );
         }// for
@@ -468,7 +468,7 @@ compress ( const double *  data,
         if ( std::abs( val ) != double(0) )
         {
             const bool      zsign = ( val < 0 );
-            const double    sval  = scale * std::abs(val) + 1;
+            const double    sval  = std::abs(val) / scale + 1;
             const uint64_t  isval = (*reinterpret_cast< const uint64_t * >( & sval ) );
             const uint64_t  sexp  = ( isval >> FP64::mant_bits ) & ((1ul << FP64::exp_bits) - 1);
             const uint64_t  smant = ( isval & ((1ul << FP64::mant_bits) - 1) );
@@ -577,7 +577,7 @@ decompress ( double *        data,
             const uint64_t  irval = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs);
 
             zero[j] = ( zval == zero_val );
-            fbuf[j] = (sign ? -1 : 1 ) * ( * reinterpret_cast< const double * >( & irval ) - 1 ) / scale;
+            fbuf[j] = (sign ? -1 : 1 ) * ( * reinterpret_cast< const double * >( & irval ) - 1 ) * scale;
         }// for
 
         // correct zeroes
@@ -620,7 +620,7 @@ decompress ( double *        data,
             const uint64_t  exp   = (zval >> prec_bits) & exp_mask;
             const bool      sign  = zval >> sign_shift;
             const uint64_t  irval = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs);
-            const double    rval  = (sign ? -1 : 1 ) * ( * reinterpret_cast< const double * >( & irval ) - 1 ) / scale;
+            const double    rval  = (sign ? -1 : 1 ) * ( * reinterpret_cast< const double * >( & irval ) - 1 ) * scale;
 
             data[i] = rval;
         }// else
@@ -679,10 +679,10 @@ compress ( const config &   config,
         return zdata;
     }// if
     
-    const auto      scale     = real_t(1) / vmin;                                                            // scale all values v_i such that |v_i| >= 1
     const uint32_t  exp_bits  = std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ); // no. of bits needed to represent exponent
     const uint32_t  prec_bits = std::min< uint32_t >( fp_info< real_t >::mant_bits, config.bitrate );        // total no. of bits per value
     const size_t    nbits     = 1 + exp_bits + prec_bits;                                                    // number of bits per value
+    const auto      scale     = vmin;                                                                        // scale all values v_i such that |v_i| >= 1
     auto            zdata     = std::vector< byte_t >( sizeof(real_t) + 1 + 1 + byte_pad( nsize * nbits ) / 8 );
 
     HLR_ASSERT( std::isfinite( scale ) );
