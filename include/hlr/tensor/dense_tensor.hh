@@ -164,11 +164,8 @@ public:
     // compression
     //
 
-    // compress internal data based on given configuration
+    // compress internal data based on given accuracy
     // - may result in non-compression if storage does not decrease
-    virtual void   compress      ( const compress::zconfig_t &  zconfig );
-
-    // same but compress based on given accuracy
     virtual void   compress      ( const Hpro::TTruncAcc &  acc );
 
     // decompress internal data
@@ -240,14 +237,39 @@ protected:
 //
 template < typename value_t >
 void
-dense_tensor3< value_t >::compress ( const compress::zconfig_t &  zconfig )
+dense_tensor3< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 {
     if ( is_compressed() )
         return;
 
-    auto          T         = this->tensor();
+    if ( this->dim(0) * this->dim(1) * this->dim(2) == 0 )
+        return;
+
+    if (( this->is(0) == indexset( 160, 191 ) ) &&
+        ( this->is(1) == indexset(   0,  31 ) ) &&
+        ( this->is(2) == indexset(   0,  31 ) ))
+        hlr::breakpoint();
+
+    auto  T   = this->tensor();
+    auto  tol = acc.abs_eps();
+
+    if ( acc.abs_eps() != 0 )
+    {
+        if      ( acc.norm_mode() == Hpro::spectral_norm  ) tol = acc.abs_eps() / blas::norm_F( T ); // TODO
+        else if ( acc.norm_mode() == Hpro::frobenius_norm ) tol = acc.abs_eps() / blas::norm_F( T );
+        else
+            HLR_ERROR( "unsupported norm mode" );
+    }// if
+    else if ( acc.rel_eps() != 0 )
+    {
+        tol = acc.rel_eps();
+    }// if
+    else
+        HLR_ERROR( "zero error" );
+
+    const auto    zconf     = compress::get_config( tol );
     const size_t  mem_dense = sizeof(value_t) * T.size(0) * T.size(1) * T.size(2);
-    auto          zT        = compress::compress< value_t >( zconfig, T );
+    auto          zT        = compress::compress< value_t >( zconf, T );
 
     // // DEBUG
     // {
@@ -288,21 +310,6 @@ dense_tensor3< value_t >::compress ( const compress::zconfig_t &  zconfig )
         _ztensor = std::move( zT );
         _tensor  = std::move( blas::tensor3< value_t >() );
     }// if
-}
-
-template < typename value_t >
-void
-dense_tensor3< value_t >::compress ( const Hpro::TTruncAcc &  acc )
-{
-    HLR_ASSERT( acc.is_fixed_prec() );
-
-    if ( this->dim(0) * this->dim(1) * this->dim(2) == 0 )
-        return;
-        
-    const auto  eps   = acc.rel_eps();
-    // const auto  eps   = acc( this->is(0), this->is(1), this->is(2) ).rel_eps();
-        
-    compress( compress::get_config( eps ) );
 }
 
 //
