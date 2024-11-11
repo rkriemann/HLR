@@ -79,6 +79,8 @@ universal     = False
 UNIVERSAL_DIR = '/'
 blosc         = False
 BLOSC_DIR     = '/'
+atc           = False
+ATC_DIR       = '/'
 
 zblas         = True
 
@@ -396,6 +398,8 @@ opts.Add( BoolVariable( 'universal',     'use universal number library',       u
 opts.Add( PathVariable( 'universal_dir', 'universal installation directory',   UNIVERSAL_DIR, PathVariable.PathIsDir ) )
 opts.Add( BoolVariable( 'blosc',         'use blosc compression library',      blosc ) )
 opts.Add( PathVariable( 'blosc_dir',     'blosc installation directory',       BLOSC_DIR, PathVariable.PathIsDir ) )
+opts.Add( BoolVariable( 'atc',           'use ATC compression library',        atc ) )
+opts.Add( PathVariable( 'atc_dir',       'ATC installation directory',         ATC_DIR, PathVariable.PathIsDir ) )
 
 opts.Add( EnumVariable( 'compressor',    'defined compressor',                  'none', allowed_values = COMPRESSORS,      ignorecase = 2 ) )
 opts.Add( EnumVariable( 'aplr',          'defined APLR compressor',             'none', allowed_values = APLR_COMPRESSORS, ignorecase = 2 ) )
@@ -481,6 +485,8 @@ universal     = opt_env['universal']
 UNIVERSAL_DIR = opt_env['universal_dir']
 blosc         = opt_env['blosc']
 BLOSC_DIR     = opt_env['blosc_dir']
+atc           = opt_env['atc']
+ATC_DIR       = opt_env['atc_dir']
 
 compressor    = opt_env['compressor']
 aplr          = opt_env['aplr']
@@ -831,6 +837,12 @@ if zblas :
 else :
     env.Append( CPPDEFINES = 'HLR_USE_ZBLAS=0' )
 
+if atc :
+    env.Append( CPPDEFINES = 'HLR_HAS_ATC' )
+    env.Append( CPPPATH    = os.path.join( ATC_DIR, 'include' ) )
+    env.Append( LIBPATH    = os.path.join( ATC_DIR, 'lib' ) )
+    env.Append( LIBS       = [ 'atc', 'hptt' ] )
+
 ######################################################################
 #
 # target 'help'
@@ -930,6 +942,8 @@ def show_help ( target, source, env ):
     print( '  {0}zstd_dir{1}     │ path to Zstd library          │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}blosc{1}        │ use Blosc2 library            │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}blosc_dir{1}    │ path to Blosc2 library        │'.format( colors['bold'], colors['reset'] ) )
+    print( '  {0}atc{1}          │ use ATC library               │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}atc_dir{1}      │ path to ATC library           │'.format( colors['bold'], colors['reset'] ) )
     print( ' ──────────────┼───────────────────────────────┼──────────' )
     print( '  {0}buildtype{1}    │ how to build the binaries     │'.format( colors['bold'], colors['reset'] ), ', '.join( BUILD_TYPES ) )
     print( '  {0}warn{1}         │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), '0/1' )
@@ -1007,6 +1021,7 @@ def show_options ( target, source, env ):
     print( '  {0}zlib{1}         │ use zlib library              │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zlib ] ),       pathstr( ZLIB_DIR      if zlib      else '' ) )
     print( '  {0}zstd{1}         │ use Zstd library              │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zstd ] ),       pathstr( ZSTD_DIR      if zstd      else '' ) )
     print( '  {0}blosc{1}        │ use BLOSC2 library            │ {2}'.format( colors['bold'], colors['reset'], bool_str[ blosc ] ),      pathstr( BLOSC_DIR     if blosc     else '' ) )
+    print( '  {0}atc{1}          │ use ATC compression library   │ {2}'.format( colors['bold'], colors['reset'], bool_str[ atc ] ),        pathstr( ATC_DIR       if atc       else '' ) )
     print( ' ──────────────┼───────────────────────────────┼──────────' )
     print( '  {0}buildtype{1}    │ how to build the binaries     │'.format( colors['bold'], colors['reset'] ), buildtype )
     print( '  {0}warn{1}         │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), bool_str[ warn ] )
