@@ -105,24 +105,24 @@ public:
     // access internal data
     //
 
-    blas::tensor3< value_t > &
-    tensor ()
-    {
-        HLR_ASSERT( ! is_compressed() );
-
-        return _tensor;
-    }
+    // blas::tensor3< value_t > &
+    // tensor ()
+    // {
+    //     HLR_ASSERT( ! is_compressed() );
+    //
+    //     return _tensor;
+    // }
     
-    const blas::tensor3< value_t > &
-    tensor () const
-    {
-        HLR_ASSERT( ! is_compressed() );
-
-        return _tensor;
-    }
+    // const blas::tensor3< value_t > &
+    // tensor () const
+    // {
+    //     HLR_ASSERT( ! is_compressed() );
+    // 
+    //     return _tensor;
+    // }
     
     blas::tensor3< value_t >
-    tensor_decompressed () const
+    tensor () const
     {
         if ( is_compressed() )
         {
@@ -322,7 +322,7 @@ dense_tensor3< value_t >::decompress ()
     if ( ! is_compressed() )
         return;
 
-    this->_tensor = std::move( tensor_decompressed() );
+    this->_tensor = std::move( tensor() );
 
     remove_compressed();
 }
