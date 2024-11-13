@@ -1,5 +1,6 @@
 #ifndef __HLR_UTILS_DETAIL_AFL_HH
 #define __HLR_UTILS_DETAIL_AFL_HH
+
 //
 // Project     : HLR
 // Module      : compress/afl
@@ -15,6 +16,19 @@
 #include <hlr/arith/blas.hh>
 #include <hlr/compress/byte_n.hh>
 
+// for tests
+// #undef HLR_HAS_ZFP
+
+#if defined(HLR_HAS_ZFP)
+#include <zfp/bitstream.h>
+#endif
+
+//
+// signal availability of compressed BLAS
+//
+#define HLR_HAS_ZBLAS_DIRECT
+#define HLR_HAS_ZBLAS_APLR
+
 ////////////////////////////////////////////////////////////
 //
 // compression using adaptive float representation
@@ -27,13 +41,34 @@
 
 namespace hlr { namespace compress { namespace afl {
 
+//
+// shared float/int types
+//
+union fp32int_t
+{
+    uint32_t u;
+    float    f;
+};
+
+union fp64int_t
+{
+    uint64_t  u;
+    double    f;
+};
+
+//
+// floating point data
+//
 template < typename real_t >
-struct fp_info
+struct FP_info
 {};
 
 template <>
-struct fp_info< float >
+struct FP_info< float >
 {
+    constexpr static uint8_t   scale_ofs   = 2;
+    constexpr static uint8_t   header_ofs  = 6;
+    
     constexpr static uint32_t  mant_bits   = 23;
     constexpr static uint32_t  exp_bits    = 8;
     constexpr static uint32_t  sign_bit    = 31;
@@ -44,8 +79,11 @@ struct fp_info< float >
 };
     
 template <>
-struct fp_info< double >
+struct FP_info< double >
 {
+    constexpr static uint8_t   scale_ofs   = 2;
+    constexpr static uint8_t   header_ofs  = 10;
+    
     constexpr static uint32_t  mant_bits   = 52;
     constexpr static uint32_t  exp_bits    = 11;
     constexpr static uint32_t  sign_bit    = 63;
@@ -55,8 +93,8 @@ struct fp_info< double >
     constexpr static float     maximum     = std::numeric_limits< float >::max();
 };
 
-using FP32 = fp_info< float >;
-using FP64 = fp_info< double >;
+using FP32 = FP_info< float >;
+using FP64 = FP_info< double >;
 
 //
 // return bitrate for given accuracy
@@ -125,6 +163,11 @@ compress ( const float *   data,
     uint32_t          bpos = 0; // start bit position in current byte
     size_t            i    = 0;
 
+    #if defined(HLR_HAS_ZFP)
+    const size_t      bssize = byte_pad( nsize * nbits ) / 8;
+    auto              bs     = stream_open( zdata + 6, bssize );
+    #endif
+    
     for ( ; i < nbsize; i += nbuf )
     {
         //
@@ -164,6 +207,13 @@ compress ( const float *   data,
                 ibuf[j] = zero_val;
 
         // write into data buffer
+        #if defined(HLR_HAS_ZFP)
+        
+        for ( size_t  j = 0; j < nbuf; ++j )
+            stream_write_bits( bs, ibuf[j], nbits );
+        
+        #else
+        
         for ( size_t  j = 0; j < nbuf; ++j )
         {
             auto  zval  = ibuf[j];
@@ -185,6 +235,8 @@ compress ( const float *   data,
                 else                  { bpos += zrest; }
             } while ( sbits < nbits );
         }// for
+        
+        #endif
     }// for
         
     // handle remaining values
@@ -208,6 +260,12 @@ compress ( const float *   data,
             HLR_DBG_ASSERT( zval != zero_val );
         }// if
         
+        #if defined(HLR_HAS_ZFP)
+        
+        stream_write_bits( bs, zval, nbits );
+        
+        #else
+
         uint32_t  sbits = 0; // number of already stored bits of zval
             
         do
@@ -225,7 +283,13 @@ compress ( const float *   data,
             if ( crest <= zrest ) { bpos  = 0; ++pos; }
             else                  { bpos += zrest; }
         } while ( sbits < nbits );
+
+        #endif
     }// for
+
+    #if defined(HLR_HAS_ZFP)
+    stream_close( bs );
+    #endif
 }
 
 inline
@@ -262,9 +326,21 @@ decompress ( float *         data,
     uint32_t          bpos = 0;
     size_t            i    = 0;
 
+    #if defined(HLR_HAS_ZFP)
+    const size_t      bssize = byte_pad( nsize * nbits ) / 8;
+    auto              bs     = stream_open( const_cast< byte_t * >( zdata ) + 4, bssize );
+    #endif
+    
     for ( ; i < nbsize; i += nbuf )
     {
         // read data
+        #if defined(HLR_HAS_ZFP)
+
+        for ( size_t  j = 0; j < nbuf; ++j )
+            ibuf[j] = stream_read_bits( bs, nbits );
+        
+        #else
+        
         for ( size_t  j = 0; j < nbuf; ++j )
         {
             uint32_t  zval  = 0;
@@ -288,6 +364,8 @@ decompress ( float *         data,
 
             ibuf[j] = zval;
         }// for
+
+        #endif
             
         // convert from compressed format
         for ( size_t  j = 0; j < nbuf; ++j )
@@ -316,6 +394,13 @@ decompress ( float *         data,
     for ( ; i < nsize; ++i )
     {
         uint32_t  zval  = 0;
+
+        #if defined(HLR_HAS_ZFP)
+
+        zval = stream_read_bits( bs, nbits );
+        
+        #else
+        
         uint32_t  sbits = 0;
             
         do
@@ -334,6 +419,8 @@ decompress ( float *         data,
             else                  { bpos += zrest; }
         } while ( sbits < nbits );
 
+        #endif
+        
         if ( zval == zero_val )
             data[i] = 0;
         else
@@ -347,6 +434,10 @@ decompress ( float *         data,
             data[i] = double( rval );
         }// else
     }// for
+
+    #if defined(HLR_HAS_ZFP)
+    stream_close( bs );
+    #endif
 }
 
 //
@@ -391,6 +482,11 @@ compress ( const double *  data,
     // size_t    nexp     = 0;
     // uint64_t  zexp_old = -1;
         
+    #if defined(HLR_HAS_ZFP)
+    const size_t      bssize = byte_pad( nsize * nbits ) / 8;
+    auto              bs     = stream_open( zdata + 10, bssize );
+    #endif
+    
     for ( ; i < nbsize; i += nbuf )
     {
         //
@@ -436,6 +532,13 @@ compress ( const double *  data,
                 ibuf[j] = zero_val;
 
         // write into data buffer
+        #if defined(HLR_HAS_ZFP)
+        
+        for ( size_t  j = 0; j < nbuf; ++j )
+            stream_write_bits( bs, ibuf[j], nbits );
+        
+        #else
+        
         for ( size_t  j = 0; j < nbuf; ++j )
         {
             auto      zval  = ibuf[j];
@@ -457,6 +560,8 @@ compress ( const double *  data,
                 else                  { bpos += zrest; }
             } while ( sbits < nbits );
         }// for
+
+        #endif
     }// for
 
     // handle remaining data
@@ -486,6 +591,13 @@ compress ( const double *  data,
             HLR_DBG_ASSERT( zval != zero_val );
         }// if
         
+        #if defined(HLR_HAS_ZFP)
+        
+        for ( size_t  j = 0; j < nbuf; ++j )
+            stream_write_bits( bs, zval, nbits );
+        
+        #else
+
         uint32_t  sbits = 0;
             
         do
@@ -503,9 +615,15 @@ compress ( const double *  data,
             if ( crest <= zrest ) { bpos  = 0; ++pos; }
             else                  { bpos += zrest; }
         } while ( sbits < nbits );
+
+        #endif
     }// for
 
     // std::cout << nsize << " / " << nexp << " | " << ( nbits * nsize ) / 8 << " / " << (( nsize - nexp ) * exp_bits ) / 8 << std::endl;
+
+    #if defined(HLR_HAS_ZFP)
+    stream_close( bs );
+    #endif
 }
 
 inline
@@ -540,9 +658,21 @@ decompress ( double *        data,
     uint32_t          bpos = 0;                          // bit position in current byte
     size_t            i    = 0;
 
+    #if defined(HLR_HAS_ZFP)
+    const size_t      bssize = byte_pad( nsize * nbits ) / 8;
+    auto              bs     = stream_open( const_cast< byte_t * >( zdata ) + 8, bssize );
+    #endif
+    
     for ( ; i < nbsize; i += nbuf )
     {
         // read data
+        #if defined(HLR_HAS_ZFP)
+
+        for ( size_t  j = 0; j < nbuf; ++j )
+            ibuf[j] = stream_read_bits( bs, nbits );
+        
+        #else
+        
         for ( size_t  j = 0; j < nbuf; ++j )
         {
             uint64_t  zval  = 0;
@@ -566,6 +696,8 @@ decompress ( double *        data,
 
             ibuf[j] = zval;
         }// for
+
+        #endif
 
         // convert from compressed format
         for ( size_t  j = 0; j < nbuf; ++j )
@@ -594,6 +726,13 @@ decompress ( double *        data,
     for ( ; i < nsize; ++i )
     {
         uint64_t  zval  = 0;
+
+        #if defined(HLR_HAS_ZFP)
+
+        zval = stream_read_bits( bs, nbits );
+        
+        #else
+
         uint32_t  sbits = 0;
             
         do
@@ -612,6 +751,8 @@ decompress ( double *        data,
             else                  { bpos += zrest; }
         } while ( sbits < nbits );
 
+        #endif
+        
         if ( zval == zero_val )
             data[i] = 0;
         else
@@ -625,6 +766,10 @@ decompress ( double *        data,
             data[i] = rval;
         }// else
     }// for
+
+    #if defined(HLR_HAS_ZFP)
+    stream_close( bs );
+    #endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -644,7 +789,7 @@ compress ( const config &   config,
 {
     using  real_t = Hpro::real_type_t< value_t >;
     
-    constexpr real_t  fp_maximum = fp_info< real_t >::maximum;
+    constexpr real_t  fp_maximum = FP_info< real_t >::maximum;
 
     //
     // look for min/max value (> 0!)
@@ -680,7 +825,7 @@ compress ( const config &   config,
     }// if
     
     const uint32_t  exp_bits  = std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ); // no. of bits needed to represent exponent
-    const uint32_t  prec_bits = std::min< uint32_t >( fp_info< real_t >::mant_bits, config.bitrate );        // total no. of bits per value
+    const uint32_t  prec_bits = std::min< uint32_t >( FP_info< real_t >::mant_bits, config.bitrate );        // total no. of bits per value
     const size_t    nbits     = 1 + exp_bits + prec_bits;                                                    // number of bits per value
     const auto      scale     = vmin;                                                                        // scale all values v_i such that |v_i| >= 1
     auto            zdata     = std::vector< byte_t >( sizeof(real_t) + 1 + 1 + byte_pad( nsize * nbits ) / 8 );
@@ -752,7 +897,7 @@ decompress ( const zarray &  zdata,
     const uint32_t  nbits     = 1 + exp_bits + prec_bits;
     
     HLR_ASSERT( nbits     <= sizeof(value_t) * 8 );
-    HLR_ASSERT( prec_bits <= fp_info< real_t >::mant_bits );
+    HLR_ASSERT( prec_bits <= FP_info< real_t >::mant_bits );
 
     if (( exp_bits == 0 ) && ( prec_bits == 0 ))
     {
@@ -809,7 +954,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
 {
     using  real_t = Hpro::real_type_t< value_t >;
     
-    constexpr real_t  fp_maximum = fp_info< real_t >::maximum;
+    constexpr real_t  fp_maximum = FP_info< real_t >::maximum;
     
     //
     // first, determine exponent bits and mantissa bits for all columns
@@ -891,7 +1036,7 @@ compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double
 {
     using  real_t = double;
     
-    constexpr real_t  fp_maximum = fp_info< real_t >::maximum;
+    constexpr real_t  fp_maximum = FP_info< real_t >::maximum;
     
     //
     // first, determine exponent bits and mantissa bits for all columns
@@ -1023,6 +1168,241 @@ decompress_lr< std::complex< double > > ( const zarray &                        
         decompress( U_ptr + l * n2, n2, zdata.data() + pos + 2, exp_bits, prec_bits );
         pos += header_size + byte_pad( nbits * n2 ) / 8;
     }// for
+}
+
+//
+// compressed blas
+//
+
+namespace
+{
+
+template < typename value_t >
+void
+mulvec ( const size_t                        nrows,
+         const size_t                        ncols,
+         const matop_t                       op_A,
+         const value_t                       alpha,
+         const Hpro::real_type_t< value_t >  zscale,
+         const byte_t *                      zA,
+         const value_t *                     x,
+         value_t *                           y,
+         const uint8_t                       exp_bits,
+         const uint8_t                       prec_bits )
+{
+    const uint8_t     nbits      = 1 + exp_bits + prec_bits;
+    const uint64_t    prec_mask  = ( 1ul << prec_bits ) - 1;
+    const uint8_t     prec_ofs   = FP64::mant_bits - prec_bits;
+    const uint64_t    exp_mask   = ( 1ul << exp_bits  ) - 1;
+    const uint32_t    sign_shift = exp_bits + prec_bits;
+    const uint64_t    zero_val   = FP64::zero_val & (( 1ul << nbits) - 1 );
+    const auto        scale      = alpha * zscale;
+
+    #if defined(HLR_HAS_ZFP)
+    const size_t      bssize = byte_pad( nrows * ncols * nbits ) / 8;
+    auto              bs     = stream_open( const_cast< byte_t * >( zA ), bssize );
+    #else
+    size_t            pos    = 0; // current byte position in zA
+    uint32_t          bpos   = 0; // bit position in current byte
+    #endif
+    
+    switch ( op_A )
+    {
+        case  apply_normal :
+        {
+            for ( size_t  j = 0; j < ncols; ++j )
+            {
+                const auto  x_j = scale * x[j];
+                fp64int_t   fival;
+                
+                for ( size_t  i = 0 ; i < nrows; ++i )
+                {
+                    #if defined(HLR_HAS_ZFP)
+
+                    const auto  z_ij = stream_read_bits( bs, nbits );
+
+                    #else
+                    
+                    uint32_t  sbits = 0;
+                    uint64_t  z_ij  = 0;
+            
+                    do
+                    {
+                        const uint32_t  crest = 8 - bpos;
+                        const uint32_t  zrest = nbits - sbits;
+                        const byte_t    zmask = (zrest < 8 ? (1 << zrest) - 1 : 0xff );
+                        const byte_t    data  = (zA[pos] >> bpos) & zmask;
+                
+                        z_ij  |= (uint64_t(data) << sbits);
+                        sbits += crest;
+
+                        if ( crest <= zrest ) { bpos  = 0; ++pos; }
+                        else                  { bpos += zrest; }
+                    } while ( sbits < nbits );
+                    
+                    #endif
+
+                    if ( z_ij != zero_val )
+                    {
+                        const uint64_t  mant = z_ij & prec_mask;
+                        const uint64_t  exp  = (z_ij >> prec_bits) & exp_mask;
+                        const uint64_t  sign = (z_ij >> sign_shift) << FP64::sign_bit;
+
+                        fival.u  = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs);
+                        fival.f  = ( fival.f - 1.0 );
+                        fival.u |= sign;
+                    }// if
+                    else
+                        fival.f = double(0);
+                    
+                    y[i] += fival.f * x_j;
+                }// for
+            }// for
+        }// case
+        break;
+        
+        case  apply_adjoint :
+        {
+            for ( size_t  j = 0; j < ncols; ++j )
+            {
+                value_t    y_j = value_t(0);
+                fp64int_t  fival;
+
+                for ( size_t  i = 0; i < nrows; ++i )
+                {
+                    #if defined(HLR_HAS_ZFP)
+
+                    const auto  z_ij = stream_read_bits( bs, nbits );
+        
+                    #else
+                    
+                    uint32_t  sbits = 0;
+                    uint64_t  z_ij  = 0;
+            
+                    do
+                    {
+                        const uint32_t  crest = 8 - bpos;
+                        const uint32_t  zrest = nbits - sbits;
+                        const byte_t    zmask = (zrest < 8 ? (1 << zrest) - 1 : 0xff );
+                        const byte_t    data  = (zA[pos] >> bpos) & zmask;
+                
+                        z_ij  |= (uint64_t(data) << sbits);
+                        sbits += crest;
+
+                        if ( crest <= zrest ) { bpos  = 0; ++pos; }
+                        else                  { bpos += zrest; }
+                    } while ( sbits < nbits );
+                    
+                    #endif
+
+                    if ( z_ij != zero_val )
+                    {
+                        const uint64_t  mant = z_ij & prec_mask;
+                        const uint64_t  exp  = (z_ij >> prec_bits) & exp_mask;
+                        const uint64_t  sign = (z_ij >> sign_shift) << FP64::sign_bit;
+                        
+                        fival.u  = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs);
+                        fival.f  = ( fival.f - 1.0 );
+                        fival.u |= sign;
+                    }// if
+                    else
+                        fival.f = double(0);
+                    
+                    y_j += fival.f * x[i];
+                }// for
+
+                y[j] += scale * y_j;
+            }// for
+        }// case
+        break;
+
+        default:
+            HLR_ERROR( "TODO" );
+    }// switch
+
+    #if defined(HLR_HAS_ZFP)
+    stream_close( bs );
+    #endif
+}
+
+}// namespace anonymous
+
+template < typename value_t >
+void
+mulvec ( const size_t     nrows,
+         const size_t     ncols,
+         const matop_t    op_A,
+         const value_t    alpha,
+         const zarray &   zA,
+         const value_t *  x,
+         value_t *        y )
+{
+    using  real_t = Hpro::real_type_t< value_t >;
+
+    const uint8_t      exp_bits  = zA[0];
+    const uint8_t      prec_bits = zA[1];
+    const uint8_t      nbits     = 1 + exp_bits + prec_bits;
+    const uint8_t      nbyte     = nbits / 8;
+    real_t             scale     = * ( reinterpret_cast< const real_t * >( zA.data() + FP_info< real_t >::scale_ofs ) );
+    constexpr size_t   data_ofs  = FP_info< real_t >::header_ofs;
+    
+    mulvec( nrows, ncols, op_A, alpha, scale, zA.data() + data_ofs, x, y, exp_bits, prec_bits );
+}
+
+template < typename value_t >
+void
+mulvec_lr ( const size_t     nrows,
+            const size_t     ncols,
+            const matop_t    op_A,
+            const value_t    alpha,
+            const zarray &   zA,
+            const value_t *  x,
+            value_t *        y )
+{
+    using  real_t = Hpro::real_type_t< value_t >;
+
+    constexpr size_t  scale_ofs = FP_info< real_t >::scale_ofs;
+    constexpr size_t  data_ofs  = FP_info< real_t >::header_ofs;
+    size_t            pos       = 0;
+
+    switch ( op_A )
+    {
+        case  apply_normal :
+        {
+            for ( uint  l = 0; l < ncols; ++l )
+            {
+                const uint8_t  exp_bits  = zA[pos];
+                const uint8_t  prec_bits = zA[pos+1];
+                const uint8_t  nbyte     = byte_pad( 1 + exp_bits + prec_bits ) / 8;
+                const real_t   scale     = * ( reinterpret_cast< const real_t * >( zA.data() + pos + scale_ofs ) );
+        
+                mulvec( nrows, 1, op_A, alpha, scale, zA.data() + pos + data_ofs, x+l, y, exp_bits, prec_bits );
+
+                pos += data_ofs + nbyte * nrows;
+            }// for
+        }// case
+        break;
+        
+        case  apply_conjugate  : HLR_ERROR( "TODO" );
+            
+        case  apply_transposed : HLR_ERROR( "TODO" );
+
+        case  apply_adjoint :
+        {
+            for ( uint  l = 0; l < ncols; ++l )
+            {
+                const uint8_t  exp_bits  = zA[pos];
+                const uint8_t  prec_bits = zA[pos+1];
+                const uint8_t  nbyte     = byte_pad( 1 + exp_bits + prec_bits ) / 8;
+                const real_t   scale     = * ( reinterpret_cast< const real_t * >( zA.data() + pos + scale_ofs ) );
+        
+                mulvec( nrows, 1, op_A, alpha, scale, zA.data() + pos + data_ofs, x, y+l, exp_bits, prec_bits );
+
+                pos += data_ofs + nbyte * nrows;
+            }// for
+        }// case
+        break;
+    }// switch
 }
 
 }}}// namespace hlr::compress::afl

@@ -370,6 +370,8 @@ using hlr::compress::afl::get_config;
 using hlr::compress::afl::byte_size;
 using hlr::compress::afl::compressed_size;
 
+namespace zblas { using hlr::compress::afl::mulvec; }
+
 }} // namespace hlr::compress
 
 //////////////////////////////////////////////////////////////////////
