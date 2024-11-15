@@ -11,6 +11,7 @@
 #include <cstdint>
 
 #include <hlr/arith/blas.hh>
+#include <hlr/compress/byte_n.hh>
 
 //
 // signal availability of compressed BLAS
@@ -32,13 +33,25 @@
 
 namespace hlr { namespace compress { namespace mixedprec {
 
-using byte_t = uint8_t;
+//
+// return bitrate for given accuracy
+//
+//   |d_i - ~d_i| ≤ 2^(-m) ≤ ε with mantissa length m = ⌈-log₂ ε⌉
+//
+inline byte_t eps_to_rate      ( const double  eps ) { return std::max< double >( 0, std::ceil( -std::log2( eps ) ) ); }
+// inline byte_t eps_to_rate_aplr ( const double  eps ) { return eps_to_rate( eps ) + 1; }
+
+struct config
+{
+    byte_t  bitrate;
+};
 
 // holds compressed data
 using  zarray = std::vector< byte_t >;
 
-inline size_t  byte_size       ( const zarray &  v ) { return sizeof(v) + v.size(); }
-inline size_t  compressed_size ( const zarray &  v ) { return v.size(); }
+inline size_t  byte_size       ( const zarray &  v   ) { return sizeof(v) + v.size(); }
+inline size_t  compressed_size ( const zarray &  v   ) { return v.size(); }
+inline config  get_config      ( const double    eps ) { return config{ eps_to_rate( eps ) }; }
 
 //////////////////////////////////////////////////////////////////////////////////////
 //
@@ -105,24 +118,228 @@ public:
 //
 
 // finest precision
-using             fp64_t    = double;
+using             fp64_t         = double;
+constexpr byte_t  fp64_prec_bits = 53;
 
 // middle precision
-using             fp32_t    = float;
-constexpr double  fp32_prec = 6.0e-8;
+using             fp32_t         = float;
+constexpr double  fp32_prec      = 6.0e-8;
+constexpr byte_t  fp32_prec_bits = 24;
 
 // coarsest precision
 #if HLR_HAS_FLOAT16
-using             fp16_t    = _Float16;
-constexpr double  fp16_prec = 4.9e-4;
+using             fp16_t         = _Float16;
+constexpr double  fp16_prec      = 4.9e-4;
+constexpr byte_t  fp16_prec_bits = 11;
 #else
-using             fp16_t    = bf16;
-constexpr double  fp16_prec = 3.9e-3;
+using             fp16_t         = bf16;
+constexpr double  fp16_prec      = 3.9e-3;
+constexpr byte_t  fp16_prec_bits = 8;
 #endif
+
+//
+// floating point data
+//
+template < typename real_t > struct prec_bits_s {};
+
+template <> struct prec_bits_s< float >  { constexpr static byte_t  value = 24; };
+template <> struct prec_bits_s< double > { constexpr static byte_t  value = 53; };
+
+template < typename real_t > inline constexpr byte_t prec_bits_v = prec_bits_s< real_t >::value;
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// compression functions
+//
+////////////////////////////////////////////////////////////////////////////////
+
+template < typename value_t >
+zarray
+compress ( const config &   config,
+           value_t *        data,
+           const size_t     dim0,
+           const size_t     dim1 = 0,
+           const size_t     dim2 = 0,
+           const size_t     dim3 = 0 )
+{
+    using  real_t = Hpro::real_type_t< value_t >;
+    
+    //
+    // precision defines format to use, e.g., FP64/32/16
+    // exponent range is assumed to be sufficient (NOT CHECKED!!!)
+    //
+    
+    const size_t  nsize     = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
+    const auto    prec_bits = std::min< byte_t >( prec_bits_v< real_t >, config.bitrate );
+    
+    if ( prec_bits <= fp16_prec_bits )
+    {
+        const auto  nbytes = 2 + nsize * 2;
+        auto        zdata  = std::vector< byte_t >( nbytes );
+
+        zdata[0] = 1;
+
+        auto  ptr = reinterpret_cast< fp16_t * >( zdata.data() + 2 );
+
+        for ( size_t  i = 0; i < nsize; ++i )
+            *(ptr++) = fp16_t( data[i] );
+
+        return zdata;
+    }// if
+    else if ( prec_bits <= fp32_prec_bits )
+    {
+        const auto  nbytes = 4 + nsize * 4;
+        auto        zdata  = std::vector< byte_t >( nbytes );
+
+        zdata[0] = 2;
+
+        auto  ptr = reinterpret_cast< fp32_t * >( zdata.data() + 4 );
+
+        for ( size_t  i = 0; i < nsize; ++i )
+            *(ptr++) = fp32_t( data[i] );
+
+        return zdata;
+    }// if
+    else
+    {
+        const auto  nbytes = 8 + nsize * 8;
+        auto        zdata  = std::vector< byte_t >( nbytes );
+
+        zdata[0] = 3;
+
+        auto  ptr = reinterpret_cast< fp64_t * >( zdata.data() + 8 );
+
+        for ( size_t  i = 0; i < nsize; ++i )
+            *(ptr++) = fp64_t( data[i] );
+
+        return zdata;
+    }// else
+}
+
+template <>
+inline
+zarray
+compress< std::complex< float > > ( const config &           config,
+                                    std::complex< float > *  data,
+                                    const size_t             dim0,
+                                    const size_t             dim1,
+                                    const size_t             dim2,
+                                    const size_t             dim3 )
+{
+    if      ( dim1 == 0 ) return compress< float >( config, reinterpret_cast< float * >( data ), dim0, 2, 0, 0 );
+    else if ( dim2 == 0 ) return compress< float >( config, reinterpret_cast< float * >( data ), dim0, dim1, 2, 0 );
+    else if ( dim3 == 0 ) return compress< float >( config, reinterpret_cast< float * >( data ), dim0, dim1, dim2, 2 );
+    else                  return compress< float >( config, reinterpret_cast< float * >( data ), dim0, dim1, dim2, dim3 * 2 );
+}
+
+template <>
+inline
+zarray
+compress< std::complex< double > > ( const config &            config,
+                                     std::complex< double > *  data,
+                                     const size_t              dim0,
+                                     const size_t              dim1,
+                                     const size_t              dim2,
+                                     const size_t              dim3 )
+{
+    if      ( dim1 == 0 ) return compress< double >( config, reinterpret_cast< double * >( data ), dim0, 2, 0, 0 );
+    else if ( dim2 == 0 ) return compress< double >( config, reinterpret_cast< double * >( data ), dim0, dim1, 2, 0 );
+    else if ( dim3 == 0 ) return compress< double >( config, reinterpret_cast< double * >( data ), dim0, dim1, dim2, 2 );
+    else                  return compress< double >( config, reinterpret_cast< double * >( data ), dim0, dim1, dim2, dim3 * 2 );
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// decompression functions
+//
+////////////////////////////////////////////////////////////////////////////////
+
+template < typename value_t >
+void
+decompress ( const zarray &  zdata,
+             value_t *       dest,
+             const size_t    dim0,
+             const size_t    dim1 = 0,
+             const size_t    dim2 = 0,
+             const size_t    dim3 = 0 )
+{
+    using  real_t = Hpro::real_type_t< value_t >;
+    
+    const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
+
+    //
+    // convert back based on given FP type
+    //
+
+    switch ( zdata[0] )
+    {
+        case 1 :
+        {
+            auto  ptr = reinterpret_cast< const fp16_t * >( zdata.data() + 2 );
+
+            for ( size_t  i = 0; i < nsize; ++i )
+                dest[i] = value_t( *(ptr++) );
+        }
+        break;
+        
+        case 2 :
+        {
+            auto  ptr = reinterpret_cast< const fp32_t * >( zdata.data() + 4 );
+
+            for ( size_t  i = 0; i < nsize; ++i )
+                dest[i] = value_t( *(ptr++) );
+        }
+        break;
+        
+        case 3 :
+        {
+            auto  ptr = reinterpret_cast< const fp64_t * >( zdata.data() + 8 );
+
+            for ( size_t  i = 0; i < nsize; ++i )
+                dest[i] = value_t( *(ptr++) );
+        }
+        break;
+
+        default :
+            HLR_ERROR( "invalid FP type in compressed data" );
+    }// switch
+}
+
+template <>
+inline
+void
+decompress< std::complex< float > > ( const zarray &           zdata,
+                                      std::complex< float > *  dest,
+                                      const size_t             dim0,
+                                      const size_t             dim1,
+                                      const size_t             dim2,
+                                      const size_t             dim3 )
+{
+    if      ( dim1 == 0 ) decompress< float >( zdata, reinterpret_cast< float * >( dest ), dim0, 2, 0, 0 );
+    else if ( dim2 == 0 ) decompress< float >( zdata, reinterpret_cast< float * >( dest ), dim0, dim1, 2, 0 );
+    else if ( dim3 == 0 ) decompress< float >( zdata, reinterpret_cast< float * >( dest ), dim0, dim1, dim2, 2 );
+    else                  decompress< float >( zdata, reinterpret_cast< float * >( dest ), dim0, dim1, dim2, dim3 * 2 );
+}
+    
+template <>
+inline
+void
+decompress< std::complex< double > > ( const zarray &            zdata,
+                                       std::complex< double > *  dest,
+                                       const size_t              dim0,
+                                       const size_t              dim1,
+                                       const size_t              dim2,
+                                       const size_t              dim3 )
+{
+    if      ( dim1 == 0 ) decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, 2, 0, 0 );
+    else if ( dim2 == 0 ) decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, 2, 0 );
+    else if ( dim3 == 0 ) decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, dim2, 2 );
+    else                  decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, dim2, dim3 * 2 );
+}
 
 //////////////////////////////////////////////////////////////////////////////////////
 //
-// compression
+// special versions for lowrank data
 //
 //////////////////////////////////////////////////////////////////////////////////////
 

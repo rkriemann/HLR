@@ -13,7 +13,7 @@
 namespace hlr { namespace compress { 
 
 // general byte type
-using byte_t = unsigned char;
+using byte_t = uint8_t;
 
 // return byte padded value of <n>
 constexpr size_t byte_pad ( const size_t  n )
