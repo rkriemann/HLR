@@ -3,7 +3,7 @@
 // Program     : iterrefine
 // Description : testing iterative refinement (linear iteration in 2nd normal form)
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <hlr/bem/aca.hh>

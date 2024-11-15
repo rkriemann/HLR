@@ -5,7 +5,7 @@
 // Module      : tensor_grid_hca.hh
 // Description : grid defined via tensor product X × Y × Z
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <array>

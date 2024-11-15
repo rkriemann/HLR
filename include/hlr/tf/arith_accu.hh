@@ -5,7 +5,7 @@
 // Module      : arith.hh
 // Description : arithmetic functions using accumulators implemented with TF
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <taskflow/taskflow.hpp>

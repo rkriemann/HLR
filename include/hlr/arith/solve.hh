@@ -5,7 +5,7 @@
 // Module      : solve.hh
 // Description : matrix solve functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <hpro/matrix/TMatrix.hh>
