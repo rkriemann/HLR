@@ -1,5 +1,5 @@
-#ifndef __HLR_BLAS_DETAIL_TENSOR_HH
-#define __HLR_BLAS_DETAIL_TENSOR_HH
+#ifndef __HLR_BLAS_DETAIL_TENSOR3_HH
+#define __HLR_BLAS_DETAIL_TENSOR3_HH
 
 namespace hlr { namespace blas {
 
@@ -230,46 +230,57 @@ tensor_product ( const tensor3< value_t > &  X,
     }// if
     
     #else
-    
-    if ( mode == 0 )
+
+    switch ( mode )
     {
-        for ( size_t  l = 0; l < X.size(2); ++l )
+        case 0 :
+        {
+            for ( size_t  l = 0; l < X.size(2); ++l )
+            {
+                for ( size_t  j = 0; j < X.size(1); ++j )
+                {
+                    auto  x_ij = X.fiber( mode, j, l );
+                    auto  y_ij = Y.fiber( mode, j, l );
+                    
+                    mulvec( M, x_ij, y_ij );
+                }// for
+            }// for
+        }
+        break;
+        
+        case 1 :
+        {
+            for ( size_t  l = 0; l < X.size(2); ++l )
+            {
+                for ( size_t  i = 0; i < X.size(0); ++i )
+                {
+                    auto  x_ij = X.fiber( mode, i, l );
+                    auto  y_ij = Y.fiber( mode, i, l );
+                    
+                    mulvec( M, x_ij, y_ij );
+                }// for
+            }// for
+        }
+        break;
+
+        case 2 :
         {
             for ( size_t  j = 0; j < X.size(1); ++j )
             {
-                auto  x_ij = X.fiber( mode, j, l );
-                auto  y_ij = Y.fiber( mode, j, l );
-
-                mulvec( M, x_ij, y_ij );
+                for ( size_t  i = 0; i < X.size(0); ++i )
+                {
+                    auto  x_ij = X.fiber( mode, i, j );
+                    auto  y_ij = Y.fiber( mode, i, j );
+                    
+                    mulvec( M, x_ij, y_ij );
+                }// for
             }// for
-        }// for
-    }// if
-    else if ( mode == 1 )
-    {
-        for ( size_t  l = 0; l < X.size(2); ++l )
-        {
-            for ( size_t  i = 0; i < X.size(0); ++i )
-            {
-                auto  x_ij = X.fiber( mode, i, l );
-                auto  y_ij = Y.fiber( mode, i, l );
+        }
+        break;
 
-                mulvec( M, x_ij, y_ij );
-            }// for
-        }// for
-    }// if
-    else if ( mode == 2 )
-    {
-        for ( size_t  j = 0; j < X.size(1); ++j )
-        {
-            for ( size_t  i = 0; i < X.size(0); ++i )
-            {
-                auto  x_ij = X.fiber( mode, i, j );
-                auto  y_ij = Y.fiber( mode, i, j );
-
-                mulvec( M, x_ij, y_ij );
-            }// for
-        }// for
-    }// if
+        default :
+            HLR_ERROR( "invalid mode" );
+    }// switch
 
     #endif
 
@@ -296,4 +307,4 @@ hadamard_product ( const tensor3< value_t > &  X1,
 
 }}// namespace hlr::blas
 
-#endif // __HLR_BLAS_DETAIL_TENSOR_HH
+#endif // __HLR_BLAS_DETAIL_TENSOR3_HH
