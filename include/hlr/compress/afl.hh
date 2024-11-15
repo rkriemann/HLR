@@ -593,8 +593,7 @@ compress ( const double *  data,
         
         #if defined(HLR_HAS_ZFP)
         
-        for ( size_t  j = 0; j < nbuf; ++j )
-            stream_write_bits( bs, zval, nbits );
+        stream_write_bits( bs, zval, nbits );
         
         #else
 
@@ -981,7 +980,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
             vmax = std::max( vmax, u_il );
         }// for
 
-        s[l] = real_t(1) / vmin;
+        s[l] = vmin;
         e[l] = uint32_t( std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ) );
         m[l] = eps_to_rate_aplr( S(l) );
 
@@ -1067,7 +1066,7 @@ compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double
             vmax = std::max( vmax, std::max( u_re, u_im ) );
         }// for
 
-        s[l] = real_t(1) / vmin;
+        s[l] = vmin;
         e[l] = uint32_t( std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ) );
         m[l] = eps_to_rate_aplr( S(l) );
 
@@ -1379,6 +1378,8 @@ mulvec_lr ( const size_t     nrows,
                 mulvec( nrows, 1, op_A, alpha, scale, zA.data() + pos + data_ofs, x+l, y, exp_bits, prec_bits );
 
                 pos += data_ofs + nbyte * nrows;
+
+                HLR_ASSERT( pos < zA.size() );
             }// for
         }// case
         break;
@@ -1399,6 +1400,8 @@ mulvec_lr ( const size_t     nrows,
                 mulvec( nrows, 1, op_A, alpha, scale, zA.data() + pos + data_ofs, x, y+l, exp_bits, prec_bits );
 
                 pos += data_ofs + nbyte * nrows;
+
+                HLR_ASSERT( pos < zA.size() );
             }// for
         }// case
         break;

@@ -838,7 +838,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
             vmax = std::max( vmax, u_il );
         }// for
 
-        s[l] = real_t(1) / vmin;
+        s[l] = vmin;
         e[l] = uint8_t( std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ) );
 
         HLR_ASSERT( std::isfinite( s[l] ) );
@@ -926,7 +926,7 @@ compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double
             vmax = std::max( vmax, std::max( u_re, u_im ) );
         }// for
 
-        s[l] = real_t(1) / vmin;
+        s[l] = vmin;
         e[l] = uint32_t( std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ) );
 
         HLR_DBG_ASSERT( std::isfinite( s[l] ) );
