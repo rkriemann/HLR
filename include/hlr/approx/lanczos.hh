@@ -5,7 +5,7 @@
 // Module      : approx/lanczos
 // Description : low-rank approximation functions using Lanczos Bidiagonalization
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <list>

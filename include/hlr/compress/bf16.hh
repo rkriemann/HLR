@@ -5,7 +5,7 @@
 // Module      : compress/bf16
 // Description : BF16 related functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 ////////////////////////////////////////////////////////////

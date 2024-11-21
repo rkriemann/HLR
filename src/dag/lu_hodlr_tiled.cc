@@ -3,7 +3,7 @@
 // Module      : lu_hodlr_tiled.cc
 // Description : generate DAG for tiled LU factorization of HODLR matrices
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <list>

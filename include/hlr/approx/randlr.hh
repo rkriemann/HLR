@@ -5,7 +5,7 @@
 // Module      : approx/randlr
 // Description : low-rank approximation functions using randomized low-rank approx.
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <list>
