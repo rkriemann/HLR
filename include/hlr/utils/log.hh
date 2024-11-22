@@ -22,12 +22,8 @@ namespace hlr
 //
 // breakpoint function as entry point for debugging
 //
-inline
 void
-breakpoint ()
-{
-    ;
-}
+breakpoint ();
 
 //
 // logging function

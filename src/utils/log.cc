@@ -11,6 +11,15 @@
 namespace hlr
 {
 
+//
+// breakpoint function as entry point for debugging
+//
+void
+breakpoint ()
+{
+    ;
+}
+
 // mutex for log function
 std::mutex  __LOG_MUTEX;
 
