@@ -5,7 +5,7 @@
 // Module      : seq/arith_accu.hh
 // Description : sequential arithmetic functions using accumulators
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <hpro/matrix/TBlockMatrix.hh>

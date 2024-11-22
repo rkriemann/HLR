@@ -5,7 +5,7 @@
 // Module      : tensor/base_tensor
 // Description : base class for tensor
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <vector>

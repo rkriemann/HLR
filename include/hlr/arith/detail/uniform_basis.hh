@@ -5,7 +5,7 @@
 // Module      : arith/uniform
 // Description : functions for handling changes in basis for uniform matrices
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 // #include <boost/format.hpp> // DEBUG

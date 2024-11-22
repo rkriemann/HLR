@@ -5,7 +5,7 @@
 // Module      : compress/aflp
 // Description : functions for adaptive padded floating points
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <cstring>
@@ -182,7 +182,7 @@ compress ( const float *  data,
 
             zero[j] = ( aval == float(0) );
             sign[j] = ( aval != val );
-            fbuf[j] = scale * aval + 1.f;
+            fbuf[j] = aval / scale + 1.f;
 
             HLR_DBG_ASSERT( fbuf[j] >= float(2) );
         }// for
@@ -226,7 +226,7 @@ compress ( const float *  data,
         if ( std::abs( val ) != float(0) )
         {
             const bool      zsign = ( val < 0 );
-            const float     sval  = scale * std::abs(val) + 1.f;
+            const float     sval  = std::abs(val) / scale + 1.f;
             
             HLR_DBG_ASSERT( sval >= float(2) );
             
@@ -312,7 +312,7 @@ decompress ( float *         data,
             const uint32_t  sign  = ( zval >> sign_shift ) << FP32::sign_bit;
             fp32int_t       fival = { ((exp | FP32::exp_highbit) << FP32::mant_bits) | (mant << prec_ofs) };
 
-            fival.f  = ( fival.f - 1.f ) / scale;
+            fival.f  = ( fival.f - 1.f ) * scale;
             fival.u |= sign;
             fbuf[j]  = fival.f;
         }// for
@@ -352,7 +352,7 @@ decompress ( float *         data,
             const uint32_t  sign  = ( zval >> sign_shift ) << FP32::sign_bit;
             fp32int_t       fival = { ((exp | FP32::exp_highbit) << FP32::mant_bits) | (mant << prec_ofs) };
 
-            fival.f  = ( fival.f - 1.f ) / scale;
+            fival.f  = ( fival.f - 1.f ) * scale;
             fival.u |= sign;
             data[i]  = fival.f;
         }// else
@@ -426,7 +426,7 @@ compress ( const double *  data,  // points to actual start of buffer
 
             zero[j] = ( aval == double(0) );
             sign[j] = ( aval != val );
-            fbuf[j] = scale * aval + 1.0;
+            fbuf[j] = aval / scale + 1.0;
 
             HLR_DBG_ASSERT( zero[j] || ( fbuf[j] >= double(2) ));
         }// for
@@ -474,7 +474,7 @@ compress ( const double *  data,  // points to actual start of buffer
         if ( std::abs( val ) != double(0) )
         {
             const bool      zsign = ( val < 0 );
-            const double    sval  = scale * std::abs(val) + 1.0;
+            const double    sval  = std::abs(val) / scale + 1.0;
             const uint64_t  isval = (*reinterpret_cast< const uint64_t * >( & sval ) );
             const uint64_t  sexp  = ( isval >> FP64::mant_bits ) & FP64::exp_mask;
             const uint64_t  smant = ( isval & FP64::mant_mask );
@@ -572,7 +572,7 @@ decompress ( double *        data,
             const uint64_t  sign  = (zval >> sign_shift) << FP64::sign_bit;
             fp64int_t       fival = { ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
 
-            fival.f  = ( fival.f - 1.0 ) / scale;
+            fival.f  = ( fival.f - 1.0 ) * scale;
             fival.u |= sign;
             fbuf[j]  = fival.f;
         }// for
@@ -616,7 +616,7 @@ decompress ( double *        data,
             const uint64_t  sign  = (zval >> sign_shift) << FP64::sign_bit;
             fp64int_t       fival = { ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
             
-            fival.f  = ( fival.f - 1.0 ) / scale;
+            fival.f  = ( fival.f - 1.0 ) * scale;
             fival.u |= sign;
             data[i]  = fival.f;
         }// else
@@ -676,7 +676,7 @@ compress ( const config &   config,
         return zdata;
     }// if
     
-    const auto     scale     = real_t(1) / vmin;                                                             // scale all values v_i such that |v_i| >= 1
+    const auto     scale     = vmin;                                                                         // scale all values v_i such that |v_i| >= 1
     const uint8_t  exp_bits  = std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) );  // no. of bits needed to represent exponent
     const uint8_t  nbits     = byte_pad( 1 + exp_bits + config.bitrate );                                    // total no. of bits per value
     const uint8_t  nbyte     = nbits / 8;
@@ -838,7 +838,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
             vmax = std::max( vmax, u_il );
         }// for
 
-        s[l] = real_t(1) / vmin;
+        s[l] = vmin;
         e[l] = uint8_t( std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ) );
 
         HLR_ASSERT( std::isfinite( s[l] ) );
@@ -926,7 +926,7 @@ compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double
             vmax = std::max( vmax, std::max( u_re, u_im ) );
         }// for
 
-        s[l] = real_t(1) / vmin;
+        s[l] = vmin;
         e[l] = uint32_t( std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ) );
 
         HLR_DBG_ASSERT( std::isfinite( s[l] ) );
@@ -1141,7 +1141,7 @@ struct accessor
             const uint64_t  sign  = (zval >> acc->sign_shift) << FP64::sign_bit;
             fp64int_t       fival = { ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << acc->prec_ofs) };
             
-            fival.f  = ( fival.f - 1.0 ) / acc->scale;
+            fival.f  = ( fival.f - 1.0 ) * acc->scale;
             fival.u |= sign;
             
             return fival.f;
@@ -1224,7 +1224,7 @@ mulvec ( const size_t                        nrows,
     const uint64_t    exp_mask   = ( 1ul << exp_bits  ) - 1;
     const uint32_t    sign_shift = exp_bits + prec_bits;
     const uint64_t    zero_val   = FP64::zero_val & (( 1ul << nbits) - 1 );
-    const auto        scale      = alpha / zscale;
+    const auto        scale      = alpha * zscale;
     // constexpr size_t  nbuf       = 1;
     // const size_t      nrows_buf  = (nrows / nbuf) * nbuf; // for <nbuf> step width 
     // value_t           fcache[nbuf];

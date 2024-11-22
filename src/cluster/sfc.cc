@@ -3,7 +3,7 @@
 // Module      : sfc.cc
 // Description : Hilbert curve based clustering
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <hpro/cluster/TBSPCTBuilder.hh>

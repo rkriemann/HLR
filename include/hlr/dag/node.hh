@@ -5,7 +5,7 @@
 // Module      : Node.hh
 // Description : node in a compute DAG
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <vector>

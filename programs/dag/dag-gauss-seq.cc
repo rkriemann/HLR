@@ -3,7 +3,7 @@
 // Module      : gauss-seq.cc
 // Description : DAG based Gaussian Elimination using sequential execution
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include "hlr/seq/matrix.hh"
