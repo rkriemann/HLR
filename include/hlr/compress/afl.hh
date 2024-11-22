@@ -63,7 +63,7 @@ using FP64 = fp_info< double >;
 //
 //   |d_i - ~d_i| ≤ 2^(-m) ≤ ε with mantissa length m = ⌈-log₂ ε⌉
 //
-inline byte_t eps_to_rate      ( const double  eps ) { return std::max< double >( 0, std::ceil( -std::log2( eps ) ) ); }
+inline byte_t eps_to_rate      ( const double  eps ) { return std::max< double >( 1, std::ceil( -std::log2( eps ) ) ); }
 inline byte_t eps_to_rate_aplr ( const double  eps ) { return eps_to_rate( eps ) + 1; }
 
 struct config
@@ -685,6 +685,7 @@ compress ( const config &   config,
     const auto      scale     = vmin;                                                                        // scale all values v_i such that |v_i| >= 1
     auto            zdata     = std::vector< byte_t >( sizeof(real_t) + 1 + 1 + byte_pad( nsize * nbits ) / 8 );
 
+    HLR_ASSERT( nbits <= sizeof(value_t) * 8 );
     HLR_ASSERT( std::isfinite( scale ) );
     
     compress( data, nsize, zdata.data(), scale, exp_bits, prec_bits );
