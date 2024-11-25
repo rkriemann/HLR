@@ -43,20 +43,24 @@ public:
     //
 
     structured_tensor3 ()
+            : _nblocks{ 0, 0, 0 }
     {}
 
     structured_tensor3 ( const indexset &  is0,
                          const indexset &  is1,
                          const indexset &  is2 )
             : super_t( is0, is1, is2 )
+            , _nblocks{ 0, 0, 0 }
     {}
     
     structured_tensor3 ( const std::array< indexset, 3 > &  ais )
             : super_t( ais[0], ais[1], ais[2] )
+            , _nblocks{ 0, 0, 0 }
     {}
     
     structured_tensor3 ( const structured_tensor3 &  t )
             : super_t( t )
+            , _nblocks{ 0, 0, 0 }
     {
         set_structure( t.nblocks(0),
                        t.nblocks(1),
@@ -65,8 +69,10 @@ public:
 
     structured_tensor3 ( structured_tensor3 &&  t )
             : super_t( std::forward( t ) )
+            , _nblocks{ 0, 0, 0 }
     {
-        std::swap( _blocks, t._blocks );
+        std::swap( _nblocks, t._nblocks );
+        std::swap( _blocks,  t._blocks );
     }
 
     // dtor
@@ -93,7 +99,8 @@ public:
     {
         super_t::operator = ( std::forward( t ) );
 
-        _blocks = std::move( t._blocks );
+        _nblocks = std::move( t._nblocks );
+        _blocks  = std::move( t._blocks );
     }
 
     //
