@@ -27,24 +27,28 @@ namespace detail
 //
 // determine "singular values" of R by looking at
 // norms of R(i:·,i:·) for all i
+// - R is assumed to be upper triangular(!)
 //
 template < typename value_t >
 blas::vector< real_type_t< value_t > >
 singular_values ( const blas::matrix< value_t > &  R )
 {
+    // return blas::sv( R );
+    
     using  real_t = real_type_t< value_t >;
 
     HLR_ASSERT( R.nrows() == R.ncols() );
     
-    const idx_t  n = idx_t( R.nrows() );
-    auto         S = blas::vector< real_t >( n );
+    const idx_t  n   = idx_t( R.nrows() );
+    auto         S   = blas::vector< real_t >( n );
+    auto         sum = value_t(0);
     
-    for ( int  i = 0; i < n; ++i )
+    for ( int  i = n-1; i >= 0; --i )
     {
-        auto  rest = blas::range( i, n-1 );
-        auto  R_i  = blas::matrix< value_t >( R, rest, rest );
-        
-        S( i ) = blas::normF( R_i );
+        for ( int  j = i; j < n; ++j )
+            sum += math::square( R(i,j) );
+
+        S(i) = math::sqrt( sum );
     }// for
 
     return S;
@@ -536,7 +540,7 @@ struct RRQR
         blas::qrp( M, R, P );
 
         auto  S  = detail::singular_values( R );
-        auto  k  = acc.trunc_rank( S );
+        auto  k  = std::min< idx_t >( M.ncols(), acc.trunc_rank( S ) ); // M might be adjusted(!)
         auto  Qk = blas::matrix< value_t >( M, blas::range::all, blas::range( 0, k-1 ) );
 
         if ( ! is_null( sv ) )
