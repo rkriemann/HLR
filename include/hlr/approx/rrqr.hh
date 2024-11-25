@@ -29,10 +29,10 @@ namespace detail
 // norms of R(i:·,i:·) for all i
 //
 template < typename value_t >
-blas::vector< Hpro::real_type_t< value_t > >
+blas::vector< real_type_t< value_t > >
 singular_values ( const blas::matrix< value_t > &  R )
 {
-    using  real_t = Hpro::real_type_t< value_t >;
+    using  real_t = real_type_t< value_t >;
 
     HLR_ASSERT( R.nrows() == R.ncols() );
     
@@ -436,7 +436,7 @@ template < typename T_value >
 struct RRQR
 {
     using  value_t = T_value;
-    using  real_t  = Hpro::real_type_t< value_t >;
+    using  real_t  = real_type_t< value_t >;
     
     // signal support for general lin. operators
     static constexpr bool supports_general_operator = false;
@@ -552,22 +552,23 @@ struct RRQR
     }
 
     std::pair< blas::matrix< value_t >,
-               blas::vector< typename Hpro::real_type_t< value_t > > >
-    column_basis ( blas::matrix< value_t > &  M ) const
+               blas::vector< real_type_t< value_t > > >
+    column_basis ( const blas::matrix< value_t > &  M ) const
     {
         const idx_t  ncols = idx_t( M.ncols() );
 
         // for update statistics
         HLR_APPROX_RANK_STAT( "full " << std::min( M.nrows(), ncols ) );
-    
+
+        auto  A = blas::copy( M );
         auto  R = blas::matrix< value_t >( ncols, ncols );
         auto  P = std::vector< int >( ncols, 0 );
 
-        blas::qrp( M, R, P );
+        blas::qrp( A, R, P );
 
         auto  S  = detail::singular_values( R );
 
-        return { std::move( blas::copy( M ) ), std::move( S ) };
+        return { std::move( A ), std::move( S ) };
     }
 };
 
