@@ -175,6 +175,67 @@ rank_info_helper_mat ( const Hpro::TMatrix< value_t > &  M )
     return { 0, 0, 0, 0 };
 }
 
+template < typename value_t >
+void
+rank_hist_helper_mat ( const Hpro::TMatrix< value_t > &  M,
+                       std::deque< size_t > &            hist )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  B = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                rank_hist_helper_mat( *B->block( i, j ), hist );
+            }// for
+        }// for
+    }// if
+    else if ( matrix::is_lowrank( M ) )
+    {
+        auto  R = cptrcast( &M, matrix::lrmatrix< value_t > );
+
+        if ( R->rank() >= hist.size() )
+            hist.resize( R->rank()+1 );
+        
+        hist[ R->rank() ]++;
+    }// if
+    else if ( matrix::is_lowrank_sv( M ) )
+    {
+        auto  R = cptrcast( &M, matrix::lrsvmatrix< value_t > );
+
+        if ( R->rank() >= hist.size() )
+            hist.resize( R->rank()+1 );
+        
+        hist[ R->rank() ]++;
+    }// if
+    else if ( matrix::is_uniform_lowrank( M ) )
+    {
+        auto  R       = cptrcast( &M, matrix::uniform_lrmatrix< value_t > );
+        auto  minrank = std::min( R->row_rank(), R->col_rank() );
+        auto  maxrank = std::max( R->row_rank(), R->col_rank() );
+        
+        if ( maxrank >= hist.size() )
+            hist.resize( maxrank+1 );
+        
+        hist[ minrank ]++;
+        hist[ maxrank ]++;
+    }// if
+    else if ( matrix::is_h2_lowrank( &M ) )
+    {
+        auto  R       = cptrcast( &M, matrix::h2_lrmatrix< value_t > );
+        auto  minrank = std::min( R->row_rank(), R->col_rank() );
+        auto  maxrank = std::max( R->row_rank(), R->col_rank() );
+        
+        if ( maxrank >= hist.size() )
+            hist.resize( maxrank+1 );
+        
+        hist[ minrank ]++;
+        hist[ maxrank ]++;
+    }// if
+}
+
 }// namespace detail
 
 template < typename value_t >
@@ -184,6 +245,17 @@ rank_info ( const Hpro::TMatrix< value_t > & M )
     auto [ min_rank, sum_rank, max_rank, nnodes ] = detail::rank_info_helper_mat( M );
 
     return { min_rank, uint( double(sum_rank) / double(nnodes) ), max_rank };
+}
+
+template < typename value_t >
+std::deque< size_t >
+rank_hist ( const Hpro::TMatrix< value_t > & M )
+{
+    auto  hist = std::deque< size_t >();
+    
+    detail::rank_hist_helper_mat( M, hist );
+
+    return hist;
 }
 
 //
