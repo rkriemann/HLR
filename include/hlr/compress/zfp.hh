@@ -42,8 +42,8 @@ inline config  reversible       ()                     { return config{ zfp_mode
 inline config  fixed_rate       ( const uint    rate ) { return config{ zfp_mode_fixed_rate, 0.0, 0, rate }; }      // fixed number of bits
 inline config  fixed_precision  ( const uint    prec ) { return config{ zfp_mode_fixed_precision, 0.0, prec, 0 }; } // fixed number of bitplanes
 inline config  fixed_accuracy   ( const double  tol  ) { return config{ zfp_mode_fixed_accuracy, tol, 0, 0 }; }     // absolute error
-inline config  get_config       ( const double  acc  ) { return fixed_rate( eps_to_rate( acc ) ); }
-// inline config  get_config       ( const double  tol  ) { return fixed_precision( eps_to_rate( 0.25 * tol ) ); }
+// inline config  get_config       ( const double  acc  ) { return fixed_rate( eps_to_rate( acc ) ); }
+inline config  get_config       ( const double  tol  ) { return fixed_precision( eps_to_rate( 0.25 * tol ) ); }
 // inline config  get_config       ( const double  tol  ) { return fixed_accuracy( tol ); }
 
 // holds compressed data
@@ -301,7 +301,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
 
     for ( uint  l = 0; l < k; ++l )
     {
-        auto  zconf = fixed_rate( eps_to_rate_aplr( S(l) ) );
+        auto  zconf = get_config( S(l) ); // fixed_rate( eps_to_rate_aplr( S(l) ) );
         auto  z_i   = compress( zconf, U.data() + l * n, n );
 
         zsize += z_i.size();

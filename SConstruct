@@ -633,7 +633,7 @@ elif lapack in [ 'mkl', 'mkl64', 'mklomp', 'mklomp64' ] :
     env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64_lin' ) ) # standard MKL
     env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64' ) )     # oneMKL
     if lapack in [ 'mkl', 'mklomp' ] :
-        env.Append( LIBS = [ 'mkl_gf_ilp' , 'mkl_gnu_thread', 'mkl_core', 'gomp' ] )
+        env.Append( LIBS = [ 'mkl_gf_lp64' , 'mkl_gnu_thread', 'mkl_core', 'gomp' ] )
     else :
         env.Append( LIBS = [ 'mkl_gf_ilp64' , 'mkl_gnu_thread', 'mkl_core', 'gomp' ] )
 elif lapack in [ 'mkltbb', 'mkltbb64' ] :
@@ -642,7 +642,7 @@ elif lapack in [ 'mkltbb', 'mkltbb64' ] :
     env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64_lin' ) ) # standard MKL
     env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64' ) )     # oneMKL
     if lapack in [ 'mkl', 'mklomp' ] :
-        env.Append( LIBS = [ 'mkl_gf_ilp' , 'mkl_tbb_thread', 'mkl_core', 'gomp' ] )
+        env.Append( LIBS = [ 'mkl_gf_lp64' , 'mkl_tbb_thread', 'mkl_core', 'gomp' ] )
     else :
         env.Append( LIBS = [ 'mkl_gf_ilp64' , 'mkl_tbb_thread', 'mkl_core', 'gomp' ] )
 elif lapack in [ 'mklseq', 'mklseq64' ] :
@@ -651,7 +651,7 @@ elif lapack in [ 'mklseq', 'mklseq64' ] :
     env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64_lin' ) ) # standard MKL
     env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64' ) )     # oneMKL
     if lapack in [ 'mkl', 'mklomp' ] :
-        env.Append( LIBS = [ 'mkl_gf_ilp' , 'mkl_sequential', 'mkl_core' ] )
+        env.Append( LIBS = [ 'mkl_gf_lp64' , 'mkl_sequential', 'mkl_core' ] )
     else :
         env.Append( LIBS = [ 'mkl_gf_ilp64' , 'mkl_sequential', 'mkl_core' ] )
 elif lapack == 'accelerate' :

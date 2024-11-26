@@ -38,7 +38,7 @@ randsvd_ortho ( const operator_t &  M,
     HLR_APPROX_RANK_STAT( "full " << std::min( nrows_M, ncols_M ) );
     
     // compute column basis
-    auto  Q   = detail::rand_column_basis( M, acc, 4, power_steps, oversampling );
+    auto  Q   = detail::rand_column_basis_full( M, acc, 4, power_steps, oversampling );
     auto  k   = Q.ncols();
 
     // B = Q^H · M  or B^H = M^H · Q
@@ -523,8 +523,134 @@ struct RandSVD
     }
 };
 
+//
+// implements randomized SVD with full column basis search
+//
+template < typename T_value >
+struct RandSVDFull
+{
+    using  value_t = T_value;
+
+    // signal support for general lin. operators
+    static constexpr bool supports_general_operator = true;
+    
+    // number of steps in power iteration during construction of column basis
+    const uint   power_steps  = 0;
+
+    // oversampling parameter
+    const uint   oversampling = 0;
+
+    //
+    // matrix approximation routines
+    //
+    
+    // std::pair< blas::matrix< value_t >,
+    //            blas::matrix< value_t > >
+    // operator () ( blas::matrix< value_t > &  M,
+    //               const accuracy &           acc ) const
+    // {
+    //     return hlr::approx::randsvd( M, acc, power_steps, oversampling );
+    // }
+
+    // std::pair< blas::matrix< value_t >,
+    //            blas::matrix< value_t > >
+    // operator () ( const blas::matrix< value_t > &  U,
+    //               const blas::matrix< value_t > &  V,
+    //               const accuracy &                 acc ) const 
+    // {
+    //     auto  Uc = blas::copy( U );
+    //     auto  Vc = blas::copy( V );
+        
+    //     return hlr::approx::randsvd( Uc, Vc, acc, power_steps, oversampling );
+    // }
+    
+    // std::pair< blas::matrix< value_t >,
+    //            blas::matrix< value_t > >
+    // operator () ( const std::list< blas::matrix< value_t > > &  U,
+    //               const std::list< blas::matrix< value_t > > &  V,
+    //               const accuracy &                              acc ) const
+    // {
+    //     return hlr::approx::randsvd( U, V, acc, power_steps, oversampling );
+    // }
+
+    // std::pair< blas::matrix< value_t >,
+    //            blas::matrix< value_t > >
+    // operator () ( const std::list< blas::matrix< value_t > > &  U,
+    //               const std::list< blas::matrix< value_t > > &  T,
+    //               const std::list< blas::matrix< value_t > > &  V,
+    //               const accuracy &                              acc ) const
+    // {
+    //     return hlr::approx::randsvd( U, T, V, acc, power_steps, oversampling );
+    // }
+
+    // template < typename operator_t >
+    // std::pair< blas::matrix< typename operator_t::value_t >,
+    //            blas::matrix< typename operator_t::value_t > >
+    // operator () ( const operator_t &       op,
+    //               const accuracy &         acc ) const
+    // {
+    //     return hlr::approx::randsvd< operator_t >( op, acc, power_steps, oversampling );
+    // }
+
+    // //
+    // // matrix approximation routines (orthogonal version)
+    // //
+    
+    // std::tuple< blas::matrix< value_t >,
+    //             blas::vector< real_type_t< value_t > >,
+    //             blas::matrix< value_t > >
+    // approx_ortho ( blas::matrix< value_t > &  M,
+    //                const accuracy &           acc ) const
+    // {
+    //     return hlr::approx::randsvd_ortho( M, acc, power_steps, oversampling );
+    // }
+
+    // std::tuple< blas::matrix< value_t >,
+    //             blas::vector< real_type_t< value_t > >,
+    //             blas::matrix< value_t > >
+    // approx_ortho ( const blas::matrix< value_t > &  U,
+    //                const blas::matrix< value_t > &  V,
+    //                const accuracy &                 acc ) const 
+    // {
+    //     return hlr::approx::randsvd_ortho( U, V, acc, power_steps, oversampling );
+    // }
+    
+    // std::tuple< blas::matrix< value_t >,
+    //             blas::vector< real_type_t< value_t > >,
+    //             blas::matrix< value_t > >
+    // approx_ortho ( const std::list< blas::matrix< value_t > > &  U,
+    //                const std::list< blas::matrix< value_t > > &  V,
+    //                const accuracy &                              acc ) const
+    // {
+    //     return hlr::approx::randsvd_ortho( U, V, acc, power_steps, oversampling );
+    // }
+
+    //
+    // compute (approximate) column basis
+    //
+    
+    template < typename value_t >
+    blas::matrix< value_t >
+    column_basis ( const blas::matrix< value_t > &  op,
+                   const accuracy &                 acc,
+                   blas::vector< Hpro::real_type_t< value_t > > *  sv = nullptr ) const
+    {
+        return detail::rand_column_basis_full_svd( op, acc, 0, power_steps, oversampling, sv );
+    }
+    
+    template < typename operator_t >
+    blas::matrix< typename operator_t::value_t >
+    column_basis ( const operator_t &  op,
+                   const accuracy &    acc,
+                   blas::vector< Hpro::real_type_t< typename operator_t::value_t > > *  sv = nullptr ) const
+    {
+        return detail::rand_column_basis_full_svd< operator_t >( op, acc, 0, power_steps, oversampling, sv );
+    }
+};
+
 // signals, that T is of approximation type
-template < typename T > struct is_approximation< RandSVD< T > > { static const bool  value = true; };
+template < typename T > struct is_approximation< RandSVD< T > >     { static const bool  value = true; };
+template < typename T > struct is_approximation< RandSVDFull< T > > { static const bool  value = true; };
 
 }}// namespace hlr::approx
 
