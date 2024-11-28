@@ -155,94 +155,11 @@ test_tensor ( const size_t  n )
 }
 
 //
-// tensor cross approximation
+// play around with tensors
 //
 template < typename value_t >
 void
-tca_full ( blas::tensor3< value_t > &  X,
-           const double                tol )
-{
-    auto    C    = std::list< value_t >();
-    auto    V0   = std::list< blas::vector< value_t > >();
-    auto    V1   = std::list< blas::vector< value_t > >();
-    auto    V2   = std::list< blas::vector< value_t > >();
-    size_t  step = 0;
-
-    while ( true )
-    {
-        // std::cout << X << std::endl;
-    
-        //
-        // determine maximal element in X
-        //
-
-        std::array< uint, 3 >  max_pos{ 0, 0, 0 };
-        value_t                max_val = std::abs( X(0,0,0) );
-
-        for ( uint  l = 0; l < X.size(2); ++l )
-            for ( uint  j = 0; j < X.size(1); ++j )
-                for ( uint  i = 0; i < X.size(0); ++i )
-                {
-                    const auto  X_ijl = std::abs( X(i,j,l) );
-
-                    if ( X_ijl > max_val )
-                    {
-                        max_val = X_ijl;
-                        max_pos = { i, j, l };
-                    }// if
-                }// for
-
-        //
-        // use fibers as next vectors
-        //
-
-        auto  v0 = blas::copy( X.fiber( 0, max_pos[1], max_pos[2] ) );
-        auto  v1 = blas::copy( X.fiber( 1, max_pos[0], max_pos[2] ) );
-        auto  v2 = blas::copy( X.fiber( 2, max_pos[0], max_pos[1] ) );
-
-        // std::cout << v0 << std::endl;
-        // std::cout << v1 << std::endl;
-        // std::cout << v2 << std::endl;
-        
-        // auto  n0 = blas::norm2( v0 );
-        // auto  n1 = blas::norm2( v1 );
-        // auto  n2 = blas::norm2( v2 );
-        // auto  c  = n0 * n1 * n2;
-        
-        if ( max_val < 1e-20 ) // just fail-safe
-            break;
-
-        blas::scale( 1.0 / max_val, v0 );
-        blas::scale( 1.0 / max_val, v1 );
-        blas::scale( 1.0 / max_val, v2 );
-        
-        // std::cout << v0 << std::endl;
-        // std::cout << v1 << std::endl;
-        // std::cout << v2 << std::endl;
-        
-        for ( uint  l = 0; l < X.size(2); ++l )
-            for ( uint  j = 0; j < X.size(1); ++j )
-                for ( uint  i = 0; i < X.size(0); ++i )
-                    X(i,j,l) -= max_val * v0(i) * v1(j) * v2(l);
-
-        const auto  norm_X = blas::norm_F( X );
-        
-        std::cout << step << " : " << format_norm( norm_X ) << " / " << max_val << std::endl;
-        // std::cout << X << std::endl;
-        
-        if ( norm_X < tol )
-            break;
-        
-        C.push_back( max_val );
-        V0.push_back( std::move( v0 ) );
-        V1.push_back( std::move( v1 ) );
-        V2.push_back( std::move( v2 ) );
-
-        step++;
-    }// while
-
-    std::cout << "rank : " << C.size() << std::endl;
-}
+test_tensors ();
 
 //
 // main function
@@ -255,136 +172,20 @@ program_main ()
 
     if ( false )
     {
-        blas::matrix< double >  M( 3, 2 );
-
-        M( 0, 0 ) = 1;
-        M( 0, 1 ) = 2;
-        M( 1, 0 ) = 3;
-        M( 1, 1 ) = 4;
-        M( 2, 0 ) = 5;
-        M( 2, 1 ) = 6;
-
-        io::hdf5::write( M, "M" );
-        
-        auto  M2 = blas::copy( blas::adjoint( M ) );
-        
-        io::hdf5::write( M2, "M2" );
-        
+        test_tensors< value_t >();
         return;
-    }
-    
+    }// if
+
     {
-        blas::tensor3< double >  M( 4, 3, 2 );
-        uint  val = 1;
+        auto  M = blas::random< value_t >( 4, 4 );
+        auto  R = blas::matrix< value_t >();
 
-        for ( uint l = 0; l < 2; ++l )
-            for ( uint j = 0; j < 3; ++j )
-                for ( uint i = 0; i < 4; ++i )
-                    M( i, j, l ) = val++;
+        io::matlab::write( M, "M" );
 
-        std::cout << M << std::endl;
+        blas::lq( M, R );
         
-        io::hdf5::write( M, "M" );
-        
-        return;
-    }
-    
-    if ( false )
-    {
-        //
-        // play around with slices and tensor_product
-        //
-        
-        auto  X = blas::tensor3< value_t >( 3, 4, 2 );
-        uint  val = 1;
-        
-        for ( size_t  i = 0; i < 3*4*2; ++i )
-            X.data()[i] = val++;
-
-        std::cout << X << std::endl;
-
-        if ( true )
-        {
-            auto  U = blas::matrix< value_t >( 2, 3 );
-
-            val = 1;
-
-            for ( size_t  i = 0; i < 2*3; ++i )
-                U.data()[i] = val++;
-        
-            std::cout << U << std::endl;
-
-            auto  XU = blas::tensor_product( X, U, 0 );
-            
-            std::cout << XU << std::endl;
-            
-            auto  X0   = blas::copy( X.slice( 2, 0 ) );
-            auto  X1   = blas::copy( X.slice( 2, 1 ) );
-            auto  XU0  = blas::prod( U, X0 );
-            auto  XU1  = blas::prod( U, X1 );
-            
-            std::cout << XU1 << std::endl;
-            std::cout << XU0 << std::endl;
-        }
-
-        if ( false )
-        {
-            auto  U = blas::matrix< value_t >( 3, 4 );
-
-            val = 1;
-
-            for ( size_t  i = 0; i < 2*4; ++i )
-                U.data()[i] = val++;
-        
-            std::cout << U << std::endl;
-
-            auto  XU = blas::tensor_product( X, U, 1 );
-            
-            std::cout << XU << std::endl;
-            
-            auto  X0   = blas::copy( X.slice( 0, 0 ) );
-            auto  X1   = blas::copy( X.slice( 0, 1 ) );
-            auto  XU0  = blas::prod( U, X0 );
-            auto  XU1  = blas::prod( U, X1 );
-            
-            std::cout << XU1 << std::endl;
-            std::cout << XU0 << std::endl;
-        }
-        
-        if ( false )
-        {
-            auto  U = blas::matrix< value_t >( 2, 2 );
-
-            val = 1;
-
-            for ( size_t  i = 0; i < 2*4; ++i )
-                U.data()[i] = val++;
-        
-            std::cout << U << std::endl;
-
-            auto  XU = blas::tensor_product( X, U, 2 );
-            
-            std::cout << XU << std::endl;
-            
-            auto  X0   = blas::copy( X.slice( 1, 0 ) );
-            std::cout << X0 << std::endl;
-            // auto  X1   = blas::copy( X.slice( 1, 1 ) );
-            auto  XU0  = blas::prod( U, X0 );
-            // auto  XU1  = blas::prod( X1, blas::transposed( U ) );
-            
-            // std::cout << XU1 << std::endl;
-            std::cout << XU0 << std::endl;
-        }
-        
-        // auto  X_1  = X.slice( 1, 2 );
-        
-        // std::cout << X_1 << std::endl;
-        
-        // auto  X_01 = X.fiber( 0, 0, 0 );
-
-        // std::cout << X_01 << std::endl;
-
-        return;
+        io::matlab::write( M, "Q" );
+        io::matlab::write( R, "R" );
     }
     
     auto  tic = timer::now();
@@ -410,7 +211,7 @@ program_main ()
     {
         tic = timer::now();
 
-        switch ( 2 )
+        switch ( 0 )
         {
             case 0:
                 std::cout << "  " << term::bullet << term::bold << "building Coulomb cost tensor" << term::reset << std::endl;
@@ -453,15 +254,6 @@ program_main ()
     auto  tapprox = split( cmdline::tapprox, "," );
     
     //
-    // cross approximation
-    //
-
-    if ( contains( tapprox, "tcafull" ) )
-    {
-        tca_full( X, cmdline::eps * norm_X );
-    }// if
-    
-    //
     // HOSVD
     //
     
@@ -497,7 +289,7 @@ program_main ()
 
         Z.compress( Hpro::fixed_prec( cmdline::eps ) );
 
-        error = blas::tucker_error( X, Z.G_decompressed(), Z.X_decompressed(0), Z.X_decompressed(1), Z.X_decompressed(2) );
+        error = blas::tucker_error( X, Z.G(), Z.X(0), Z.X(1), Z.X(2) );
 
         std::cout << "    mem    = " << format_mem( Z.byte_size() ) << std::endl;
         std::cout << "      rate = " << format_rate( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
@@ -539,7 +331,7 @@ program_main ()
 
         Z.compress( Hpro::fixed_prec( cmdline::eps ) );
 
-        error = blas::tucker_error( X, Z.G_decompressed(), Z.X_decompressed(0), Z.X_decompressed(1), Z.X_decompressed(2) );
+        error = blas::tucker_error( X, Z.G(), Z.X(0), Z.X(1), Z.X(2) );
 
         std::cout << "    mem    = " << format_mem( Z.byte_size() ) << std::endl;
         std::cout << "      rate = " << format_rate( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
@@ -608,7 +400,7 @@ program_main ()
 
         Z.compress( Hpro::fixed_prec( cmdline::eps ) );
 
-        error = blas::tucker_error( X, Z.G_decompressed(), Z.X_decompressed(0), Z.X_decompressed(1), Z.X_decompressed(2) );
+        error = blas::tucker_error( X, Z.G(), Z.X(0), Z.X(1), Z.X(2) );
 
         std::cout << "    mem    = " << format_mem( Z.byte_size() ) << std::endl;
         std::cout << "      rate = " << format_rate( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
@@ -641,11 +433,12 @@ program_main ()
 
         if ( verbose(1) ) io::vtk::print( *H, "H" );
 
-        auto  Y = impl::tensor::to_dense( *H );
+        auto  Y  = impl::tensor::to_dense( *H );
+        auto  YT = Y->tensor();
 
-        impl::blas::add( -1, X, Y->tensor() );
+        impl::blas::add( -1, X, YT );
 
-        auto  error = impl::blas::norm_F( Y->tensor() );
+        auto  error = impl::blas::norm_F( YT );
         
         std::cout << "    error  = " << format_error( error, error / norm_X ) << std::endl;
 
@@ -662,8 +455,149 @@ program_main ()
         std::cout << "      rate = " << format_rate( double(X.byte_size()) / double(H->byte_size()) ) << std::endl;
 
         Y = impl::tensor::to_dense( *H );
-        impl::blas::add( -1, X, Y->tensor() );
-        error = impl::blas::norm_F( Y->tensor() );
+        YT = Y->tensor();
+        impl::blas::add( -1, X, YT );
+        error = impl::blas::norm_F( YT );
         std::cout << "    error  = " << format_error( error, error / norm_X ) << std::endl;
     }
+
+    //
+    // cross approximation
+    //
+
+    if ( contains( tapprox, "tcafull" ) )
+    {
+        std::cout << term::bullet << term::bold << "TCA-Full" << " ( ε = " << cmdline::eps << " )" << term::reset << std::endl;
+        
+        auto  tol = cmdline::eps;
+        auto  acc = relative_prec( tol );
+        
+        tic = timer::now();
+        
+        auto  [ G, X0, X1, X2 ] = blas::tca_full( X, acc, verbosity );
+        
+        toc = timer::since( tic );
+            
+        std::cout << "    done in  " << format_time( toc ) << std::endl;
+        std::cout << "    ranks  = " << term::bold << G.size(0) << " × " << G.size(1) << " × " << G.size(2) << term::reset << std::endl;
+
+        auto  Z     = tensor::tucker_tensor3< value_t >( is( 0, X.size(0)-1 ), is( 0, X.size(1)-1 ), is( 0, X.size(2)-1 ),
+                                                         std::move( G ),
+                                                         std::move( X0 ),
+                                                         std::move( X1 ),
+                                                         std::move( X2 ) );
+        auto  error = blas::tucker_error( X, Z.G(), Z.X(0), Z.X(1), Z.X(2) );
+            
+        std::cout << "    mem    = " << format_mem( Z.byte_size() ) << std::endl;
+        std::cout << "      rate = " << format_rate( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
+        std::cout << "    error  = " << format_error( error, error / norm_X ) << std::endl;
+        
+        std::cout << "  " << term::bullet << term::bold << "compression via " << compress::provider << term::reset << std::endl;
+
+        Z.compress( Hpro::fixed_prec( cmdline::eps ) );
+
+        error = blas::tucker_error( X, Z.G(), Z.X(0), Z.X(1), Z.X(2) );
+
+        std::cout << "    mem    = " << format_mem( Z.byte_size() ) << std::endl;
+        std::cout << "      rate = " << format_rate( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
+        std::cout << "    error  = " << format_error( error, error / norm_X ) << std::endl;
+    }// if
+}
+
+template < typename value_t >
+void
+test_tensors ()
+{
+    //
+    // play around with slices and tensor_product
+    //
+        
+    auto  X = blas::tensor3< value_t >( 3, 4, 2 );
+    uint  val = 1;
+        
+    for ( size_t  i = 0; i < 3*4*2; ++i )
+        X.data()[i] = val++;
+
+    std::cout << X << std::endl;
+
+    if ( true )
+    {
+        auto  U = blas::matrix< value_t >( 2, 3 );
+
+        val = 1;
+
+        for ( size_t  i = 0; i < 2*3; ++i )
+            U.data()[i] = val++;
+        
+        std::cout << U << std::endl;
+
+        auto  XU = blas::tensor_product( X, U, 0 );
+            
+        std::cout << XU << std::endl;
+            
+        auto  X0   = blas::copy( X.slice( 2, 0 ) );
+        auto  X1   = blas::copy( X.slice( 2, 1 ) );
+        auto  XU0  = blas::prod( U, X0 );
+        auto  XU1  = blas::prod( U, X1 );
+            
+        std::cout << XU1 << std::endl;
+        std::cout << XU0 << std::endl;
+    }
+
+    if ( false )
+    {
+        auto  U = blas::matrix< value_t >( 3, 4 );
+
+        val = 1;
+
+        for ( size_t  i = 0; i < 2*4; ++i )
+            U.data()[i] = val++;
+        
+        std::cout << U << std::endl;
+
+        auto  XU = blas::tensor_product( X, U, 1 );
+            
+        std::cout << XU << std::endl;
+            
+        auto  X0   = blas::copy( X.slice( 0, 0 ) );
+        auto  X1   = blas::copy( X.slice( 0, 1 ) );
+        auto  XU0  = blas::prod( U, X0 );
+        auto  XU1  = blas::prod( U, X1 );
+            
+        std::cout << XU1 << std::endl;
+        std::cout << XU0 << std::endl;
+    }
+        
+    if ( false )
+    {
+        auto  U = blas::matrix< value_t >( 2, 2 );
+
+        val = 1;
+
+        for ( size_t  i = 0; i < 2*4; ++i )
+            U.data()[i] = val++;
+        
+        std::cout << U << std::endl;
+
+        auto  XU = blas::tensor_product( X, U, 2 );
+            
+        std::cout << XU << std::endl;
+            
+        auto  X0   = blas::copy( X.slice( 1, 0 ) );
+        std::cout << X0 << std::endl;
+        // auto  X1   = blas::copy( X.slice( 1, 1 ) );
+        auto  XU0  = blas::prod( U, X0 );
+        // auto  XU1  = blas::prod( X1, blas::transposed( U ) );
+            
+        // std::cout << XU1 << std::endl;
+        std::cout << XU0 << std::endl;
+    }
+        
+    // auto  X_1  = X.slice( 1, 2 );
+        
+    // std::cout << X_1 << std::endl;
+        
+    // auto  X_01 = X.fiber( 0, 0, 0 );
+
+    // std::cout << X_01 << std::endl;
 }

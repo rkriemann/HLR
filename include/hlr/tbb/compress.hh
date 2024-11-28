@@ -995,7 +995,7 @@ compress ( tensor::base_tensor3< value_t > &  A,
                             if ( is_null( BA->block( i, j, l ) ) )
                                 continue;
                             
-                            compress( *BA->block( i, j, l ), acc );
+                            hlr::tbb::tensor::compress( *BA->block( i, j, l ), acc );
                         }// for
                     }// for
                 }// for

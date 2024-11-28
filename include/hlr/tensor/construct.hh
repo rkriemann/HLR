@@ -137,10 +137,10 @@ merge_all ( const indexset &                  is0,
                     auto  X1_ijl = blas::matrix< value_t >( X1, D_ijl->is(1) - is1.first(), k1 );
                     auto  X2_ijl = blas::matrix< value_t >( X2, D_ijl->is(2) - is2.first(), k2 );
 
-                    blas::copy( D_ijl->G_decompressed(), G_ijl );
-                    blas::copy( D_ijl->X_decompressed( 0 ), X0_ijl );
-                    blas::copy( D_ijl->X_decompressed( 1 ), X1_ijl );
-                    blas::copy( D_ijl->X_decompressed( 2 ), X2_ijl );
+                    blas::copy( D_ijl->G(),  G_ijl );
+                    blas::copy( D_ijl->X(0), X0_ijl );
+                    blas::copy( D_ijl->X(1), X1_ijl );
+                    blas::copy( D_ijl->X(2), X2_ijl );
 
                     ofs[0] += D_ijl->rank(0);
                     ofs[1] += D_ijl->rank(1);
