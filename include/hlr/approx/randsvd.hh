@@ -630,6 +630,19 @@ struct RandSVDFull
     //
     
     template < typename value_t >
+    std::pair< blas::matrix< value_t >,
+               blas::vector< real_type_t< value_t > > >
+    column_basis ( const blas::matrix< value_t > &  op ) const
+    {
+        using  real_t = real_type_t< value_t >;
+        
+        auto  S = blas::vector< real_t >();
+        auto  Q = detail::rand_column_basis_full_svd( op, 0, power_steps, oversampling, & S );
+
+        return { std::move( Q ), std::move( S ) };
+    }
+    
+    template < typename value_t >
     blas::matrix< value_t >
     column_basis ( const blas::matrix< value_t > &  op,
                    const accuracy &                 acc,
