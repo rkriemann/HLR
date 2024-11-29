@@ -173,6 +173,61 @@ rand_column_basis_full_svd ( const operator_t &  M,
     return blas::copy( Qk );
 }
 
+template < typename operator_t >
+blas::matrix< typename operator_t::value_t >
+rand_column_basis_full_svd ( const operator_t &  M,
+                             const uint          /* block_size */,  // ignored
+                             const uint          /* power_steps */, // ignored
+                             const uint          oversampling,
+                             blas::vector< Hpro::real_type_t< typename operator_t::value_t > > *  sv = nullptr )
+{
+    using  value_t = typename operator_t::value_t;
+    using  real_t  = Hpro::real_type_t< value_t >;
+        
+    const auto  nrows_M = nrows( M );
+    const auto  ncols_M = ncols( M );
+
+    std::random_device          rd{};
+    std::mt19937                generator{ rd() };
+    std::normal_distribution<>  distr{ 0, 1 };
+    auto                        rand_norm = [&] () { return distr( generator ); };
+    
+    //
+    // generate random sampling matrix T and Q ≔ M·T
+    //
+    
+    auto  k = std::min( nrows_M, ncols_M );
+    auto  T = blas::matrix< value_t >( ncols_M, k + oversampling );
+    
+    blas::fill_fn( T, rand_norm );
+    
+    auto  Q = blas::matrix< value_t >( nrows_M, k + oversampling );
+    auto  R = blas::matrix< value_t >( k + oversampling, k + oversampling );
+    
+    prod( value_t(1), Hpro::apply_normal, M, T, Q );
+
+    //
+    // truncate
+    //
+
+    auto  S = blas::vector< real_t >( Q.ncols() );
+    
+    blas::svd( Q, S );
+
+    if ( ! is_null( sv ) )
+    {
+        if ( sv->length() != k )
+            *sv = std::move( blas::vector< real_t >( k ) );
+        
+        for ( uint  i = 0; i < k; ++i )
+            (*sv)(i) = S(i);
+    }// if
+
+    auto  Qk = Q( blas::range::all, blas::range( 0, k-1 ) );
+        
+    return blas::copy( Qk );
+}
+
 //
 // compute basis for column space (range) of M
 // - fully adaptive version
