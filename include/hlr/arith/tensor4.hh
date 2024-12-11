@@ -144,11 +144,11 @@ public:
                 _stride[3] = _length[0]*_length[1]*_length[2];
                 super_t::alloc_wo_value( _length[0] * _length[1] * _length[2] * _length[3] );
 
-                for ( idx_t  k = 0; k < idx_t( _length[3] ); k++ )
-                    for ( idx_t  l = 0; l < idx_t( _length[2] ); l++ )
-                        for ( idx_t  j = 0; j < idx_t( _length[1] ); j++ )
-                            for ( idx_t  i = 0; i < idx_t( _length[0] ); i++ )
-                                (*this)(i,j,l,k) = t(i,j,l,k);
+                for ( idx_t  i3 = 0; i3 < idx_t( _length[3] ); i3++ )
+                    for ( idx_t  i2 = 0; i2 < idx_t( _length[2] ); i2++ )
+                        for ( idx_t  i1 = 0; i1 < idx_t( _length[1] ); i1++ )
+                            for ( idx_t  i0 = 0; i0 < idx_t( _length[0] ); i0++ )
+                                (*this)(i0,i1,i2,i3) = t(i0,i1,i2,i3);
                 
                 break;
         }// switch
@@ -210,14 +210,14 @@ public:
                 _stride[2] = _length[0]*_length[1];
                 _stride[3] = _length[0]*_length[1]*_length[2];
 
-                for ( idx_t  k = 0; k < idx_t( _length[3] ); k++ )
-                    for ( idx_t  l = 0; l < idx_t( _length[2] ); l++ )
-                        for ( idx_t  j = 0; j < idx_t( _length[1] ); j++ )
-                            for ( idx_t  i = 0; i < idx_t( _length[0] ); i++ )
-                                (*this)(i,j,l,k) = t( r0.first() + i * idx_t( r0.stride() ),
-                                                      r1.first() + j * idx_t( r1.stride() ),
-                                                      r2.first() + l * idx_t( r2.stride() ),
-                                                      r3.first() + k * idx_t( r3.stride() ) );
+                for ( idx_t  i3 = 0; i3 < idx_t( _length[3] ); i3++ )
+                    for ( idx_t  i2 = 0; i2 < idx_t( _length[2] ); i2++ )
+                        for ( idx_t  i1 = 0; i1 < idx_t( _length[1] ); i1++ )
+                            for ( idx_t  i0 = 0; i0 < idx_t( _length[0] ); i0++ )
+                                (*this)(i0,i1,i2,i3) = t( r0.first() + i0 * idx_t( r0.stride() ),
+                                                          r1.first() + i1 * idx_t( r1.stride() ),
+                                                          r2.first() + i2 * idx_t( r2.stride() ),
+                                                          r3.first() + i3 * idx_t( r3.stride() ) );
                 break;
         }// switch
     }
@@ -283,29 +283,29 @@ public:
     size_t       size         ( const uint  d ) const { return _length[d]; }
 
     // return coefficient (i,j,l,k)
-    value_t      operator ()  ( const idx_t  i,
-                                const idx_t  j,
-                                const idx_t  l,
-                                const idx_t  k ) const
+    value_t      operator ()  ( const idx_t  i0,
+                                const idx_t  i1,
+                                const idx_t  i2,
+                                const idx_t  i3 ) const
     {
-        HLR_DBG_ASSERT( i < idx_t(_length[0]) &&
-                        j < idx_t(_length[1]) &&
-                        l < idx_t(_length[2]) &&
-                        k < idx_t(_length[3]) );
-        return super_t::_data[ k * _stride[3] + l * _stride[2] + j * _stride[1] + i * _stride[0] ];
+        HLR_DBG_ASSERT( i0 < idx_t(_length[0]) &&
+                        i1 < idx_t(_length[1]) &&
+                        i2 < idx_t(_length[2]) &&
+                        i3 < idx_t(_length[3]) );
+        return super_t::_data[ i3 * _stride[3] + i2 * _stride[2] + i1 * _stride[1] + i0 * _stride[0] ];
     }
 
     // return reference to coefficient (i,j,l,k)
-    value_t &    operator ()  ( const idx_t  i,
-                                const idx_t  j,
-                                const idx_t  l,
-                                const idx_t  k )
+    value_t &    operator ()  ( const idx_t  i0,
+                                const idx_t  i1,
+                                const idx_t  i2,
+                                const idx_t  i3 )
     {
-        HLR_DBG_ASSERT( i < idx_t(_length[0]) &&
-                        j < idx_t(_length[1]) &&
-                        l < idx_t(_length[2]) &&
-                        k < idx_t(_length[3]) );
-        return super_t::_data[ k * _stride[3] + l * _stride[2] + j * _stride[1] + i * _stride[0] ];
+        HLR_DBG_ASSERT( i0 < idx_t(_length[0]) &&
+                        i1 < idx_t(_length[1]) &&
+                        i2 < idx_t(_length[2]) &&
+                        i3 < idx_t(_length[3]) );
+        return super_t::_data[ i3 * _stride[3] + i2 * _stride[2] + i1 * _stride[1] + i0 * _stride[0] ];
     }
 
     // return pointer to internal data
@@ -350,10 +350,10 @@ public:
     }
     
     // return tensor referencing sub tensor defined by \a r1 × \a r2
-    tensor4< value_t >  operator () ( const blas::range & r0,
-                                      const blas::range & r1,
-                                      const blas::range & r2,
-                                      const blas::range & r3 ) const
+    tensor4< value_t >  operator () ( const blas::range &  r0,
+                                      const blas::range &  r1,
+                                      const blas::range &  r2,
+                                      const blas::range &  r3 ) const
     {
         return tensor4< value_t >( *this, r0, r1, r2, r3 );
     }
@@ -366,6 +366,8 @@ public:
     matrix< value_t >  slice ( const uint    mode,
                                const size_t  i ) const
     {
+        HLR_ERROR( "TODO" );
+        
         if      ( mode == 0 ) return matrix< value_t >( data() + i,                               size(1), size(0), size(2), size(0)*size(1) );
         else if ( mode == 1 ) return matrix< value_t >( data() + i * size(0),                     size(0),       1, size(2), size(0)*size(1) );
         else if ( mode == 2 ) return matrix< value_t >( data() + i * size(0) * size(1),           size(0),       1, size(1), size(0)         );
@@ -380,12 +382,21 @@ public:
                                const size_t  j,
                                const size_t  l ) const
     {
-        if      ( mode == 0 ) return vector< value_t >( data() + l * size(0) * size(1) * size(2) + j * size(0) * size(1) + i * size(0), size(0), 1 ); // i = col, j = page
-        else if ( mode == 1 ) return vector< value_t >( data() + j * size(0) * size(1) + i,           size(1), size(0) );                             // i = row, j = page
-        else if ( mode == 2 ) return vector< value_t >( data() + j * size(0) + i,                     size(2), size(0)*size(1) );                     // i = row, j = col
-        else if ( mode == 3 ) return vector< value_t >( data() + j * size(0) + i,                     size(2), size(0)*size(1) );                     // i = row, j = col
-        else
-            HLR_ERROR( "wrong mode" );
+        idx_t  i0 = 0;
+        idx_t  i1 = 0;
+        idx_t  i2 = 0;
+        idx_t  i3 = 0;
+        
+        switch ( mode )
+        {
+            case  0 : {         i1 = i; i2 = j; i3 = l; } break;
+            case  1 : { i0 = i;         i2 = j; i3 = l; } break;
+            case  2 : { i0 = i; i1 = j;         i3 = l; } break;
+            case  3 : { i0 = i; i1 = j; i2 = l;         } break;
+            default : HLR_ERROR( "wrong mode" );
+        }// switch
+
+        return vector< value_t >( data() + i3 * _stride[3] + i2 * _stride[2] + i1 * _stride[1] + i0 + _stride[0], _length[mode], _stride[mode] );
     }
                           
     // unfolding
@@ -434,25 +445,26 @@ copy ( const tensor4< value_t > &  t )
 //
 // print tensor to (standard) output
 //
+template < typename value_t >
 void
-print ( const tensor_type auto &  t,
-        std::ostream &            out = std::cout )
+print ( const tensor4< value_t > &  t,
+        std::ostream &              out = std::cout )
 {
     // from back to front
-    for ( int  k = t.size(3)-1; k >= 0; --k )
+    for ( int  i3 = t.size(3)-1; i3 >= 0; --i3 )
     {
-        for ( int  l = t.size(2)-1; l >= 0; --l )
+        for ( int  i2 = t.size(2)-1; i2 >= 0; --i2 )
         {
             // top to bottom
-            for ( uint  i = 0; i < t.size(0); ++i )
+            for ( uint  i0 = 0; i0 < t.size(0); ++i0 )
             {
                 // offset of 3D effect
-                for ( uint  o = 0; o < l; ++o )
+                for ( uint  o = 0; o < i2; ++o )
                     out << "   ";
                 
                 // print single row
-                for ( uint  j = 0; j < t.size(1); ++j )
-                    out << t( i, j, l ) << ", ";
+                for ( uint  i1 = 0; i1 < t.size(1); ++i1 )
+                    out << t( i0, i1, i2, i3 ) << ", ";
                 
                 out << std::endl;
             }// for
@@ -491,15 +503,15 @@ real_type_t< value_t >
 max_abs_val ( const tensor4< value_t > &  t );
 
 //
-// compute B := α A + β B (element wise)
+// compute t₂ := α t₁ + β t₂ (element wise)
 //
 template < typename alpha_t,
            typename value_t >
 requires ( std::convertible_to< alpha_t, value_t > )
 void
 add ( const alpha_t               alpha,
-      const tensor4< value_t > &  A,
-      tensor4< value_t > &        B );
+      const tensor4< value_t > &  t1,
+      tensor4< value_t > &        t2 );
 
 template < typename alpha_t,
            typename beta_t,
@@ -508,28 +520,28 @@ requires ( std::convertible_to< alpha_t, value_t > &&
            std::convertible_to< beta_t, value_t > )
 void
 add ( const alpha_t               alpha,
-      const tensor4< value_t > &  A,
+      const tensor4< value_t > &  t1,
       const beta_t                beta,
-      tensor4< value_t > &        B );
+      tensor4< value_t > &        t2 );
 using Hpro::BLAS::add;
 
 //
-// compute d-mode tensor product X×M
+// compute d-mode tensor product with matrix t × M
 //
 template < typename     value_t,
            matrix_type  matrix_t >
 tensor4< value_t >
-tensor_product ( const tensor4< value_t > &  X,
+tensor_product ( const tensor4< value_t > &  t,
                  const matrix_t &            M,
                  const uint                  mode );
 
 //
-// element-wise multiplication X2 := X1 * X2
+// element-wise multiplication t₂ := t₁ * t₂
 //
 template < typename value_t >
 tensor4< value_t >
-hadamard_product ( const tensor4< value_t > &  X1,
-                   tensor4< value_t > &        X2 );
+hadamard_product ( const tensor4< value_t > &  t1,
+                   tensor4< value_t > &        t2 );
 
 }}// namespace hlr::blas
 

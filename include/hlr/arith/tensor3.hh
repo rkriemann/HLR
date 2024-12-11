@@ -338,11 +338,25 @@ public:
                                const size_t  i,
                                const size_t  j ) const
     {
-        if      ( mode == 0 ) return vector< value_t >( data() + j * size(0) * size(1) + i * size(0), size(0), 1 );               // i = column, j = page
-        else if ( mode == 1 ) return vector< value_t >( data() + j * size(0) * size(1) + i,           size(1), size(0) );         // i = row,    j = page
-        else if ( mode == 2 ) return vector< value_t >( data() + j * size(0) + i,                     size(2), size(0)*size(1) ); // i = row,    j = column
-        else
-            HLR_ERROR( "wrong mode" );
+        idx_t  i0 = 0;
+        idx_t  i1 = 0;
+        idx_t  i2 = 0;
+        
+        switch ( mode )
+        {
+            case  0 : {         i1 = i; i2 = j; } break;
+            case  1 : { i0 = i;         i2 = j; } break;
+            case  2 : { i0 = i; i1 = j;         } break;
+            default : HLR_ERROR( "wrong mode" );
+        }// switch
+
+        return vector< value_t >( data() + i2 * _stride[2] + i1 * _stride[1] + i0 + _stride[0], _length[mode], _stride[mode] );
+
+        // if      ( mode == 0 ) return vector< value_t >( data() + j * size(0) * size(1) + i * size(0), size(0), 1 );               // i = column, j = page
+        // else if ( mode == 1 ) return vector< value_t >( data() + j * size(0) * size(1) + i,           size(1), size(0) );         // i = row,    j = page
+        // else if ( mode == 2 ) return vector< value_t >( data() + j * size(0) + i,                     size(2), size(0)*size(1) ); // i = row,    j = column
+        // else
+        //     HLR_ERROR( "wrong mode" );
     }
                           
     // unfolding
