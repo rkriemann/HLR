@@ -8,94 +8,102 @@ namespace hlr { namespace blas {
 //
 template < typename value_t >
 matrix< value_t >
-tensor4< value_t >::unfold ( const uint  d ) const
+tensor4< value_t >::unfold ( const uint  mode ) const
 {
-    HLR_ASSERT( d < 3 );
-    
-    if ( d == 0 )
-    {
-        auto    M   = matrix< value_t >( size(0), size(1) * size(2) * size(3) );
-        size_t  col = 0;
+    HLR_ASSERT( mode < 4 );
 
-        for ( size_t  i3 = 0; i3 < size(3); ++i3 )
+    switch ( mode )
+    {
+        case  0 :
         {
+            auto    M   = matrix< value_t >( size(0), size(1) * size(2) * size(3) );
+            size_t  col = 0;
+
+            for ( size_t  i3 = 0; i3 < size(3); ++i3 )
+            {
+                for ( size_t  i2 = 0; i2 < size(2); ++i2 )
+                {
+                    for ( size_t  i1 = 0; i1 < size(1); ++i1 )
+                    {
+                        auto  t_123 = fiber( mode, i1, i2, i3 );
+                        auto  m_c   = M.column( col++ );
+                    
+                        blas::copy( t_123, m_c );
+                    }// for
+                }// for
+            }// for
+            
+            return M;
+        }// case
+
+        case  1 :
+        {
+            auto    M   = matrix< value_t >( size(1), size(0) * size(2) * size(3) );
+            size_t  col = 0;
+
+            for ( size_t  i3 = 0; i3 < size(3); ++i3 )
+            {
+                for ( size_t  i2 = 0; i2 < size(2); ++i2 )
+                {
+                    for ( size_t  i0 = 0; i0 < size(0); ++i0 )
+                    {
+                        auto  t_023 = fiber( mode, i0, i2, i3 );
+                        auto  m_c   = M.column( col++ );
+                    
+                        blas::copy( t_023, m_c );
+                    }// for
+                }// for
+            }// for
+        
+            return M;
+        }// case
+        
+        case  2 :
+        {
+            auto    M   = matrix< value_t >( size(2), size(0) * size(1) * size(3) );
+            size_t  col = 0;
+        
+            for ( size_t  i3 = 0; i3 < size(3); ++i3 )
+            {
+                for ( size_t  i1 = 0; i1 < size(1); ++i1 )
+                {
+                    for ( size_t  i0 = 0; i0 < size(0); ++i0 )
+                    {
+                        auto  t_013 = fiber( mode, i0, i1, i3 );
+                        auto  m_c   = M.column( col++ );
+                
+                        blas::copy( t_013, m_c );
+                    }// for
+                }// for
+            }// for
+        
+            return M;
+        }// case
+
+        case  3 :
+        {
+            auto    M   = matrix< value_t >( size(3), size(0) * size(1) * size(2) );
+            size_t  col = 0;
+        
             for ( size_t  i2 = 0; i2 < size(2); ++i2 )
             {
                 for ( size_t  i1 = 0; i1 < size(1); ++i1 )
                 {
-                    auto  t_123 = fiber( d, i1, i2, i3 );
-                    auto  m_c   = M.column( col++ );
-                    
-                    blas::copy( t_123, m_c );
+                    for ( size_t  i0 = 0; i0 < size(0); ++i0 )
+                    {
+                        auto  t_012 = fiber( mode, i0, i1, i2 );
+                        auto  m_c   = M.column( col++ );
+                
+                        blas::copy( t_012, m_c );
+                    }// for
                 }// for
             }// for
-        }// for
-            
-        return M;
-    }// if
-    else if ( d == 1 )
-    {
-        auto    M   = matrix< value_t >( size(1), size(0) * size(2) * size(3) );
-        size_t  col = 0;
+        
+            return M;
+        }// case
 
-        for ( size_t  i3 = 0; i3 < size(3); ++i3 )
-        {
-            for ( size_t  i2 = 0; i2 < size(2); ++i2 )
-            {
-                for ( size_t  i0 = 0; i0 < size(0); ++i0 )
-                {
-                    auto  t_023 = fiber( d, i0, i2, i3 );
-                    auto  m_c   = M.column( col++ );
-                    
-                    blas::copy( t_023, m_c );
-                }// for
-            }// for
-        }// for
-        
-        return M;
-    }// if
-    else if ( d == 2 )
-    {
-        auto    M   = matrix< value_t >( size(2), size(0) * size(1) * size(3) );
-        size_t  col = 0;
-        
-        for ( size_t  i3 = 0; i3 < size(3); ++i3 )
-        {
-            for ( size_t  i1 = 0; i1 < size(1); ++i1 )
-            {
-                for ( size_t  i0 = 0; i0 < size(0); ++i0 )
-                {
-                    auto  t_013 = fiber( d, i0, i1, i3 );
-                    auto  m_c   = M.column( col++ );
-                
-                    blas::copy( t_013, m_c );
-                }// for
-            }// for
-        }// for
-        
-        return M;
-    }// else
-    else // if ( d == 3 )
-    {
-        auto    M   = matrix< value_t >( size(3), size(0) * size(1) * size(2) );
-        size_t  col = 0;
-        
-        for ( size_t  i2 = 0; i2 < size(2); ++i2 )
-        {
-            for ( size_t  i1 = 0; i1 < size(1); ++i1 )
-            {
-                for ( size_t  i0 = 0; i0 < size(0); ++i0 )
-                {
-                    auto  t_012 = fiber( d, i0, i1, i2 );
-                    auto  m_c   = M.column( col++ );
-                
-                    blas::copy( t_012, m_c );
-                }// for
-            }// for
-        }// for
-        
-        return M;
-    }// else
+        default  : HLR_ERROR( "invalid mode" );
+    }// switch
 }
 
 ////////////////////////////////////////////////////////////////
@@ -227,60 +235,85 @@ tensor_product ( const tensor4< value_t > &  X,
 
     auto  Y = tensor4< value_t >( ( mode == 0 ? M.nrows() : X.size(0) ),
                                   ( mode == 1 ? M.nrows() : X.size(1) ),
-                                  ( mode == 2 ? M.nrows() : X.size(2) ) );
+                                  ( mode == 2 ? M.nrows() : X.size(2) ),
+                                  ( mode == 3 ? M.nrows() : X.size(3) ) );
 
-    if ( mode == 0 )
+    switch ( mode )
     {
-        for ( size_t  l = 0; l < X.size(2); ++l )
+        case  0 :
         {
-            for ( size_t  j = 0; j < X.size(1); ++j )
+            for ( size_t  i3 = 0; i3 < X.size(3); ++i3 )
             {
-                auto  x_ij = X.fiber( mode, j, l );
-                auto  y_ij = Y.fiber( mode, j, l );
-
-                mulvec( M, x_ij, y_ij );
+                for ( size_t  i2 = 0; i2 < X.size(2); ++i2 )
+                {
+                    for ( size_t  i1 = 0; i1 < X.size(1); ++i1 )
+                    {
+                        auto  x = X.fiber( mode, i1, i2, i3 );
+                        auto  y = Y.fiber( mode, i1, i2, i3 );
+                    
+                        mulvec( M, x, y );
+                    }// for
+                }// for
             }// for
-        }// for
-    }// if
-    else if ( mode == 1 )
-    {
-        for ( size_t  l = 0; l < X.size(2); ++l )
+        }// case
+        break;
+
+        case  1 :
         {
-            for ( size_t  i = 0; i < X.size(0); ++i )
+            for ( size_t  i3 = 0; i3 < X.size(3); ++i3 )
             {
-                auto  x_ij = X.fiber( mode, i, l );
-                auto  y_ij = Y.fiber( mode, i, l );
-
-                mulvec( M, x_ij, y_ij );
+                for ( size_t  i2 = 0; i2 < X.size(2); ++i2 )
+                {
+                    for ( size_t  i0 = 0; i0 < X.size(0); ++i0 )
+                    {
+                        auto  x = X.fiber( mode, i0, i2, i3 );
+                        auto  y = Y.fiber( mode, i0, i2, i3 );
+                    
+                        mulvec( M, x, y );
+                    }// for
+                }// for
             }// for
-        }// for
-    }// if
-    else if ( mode == 2 )
-    {
-        for ( size_t  j = 0; j < X.size(1); ++j )
+        }// case
+        break;
+
+        case  2 :
         {
-            for ( size_t  i = 0; i < X.size(0); ++i )
+            for ( size_t  i3 = 0; i3 < X.size(3); ++i3 )
             {
-                auto  x_ij = X.fiber( mode, i, j );
-                auto  y_ij = Y.fiber( mode, i, j );
+                for ( size_t  i1 = 0; i1 < X.size(1); ++i1 )
+                {
+                    for ( size_t  i0 = 0; i0 < X.size(0); ++i0 )
+                    {
+                        auto  x = X.fiber( mode, i0, i1, i3 );
+                        auto  y = Y.fiber( mode, i0, i1, i3 );
 
-                mulvec( M, x_ij, y_ij );
+                        mulvec( M, x, y );
+                    }// for
+                }// for
             }// for
-        }// for
-    }// if
-    else // if ( mode == 3 )
-    {
-        for ( size_t  j = 0; j < X.size(1); ++j )
+        }// case
+        break;
+
+        case  3 :
         {
-            for ( size_t  i = 0; i < X.size(0); ++i )
+            for ( size_t  i2 = 0; i2 < X.size(2); ++i2 )
             {
-                auto  x_ij = X.fiber( mode, i, j );
-                auto  y_ij = Y.fiber( mode, i, j );
+                for ( size_t  i1 = 0; i1 < X.size(1); ++i1 )
+                {
+                    for ( size_t  i0 = 0; i0 < X.size(0); ++i0 )
+                    {
+                        auto  x = X.fiber( mode, i0, i1, i2 );
+                        auto  y = Y.fiber( mode, i0, i1, i2 );
 
-                mulvec( M, x_ij, y_ij );
+                        mulvec( M, x, y );
+                    }// for
+                }// for
             }// for
-        }// for
-    }// if
+        }// case
+        break;
+
+        default : HLR_ERROR( "invalid mode" );
+    }// switch
 
     return Y;
 }

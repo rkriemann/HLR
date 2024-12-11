@@ -323,9 +323,36 @@ public:
     //
 
     // return slice by fixing i'th mode <mode>
-    matrix< value_t >  slice ( const uint    mode,
-                               const size_t  i ) const
+    matrix< value_t >
+    slice ( const uint    mode,
+            const size_t  i ) const
     {
+        // switch ( mode )
+        // {
+        //     // fixed: 0, I₁ × I₂
+        //     case  0 : return matrix< value_t >( data() + i * stride(0), // pointer to first element
+        //                                         size( 1 ),              // nrows
+        //                                         stride(0),              // row stride
+        //                                         size( 2 ),              // ncols
+        //                                         stride(0) * stride(1)   // col stride );
+
+        //     // fixed: 1, I₀ × I₂
+        //     case  1 : return matrix< value_t >( data() + i * stride(0), // pointer to first element
+        //                                         size( 0 ),              // nrows
+        //                                         stride(0),              // row stride
+        //                                         size( 2 ),              // ncols
+        //                                         stride(0) * stride(1)   // col stride );
+                                                
+        //     // fixed: 2, I₀ × I₁
+        //     case  2 : return matrix< value_t >( data() + i * stride(0), // pointer to first element
+        //                                         size( 0 ),              // nrows
+        //                                         stride(0),              // row stride
+        //                                         size( 1 ),              // ncols
+        //                                         stride(0) * stride(1)   // col stride );
+                                                
+        //     default : HLR_ERROR( "wrong mode" );
+        // }// switch
+
         if      ( mode == 0 ) return matrix< value_t >( data() + i,                     size(1), size(0), size(2), size(0)*size(1) );
         else if ( mode == 1 ) return matrix< value_t >( data() + i * size(0),           size(0),       1, size(2), size(0)*size(1) );
         else if ( mode == 2 ) return matrix< value_t >( data() + i * size(0) * size(1), size(0),       1, size(1), size(0)         );
@@ -334,9 +361,10 @@ public:
     }
                           
     // return (i,j)'th mode-d fiber
-    vector< value_t >  fiber ( const uint    mode,
-                               const size_t  i,
-                               const size_t  j ) const
+    vector< value_t >
+    fiber ( const uint    mode,
+            const size_t  i,
+            const size_t  j ) const
     {
         idx_t  i0 = 0;
         idx_t  i1 = 0;
@@ -350,7 +378,11 @@ public:
             default : HLR_ERROR( "wrong mode" );
         }// switch
 
-        return vector< value_t >( data() + i2 * _stride[2] + i1 * _stride[1] + i0 + _stride[0], _length[mode], _stride[mode] );
+        return vector< value_t >( data()
+                                  + ( i2 * _stride[2] )
+                                  + ( i1 * _stride[1] )
+                                  + ( i0 * _stride[0] ),
+                                  _length[mode], _stride[mode] );
 
         // if      ( mode == 0 ) return vector< value_t >( data() + j * size(0) * size(1) + i * size(0), size(0), 1 );               // i = column, j = page
         // else if ( mode == 1 ) return vector< value_t >( data() + j * size(0) * size(1) + i,           size(1), size(0) );         // i = row,    j = page
@@ -370,6 +402,12 @@ public:
     size_t  byte_size () const
     {
         return sizeof( value_t ) * _length[0] * _length[1] * _length[2] + sizeof(_length) + sizeof(_stride) + sizeof(super_t);
+    }
+
+    // return size of (floating point) data in bytes handled by this object
+    size_t  data_byte_size () const
+    {
+        return sizeof( value_t ) * _length[0] * _length[1] * _length[2];
     }
 
     //
@@ -404,19 +442,19 @@ void
 print ( const tensor3< value_t > &  t,
         std::ostream &              out = std::cout )
 {
-    // from back to front
-    for ( int  l = t.size(2)-1; l >= 0; --l )
+    // back to front
+    for ( int  i2 = t.size(2)-1; i2 >= 0; --i2 )
     {
         // top to bottom
-        for ( uint  i = 0; i < t.size(0); ++i )
+        for ( uint  i1 = 0; i1 < t.size(1); ++i1 )
         {
-            // offset of 3D effect
-            for ( uint  o = 0; o < l; ++o )
+            // offset for 3D effect
+            for ( uint  o = 0; o < i2; ++o )
                 out << "   ";
                     
             // print single row
-            for ( uint  j = 0; j < t.size(1); ++j )
-                out << t( i, j, l ) << ", ";
+            for ( uint  i0 = 0; i0 < t.size(0); ++i0 )
+                out << t( i0, i1, i2 ) << ", ";
 
             out << std::endl;
         }// for

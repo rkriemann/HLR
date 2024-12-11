@@ -77,6 +77,25 @@ tucker_diff ( const tensor3< value_t > &  D,
     return Y;
 }
 
+template < typename value_t >
+tensor4< value_t >
+tucker_diff ( const tensor4< value_t > &  D,
+              const tensor4< value_t > &  G,
+              const matrix< value_t > &   X0,
+              const matrix< value_t > &   X1,
+              const matrix< value_t > &   X2,
+              const matrix< value_t > &   X3 )
+{
+    auto  T0 = tensor_product( G,  X0, 0 );
+    auto  T1 = tensor_product( T0, X1, 1 );
+    auto  T2 = tensor_product( T1, X2, 2 );
+    auto  Y  = tensor_product( T2, X3, 3 );
+        
+    add( -1, D, Y );
+
+    return Y;
+}
+
 //
 // error of Tucker decomposition D - G ×₀ X₀ ×₁ X₁ ×₂ X₂ 
 //
@@ -89,6 +108,20 @@ tucker_error ( const tensor3< value_t > &  D,
                const matrix< value_t > &   X2 )
 {
     auto  Y = tucker_diff( D, G, X0, X1, X2 );
+
+    return norm_F( Y );
+}
+
+template < typename value_t >
+real_type_t< value_t >
+tucker_error ( const tensor4< value_t > &  D,
+               const tensor4< value_t > &  G,
+               const matrix< value_t > &   X0,
+               const matrix< value_t > &   X1,
+               const matrix< value_t > &   X2,
+               const matrix< value_t > &   X3 )
+{
+    auto  Y = tucker_diff( D, G, X0, X1, X2, X3 );
 
     return norm_F( Y );
 }
@@ -121,6 +154,37 @@ hosvd ( const tensor3< value_t > &  X,
     auto  G  = tensor_product( Y1, adjoint( U2 ), 2 );
 
     return { std::move(G), std::move(U0), std::move(U1), std::move(U2) };
+}
+
+template < typename                    value_t,
+           approx::approximation_type  approx_t >
+std::tuple< tensor4< value_t >,
+            matrix< value_t >,
+            matrix< value_t >,
+            matrix< value_t >,
+            matrix< value_t > >
+hosvd ( const tensor4< value_t > &  X,
+        const accuracy &            acc,
+        const approx_t &            apx )
+{
+    auto  X0 = X.unfold( 0 );
+    auto  U0 = apx.column_basis( X0, acc );
+
+    auto  X1 = X.unfold( 1 );
+    auto  U1 = apx.column_basis( X1, acc );
+
+    auto  X2 = X.unfold( 2 );
+    auto  U2 = apx.column_basis( X2, acc );
+
+    auto  X3 = X.unfold( 3 );
+    auto  U3 = apx.column_basis( X3, acc );
+
+    auto  Y0 = tensor_product( X,  adjoint( U0 ), 0 );
+    auto  Y1 = tensor_product( Y0, adjoint( U1 ), 1 );
+    auto  Y2 = tensor_product( Y1, adjoint( U2 ), 2 );
+    auto  G  = tensor_product( Y2, adjoint( U3 ), 3 );
+
+    return { std::move(G), std::move(U0), std::move(U1), std::move(U2), std::move(U3) };
 }
 
 template < typename  value_t >

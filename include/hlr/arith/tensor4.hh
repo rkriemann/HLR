@@ -373,7 +373,7 @@ public:
         else if ( mode == 2 ) return matrix< value_t >( data() + i * size(0) * size(1),           size(0),       1, size(1), size(0)         );
         else if ( mode == 3 ) return matrix< value_t >( data() + i * size(0) * size(1) * size(2), size(0),       1, size(1), size(0)         );
         else
-            HLR_ERROR( "wrong mode" );
+            HLR_ERROR( "invalid mode" );
     }
                           
     // return (i,j)'th mode-d fiber
@@ -393,10 +393,15 @@ public:
             case  1 : { i0 = i;         i2 = j; i3 = l; } break;
             case  2 : { i0 = i; i1 = j;         i3 = l; } break;
             case  3 : { i0 = i; i1 = j; i2 = l;         } break;
-            default : HLR_ERROR( "wrong mode" );
+            default : HLR_ERROR( "invalid mode" );
         }// switch
 
-        return vector< value_t >( data() + i3 * _stride[3] + i2 * _stride[2] + i1 * _stride[1] + i0 + _stride[0], _length[mode], _stride[mode] );
+        return vector< value_t >( data()
+                                  + ( i3 * _stride[3] )
+                                  + ( i2 * _stride[2] )
+                                  + ( i1 * _stride[1] )
+                                  + ( i0 * _stride[0] ),
+                                  _length[mode], _stride[mode] );
     }
                           
     // unfolding
@@ -450,20 +455,21 @@ void
 print ( const tensor4< value_t > &  t,
         std::ostream &              out = std::cout )
 {
-    // from back to front
+    // each mode 4 is shown as a separate 3d tensor
     for ( int  i3 = t.size(3)-1; i3 >= 0; --i3 )
     {
+        // back to front
         for ( int  i2 = t.size(2)-1; i2 >= 0; --i2 )
         {
-            // top to bottom
-            for ( uint  i0 = 0; i0 < t.size(0); ++i0 )
+            // bottom top
+            for ( uint  i1 = 0; i1 < t.size(1); ++i1 )
             {
-                // offset of 3D effect
+                // offset for 3D effect
                 for ( uint  o = 0; o < i2; ++o )
                     out << "   ";
                 
                 // print single row
-                for ( uint  i1 = 0; i1 < t.size(1); ++i1 )
+                for ( uint  i0 = 0; i0 < t.size(0); ++i0 )
                     out << t( i0, i1, i2, i3 ) << ", ";
                 
                 out << std::endl;

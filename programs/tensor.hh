@@ -298,7 +298,7 @@ program_main ()
 {
     using value_t = double;
 
-    if ( false )
+    if ( true )
     {
         test_tensors< value_t >();
         return;
@@ -665,6 +665,47 @@ template < typename value_t >
 void
 test_tensors ()
 {
+    {
+        int   n = 8;
+        auto  X = blas::tensor4< value_t >( n, n, n, n );
+        uint  val = 1;
+        
+        for ( size_t  i = 0; i < n*n*n*n; ++i )
+            X.data()[i] = val++;
+
+        std::cout << X << std::endl;
+
+        // if ( false )
+        // {
+        //     auto  v_000 = X.fiber( 0, 0, 0, 0 );
+        //     auto  v_100 = X.fiber( 0, 1, 0, 0 );
+        //     auto  v_210 = X.fiber( 0, 2, 1, 0 );
+        //     auto  v_231 = X.fiber( 0, 2, 2, 1 );
+
+        //     std::cout << v_000 << std::endl;
+        //     std::cout << v_100 << std::endl;
+        //     std::cout << v_210 << std::endl;
+        //     std::cout << v_231 << std::endl;
+        // }// if
+
+        // auto  M0 = X.unfold( 0 );
+        // auto  M1 = X.unfold( 1 );
+        // auto  M2 = X.unfold( 2 );
+        // auto  M3 = X.unfold( 3 );
+
+        // std::cout << M0 << std::endl;
+        // std::cout << M1 << std::endl;
+        // std::cout << M2 << std::endl;
+        // std::cout << M3 << std::endl;
+
+        auto  T                     = blas::copy( X );
+        auto  apx                   = approx::SVD< value_t >();
+        auto  [ G, U0, U1, U2, U3 ] = blas::hosvd( X, relative_prec( 1e-4 ), apx );
+
+        std::cout << G.size(0) << " x " << G.size(1) << " x " << G.size(2) << " x " << G.size(3) << std::endl;
+        std::cout << "error : " << format_error( blas::tucker_error( T, G, U0, U1, U2, U3 ), blas::tucker_error( T, G, U0, U1, U2, U3 ) / blas::norm_F( T ) ) << std::endl;
+    }
+    
     //
     // play around with slices and tensor_product
     //
@@ -678,6 +719,17 @@ test_tensors ()
     std::cout << X << std::endl;
 
     if ( true )
+    {
+        auto  v_z00 = X.fiber( 2, 0, 0 );
+        auto  v_z10 = X.fiber( 2, 1, 0 );
+        auto  v_z21 = X.fiber( 2, 2, 1 );
+
+        std::cout << v_z00 << std::endl;
+        std::cout << v_z10 << std::endl;
+        std::cout << v_z21 << std::endl;
+    }// if
+    
+    if ( false )
     {
         auto  U = blas::matrix< value_t >( 2, 3 );
 
