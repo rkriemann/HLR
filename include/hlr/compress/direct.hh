@@ -370,6 +370,8 @@ using hlr::compress::afl::get_config;
 using hlr::compress::afl::byte_size;
 using hlr::compress::afl::compressed_size;
 
+namespace zblas { using hlr::compress::afl::mulvec; }
+
 }} // namespace hlr::compress
 
 //////////////////////////////////////////////////////////////////////
@@ -484,6 +486,28 @@ using hlr::compress::mgard::compress;
 using hlr::compress::mgard::decompress;
 using hlr::compress::mgard::get_config;
 using hlr::compress::mgard::byte_size;
+
+}} // namespace hlr::compress
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_MP
+
+#include <hlr/compress/mixedprec.hh>
+
+namespace hlr { namespace compress {
+
+static const char provider[] = "mixedprec";
+
+using  zconfig_t = hlr::compress::mixedprec::config;
+using  zarray    = hlr::compress::mixedprec::zarray;
+
+using hlr::compress::mixedprec::compress;
+using hlr::compress::mixedprec::decompress;
+using hlr::compress::mixedprec::get_config;
+using hlr::compress::mixedprec::byte_size;
+using hlr::compress::mixedprec::compressed_size;
 
 }} // namespace hlr::compress
 

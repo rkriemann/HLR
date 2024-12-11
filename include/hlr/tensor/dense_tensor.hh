@@ -5,7 +5,7 @@
 // Module      : tensor/dense_tensor
 // Description : dense (full) tensor
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <hlr/arith/blas.hh>
@@ -25,7 +25,7 @@ namespace hlr { namespace tensor {
 // - storage layout is column-major
 //
 template < typename T_value >
-class dense_tensor3 : public base_tensor3< T_value >, public compress::compressible
+class dense_tensor3 : public base_tensor3< T_value >
 {
 public:
     using  value_t = T_value;
@@ -38,10 +38,8 @@ private:
     // tensor data
     blas::tensor3< value_t >   _tensor;
 
-    #if HLR_HAS_COMPRESSION == 1
     // compressed data
     compress::zarray           _ztensor;
-    #endif
     
 public:
     //
@@ -107,27 +105,25 @@ public:
     // access internal data
     //
 
-    blas::tensor3< value_t > &
-    tensor ()
-    {
-        HLR_ASSERT( ! is_compressed() );
-
-        return _tensor;
-    }
+    // blas::tensor3< value_t > &
+    // tensor ()
+    // {
+    //     HLR_ASSERT( ! is_compressed() );
+    //
+    //     return _tensor;
+    // }
     
-    const blas::tensor3< value_t > &
-    tensor () const
-    {
-        HLR_ASSERT( ! is_compressed() );
-
-        return _tensor;
-    }
+    // const blas::tensor3< value_t > &
+    // tensor () const
+    // {
+    //     HLR_ASSERT( ! is_compressed() );
+    // 
+    //     return _tensor;
+    // }
     
     blas::tensor3< value_t >
-    tensor_decompressed () const
+    tensor () const
     {
-        #if HLR_HAS_COMPRESSION == 1
-        
         if ( is_compressed() )
         {
             auto  dT = blas::tensor3< value_t >( this->dim(0),
@@ -138,8 +134,6 @@ public:
             
             return dT;
         }// if
-
-        #endif
 
         return _tensor;
     }
@@ -170,11 +164,8 @@ public:
     // compression
     //
 
-    // compress internal data based on given configuration
+    // compress internal data based on given accuracy
     // - may result in non-compression if storage does not decrease
-    virtual void   compress      ( const compress::zconfig_t &  zconfig );
-
-    // same but compress based on given accuracy
     virtual void   compress      ( const Hpro::TTruncAcc &  acc );
 
     // decompress internal data
@@ -183,11 +174,7 @@ public:
     // return true if data is compressed
     virtual bool   is_compressed () const
     {
-        #if HLR_HAS_COMPRESSION == 1
-        return ! is_null( _ztensor.data() );
-        #else
-        return false;
-        #endif
+        return ! _ztensor.empty();
     }
 
     //
@@ -204,12 +191,8 @@ public:
 
         X->_tensor  = blas::copy( _tensor );
 
-        #if HLR_HAS_COMPRESSION == 1
-        
         X->_ztensor = compress::zarray( _ztensor.size() );
         std::copy( _ztensor.begin(), _ztensor.end(), X->_ztensor.begin() );
-
-        #endif
         
         return T;
     }
@@ -225,13 +208,18 @@ public:
     // return size in bytes used by this object
     virtual size_t  byte_size () const
     {
-        #if HLR_HAS_COMPRESSION == 1
         return super_t::byte_size() + _tensor.byte_size() + hlr::compress::byte_size( _ztensor );
-        #else
-        return super_t::byte_size() + _tensor.byte_size();
-        #endif
     }
 
+    // return size of (floating point) data in bytes handled by this object
+    virtual size_t data_byte_size () const
+    {
+        if ( is_compressed() )
+            return hlr::compress::byte_size( _ztensor );
+        else
+            return _tensor.data_byte_size();
+    }
+    
     // return name of type
     virtual std::string  typestr () const { return "dense_tensor3"; }
 
@@ -239,9 +227,7 @@ protected:
     // remove compressed storage (standard storage not restored!)
     virtual void  remove_compressed ()
     {
-        #if HLR_HAS_COMPRESSION == 1
         _ztensor = compress::zarray();
-        #endif
     }
 };
 
@@ -251,16 +237,39 @@ protected:
 //
 template < typename value_t >
 void
-dense_tensor3< value_t >::compress ( const compress::zconfig_t &  zconfig )
+dense_tensor3< value_t >::compress ( const Hpro::TTruncAcc &  acc )
 {
-    #if HLR_HAS_COMPRESSION == 1
-        
     if ( is_compressed() )
         return;
 
-    auto          T         = this->tensor();
+    if ( this->dim(0) * this->dim(1) * this->dim(2) == 0 )
+        return;
+
+    if (( this->is(0) == indexset( 160, 191 ) ) &&
+        ( this->is(1) == indexset(   0,  31 ) ) &&
+        ( this->is(2) == indexset(   0,  31 ) ))
+        hlr::breakpoint();
+
+    auto  T   = this->tensor();
+    auto  tol = acc.abs_eps();
+
+    if ( acc.abs_eps() != 0 )
+    {
+        if      ( acc.norm_mode() == Hpro::spectral_norm  ) tol = acc.abs_eps() / blas::norm_F( T ); // TODO
+        else if ( acc.norm_mode() == Hpro::frobenius_norm ) tol = acc.abs_eps() / blas::norm_F( T );
+        else
+            HLR_ERROR( "unsupported norm mode" );
+    }// if
+    else if ( acc.rel_eps() != 0 )
+    {
+        tol = acc.rel_eps();
+    }// if
+    else
+        HLR_ERROR( "zero error" );
+
+    const auto    zconf     = compress::get_config( tol );
     const size_t  mem_dense = sizeof(value_t) * T.size(0) * T.size(1) * T.size(2);
-    auto          zT        = compress::compress< value_t >( zconfig, T );
+    auto          zT        = compress::compress< value_t >( zconf, T );
 
     // // DEBUG
     // {
@@ -301,23 +310,6 @@ dense_tensor3< value_t >::compress ( const compress::zconfig_t &  zconfig )
         _ztensor = std::move( zT );
         _tensor  = std::move( blas::tensor3< value_t >() );
     }// if
-
-    #endif
-}
-
-template < typename value_t >
-void
-dense_tensor3< value_t >::compress ( const Hpro::TTruncAcc &  acc )
-{
-    HLR_ASSERT( acc.is_fixed_prec() );
-
-    if ( this->dim(0) * this->dim(1) * this->dim(2) == 0 )
-        return;
-        
-    const auto  eps   = acc.rel_eps();
-    // const auto  eps   = acc( this->is(0), this->is(1), this->is(2) ).rel_eps();
-        
-    compress( compress::get_config( eps ) );
 }
 
 //
@@ -327,16 +319,12 @@ template < typename value_t >
 void
 dense_tensor3< value_t >::decompress ()
 {
-    #if HLR_HAS_COMPRESSION == 1
-        
     if ( ! is_compressed() )
         return;
 
-    this->_tensor = std::move( tensor_decompressed() );
+    this->_tensor = std::move( tensor() );
 
     remove_compressed();
-
-    #endif
 }
 
 //

@@ -5,7 +5,7 @@
 // Module      : tensor/base_tensor
 // Description : base class for tensor
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <vector>
@@ -26,7 +26,7 @@ namespace tensor
 // defines basic interfaces and handles index sets
 //
 template < typename T_value >
-class base_tensor3
+class base_tensor3 : public compress::compressible
 {
 public:
     using  value_t = T_value;
@@ -101,6 +101,19 @@ public:
     indexset  is   ( const uint  d ) const { HLR_DBG_ASSERT( d < dimension ); return _indexsets[d]; }
     
     //
+    // compression
+    //
+
+    // same but compress based on given accuracy
+    virtual void   compress      ( const Hpro::TTruncAcc &  /* acc */ ) { HLR_ERROR( "TODO" ); }
+
+    // decompress internal data
+    virtual void   decompress    ()  { HLR_ERROR( "TODO" ); }
+
+    // return true if data is compressed
+    virtual bool   is_compressed () const { return false; }
+
+    //
     // misc
     //
 
@@ -133,6 +146,9 @@ public:
         return sizeof(_indexsets) + sizeof(_id);
     }
 
+    // return size of (floating point) data in bytes handled by this object
+    virtual size_t data_byte_size () const { return 0; }
+    
     // return name of type
     virtual std::string  typestr () const { return "base_tensor3"; }
 };

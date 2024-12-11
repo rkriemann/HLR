@@ -6,7 +6,7 @@
 // Module      : approx/rrqr
 // Description : low-rank approximation functions using rank revealing QR
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <list>
@@ -27,24 +27,28 @@ namespace detail
 //
 // determine "singular values" of R by looking at
 // norms of R(i:·,i:·) for all i
+// - R is assumed to be upper triangular(!)
 //
 template < typename value_t >
-blas::vector< Hpro::real_type_t< value_t > >
+blas::vector< real_type_t< value_t > >
 singular_values ( const blas::matrix< value_t > &  R )
 {
-    using  real_t = Hpro::real_type_t< value_t >;
+    // return blas::sv( R );
+    
+    using  real_t = real_type_t< value_t >;
 
     HLR_ASSERT( R.nrows() == R.ncols() );
     
-    const idx_t  n = idx_t( R.nrows() );
-    auto         S = blas::vector< real_t >( n );
+    const idx_t  n   = idx_t( R.nrows() );
+    auto         S   = blas::vector< real_t >( n );
+    auto         sum = value_t(0);
     
-    for ( int  i = 0; i < n; ++i )
+    for ( int  i = n-1; i >= 0; --i )
     {
-        auto  rest = blas::range( i, n-1 );
-        auto  R_i  = blas::matrix< value_t >( R, rest, rest );
-        
-        S( i ) = blas::normF( R_i );
+        for ( int  j = i; j < n; ++j )
+            sum += math::square( R(i,j) );
+
+        S(i) = math::sqrt( sum );
     }// for
 
     return S;
@@ -436,7 +440,7 @@ template < typename T_value >
 struct RRQR
 {
     using  value_t = T_value;
-    using  real_t  = Hpro::real_type_t< value_t >;
+    using  real_t  = real_type_t< value_t >;
     
     // signal support for general lin. operators
     static constexpr bool supports_general_operator = false;
@@ -536,7 +540,7 @@ struct RRQR
         blas::qrp( M, R, P );
 
         auto  S  = detail::singular_values( R );
-        auto  k  = acc.trunc_rank( S );
+        auto  k  = std::min< idx_t >( M.ncols(), acc.trunc_rank( S ) ); // M might be adjusted(!)
         auto  Qk = blas::matrix< value_t >( M, blas::range::all, blas::range( 0, k-1 ) );
 
         if ( ! is_null( sv ) )
@@ -552,22 +556,23 @@ struct RRQR
     }
 
     std::pair< blas::matrix< value_t >,
-               blas::vector< typename Hpro::real_type_t< value_t > > >
-    column_basis ( blas::matrix< value_t > &  M ) const
+               blas::vector< real_type_t< value_t > > >
+    column_basis ( const blas::matrix< value_t > &  M ) const
     {
         const idx_t  ncols = idx_t( M.ncols() );
 
         // for update statistics
         HLR_APPROX_RANK_STAT( "full " << std::min( M.nrows(), ncols ) );
-    
+
+        auto  A = blas::copy( M );
         auto  R = blas::matrix< value_t >( ncols, ncols );
         auto  P = std::vector< int >( ncols, 0 );
 
-        blas::qrp( M, R, P );
+        blas::qrp( A, R, P );
 
         auto  S  = detail::singular_values( R );
 
-        return { std::move( blas::copy( M ) ), std::move( S ) };
+        return { std::move( A ), std::move( S ) };
     }
 };
 

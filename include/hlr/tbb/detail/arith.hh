@@ -5,7 +5,7 @@
 // Module      : arith.hh
 // Description : implementation of arithmetic functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 namespace hlr { namespace tbb { namespace detail {
@@ -187,8 +187,10 @@ void
 mul_vec_row ( const value_t                     alpha,
               const Hpro::matop_t               op_M,
               const Hpro::TMatrix< value_t > &  M,
-              const scalar_vector< value_t > &  sx,
-              scalar_vector< value_t > &        sy )
+              const blas::vector< value_t > &   x,
+              blas::vector< value_t > &         y,
+              const size_t                      x_ofs,
+              const size_t                      y_ofs )
 {
     if ( is_blocked( M ) )
     {
@@ -203,95 +205,95 @@ mul_vec_row ( const value_t                     alpha,
                     auto  B_ij = B->block( i, j );
                     
                     if ( ! is_null( B_ij ) )
-                        mul_vec_row( alpha, op_M, *B_ij, sx, sy );
+                        mul_vec_row( alpha, op_M, *B_ij, x, y, x_ofs, y_ofs );
                 }// for
             }
         );
     }// if
-    else if ( matrix::is_lowrank( M ) && cptrcast( & M, matrix::lrmatrix< value_t > )->is_compressed() )
-    {
-        auto  R   = cptrcast( & M, matrix::lrmatrix< value_t > );
-        auto  U   = blas::matrix< value_t >();
-        auto  V   = blas::matrix< value_t >();
-        auto  t   = blas::vector< value_t >();
-        auto  x_i = blas::vector< value_t >( blas::vec( sx ), M.col_is( op_M ) - sx.ofs() );
-        auto  y_j = blas::vector< value_t >( blas::vec( sy ), M.row_is( op_M ) - sy.ofs() );
-        auto  yt  = blas::vector< value_t >( y_j.length() );
+    // else if ( matrix::is_lowrank( M ) && cptrcast( & M, matrix::lrmatrix< value_t > )->is_compressed() )
+    // {
+    //     auto  R   = cptrcast( & M, matrix::lrmatrix< value_t > );
+    //     auto  U   = blas::matrix< value_t >();
+    //     auto  V   = blas::matrix< value_t >();
+    //     auto  t   = blas::vector< value_t >();
+    //     auto  x_i = x( M.col_is( op_M ) - x_ofs );
+    //     auto  y_j = y( M.row_is( op_M ) - y_ofs );
+    //     auto  yt  = blas::vector< value_t >( y_j.length() );
         
-        switch ( op_M )
-        {
-            case Hpro::apply_normal :
-            {
-                ::tbb::parallel_invoke(
-                    [&,alpha] ()
-                    {
-                        V = std::move( R->V() );
-                        t = std::move( blas::mulvec( blas::adjoint( V ), x_i ) );
-                        blas::scale( value_t(alpha), t );
-                    },
+    //     switch ( op_M )
+    //     {
+    //         case Hpro::apply_normal :
+    //         {
+    //             ::tbb::parallel_invoke(
+    //                 [&,alpha] ()
+    //                 {
+    //                     V = std::move( R->V() );
+    //                     t = std::move( blas::mulvec( blas::adjoint( V ), x_i ) );
+    //                     blas::scale( value_t(alpha), t );
+    //                 },
                     
-                    [&] ()
-                    {
-                        U = std::move( R->U() );
-                    }
-                );
+    //                 [&] ()
+    //                 {
+    //                     U = std::move( R->U() );
+    //                 }
+    //             );
             
-                blas::mulvec( U, t, yt );
-            }
-            break;
+    //             blas::mulvec( U, t, yt );
+    //         }
+    //         break;
 
-            case Hpro::apply_transposed :
-            {
-                ::tbb::parallel_invoke(
-                    [&,alpha] ()
-                    {
-                        U = std::move( R->U() );
-                        t = std::move( blas::mulvec( blas::transposed( U ), x_i ) );
-                        blas::scale( value_t(alpha), t );
-                        blas::conj( t );
-                    },
+    //         case Hpro::apply_transposed :
+    //         {
+    //             ::tbb::parallel_invoke(
+    //                 [&,alpha] ()
+    //                 {
+    //                     U = std::move( R->U() );
+    //                     t = std::move( blas::mulvec( blas::transposed( U ), x_i ) );
+    //                     blas::scale( value_t(alpha), t );
+    //                     blas::conj( t );
+    //                 },
 
-                    [&] ()
-                    {
-                        V = std::move( R->V() );
-                    }
-                );
+    //                 [&] ()
+    //                 {
+    //                     V = std::move( R->V() );
+    //                 }
+    //             );
                 
-                blas::mulvec( V, t, yt );
-                blas::conj( yt );
-            }
-            break;
+    //             blas::mulvec( V, t, yt );
+    //             blas::conj( yt );
+    //         }
+    //         break;
             
-            case Hpro::apply_adjoint :
-            {
-                ::tbb::parallel_invoke(
-                    [&,alpha] ()
-                    {
-                        U = std::move( R->U() );
-                        t = std::move( blas::mulvec( blas::adjoint( U ), x_i ) );
-                        blas::scale( value_t(alpha), t );
-                    },
+    //         case Hpro::apply_adjoint :
+    //         {
+    //             ::tbb::parallel_invoke(
+    //                 [&,alpha] ()
+    //                 {
+    //                     U = std::move( R->U() );
+    //                     t = std::move( blas::mulvec( blas::adjoint( U ), x_i ) );
+    //                     blas::scale( value_t(alpha), t );
+    //                 },
 
-                    [&] ()
-                    {
-                        V = std::move( R->V() );
-                    }
-                );
+    //                 [&] ()
+    //                 {
+    //                     V = std::move( R->V() );
+    //                 }
+    //             );
             
-                blas::mulvec( V, t, yt );
-            }
-            break;
+    //             blas::mulvec( V, t, yt );
+    //         }
+    //         break;
 
-            default:
-                HLR_ERROR( "unsupported matrix op" )
-        }// switch
+    //         default:
+    //             HLR_ERROR( "unsupported matrix op" )
+    //     }// switch
 
-        blas::add( 1, yt, y_j );
-    }// if
+    //     blas::add( 1, yt, y_j );
+    // }// if
     else
     {
-        auto  x_i = blas::vector< value_t >( blas::vec( sx ), M.col_is( op_M ) - sx.ofs() );
-        auto  y_j = blas::vector< value_t >( blas::vec( sy ), M.row_is( op_M ) - sy.ofs() );
+        auto  x_i = x( M.col_is( op_M ) - x_ofs );
+        auto  y_j = y( M.row_is( op_M ) - y_ofs );
         auto  yt  = blas::vector< value_t >( y_j.length() );
         
         M.apply_add( alpha, x_i, yt, op_M );
@@ -311,7 +313,7 @@ template < typename value_t >
 blas::vector< value_t >
 mul_vec_reduce ( const matop_t                             op_M,
                  const matrix_list_t< value_t > &          matrices,
-                 const vector::scalar_vector< value_t > &  sx,
+                 const vector::scalar_vector< value_t > &  x,
                  const blas::vector< value_t > &           y_j,
                  const uint                                lb,
                  const uint                                ub )
@@ -323,8 +325,8 @@ mul_vec_reduce ( const matop_t                             op_M,
         auto        y2  = blas::vector< value_t >();
 
         ::tbb::parallel_invoke(
-            [&,op_M,lb,mid] () { y1 = std::move( mul_vec_reduce( op_M, matrices, sx, y_j, lb, mid ) ); },
-            [&,op_M,mid,ub] () { y2 = std::move( mul_vec_reduce( op_M, matrices, sx, y_j, mid, ub ) ); }
+            [&,op_M,lb,mid] () { y1 = std::move( mul_vec_reduce( op_M, matrices, x, y_j, lb, mid ) ); },
+            [&,op_M,mid,ub] () { y2 = std::move( mul_vec_reduce( op_M, matrices, x, y_j, mid, ub ) ); }
         );
 
         blas::add( value_t(1), y1, y2 );
@@ -338,7 +340,7 @@ mul_vec_reduce ( const matop_t                             op_M,
         for ( uint  i = lb; i < ub; ++i )
         {
             const auto  A   = matrices[i];
-            auto        x_i = blas::vector< value_t >( blas::vec( sx ), A->col_is( op_M ) - sx.ofs() );
+            auto        x_i = blas::vector< value_t >( blas::vec( x ), A->col_is( op_M ) - x.ofs() );
         
             A->apply_add( 1, x_i, yt, op_M );
         }// for
@@ -349,12 +351,14 @@ mul_vec_reduce ( const matop_t                             op_M,
     
 template < typename value_t >
 void
-mul_vec_cl ( const value_t                             alpha,
-             const matop_t                             op_M,
-             const Hpro::TMatrix< value_t > &          M,
-             const cluster_block_map_t< value_t > &    blocks,
-             const vector::scalar_vector< value_t > &  sx,
-             vector::scalar_vector< value_t > &        sy )
+mul_vec_cl ( const value_t                           alpha,
+             const matop_t                           op_M,
+             const Hpro::TMatrix< value_t > &        M,
+             const cluster_block_map_t< value_t > &  blocks,
+             const blas::vector< value_t > &         x,
+             blas::vector< value_t > &               y,
+             const size_t                            x_ofs,
+             const size_t                            y_ofs )
 {
     if ( is_blocked( M ) )
     {
@@ -368,7 +372,7 @@ mul_vec_cl ( const value_t                             alpha,
                 auto  B_ii = B->block( i, i );
                     
                 if ( ! is_null( B_ii ) )
-                    hlr::tbb::detail::mul_vec_cl( alpha, op_M, *B_ii, blocks, sx, sy );
+                    hlr::tbb::detail::mul_vec_cl( alpha, op_M, *B_ii, blocks, x, y, x_ofs, y_ofs );
             }
         );
     }// if
@@ -381,16 +385,16 @@ mul_vec_cl ( const value_t                             alpha,
     //
     
     auto &  mat_list = blocks.at( M.row_is( op_M ) );
-    auto    y_j      = blas::vector< value_t >( blas::vec( sy ), M.row_is( op_M ) - sy.ofs() );
+    auto    y_j      = y( M.row_is( op_M ) - y_ofs );
 
     #if 0
-    auto    yt       = mul_vec_reduce( op_M, mat_list, sx, y_j, 0, mat_list.size() );
+    auto    yt       = mul_vec_reduce( op_M, mat_list, x, y_j, 0, mat_list.size() );
     #else
     auto    yt       = blas::vector< value_t >( y_j.length() );
     
     for ( auto  A : mat_list )
     {
-        auto  x_i = blas::vector< value_t >( blas::vec( sx ), A->col_is( op_M ) - sx.ofs() );
+        auto  x_i = x( A->col_is( op_M ) - x_ofs );
         
         A->apply_add( 1, x_i, yt, op_M );
     }// for
@@ -401,11 +405,13 @@ mul_vec_cl ( const value_t                             alpha,
 
 template < typename value_t >
 void
-mul_vec_cl ( const value_t                             alpha,
-             const matop_t                             op_M,
-             const cluster_blocks_t< value_t > &       cb,
-             const vector::scalar_vector< value_t > &  x,
-             vector::scalar_vector< value_t > &        y )
+mul_vec_cl ( const value_t                        alpha,
+             const matop_t                        op_M,
+             const cluster_blocks_t< value_t > &  cb,
+             const blas::vector< value_t > &      x,
+             blas::vector< value_t > &            y,
+             const size_t                         x_ofs,
+             const size_t                         y_ofs )
 {
     //
     // compute update with all block in current block row
@@ -413,12 +419,12 @@ mul_vec_cl ( const value_t                             alpha,
 
     if ( ! cb.M.empty() )
     {
-        auto  y_j = blas::vector< value_t >( blas::vec( y ), cb.is - y.ofs() );
+        auto  y_j = y( cb.is - y_ofs );
         auto  yt  = blas::vector< value_t >( y_j.length() );
     
         for ( auto  M : cb.M )
         {
-            auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
+            auto  x_i = x( M->col_is( op_M ) - x_ofs );
             
             M->apply_add( 1, x_i, yt, op_M );
         }// for
@@ -434,20 +440,22 @@ mul_vec_cl ( const value_t                             alpha,
     {
         ::tbb::parallel_for< uint >(
             0, cb.sub_blocks.size(),
-            [alpha,op_M,&cb,&x,&y] ( const uint  i )
+            [=,&cb,&x,&y] ( const uint  i )
             {
-                hlr::tbb::detail::mul_vec_cl( alpha, op_M, *cb.sub_blocks[i], x, y );
+                hlr::tbb::detail::mul_vec_cl( alpha, op_M, *cb.sub_blocks[i], x, y, x_ofs, y_ofs );
             } );
     }// if
 }
 
 template < typename value_t >
 void
-mul_vec_cl2 ( const value_t                             alpha,
-              const matop_t                             op_M,
-              const cluster_blocks_t< value_t > &       cb,
-              const vector::scalar_vector< value_t > &  x,
-              vector::scalar_vector< value_t > &        y )
+mul_vec_cl2 ( const value_t                        alpha,
+              const matop_t                        op_M,
+              const cluster_blocks_t< value_t > &  cb,
+              const blas::vector< value_t > &      x,
+              blas::vector< value_t > &            y,
+              const size_t                         x_ofs,
+              const size_t                         y_ofs )
 {
 
     //
@@ -458,9 +466,9 @@ mul_vec_cl2 ( const value_t                             alpha,
     {
         ::tbb::parallel_for< uint >(
             0, cb.sub_blocks.size(),
-            [alpha,op_M,&cb,&x,&y] ( const uint  i )
+            [=,&cb,&x,&y] ( const uint  i )
             {
-                hlr::tbb::detail::mul_vec_cl( alpha, op_M, *cb.sub_blocks[i], x, y );
+                hlr::tbb::detail::mul_vec_cl( alpha, op_M, *cb.sub_blocks[i], x, y, x_ofs, y_ofs );
             } );
     }// if
 
@@ -470,12 +478,12 @@ mul_vec_cl2 ( const value_t                             alpha,
 
     if ( ! cb.M.empty() )
     {
-        auto  y_j = blas::vector< value_t >( blas::vec( y ), cb.is - y.ofs() );
+        auto  y_j = y( cb.is - y_ofs );
         auto  yt  = blas::vector< value_t >( y_j.length() );
     
         for ( auto  M : cb.M )
         {
-            auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
+            auto  x_i = x( M->col_is( op_M ) - x_ofs );
             
             M->apply_add( 1, x_i, yt, op_M );
         }// for
@@ -668,11 +676,13 @@ build_joined_matrix ( const matop_t                  op_M,
 
 template < typename value_t >
 void
-mul_vec_cl ( const value_t                             alpha,
-             const matop_t                             op_M,
-             const cluster_matrix_t< value_t > &       cm,
-             const vector::scalar_vector< value_t > &  x,
-             vector::scalar_vector< value_t > &        y )
+mul_vec_cl ( const value_t                        alpha,
+             const matop_t                        op_M,
+             const cluster_matrix_t< value_t > &  cm,
+             const blas::vector< value_t > &      x,
+             blas::vector< value_t > &            y,
+             const size_t                         x_ofs,
+             const size_t                         y_ofs )
 {
     if ( alpha == value_t(0) )
         return;
@@ -683,14 +693,14 @@ mul_vec_cl ( const value_t                             alpha,
 
     if ( ! cm.D.empty() || ! cm.R.empty() )
     {
-        auto  y_j = blas::vector< value_t >( blas::vec( y ), cm.is - y.ofs() );
+        auto  y_j = y( cm.is - y_ofs );
         auto  yt  = blas::vector< value_t >( y_j.length() );
     
         if ( ! cm.D.empty() )
         {
             for ( auto  M : cm.D )
             {
-                auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
+                auto  x_i = x( M->col_is( op_M ) - x_ofs );
                 
                 M->apply_add( 1, x_i, yt, op_M );
             }// for
@@ -708,7 +718,7 @@ mul_vec_cl ( const value_t                             alpha,
                 {
                     auto  R   = cptrcast( M, matrix::lrsvmatrix< value_t > );
                     auto  k_i = R->rank();
-                    auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
+                    auto  x_i = x( M->col_is( op_M ) - x_ofs );
                     auto  t_i = blas::vector< value_t >( t, blas::range( pos, pos + k_i - 1 )  );
                     
                     #if defined(HLR_HAS_ZBLAS_APLR)
@@ -744,7 +754,7 @@ mul_vec_cl ( const value_t                             alpha,
                         auto  R   = cptrcast( M, matrix::lrmatrix< value_t > );
                         auto  VR  = R->V( op_M );
                         auto  k_i = R->rank();
-                        auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
+                        auto  x_i = x( M->col_is( op_M ) - x_ofs );
                         auto  t_i = blas::vector< value_t >( t, blas::range( pos, pos + k_i - 1 )  );
                         
                         blas::mulvec( blas::adjoint( VR ), x_i, t_i );
@@ -755,7 +765,7 @@ mul_vec_cl ( const value_t                             alpha,
                         auto  R   = cptrcast( M, matrix::lrsvmatrix< value_t > );
                         auto  VR  = R->V( op_M );
                         auto  k_i = R->rank();
-                        auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
+                        auto  x_i = x( M->col_is( op_M ) - x_ofs );
                         auto  t_i = blas::vector< value_t >( t, blas::range( pos, pos + k_i - 1 )  );
                         
                         blas::mulvec( blas::adjoint( VR ), x_i, t_i );
@@ -780,9 +790,9 @@ mul_vec_cl ( const value_t                             alpha,
     {
         ::tbb::parallel_for< uint >(
             0, cm.sub_blocks.size(),
-            [alpha,op_M,&cm,&x,&y] ( const uint  i )
+            [=,&cm,&x,&y] ( const uint  i )
             {
-                hlr::tbb::detail::mul_vec_cl( alpha, op_M, *cm.sub_blocks[i], x, y );
+                hlr::tbb::detail::mul_vec_cl( alpha, op_M, *cm.sub_blocks[i], x, y, x_ofs, y_ofs );
             } );
     }// if
 }
@@ -792,8 +802,10 @@ void
 mul_vec_hier ( const value_t                               alpha,
                const Hpro::matop_t                         op_M,
                const matrix::level_hierarchy< value_t > &  M,
-               const scalar_vector< value_t > &            sx,
-               scalar_vector< value_t > &                  sy )
+               const blas::vector< value_t > &             x,
+               blas::vector< value_t > &                   y,
+               const size_t                                x_ofs,
+               const size_t                                y_ofs )
 {
     HLR_ASSERT( op_M == apply_normal );
     
@@ -810,14 +822,14 @@ mul_vec_hier ( const value_t                               alpha,
                     return;
             
                 const auto  row_is = M.row_mat[lvl][lb]->row_is( op_M );
-                auto        y_j    = blas::vector< value_t >( blas::vec( sy ), row_is - sy.ofs() );
+                auto        y_j    = y( row_is - y_ofs );
                 auto        t_j    = blas::vector< value_t >( y_j.length() );
                 
                 for ( uint  j = lb; j < ub; ++j )
                 {
                     auto  col_idx = M.col_idx[lvl][j];
                     auto  mat     = M.row_mat[lvl][j];
-                    auto  x_i     = blas::vector< value_t >( blas::vec( sx ), mat->col_is( op_M ) - sx.ofs() );
+                    auto  x_i     = x( mat->col_is( op_M ) - x_ofs );
                         
                     mat->apply_add( alpha, x_i, t_j, op_M );
                 }// for
@@ -838,8 +850,8 @@ mul_vec_ts ( const value_t                                                   alp
              const Hpro::TMatrix< value_t > &                                M,
              const blas::vector< value_t > &                                 x,
              ::tbb::enumerable_thread_specific< blas::vector< value_t > > &  y,
-             const size_t                                                    ofs_rows,
-             const size_t                                                    ofs_cols )
+             const size_t                                                    x_ofs,
+             const size_t                                                    y_ofs )
 {
     if ( is_blocked( M ) )
     {
@@ -857,15 +869,15 @@ mul_vec_ts ( const value_t                                                   alp
                         auto  B_ij = B->block( i, j );
                         
                         if ( ! is_null( B_ij ) )
-                            mul_vec_ts( alpha, op_M, *B_ij, x, y, ofs_rows, ofs_cols );
+                            mul_vec_ts( alpha, op_M, *B_ij, x, y, x_ofs, y_ofs );
                     }// for
                 }// for
             } );
     }// if
     else
     {
-        auto  x_is = x( M.col_is( op_M ) - ofs_cols );
-        auto  y_is = y.local()( M.row_is( op_M ) - ofs_rows );
+        auto  x_is = x( M.col_is( op_M ) - x_ofs );
+        auto  y_is = y.local()( M.row_is( op_M ) - y_ofs );
             
         M.apply_add( alpha, x_is, y_is, op_M );
     }// else

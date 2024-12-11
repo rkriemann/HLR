@@ -5,7 +5,7 @@
 // Module      : approx/svd
 // Description : low-rank approximation functions using SVD
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <list>
@@ -614,12 +614,12 @@ struct SVD
     blas::matrix< value_t >
     column_basis ( const blas::matrix< value_t > &  M,
                    const accuracy &                 acc,
-                   blas::vector< real_t > *         sv = nullptr ) const
+                   blas::vector< real_t > *         sv ) const
     {
         if ( M.ncols() == 0 )
             return blas::matrix< value_t >( M.nrows(), 0 );
         
-        if ( M.ncols() > 2 * M.nrows() )
+        if ( false && ( M.ncols() > 2 * M.nrows() ))
         {
             //
             // compute eigenvalues and eigenvectors of M·M'
@@ -719,15 +719,30 @@ struct SVD
         }// else
     }
 
+    blas::matrix< value_t >
+    column_basis ( const blas::matrix< value_t > &  M,
+                   const accuracy &                 acc ) const
+    {
+        return column_basis( M, acc, nullptr );
+    }
+
+    blas::matrix< value_t >
+    column_basis ( const blas::matrix< value_t > &  M,
+                   const accuracy &                 acc,
+                   blas::vector< real_t > &         sv ) const
+    {
+        return column_basis( M, acc, & sv );
+    }
+
     //
     // compute column basis and return basis and singular values
     //
     
     std::pair< blas::matrix< value_t >,
-               blas::vector< typename Hpro::real_type_t< value_t > > >
+               blas::vector< real_type_t< value_t > > >
     column_basis ( const blas::matrix< value_t > &  M ) const
     {
-        if ( M.ncols() > 2 * M.nrows() )
+        if ( false && ( M.ncols() > 2 * M.nrows() ))
         {
             //
             // compute eigenvalues and eigenvectors of M·M'

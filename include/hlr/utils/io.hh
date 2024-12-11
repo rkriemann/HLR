@@ -5,7 +5,7 @@
 // Module      : utils/io
 // Description : IO related functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <string>
@@ -336,6 +336,42 @@ read ( const std::string &  filename = "" )
 
 //////////////////////////////////////////////////////////////////////
 //
+// raw data
+//
+//////////////////////////////////////////////////////////////////////
+
+namespace raw
+{
+
+template < typename value_t >
+blas::tensor3< value_t >
+read ( const std::string &  filename,
+       const size_t         size0,
+       const size_t         size1,
+       const size_t         size2 )
+{
+    auto  file = std::ifstream( filename, std::ios::in | std::ios::binary );
+    auto  t    = blas::tensor3< value_t >( size0, size1, size2 );
+
+    file.read( reinterpret_cast< char * >( t.data() ), sizeof(value_t) * size0 * size1 * size2 );
+
+    return  t;
+}
+
+template < typename value_t >
+void
+write ( const blas::tensor3< value_t > &  t,
+        const std::string &               filename = "" )
+{
+    auto  file = std::ofstream( filename, std::ios::out | std::ios::binary );
+
+    file.write( reinterpret_cast< const char * >( t.data() ), sizeof(value_t) * t.size(0) * t.size(1) * t.size(2) );
+}
+
+}// namespace raw
+
+//////////////////////////////////////////////////////////////////////
+//
 // NetCDF format
 //
 //////////////////////////////////////////////////////////////////////
@@ -533,11 +569,24 @@ inline
 void
 print ( const Hpro::TCoordinate &   coord,
         const Hpro::TCluster &      ct,
-        const Hpro::TPermutation &  i2e,
+        const Hpro::TPermutation &  pi2e,
         const uint                  lvl,
         const std::string &         filename )
 {
-    detail::vtk_print_cluster( coord, ct, i2e, lvl, filename );
+    detail::vtk_print_cluster( coord, ct, pi2e, lvl, filename );
+}
+
+//
+// print bounding box and coordinates of given block cluster
+//
+inline
+void
+print ( const Hpro::TBlockCluster &  bc,
+        const Hpro::TCoordinate &    coord,
+        const Hpro::TPermutation &   pi2e,
+        const std::string &          filename )
+{
+    detail::vtk_print_cluster( bc, coord, pi2e, filename );
 }
 
 //

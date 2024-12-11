@@ -5,7 +5,7 @@
 // Module      : arith.hh
 // Description : arithmetic functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <tbb/parallel_invoke.h>
@@ -55,7 +55,7 @@ mul_vec_chunk ( const value_t                             alpha,
         return;
     
     const auto  is      = M.row_is( op_M );
-    auto        mtx_map = detail::mutex_map_t( ( is.last() + 1 ) / detail::CHUNK_SIZE );
+    auto        mtx_map = detail::mutex_map_t( ( is.last() + 1 ) / detail::CHUNK_SIZE + 1 );
 
     detail::mul_vec_chunk( alpha, op_M, M, x.blas_vec(), y.blas_vec(), M.row_is( op_M ).first(), M.col_is( op_M ).first(), mtx_map );
 }
@@ -74,7 +74,7 @@ mul_vec_row ( const value_t                             alpha,
     if ( alpha == value_t(0) )
         return;
     
-    detail::mul_vec_row( alpha, op_M, M, x, y );
+    detail::mul_vec_row( alpha, op_M, M, x.blas_vec(), y.blas_vec(), x.ofs(), y.ofs() );
 }
 
 //
@@ -97,7 +97,7 @@ mul_vec_cl ( const value_t                             alpha,
     if ( alpha == value_t(0) )
         return;
 
-    detail::mul_vec_cl( alpha, op_M, M, blocks, x, y );
+    detail::mul_vec_cl( alpha, op_M, M, blocks, x.blas_vec(), y.blas_vec(), x.ofs(), y.ofs() );
 }
 
 template < typename value_t >
@@ -111,7 +111,7 @@ mul_vec_cl ( const value_t                             alpha,
     if ( alpha == value_t(0) )
         return;
 
-    detail::mul_vec_cl( alpha, op_M, cb, x, y );
+    detail::mul_vec_cl( alpha, op_M, cb, x.blas_vec(), y.blas_vec(), x.ofs(), y.ofs() );
 }
 
 template < typename value_t >
@@ -125,7 +125,7 @@ mul_vec_cl2 ( const value_t                             alpha,
     if ( alpha == value_t(0) )
         return;
 
-    detail::mul_vec_cl2( alpha, op_M, cb, x, y );
+    detail::mul_vec_cl2( alpha, op_M, cb, x.blas_vec(), y.blas_vec(), x.ofs(), y.ofs() );
 }
 
 template < typename value_t >
@@ -139,16 +139,16 @@ mul_vec_hier ( const value_t                               alpha,
     if ( alpha == value_t(0) )
         return;
 
-    detail::mul_vec_hier( alpha, op_M, M, x, y );
+    detail::mul_vec_hier( alpha, op_M, M, x.blas_vec(), y.blas_vec(), x.ofs(), y.ofs() );
 }
 
 template < typename value_t >
 void
-mul_vec_ts ( const value_t                               alpha,
-             const Hpro::matop_t                         op_M,
+mul_vec_ts ( const value_t                             alpha,
+             const Hpro::matop_t                       op_M,
              const Hpro::TMatrix< value_t > &          M,
-             const vector::scalar_vector< value_t > &    x,
-             vector::scalar_vector< value_t > &          y )
+             const vector::scalar_vector< value_t > &  x,
+             vector::scalar_vector< value_t > &        y )
 {
     if ( alpha == value_t(0) )
         return;
@@ -159,7 +159,7 @@ mul_vec_ts ( const value_t                               alpha,
     
     auto  y_ts = ::tbb::enumerable_thread_specific< blas::vector< value_t > >( M.nrows( op_M ) );
     
-    detail::mul_vec_ts( alpha, op_M, M, blas::vec( x ), y_ts, M.row_ofs( op_M ), M.col_ofs( op_M ) );
+    detail::mul_vec_ts( alpha, op_M, M, x.blas_vec(), y_ts, x.ofs(), M.row_ofs() );
 
     //
     // add local results to destination
@@ -266,7 +266,7 @@ mul_vec_cl ( const value_t                             alpha,
     if ( alpha == value_t(0) )
         return;
 
-    detail::mul_vec_cl( alpha, op_M, cm, x, y );
+    detail::mul_vec_cl( alpha, op_M, cm, x.blas_vec(), y.blas_vec(), x.ofs(), y.ofs() );
 }
 
 using hlr::setup_cluster_block_map;
@@ -316,6 +316,23 @@ mul_vec ( const value_t                             alpha,
     mul_vec_chunk( alpha, op_M, M, x, y );
     // mul_vec_row( alpha, op_M, M, x, y );
     // mul_vec_reduce( alpha, op_M, M, blas::vec( x ), blas::vec( y ) );
+}
+
+template < typename value_t >
+void
+mul_vec ( const value_t                     alpha,
+          const matop_t                     op_M,
+          const Hpro::TMatrix< value_t > &  M,
+          const blas::vector< value_t > &   x,
+          blas::vector< value_t > &         y )
+{
+    if ( alpha == value_t(0) )
+        return;
+    
+    const auto  is      = M.row_is( op_M );
+    auto        mtx_map = detail::mutex_map_t( ( is.last() + 1 ) / detail::CHUNK_SIZE + 1 );
+
+    detail::mul_vec_chunk( alpha, op_M, M, x, y, M.row_ofs( op_M ), M.col_ofs( op_M ), mtx_map );
 }
 
 ///////////////////////////////////////////////////////////////////////

@@ -3,7 +3,7 @@
 // Module      : matrix/print
 // Description : printing functions for matrices
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <list>
@@ -23,6 +23,7 @@
 #include <hlr/matrix/uniform_lrmatrix.hh>
 #include <hlr/matrix/uniform_lr2matrix.hh>
 #include <hlr/matrix/h2_lrmatrix.hh>
+#include <hlr/matrix/h2_lr2matrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
 #include <hlr/matrix/sparse_matrix.hh>
 #include <hlr/utils/eps_printer.hh>
@@ -407,12 +408,12 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
             if ( ! contains( options, "norank" ) )
             {
                 prn.save();
-                prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 4.0 ) );
+                prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 7.0 ) );
                 
                 prn.set_rgb( colors[HLR_COLOR_FG_RANK] );
                 prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
                                double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
-                               Hpro::to_string( "%dx%d", R->row_rank(), R->col_rank() ) );
+                               Hpro::to_string( "%dx%dx%d", R->row_rank(), R->rank(), R->col_rank() ) );
                 
                 prn.restore();
             }// if
@@ -438,6 +439,31 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
                 prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
                                double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
                                Hpro::to_string( "%dx%d", R->row_rank(), R->col_rank() ) );
+                
+                prn.restore();
+            }// if
+        }// if
+        else if ( matrix::is_h2_lowrank2( &M ) )
+        {
+            auto  R = cptrcast( &M, matrix::h2_lr2matrix< value_t > );
+
+            if ( R->is_compressed() ) prn.set_rgb( colors[HLR_COLOR_BG_H2_COMPRESSED] );
+            else                      prn.set_rgb( colors[HLR_COLOR_BG_H2] );
+
+            prn.fill_rect( M.col_ofs(),
+                           M.row_ofs(),
+                           M.col_ofs() + M.ncols(),
+                           M.row_ofs() + M.nrows() );
+
+            if ( ! contains( options, "norank" ) )
+            {
+                prn.save();
+                prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 7.0 ) );
+                
+                prn.set_rgb( colors[HLR_COLOR_FG_RANK] );
+                prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
+                               double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
+                               Hpro::to_string( "%dx%dx%d", R->row_rank(), R->rank(), R->col_rank() ) );
                 
                 prn.restore();
             }// if

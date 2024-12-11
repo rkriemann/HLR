@@ -5,7 +5,7 @@
 // Module      : uniform_lr2matrix.hh
 // Description : low-rank matrix with shared cluster basis
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <cassert>
@@ -232,6 +232,20 @@ public:
         }// if
 
         return _S_col;
+    }
+    
+    hlr::blas::matrix< value_t >
+    row_coupling ( const matop_t  op ) const
+    {
+        if ( op == apply_normal ) return row_coupling();
+        else                      return col_coupling();
+    }
+    
+    hlr::blas::matrix< value_t >
+    col_coupling ( const matop_t  op ) const
+    {
+        if ( op == apply_normal ) return col_coupling();
+        else                      return row_coupling();
     }
     
     void

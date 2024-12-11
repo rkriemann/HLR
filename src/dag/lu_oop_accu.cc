@@ -3,7 +3,7 @@
 // Module      : lu.cc
 // Description : generate DAG for LU factorization
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <list>

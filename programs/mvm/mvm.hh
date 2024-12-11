@@ -3,7 +3,7 @@
 // Program     : mixedprec
 // Description : testing mixed precision for H
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <fstream>
@@ -48,7 +48,7 @@ program_main ()
     auto  ct      = gen_ct( *coord );
     auto  bct     = gen_bct( *ct, *ct );
 
-    io::eps::print( bct->root(), "bt" );
+    io::eps::print( * bct->root(), "bt" );
     
     auto  coeff   = problem->coeff_func();
     auto  pcoeff  = Hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
@@ -188,7 +188,7 @@ program_main ()
         {
             runtime.clear();
             
-            std::cout << "    " << term::bullet << term::bold << "row cluster lists (TtB)" << term::reset << std::endl;
+            std::cout << "    " << term::bullet << term::bold << "row cluster lists" << term::reset << std::endl;
         
             auto  x = std::make_unique< vector::scalar_vector< value_t > >( A->col_is() );
             auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );

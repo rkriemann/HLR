@@ -3,7 +3,7 @@
 // Program     : mixedprec
 // Description : testing mixed precision for H
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <fstream>
@@ -69,12 +69,12 @@ program_main ()
                 
             auto  hcagen = problem->hca_gen_func( *ct );
             auto  hca    = bem::hca( pcoeff, *hcagen, cmdline::eps / 100.0, 6 );
-            auto  hcalr  = bem::hca_lrapx( hca );
+            auto  lrapx  = bem::hca_lrapx( hca );
 
             if ( sep_coup )
-                std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_sep( bct->root(), pcoeff, hcalr, cbapx, acc, cmdline::compress );
+                std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_sep( bct->root(), pcoeff, lrapx, cbapx, acc, cmdline::compress );
             else
-                std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform( bct->root(), pcoeff, hcalr, cbapx, acc, cmdline::compress );
+                std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform( bct->root(), pcoeff, lrapx, cbapx, acc, cmdline::compress );
         }// if
         else
             cmdline::capprox = "default";
@@ -86,26 +86,12 @@ program_main ()
                   << " (" << hlr::compress::provider << " + " << hlr::compress::aplr::provider << ")"
                   << std::endl;
 
-        auto  acalr = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
+        auto  lrapx = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
 
         if ( sep_coup )
-            std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_sep( bct->root(), pcoeff, acalr, cbapx, acc, cmdline::compress );
+            std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_sep( bct->root(), pcoeff, lrapx, cbapx, acc, cmdline::compress );
         else
-            std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform( bct->root(), pcoeff, acalr, cbapx, acc, cmdline::compress );
-    }// else
-        
-    if ( cmdline::capprox == "dense" )
-    {
-        std::cout << "    using dense"
-                  << " (" << hlr::compress::provider << " + " << hlr::compress::aplr::provider << ")"
-                  << std::endl;
-
-        auto  dense = bem::dense_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
-        
-        if ( sep_coup )
-            std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_sep( bct->root(), pcoeff, dense, cbapx, acc, cmdline::compress );
-        else
-            std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform( bct->root(), pcoeff, dense, cbapx, acc, cmdline::compress );
+            std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform( bct->root(), pcoeff, lrapx, cbapx, acc, cmdline::compress );
     }// else
 
     // impl::matrix::compress( *A, acc );
@@ -150,9 +136,9 @@ program_main ()
                 
                 auto  hcagen = problem->hca_gen_func( *ct );
                 auto  hca    = bem::hca( pcoeff, *hcagen, cmdline::eps / 100.0, 6 );
-                auto  hcalr  = bem::hca_lrapx( hca );
+                auto  lrapx  = bem::hca_lrapx( hca );
 
-                H = impl::matrix::build( bct->root(), pcoeff, hcalr, acc, false );
+                H = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, false );
             }// if
             else
                 cmdline::capprox = "default";
@@ -162,9 +148,9 @@ program_main ()
         {
             std::cout << "    using ACA" << std::endl;
 
-            auto  acalr = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
+            auto  lrapx = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
 
-            H = impl::matrix::build( bct->root(), pcoeff, acalr, acc, false );
+            H = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, false );
         }// else
         
         if ( cmdline::capprox == "dense" )
@@ -275,6 +261,7 @@ program_main ()
             std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
+        if ( false )
         {
             runtime.clear();
             

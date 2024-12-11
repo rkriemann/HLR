@@ -5,7 +5,7 @@
 // Module      : tbb/blas
 // Description : optimized BLAS algorithms using TBB
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <functional>

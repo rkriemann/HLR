@@ -79,6 +79,8 @@ universal     = False
 UNIVERSAL_DIR = '/'
 blosc         = False
 BLOSC_DIR     = '/'
+atc           = False
+ATC_DIR       = '/'
 
 zblas         = True
 
@@ -111,15 +113,21 @@ LAPACKLIBS   = [ 'help',        # print help
                  'mklomp',      # use OpenMP based Intel MKL
                  'mkltbb',      # use TBB based Intel MKL
                  'mklseq',      # use sequential Intel MKL
+                 'mklomp64',    # use OpenMP based Intel MKL (ILP64)
+                 'mkltbb64',    # use TBB based Intel MKL (ILP64)
+                 'mklseq64',    # use sequential Intel MKL (ILP64)
                  'accelerate' ] # Accelerate framework on MacOS
 
 LAPACKLIBS_HELP = { 'default'    : 'system default, e.g. {0}-llapack -lblas{1} (Linux) or {0}accelerate{1} (MacOS)',
                     'none'       : 'do not use BLAS/LAPACK',
                     'user'       : 'user defined BLAS/LAPACK (needs {0}lapackflags{1})',
-                    'mkl'        : 'use MKL (default version (see also {0}mkl_dir{1})',
-                    'mklomp'     : 'use MKL based on OpenMP',
-                    'mkltbb'     : 'use MKL based on TBB',
-                    'mklseq'     : 'use sequential MKL ({0}recommended{1})',
+                    'mkl'        : 'use MKL using 32 bit integer (default version (see also {0}mkl_dir{1})',
+                    'mklomp'     : 'use MKL based on OpenMP using 32 bit integer',
+                    'mkltbb'     : 'use MKL based on TBB using 32 bit integer',
+                    'mklseq'     : 'use sequential MKL using 32 bit integer ({0}recommended{1})',
+                    'mklomp64'   : 'use MKL based on OpenMP using 64bit integer (ILP64)',
+                    'mkltbb64'   : 'use MKL based on TBB using 64bit integer (ILP64)',
+                    'mklseq64'   : 'use sequential MKL  using 64bit integer (ILP64) ({0}recommended{1})',
                     'accelerate' : 'use Accelerate framework ({0}only MacOS{1})' }
 
 # user defined linking flags for LAPACK
@@ -149,6 +157,7 @@ COMPRESSORS   = [ 'help',       # print help
                   'bfl',
                   'dfl',
                   'dfl2',
+                  'mp3',
                   'fp32',
                   # 'fp16',
                   # 'bf16',
@@ -172,6 +181,7 @@ COMPRESSORS_HELP = { 'none'   : 'no compression used',
                      'bfl'    : 'use BFL',
                      'dfl'    : 'use DFL',
                      'dfl2'   : 'use DFL2',
+                     'mp3'    : 'use mixed precision storage with FP64/FP32/BF16',
                      'fp32'   : 'use FP32 for storage',
                      'zfp'    : 'use ZFP     (see also {0}zfp/zfp_dir{1})',
                      'posits' : 'use Posits  (see also {0}universal/universal_dir{1})',
@@ -396,6 +406,8 @@ opts.Add( BoolVariable( 'universal',     'use universal number library',       u
 opts.Add( PathVariable( 'universal_dir', 'universal installation directory',   UNIVERSAL_DIR, PathVariable.PathIsDir ) )
 opts.Add( BoolVariable( 'blosc',         'use blosc compression library',      blosc ) )
 opts.Add( PathVariable( 'blosc_dir',     'blosc installation directory',       BLOSC_DIR, PathVariable.PathIsDir ) )
+opts.Add( BoolVariable( 'atc',           'use ATC compression library',        atc ) )
+opts.Add( PathVariable( 'atc_dir',       'ATC installation directory',         ATC_DIR, PathVariable.PathIsDir ) )
 
 opts.Add( EnumVariable( 'compressor',    'defined compressor',                  'none', allowed_values = COMPRESSORS,      ignorecase = 2 ) )
 opts.Add( EnumVariable( 'aplr',          'defined APLR compressor',             'none', allowed_values = APLR_COMPRESSORS, ignorecase = 2 ) )
@@ -481,6 +493,8 @@ universal     = opt_env['universal']
 UNIVERSAL_DIR = opt_env['universal_dir']
 blosc         = opt_env['blosc']
 BLOSC_DIR     = opt_env['blosc_dir']
+atc           = opt_env['atc']
+ATC_DIR       = opt_env['atc_dir']
 
 compressor    = opt_env['compressor']
 aplr          = opt_env['aplr']
@@ -613,24 +627,33 @@ if lapack == 'default' :
 elif lapack == 'user' :
     flags = env.ParseFlags( LAPACK_FLAGS )
     env.MergeFlags( flags )
-elif lapack == 'mkl' or lapack == 'mklomp' :
+elif lapack in [ 'mkl', 'mkl64', 'mklomp', 'mklomp64' ] :
     env.Append( CPPPATH = os.path.join( MKL_DIR, 'include' ) )
     env.Append( CPPPATH = os.path.join( MKL_DIR, 'include', 'mkl' ) )
     env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64_lin' ) ) # standard MKL
     env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64' ) )     # oneMKL
-    env.Append( LIBS = [ 'mkl_gf_lp64' , 'mkl_gnu_thread', 'mkl_core', 'gomp' ] )
-elif lapack == 'mkltbb' :
+    if lapack in [ 'mkl', 'mklomp' ] :
+        env.Append( LIBS = [ 'mkl_gf_lp64' , 'mkl_gnu_thread', 'mkl_core', 'gomp' ] )
+    else :
+        env.Append( LIBS = [ 'mkl_gf_ilp64' , 'mkl_gnu_thread', 'mkl_core', 'gomp' ] )
+elif lapack in [ 'mkltbb', 'mkltbb64' ] :
     env.Append( CPPPATH = os.path.join( MKL_DIR, 'include' ) )
     env.Append( CPPPATH = os.path.join( MKL_DIR, 'include', 'mkl' ) )
     env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64_lin' ) ) # standard MKL
     env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64' ) )     # oneMKL
-    env.Append( LIBS = [ 'mkl_gf_lp64' , 'mkl_tbb_thread', 'mkl_core', 'gomp' ] )
-elif lapack == 'mklseq' :
+    if lapack in [ 'mkl', 'mklomp' ] :
+        env.Append( LIBS = [ 'mkl_gf_lp64' , 'mkl_tbb_thread', 'mkl_core', 'gomp' ] )
+    else :
+        env.Append( LIBS = [ 'mkl_gf_ilp64' , 'mkl_tbb_thread', 'mkl_core', 'gomp' ] )
+elif lapack in [ 'mklseq', 'mklseq64' ] :
     env.Append( CPPPATH = os.path.join( MKL_DIR, 'include' ) )
     env.Append( CPPPATH = os.path.join( MKL_DIR, 'include', 'mkl' ) )
     env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64_lin' ) ) # standard MKL
     env.Append( LIBPATH = os.path.join( MKL_DIR, 'lib', 'intel64' ) )     # oneMKL
-    env.Append( LIBS = [ 'mkl_gf_lp64' , 'mkl_sequential', 'mkl_core' ] )
+    if lapack in [ 'mkl', 'mklomp' ] :
+        env.Append( LIBS = [ 'mkl_gf_lp64' , 'mkl_sequential', 'mkl_core' ] )
+    else :
+        env.Append( LIBS = [ 'mkl_gf_ilp64' , 'mkl_sequential', 'mkl_core' ] )
 elif lapack == 'accelerate' :
     env.MergeFlags( '-Wl,-framework,Accelerate' )
 
@@ -682,7 +705,13 @@ if 'cuda' in frameworks :
 if half :
     env.Append( CPPDEFINES = 'HLR_HAS_HALF' )
     env.Append( CPPPATH    = os.path.join( HALF_DIR, 'include' ) )
-        
+
+if zfp :
+    env.Append( CPPDEFINES = 'HLR_HAS_ZFP' )
+    env.Append( CPPPATH    = os.path.join( ZFP_DIR, 'include' ) )
+    env.Append( LIBPATH    = os.path.join( ZFP_DIR, 'lib' ) )
+    env.Append( LIBS       = [ 'zfp' ] )
+    
 if   compressor == 'none' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=0' )
 elif   compressor == 'afl' :
@@ -695,12 +724,14 @@ elif compressor == 'dfl' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=4' )
 elif compressor == 'dfl2' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=22' )
+elif compressor == 'mp3' :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=18' )
 elif compressor == 'zfp' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=5' )
-    env.Append( CPPDEFINES = 'HLR_HAS_ZFP' )
-    env.Append( CPPPATH    = os.path.join( ZFP_DIR, 'include' ) )
-    env.Append( LIBPATH    = os.path.join( ZFP_DIR, 'lib' ) )
-    env.Append( LIBS       = [ 'zfp' ] )
+    # env.Append( CPPDEFINES = 'HLR_HAS_ZFP' )
+    # env.Append( CPPPATH    = os.path.join( ZFP_DIR, 'include' ) )
+    # env.Append( LIBPATH    = os.path.join( ZFP_DIR, 'lib' ) )
+    # env.Append( LIBS       = [ 'zfp' ] )
 elif compressor == 'sz'   :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=6' )
     env.Append( CPPDEFINES = 'HLR_HAS_SZ' )
@@ -769,6 +800,7 @@ if aplr == 'default'  :
     elif compressor == 'bfl'    : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=3' )
     elif compressor == 'dfl'    : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=4' )
     elif compressor == 'dfl2'   : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=22' )
+    elif compressor == 'mp3'    : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=18' )
     elif compressor == 'zfp'    : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=5' )
     elif compressor == 'sz'     : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=6' )
     elif compressor == 'sz3'    : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=7' )
@@ -830,6 +862,12 @@ if zblas :
     env.Append( CPPDEFINES = 'HLR_USE_ZBLAS=1' )
 else :
     env.Append( CPPDEFINES = 'HLR_USE_ZBLAS=0' )
+
+if atc :
+    env.Append( CPPDEFINES = 'HLR_HAS_ATC' )
+    env.Append( CPPPATH    = os.path.join( ATC_DIR, 'include' ) )
+    env.Append( LIBPATH    = os.path.join( ATC_DIR, 'lib' ) )
+    env.Append( LIBS       = [ 'atc', 'hptt' ] )
 
 ######################################################################
 #
@@ -930,6 +968,8 @@ def show_help ( target, source, env ):
     print( '  {0}zstd_dir{1}     │ path to Zstd library          │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}blosc{1}        │ use Blosc2 library            │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}blosc_dir{1}    │ path to Blosc2 library        │'.format( colors['bold'], colors['reset'] ) )
+    print( '  {0}atc{1}          │ use ATC library               │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    print( '  {0}atc_dir{1}      │ path to ATC library           │'.format( colors['bold'], colors['reset'] ) )
     print( ' ──────────────┼───────────────────────────────┼──────────' )
     print( '  {0}buildtype{1}    │ how to build the binaries     │'.format( colors['bold'], colors['reset'] ), ', '.join( BUILD_TYPES ) )
     print( '  {0}warn{1}         │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), '0/1' )
@@ -1007,6 +1047,7 @@ def show_options ( target, source, env ):
     print( '  {0}zlib{1}         │ use zlib library              │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zlib ] ),       pathstr( ZLIB_DIR      if zlib      else '' ) )
     print( '  {0}zstd{1}         │ use Zstd library              │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zstd ] ),       pathstr( ZSTD_DIR      if zstd      else '' ) )
     print( '  {0}blosc{1}        │ use BLOSC2 library            │ {2}'.format( colors['bold'], colors['reset'], bool_str[ blosc ] ),      pathstr( BLOSC_DIR     if blosc     else '' ) )
+    print( '  {0}atc{1}          │ use ATC compression library   │ {2}'.format( colors['bold'], colors['reset'], bool_str[ atc ] ),        pathstr( ATC_DIR       if atc       else '' ) )
     print( ' ──────────────┼───────────────────────────────┼──────────' )
     print( '  {0}buildtype{1}    │ how to build the binaries     │'.format( colors['bold'], colors['reset'] ), buildtype )
     print( '  {0}warn{1}         │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), bool_str[ warn ] )

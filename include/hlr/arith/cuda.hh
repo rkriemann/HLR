@@ -5,7 +5,7 @@
 // Module      : arith/cuda
 // Description : basic linear algebra functions using cuda
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <cuda_runtime.h>
@@ -688,10 +688,10 @@ GESVDJ( cuDoubleComplex, cusolverDnZgesvdj )
 //
 template < typename value_t >
 void
-svd ( handle               handle,
-      matrix< value_t > &  M,
-      vector< typename Hpro::real_type< value_t >::type_t > &  S,
-      matrix< value_t > &  VH )
+svd ( handle                                    handle,
+      matrix< value_t > &                       M,
+      vector< Hpro::real_type_t< value_t > > &  S,
+      matrix< value_t > &                       VH )
 {
     using cuda_t = typename cuda_type< value_t >::type_t;
     using real_t = typename cuda::real_type< cuda_t >::type_t;

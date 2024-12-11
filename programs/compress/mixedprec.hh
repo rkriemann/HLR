@@ -3,7 +3,7 @@
 // Program     : mixedprec
 // Description : testing mixed precision for H
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <fstream>
@@ -15,6 +15,7 @@
 #include "hlr/approx/accuracy.hh"
 #include "hlr/bem/aca.hh"
 #include "hlr/bem/dense.hh"
+#include <hlr/matrix/info.hh>
 #include <hlr/matrix/print.hh>
 #include <hlr/utils/io.hh>
 
@@ -77,7 +78,7 @@ program_main ()
                 auto  hca    = bem::hca( pcoeff, *hcagen, cmdline::eps / 100.0, 6 );
                 auto  hcalr  = bem::hca_lrapx( hca );
                 
-                A = impl::matrix::build( bct->root(), pcoeff, hcalr, acc, nseq );
+                A = impl::matrix::build_sv( bct->root(), pcoeff, hcalr, acc, nseq );
             }// if
             else
                 cmdline::capprox = "default";
@@ -89,7 +90,7 @@ program_main ()
 
             auto  acalr = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
         
-            A = impl::matrix::build( bct->root(), pcoeff, acalr, acc, nseq );
+            A = impl::matrix::build_sv( bct->root(), pcoeff, acalr, acc, nseq );
         }// else
         
         if ( cmdline::capprox == "dense" )
@@ -98,7 +99,7 @@ program_main ()
 
             auto  dense = bem::dense_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
         
-            A = impl::matrix::build( bct->root(), pcoeff, dense, acc, nseq );
+            A = impl::matrix::build_sv( bct->root(), pcoeff, dense, acc, nseq );
         }// else
         
         toc = timer::since( tic );
@@ -114,12 +115,15 @@ program_main ()
         toc = timer::since( tic );
     }// else
     
-    const auto  mem_A  = A->byte_size();
-    const auto  norm_A = impl::norm::frobenius( *A );
+    const auto  mem_A     = A->byte_size();
+    const auto  dmem_A    = matrix::data_byte_size( *A );
+    const auto  dmem_A_d  = matrix::data_byte_size_dense( *A );
+    const auto  dmem_A_lr = matrix::data_byte_size_lowrank( *A );
+    const auto  norm_A    = impl::norm::frobenius( *A );
         
     std::cout << "    dims  = " << A->nrows() << " × " << A->ncols() << std::endl;
     std::cout << "    done in " << format_time( toc ) << std::endl;
-    std::cout << "    mem   = " << format_mem( mem_A ) << std::endl;
+    std::cout << "    mem   = " << format_mem( mem_A, dmem_A, dmem_A_d, dmem_A_lr ) << std::endl;
     std::cout << "      idx = " << format_mem( mem_A / A->nrows() ) << std::endl;
     std::cout << "    |A|   = " << format_norm( norm_A ) << std::endl;
 
@@ -211,7 +215,7 @@ program_main ()
 
     {
         // auto  lacc = local_accuracy( delta );
-        auto  lacc  = absolute_prec( Hpro::frobenius_norm, delta );
+        auto  lacc  = relative_prec( Hpro::spectral_norm, delta );
         auto  niter = std::max( nbench, 1u );
         
         runtime.clear();
@@ -239,10 +243,18 @@ program_main ()
         std::cout << std::endl;
     }
 
-    const auto  mem_zA = zA->byte_size();
+    const auto  mem_zA     = zA->byte_size();
+    const auto  dmem_zA    = matrix::data_byte_size( *zA );
+    const auto  dmem_zA_d  = matrix::data_byte_size_dense( *zA );
+    const auto  dmem_zA_lr = matrix::data_byte_size_lowrank( *zA );
     
-    std::cout << "    mem     = " << format_mem( zA->byte_size() ) << std::endl;
-    std::cout << "        vs H  " << boost::format( "%.3f" ) % ( double(mem_zA) / double(mem_A) ) << std::endl;
+    std::cout << "    mem     = " << format_mem( mem_zA, dmem_zA, dmem_zA_d, dmem_zA_lr ) << std::endl;
+    std::cout << "        vs H  "
+              << boost::format( "%.3f" ) % ( double(mem_zA) / double(mem_A) ) << " / "
+              << boost::format( "%.3f" ) % ( double(dmem_zA) / double(dmem_A) ) << " / "
+              << boost::format( "%.3f" ) % ( double(dmem_zA_d) / double(dmem_A_d) ) << " / "
+              << boost::format( "%.3f" ) % ( double(dmem_zA_lr) / double(dmem_A_lr) ) << " / "
+              << std::endl;
 
     if ( verbose( 3 ) )
         matrix::print_eps( *zA, "zA", "noid,norank,nosize" );

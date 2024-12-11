@@ -5,7 +5,7 @@
 // Module      : compress/zfp
 // Description : ZFP related functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #if defined(HLR_HAS_ZFP)
@@ -38,11 +38,13 @@ inline uint  eps_to_rate_aplr ( const double  eps ) { return std::max< double >(
 //
 // define various compression modes
 //
-inline config  reversible        ()                     { return config{ zfp_mode_reversible, 0.0, 0, 0 }; }
-inline config  fixed_rate        ( const uint    rate ) { return config{ zfp_mode_fixed_rate, 0.0, 0, rate }; }
-inline config  absolute_accuracy ( const double  acc  ) { return config{ zfp_mode_fixed_accuracy, acc, 0, 0 }; }
-inline config  get_config        ( const double  acc  ) { return fixed_rate( eps_to_rate( acc ) ); }
-// inline config  get_config        ( const double  acc  ) { return absolute_accuracy( acc ); }
+inline config  reversible       ()                     { return config{ zfp_mode_reversible, 0.0, 0, 0 }; }         // no truncation
+inline config  fixed_rate       ( const uint    rate ) { return config{ zfp_mode_fixed_rate, 0.0, 0, rate }; }      // fixed number of bits
+inline config  fixed_precision  ( const uint    prec ) { return config{ zfp_mode_fixed_precision, 0.0, prec, 0 }; } // fixed number of bitplanes
+inline config  fixed_accuracy   ( const double  tol  ) { return config{ zfp_mode_fixed_accuracy, tol, 0, 0 }; }     // absolute error
+// inline config  get_config       ( const double  acc  ) { return fixed_rate( eps_to_rate( acc ) ); }
+inline config  get_config       ( const double  tol  ) { return fixed_precision( eps_to_rate( 0.25 * tol ) ); }
+// inline config  get_config       ( const double  tol  ) { return fixed_accuracy( tol ); }
 
 // holds compressed data
 using  byte_t = unsigned char;
@@ -299,7 +301,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
 
     for ( uint  l = 0; l < k; ++l )
     {
-        auto  zconf = fixed_rate( eps_to_rate_aplr( S(l) ) );
+        auto  zconf = get_config( S(l) ); // fixed_rate( eps_to_rate_aplr( S(l) ) );
         auto  z_i   = compress( zconf, U.data() + l * n, n );
 
         zsize += z_i.size();
