@@ -5,7 +5,7 @@
 // Module      : base_hca.hh
 // Description : base class for various HCA algorithms
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <vector>
@@ -96,7 +96,11 @@ public:
     // compute ACA(-Full) pivots for approximating the generator function
     // in local block as defined by row- and column grid
     //
-    pivot_arr_t
+    std::tuple<
+        std::vector< Hpro::idx_t >,
+        std::vector< Hpro::idx_t >,
+        blas::matrix< value_t >,
+        blas::matrix< value_t > >
     comp_aca_pivots ( const tensor_grid< real_t > &  row_grid,
                       const tensor_grid< real_t > &  col_grid,
                       const real_t                   eps ) const
@@ -168,20 +172,21 @@ public:
     // compute generator matrix G
     //
     blas::matrix< value_t >
-    compute_G ( const pivot_arr_t &            pivots,
-                const tensor_grid< real_t > &  row_grid,
-                const tensor_grid< real_t > &  col_grid ) const
+    compute_G ( const std::vector< Hpro::idx_t > &  row_pivots,
+                const std::vector< Hpro::idx_t > &  col_pivots,
+                const tensor_grid< real_t > &       row_grid,
+                const tensor_grid< real_t > &       col_grid ) const
     {
-        const auto               k = pivots.size();
+        const auto               k = row_pivots.size();
         blas::matrix< value_t >  G( k, k );
     
         for ( idx_t  j = 0; j < idx_t(k); j++ )
         {
-            const auto  y  = col_grid( col_grid.fold( pivots[j].second ) );
+            const auto  y  = col_grid( col_grid.fold( col_pivots[j] ) );
         
             for ( idx_t  i = 0; i < idx_t(k); i++ )
             {
-                const auto  x  = row_grid( row_grid.fold( pivots[i].first ) );
+                const auto  x  = row_grid( row_grid.fold( row_pivots[i] ) );
             
                 G(i,j) = _generator_fn.eval( x, y );
             }// for
@@ -200,7 +205,7 @@ public:
 //////////////////////////////////////////////////////////////////////
 
 template < typename hca_impl_t >
-class hca_lrapx : public TLowRankApx
+class hca_lrapx : public Hpro::TLowRankApx< typename hca_impl_t::value_t >
 {
 public:
     using  value_t = typename hca_impl_t::value_t;
@@ -225,23 +230,23 @@ public:
     // build low rank matrix for block cluster bct with
     // rank defined by accuracy acc
     virtual
-    std::unique_ptr< TMatrix< value_t > >
-    build ( const TBlockCluster *  bc,
-            const TTruncAcc &      acc ) const
+    std::unique_ptr< Hpro::TMatrix< value_t > >
+    build ( const Hpro::TBlockCluster *  bc,
+            const Hpro::TTruncAcc &      acc ) const
     {
-        HLR_ASSERT( IS_TYPE( bc->rowcl(), TGeomCluster ) && IS_TYPE( bc->colcl(), TGeomCluster ) );
+        HLR_ASSERT( Hpro::is_geom_cluster( bc->rowcl() ) && Hpro::is_geom_cluster( bc->colcl() ) );
         
-        return _hca.approx( * cptrcast( bc->rowcl(), TGeomCluster ),
-                            * cptrcast( bc->colcl(), TGeomCluster ),
+        return _hca.approx( * cptrcast( bc->rowcl(), Hpro::TGeomCluster ),
+                            * cptrcast( bc->colcl(), Hpro::TGeomCluster ),
                             acc );
     }
 
     virtual
-    std::unique_ptr< TMatrix< value_t > >
-    build ( const TBlockIndexSet & ,
-            const TTruncAcc & ) const
+    std::unique_ptr< Hpro::TMatrix< value_t > >
+    build ( const Hpro::TBlockIndexSet & ,
+            const Hpro::TTruncAcc & ) const
     {
-        HLR_ERROR( "hca_lrapx::build : block index set not supported" );
+        HLR_ERROR( "block index set not supported" );
     }
     
 };

@@ -5,7 +5,7 @@
 // Module      : term.hh
 // Description : basic functions to handle/modify terminal output
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <ostream>
@@ -17,6 +17,9 @@ namespace hlr { namespace term {
 // change color or attribute of output stream
 //
 std::ostream &  reset        ( std::ostream &  os );
+std::ostream &  flush        ( std::ostream &  os );
+std::ostream &  rollback     ( std::ostream &  os );
+std::ostream &  clearline    ( std::ostream &  os );
 
 std::ostream &  black        ( std::ostream &  os );
 std::ostream &  red          ( std::ostream &  os );
@@ -62,11 +65,15 @@ std::ostream &  reverse      ( std::ostream &  os );
 
 std::ostream &  alert        ( std::ostream &  os );
 std::ostream &  bullet       ( std::ostream &  os );
+std::ostream &  triangle     ( std::ostream &  os );
+std::ostream &  dash         ( std::ostream &  os );
 
 //
 // modify given string
 //
 std::string  reset        ( const std::string &  text );
+std::string  rollback     ( const std::string &  text );
+std::string  clearline    ( const std::string &  text );
 
 std::string  black        ( const std::string &  text );
 std::string  red          ( const std::string &  text );
@@ -114,6 +121,8 @@ std::string  reverse      ( const std::string &  text );
 // return modifier string for terminal color/attribute
 //
 const char *  reset        ();
+const char *  rollback     ();
+const char *  clearline    ();
 
 const char *  black        ();
 const char *  red          ();

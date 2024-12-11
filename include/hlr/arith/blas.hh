@@ -5,7 +5,7 @@
 // Module      : arith/blas
 // Description : basic linear algebra functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <cassert>
@@ -438,6 +438,23 @@ join_col ( const std::list< matrix< value_t > > &  matrices )
 }
 
 //
+// convert given vector into diagonal matrix
+//
+template < typename valueM_t,
+           typename valueD_t >
+matrix< valueM_t >
+diag ( const vector< valueD_t > &  d )
+{
+    const auto  n = d.length();
+    auto        M = matrix< valueM_t >( n, n );
+
+    for ( size_t  i = 0; i < n; ++i )
+        M(i,i) = d(i);
+    
+    return M;
+}
+
+//
 // construct block-diagonal matrix out of given matrices M_i
 //
 template < typename value_t >
@@ -747,7 +764,7 @@ sqnorm_F ( const matrix< value_t > &  U,
             auto  u_l = U.column( l );
             auto  v_l = V.column( l );
 
-            res += dot( u_k, u_l ) * dot( v_k, v_l );
+            res += std::abs( dot( u_k, u_l ) * dot( v_k, v_l ) );
         }// for
     }// for
 
@@ -764,6 +781,40 @@ norm_F ( const matrix< value_t > &  U,
 
 // make sure, standard norm_F is found
 using Hpro::BLAS::norm_F;
+
+//////////////////////////////////////////////////////////////////////
+//
+// enhanced versions regarding scalar parameters
+//
+//////////////////////////////////////////////////////////////////////
+
+template < typename     alpha_t,
+           vector_type  vector_t >
+requires ( std::convertible_to< alpha_t, typename vector_t::value_t > )
+void
+scale ( const alpha_t  alpha,
+        vector_t &     v )
+{
+    const auto  n = Hpro::idx_t(v.length());
+    
+    for ( Hpro::idx_t  i = 0; i < n; ++i )
+        v(i) *= alpha;
+}
+
+template < typename     alpha_t,
+           matrix_type  matrix_t >
+requires ( std::convertible_to< alpha_t, typename matrix_t::value_t > )
+void
+scale ( const alpha_t  alpha,
+        matrix_t &     M )
+{
+    const auto  n = Hpro::idx_t(M.nrows());
+    const auto  m = Hpro::idx_t(M.ncols());
+    
+    for ( Hpro::idx_t  j = 0; j < m; ++j )
+        for ( Hpro::idx_t  i = 0; i < n; ++i )
+            M(i,j) *= alpha;
+}
 
 //////////////////////////////////////////////////////////////////////
 //
@@ -826,6 +877,7 @@ using Hpro::BLAS::mulvec;
 //
 template < typename T_alpha,
            typename T_value >
+requires ( std::convertible_to< T_alpha, T_value > )
 void
 mulvec_lr ( const T_alpha                    alpha,
             const blas::matrix< T_value > &  U,
@@ -899,6 +951,7 @@ mulvec_lr ( const T_alpha                    alpha,
 //
 template < typename T_alpha,
            typename T_value >
+requires ( std::convertible_to< T_alpha, T_value > )
 void
 mulvec_lr ( const T_alpha                    alpha,
             const blas::matrix< T_value > &  U,
@@ -973,15 +1026,17 @@ mulvec_lr ( const T_alpha                    alpha,
 // compute op(U·S·V')·x = y with diagonal S
 //
 template < typename T_alpha,
-           typename T_value >
+           typename T_value,
+           typename T_value_S >
+requires ( std::convertible_to< T_value_S, T_value > && std::convertible_to< T_alpha, T_value > )
 void
-mulvec_lr ( const T_alpha                    alpha,
-            const blas::matrix< T_value > &  U,
-            const blas::vector< T_value > &  S,
-            const blas::matrix< T_value > &  V,
-            const matop_t                    op,
-            const blas::vector< T_value > &  x,
-            blas::vector< T_value > &        y )
+mulvec_lr ( const T_alpha                      alpha,
+            const blas::matrix< T_value > &    U,
+            const blas::vector< T_value_S > &  S,
+            const blas::matrix< T_value > &    V,
+            const matop_t                      op,
+            const blas::vector< T_value > &    x,
+            blas::vector< T_value > &          y )
 {
     using  value_t = T_value;
 
@@ -1118,7 +1173,14 @@ prod_diag_ip ( matrix_t &        M,
 {
     HLR_DBG_ASSERT( M.ncols() == D.length() );
     
-    Hpro::BLAS::prod_diag( M, D, M.ncols() );
+    using  value_t = typename matrix_t::value_t;
+    
+    for ( Hpro::idx_t  i = 0; i < M.ncols(); ++i )
+    {
+        auto  Mi = M.column( i );
+
+        scale( value_t(D(i)), Mi );
+    }// for
 }
 
 template < matrix_type matrix_t,
@@ -1133,8 +1195,13 @@ prod_diag ( const matrix_t &  M,
     using  value_t = typename matrix_t::value_t;
 
     auto  T = copy( M );
+    
+    for ( Hpro::idx_t  i = 0; i < T.ncols(); ++i )
+    {
+        auto  Ti = T.column( i );
 
-    Hpro::BLAS::prod_diag( T, D, T.ncols() );
+        scale( value_t(D(i)), Ti );
+    }// for
 
     return T;
 }
@@ -1151,7 +1218,14 @@ prod_diag_ip ( const vector_t &  D,
 {
     HLR_DBG_ASSERT( M.nrows() == D.length() );
     
-    Hpro::BLAS::prod_diag( D, M, M.nrows() );
+    using  value_t = value_type_t< matrix_t >;
+    
+    for ( Hpro::idx_t  i = 0; i < M.nrows(); ++i )
+    {
+        auto  Mi = M.row( i );
+
+        scale( value_t(D(i)), Mi );
+    }// for
 }
 
 template < vector_type vector_t,
@@ -1163,9 +1237,16 @@ prod_diag ( const vector_t &  D,
 {
     HLR_DBG_ASSERT( M.nrows() == D.length() );
     
+    using  value_t = value_type_t< matrix_t >;
+    
     auto  T = copy( M );
+    
+    for ( Hpro::idx_t  i = 0; i < T.nrows(); ++i )
+    {
+        auto  Ti = T.row( i );
 
-    Hpro::BLAS::prod_diag( D, T, T.nrows() );
+        scale( value_t(D(i)), Ti );
+    }// for
 
     return T;
 }
@@ -1448,7 +1529,7 @@ template < typename value_t >
 void
 qr ( matrix< value_t > &  M,
      matrix< value_t > &  R,
-     const bool           comp_Q = true )
+     const bool           comp_Q )
 {
     // if ( M.nrows() > 2*M.ncols() ) // not efficient in general
     //    qrts( M, R, comp_Q );
@@ -1468,6 +1549,8 @@ qr ( const matrix< value_t > &  M )
 
     return { std::move( Q ), std::move( R ) };
 }
+
+using Hpro::BLAS::qr;
 
 //
 // compute QR factorisation A = Q·R with orthonormal Q
@@ -1960,15 +2043,17 @@ sv ( const matrix< value_t > &  M )
 // compute singular values of U·V'
 //
 template < typename value_t >
-vector< value_t >
+vector< real_type_t< value_t > >
 sv ( const matrix< value_t > &  U,
      const matrix< value_t > &  V )
 {
+    using  real_t = real_type_t< value_t >;
+    
     const auto   nrows_U = U.nrows();
     const auto   nrows_V = V.nrows();
     const auto   rank    = U.ncols();
     const auto   minrc   = std::min( nrows_U, nrows_V );
-    auto         S       = vector< value_t >( minrc );
+    auto         S       = vector< real_t >( minrc );
 
     if ( rank >= minrc )
     {
@@ -2020,12 +2105,13 @@ using Hpro::BLAS::eigen;
 //
 template < matrix_type matrix_t >
 std::pair< matrix< typename matrix_t::value_t >,
-           vector< typename matrix_t::value_t > >
+           vector< real_type_t< typename matrix_t::value_t > > >
 eigen_herm ( matrix_t &  M )
 {
     using value_t = typename matrix_t::value_t;
+    using real_t  = real_type_t< typename matrix_t::value_t >;
     
-    auto  E = vector< value_t >();
+    auto  E = vector< real_t >();
     auto  V = matrix< value_t >();
 
     Hpro::BLAS::eigen_herm( M, E, V );

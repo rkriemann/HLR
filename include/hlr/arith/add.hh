@@ -5,7 +5,7 @@
 // Module      : add.hh
 // Description : matrix summation functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 // #include <hpro/algebra/mat_add.hh> // DEBUG
@@ -149,6 +149,78 @@ add ( const value_t                     alpha,
     }// if
     
     #endif
+}
+
+//
+// compute M := M + λI
+//
+template < typename value_t >
+void
+add_identity ( Hpro::TMatrix< value_t > &  M,
+               const value_t &             λ )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  B = ptrcast( &M, Hpro::TBlockMatrix< value_t > );
+        
+        for ( uint  i = 0; i < std::min( B->nblock_rows(), B->nblock_cols() ); ++i )
+        {
+            auto  B_ii = B->block( i, i );
+            
+            if ( ! is_null( B_ii ) )
+                add_identity( *B_ii, λ );
+        }// for
+    }// if
+    else if ( matrix::is_dense( M ) )
+    {
+        auto  D  = ptrcast( &M, matrix::dense_matrix< value_t > );
+        auto  DD = D->mat();
+
+        HLR_ASSERT( M.row_is() == M.col_is() );
+        HLR_ASSERT( ! D->is_compressed() );
+
+        for ( uint  i = 0; i < std::min( DD.nrows(), DD.ncols() ); ++i )
+            DD(i,i) += λ;
+    }// if
+    else
+        HLR_ERROR( "todo" );
+}
+
+//
+// compute M := M + d with d representing entries of diagonal matrix
+//
+template < typename value_t >
+void
+add_diag ( Hpro::TMatrix< value_t > &       M,
+           const blas::vector< value_t > &  d )
+{
+    if ( is_blocked( M ) )
+    {
+        auto  B = ptrcast( &M, Hpro::TBlockMatrix< value_t > );
+        
+        for ( uint  i = 0; i < std::min( B->nblock_rows(), B->nblock_cols() ); ++i )
+        {
+            auto  B_ii = B->block( i, i );
+            
+            HLR_ASSERT( ! is_null( B_ii ) );
+
+            auto  d_i = blas::vector< value_t >( d, B_ii->row_is() - M.row_ofs() );
+                
+            add_diag( *B_ii, d_i );
+        }// for
+    }// if
+    else if ( matrix::is_dense( M ) )
+    {
+        auto  D  = ptrcast( &M, matrix::dense_matrix< value_t > );
+        auto  DD = D->mat();
+
+        HLR_ASSERT( ! D->is_compressed() );
+
+        for ( uint  i = 0; i < std::min( DD.nrows(), DD.ncols() ); ++i )
+            DD(i,i) += d(i);
+    }// if
+    else
+        HLR_ERROR( "todo" );
 }
 
 }// namespace hlr

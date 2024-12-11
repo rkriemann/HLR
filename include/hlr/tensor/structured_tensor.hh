@@ -5,7 +5,7 @@
 // Module      : tensor/structured_tensor
 // Description : structured tensor (with sub-blocks)
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <array>
@@ -43,20 +43,24 @@ public:
     //
 
     structured_tensor3 ()
+            : _nblocks{ 0, 0, 0 }
     {}
 
     structured_tensor3 ( const indexset &  is0,
                          const indexset &  is1,
                          const indexset &  is2 )
             : super_t( is0, is1, is2 )
+            , _nblocks{ 0, 0, 0 }
     {}
     
     structured_tensor3 ( const std::array< indexset, 3 > &  ais )
             : super_t( ais[0], ais[1], ais[2] )
+            , _nblocks{ 0, 0, 0 }
     {}
     
     structured_tensor3 ( const structured_tensor3 &  t )
             : super_t( t )
+            , _nblocks{ 0, 0, 0 }
     {
         set_structure( t.nblocks(0),
                        t.nblocks(1),
@@ -65,8 +69,10 @@ public:
 
     structured_tensor3 ( structured_tensor3 &&  t )
             : super_t( std::forward( t ) )
+            , _nblocks{ 0, 0, 0 }
     {
-        std::swap( _blocks, t._blocks );
+        std::swap( _nblocks, t._nblocks );
+        std::swap( _blocks,  t._blocks );
     }
 
     // dtor
@@ -93,7 +99,8 @@ public:
     {
         super_t::operator = ( std::forward( t ) );
 
-        _blocks = std::move( t._blocks );
+        _nblocks = std::move( t._nblocks );
+        _blocks  = std::move( t._blocks );
     }
 
     //
@@ -165,6 +172,45 @@ public:
     }
     
     //
+    // compression
+    //
+
+    // same but compress based on given accuracy
+    virtual void   compress      ( const Hpro::TTruncAcc &  acc )
+    {
+        for ( auto  b : _blocks )
+        {
+            if ( ! is_null( b ) )
+                b->compress( acc );
+        }// if
+    }
+
+    // decompress internal data
+    virtual void   decompress    ()
+    {
+        for ( auto  b : _blocks )
+        {
+            if ( ! is_null( b ) )
+                b->decompress();
+        }// if
+    }
+
+    // return true if data is compressed
+    virtual bool   is_compressed () const
+    {
+        bool  c = false;
+        
+        for ( auto  b : _blocks )
+        {
+            if ( ! is_null( b ) )
+                if ( b->is_compressed() )
+                    c = true;
+        }// if
+
+        return  c;
+    }
+
+    //
     // misc
     //
     
@@ -205,6 +251,18 @@ public:
         return s;
     }
 
+    // return size of (floating point) data in bytes handled by this object
+    virtual size_t data_byte_size () const
+    {
+        size_t  s = 0;
+
+        for ( auto  b : _blocks )
+            if ( ! is_null( b ) )
+                s += b->data_byte_size();
+
+        return s;
+    }
+    
     // return name of type
     virtual std::string  typestr () const { return "structured_tensor3"; }
 };
@@ -213,7 +271,7 @@ public:
 // type tests
 //
 bool
-is_structured ( const with_value_type auto &  t )
+is_structured ( const has_value_type auto &  t )
 {
     using type_t  = std::remove_cv_t< std::remove_reference_t< decltype( t ) > >;
     using value_t = typename type_t::value_t;

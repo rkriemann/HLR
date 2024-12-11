@@ -5,7 +5,7 @@
 // Module      : mblr.hh
 // Description : MBLR related clustering functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <hpro/cluster/TCoordinate.hh>
@@ -19,9 +19,10 @@ namespace hlr { namespace cluster { namespace mblr {
 // and hierarchy of depth <nlvl> 
 //
 std::unique_ptr< Hpro::TClusterTree >
-cluster      ( Hpro::TCoordinate &   coords,
-               const size_t          ntile,
-               const size_t          nlvl );
+cluster      ( Hpro::TCoordinate &          coords,
+               const Hpro::TBSPPartStrat &  part,
+               const size_t                 ntile,
+               const size_t                 nlvl );
 
 //
 // build block cluster tree based on given row/column cluster trees

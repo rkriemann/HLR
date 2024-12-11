@@ -6,13 +6,14 @@
 // Module      : approx/rrqr
 // Description : low-rank approximation functions using rank revealing QR
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <list>
 
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/operator_wrapper.hh>
+#include <hlr/approx/tools.hh>
 
 namespace hlr { namespace approx {
 
@@ -26,24 +27,28 @@ namespace detail
 //
 // determine "singular values" of R by looking at
 // norms of R(i:·,i:·) for all i
+// - R is assumed to be upper triangular(!)
 //
 template < typename value_t >
-blas::vector< Hpro::real_type_t< value_t > >
+blas::vector< real_type_t< value_t > >
 singular_values ( const blas::matrix< value_t > &  R )
 {
-    using  real_t = Hpro::real_type_t< value_t >;
+    // return blas::sv( R );
+    
+    using  real_t = real_type_t< value_t >;
 
     HLR_ASSERT( R.nrows() == R.ncols() );
     
-    const idx_t  n = idx_t( R.nrows() );
-    auto         S = blas::vector< real_t >( n );
+    const idx_t  n   = idx_t( R.nrows() );
+    auto         S   = blas::vector< real_t >( n );
+    auto         sum = value_t(0);
     
-    for ( int  i = 0; i < n; ++i )
+    for ( int  i = n-1; i >= 0; --i )
     {
-        auto  rest = blas::range( i, n-1 );
-        auto  R_i  = blas::matrix< value_t >( R, rest, rest );
-        
-        S( i ) = blas::normF( R_i );
+        for ( int  j = i; j < n; ++j )
+            sum += math::square( R(i,j) );
+
+        S(i) = math::sqrt( sum );
     }// for
 
     return S;
@@ -55,7 +60,7 @@ singular_values ( const blas::matrix< value_t > &  R )
 template < typename value_t >
 int
 trunc_rank ( const blas::matrix< value_t > &  R,
-             const Hpro::TTruncAcc &          acc )
+             const accuracy &                 acc )
 {
     auto  S = singular_values( R );
 
@@ -71,7 +76,7 @@ template < typename value_t >
 std::pair< blas::matrix< value_t >,
            blas::matrix< value_t > >
 rrqr ( blas::matrix< value_t > &  M,
-       const Hpro::TTruncAcc &    acc )
+       const accuracy &           acc )
 {
     //
     // algorithm only works for nrows >= ncols, so proceed with
@@ -140,14 +145,26 @@ rrqr ( blas::matrix< value_t > &  M,
     return { std::move( U ), std::move( V ) };
 }
 
+template < typename value_t >
+std::tuple< blas::matrix< value_t >,
+            blas::vector< real_type_t< value_t > >,
+            blas::matrix< value_t > >
+rrqr_ortho ( blas::matrix< value_t > &  M,
+             const accuracy &           acc )
+{
+    auto [ U, V ] = rrqr( M, acc );
+
+    return detail::make_ortho( U, V );
+}
+
 //
 // truncate low-rank matrix U·V' up to accuracy <acc>
 //
-template <typename T>
+template < typename T >
 std::pair< blas::matrix< T >, blas::matrix< T > >
 rrqr ( const blas::matrix< T > &  U,
        const blas::matrix< T > &  V,
-       const Hpro::TTruncAcc &    acc )
+       const accuracy &           acc )
 {
     using  value_t = T;
 
@@ -226,6 +243,19 @@ rrqr ( const blas::matrix< T > &  U,
     }// else
 }
 
+template < typename value_t >
+std::tuple< blas::matrix< value_t >,
+            blas::vector< real_type_t< value_t > >,
+            blas::matrix< value_t > >
+rrqr_ortho ( const blas::matrix< value_t > &  U,
+             const blas::matrix< value_t > &  V,
+             const accuracy &                 acc )
+{
+    auto [ TU, TV ] = rrqr( U, V, acc );
+
+    return detail::make_ortho( TU, TV );
+}
+
 //
 // compute low-rank approximation of a sum Σ_i U_i V_i^H using RRQR
 //
@@ -233,7 +263,7 @@ template< typename value_t >
 std::pair< blas::matrix< value_t >, blas::matrix< value_t > >
 rrqr ( const std::list< blas::matrix< value_t > > &  U,
        const std::list< blas::matrix< value_t > > &  V,
-       const Hpro::TTruncAcc &                       acc )
+       const accuracy &                              acc )
 {
     if ( U.empty() )
         return { std::move( blas::matrix< value_t >() ),
@@ -301,6 +331,19 @@ rrqr ( const std::list< blas::matrix< value_t > > &  U,
     }// else
 }
 
+template < typename value_t >
+std::tuple< blas::matrix< value_t >,
+            blas::vector< real_type_t< value_t > >,
+            blas::matrix< value_t > >
+rrqr_ortho ( const std::list< blas::matrix< value_t > > &  U,
+             const std::list< blas::matrix< value_t > > &  V,
+             const accuracy &                              acc )
+{
+    auto [ TU, TV ] = rrqr( U, V, acc );
+
+    return detail::make_ortho( TU, TV );
+}
+
 //
 // compute low-rank approximation of a sum Σ_i U_i T_i V_i^H using RRQR
 //
@@ -309,7 +352,7 @@ std::pair< blas::matrix< value_t >, blas::matrix< value_t > >
 rrqr ( const std::list< blas::matrix< value_t > > &  U,
        const std::list< blas::matrix< value_t > > &  T,
        const std::list< blas::matrix< value_t > > &  V,
-       const Hpro::TTruncAcc &                       acc )
+       const accuracy &                              acc )
 {
     HLR_ASSERT( U.size() == T.size() );
     HLR_ASSERT( T.size() == V.size() );
@@ -397,6 +440,7 @@ template < typename T_value >
 struct RRQR
 {
     using  value_t = T_value;
+    using  real_t  = real_type_t< value_t >;
     
     // signal support for general lin. operators
     static constexpr bool supports_general_operator = false;
@@ -408,7 +452,7 @@ struct RRQR
     std::pair< blas::matrix< value_t >,
                blas::matrix< value_t > >
     operator () ( blas::matrix< value_t > &  M,
-                  const Hpro::TTruncAcc &    acc ) const
+                  const accuracy &           acc ) const
     {
         return hlr::approx::rrqr( M, acc );
     }
@@ -417,7 +461,7 @@ struct RRQR
                blas::matrix< value_t > >
     operator () ( const blas::matrix< value_t > &  U,
                   const blas::matrix< value_t > &  V,
-                  const Hpro::TTruncAcc &          acc ) const 
+                  const accuracy &                 acc ) const 
     {
         return hlr::approx::rrqr( U, V, acc );
     }
@@ -426,7 +470,7 @@ struct RRQR
                blas::matrix< value_t > >
     operator () ( const std::list< blas::matrix< value_t > > &  U,
                   const std::list< blas::matrix< value_t > > &  V,
-                  const Hpro::TTruncAcc &                       acc ) const
+                  const accuracy &                              acc ) const
     {
         return hlr::approx::rrqr( U, V, acc );
     }
@@ -436,9 +480,42 @@ struct RRQR
     operator () ( const std::list< blas::matrix< value_t > > &  U,
                   const std::list< blas::matrix< value_t > > &  T,
                   const std::list< blas::matrix< value_t > > &  V,
-                  const Hpro::TTruncAcc &                       acc ) const
+                  const accuracy &                              acc ) const
     {
         return hlr::approx::rrqr( U, T, V, acc );
+    }
+
+    //
+    // matrix approximation routines (orthogonal version)
+    //
+    
+    std::tuple< blas::matrix< value_t >,
+                blas::vector< real_type_t< value_t > >,
+                blas::matrix< value_t > >
+    approx_ortho ( blas::matrix< value_t > &  M,
+                   const accuracy &           acc ) const
+    {
+        return hlr::approx::rrqr_ortho( M, acc );
+    }
+
+    std::tuple< blas::matrix< value_t >,
+                blas::vector< real_type_t< value_t > >,
+                blas::matrix< value_t > >
+    approx_ortho ( const blas::matrix< value_t > &  U,
+                   const blas::matrix< value_t > &  V,
+                   const accuracy &                 acc ) const 
+    {
+        return hlr::approx::rrqr_ortho( U, V, acc );
+    }
+    
+    std::tuple< blas::matrix< value_t >,
+                blas::vector< real_type_t< value_t > >,
+                blas::matrix< value_t > >
+    approx_ortho ( const std::list< blas::matrix< value_t > > &  U,
+                   const std::list< blas::matrix< value_t > > &  V,
+                   const accuracy &                              acc ) const
+    {
+        return hlr::approx::rrqr_ortho( U, V, acc );
     }
 
     //
@@ -447,7 +524,8 @@ struct RRQR
     
     blas::matrix< value_t >
     column_basis ( blas::matrix< value_t > &  M,
-                   const Hpro::TTruncAcc &    acc ) const
+                   const accuracy &           acc,
+                   blas::vector< real_t > *   sv = nullptr ) const
     {
         // see "rrqr" above for comments
 
@@ -461,29 +539,40 @@ struct RRQR
 
         blas::qrp( M, R, P );
 
-        auto  k  = detail::trunc_rank( R, acc );
+        auto  S  = detail::singular_values( R );
+        auto  k  = std::min< idx_t >( M.ncols(), acc.trunc_rank( S ) ); // M might be adjusted(!)
         auto  Qk = blas::matrix< value_t >( M, blas::range::all, blas::range( 0, k-1 ) );
 
+        if ( ! is_null( sv ) )
+        {
+            if ( sv->length() != k )
+                *sv = std::move( blas::vector< real_t >( k ) );
+            
+            for ( uint  i = 0; i < k; ++i )
+                (*sv)(i) = S(i);
+        }// if
+        
         return blas::copy( Qk );
     }
 
     std::pair< blas::matrix< value_t >,
-               blas::vector< typename Hpro::real_type_t< value_t > > >
-    column_basis ( blas::matrix< value_t > &  M ) const
+               blas::vector< real_type_t< value_t > > >
+    column_basis ( const blas::matrix< value_t > &  M ) const
     {
         const idx_t  ncols = idx_t( M.ncols() );
 
         // for update statistics
         HLR_APPROX_RANK_STAT( "full " << std::min( M.nrows(), ncols ) );
-    
+
+        auto  A = blas::copy( M );
         auto  R = blas::matrix< value_t >( ncols, ncols );
         auto  P = std::vector< int >( ncols, 0 );
 
-        blas::qrp( M, R, P );
+        blas::qrp( A, R, P );
 
         auto  S  = detail::singular_values( R );
 
-        return { std::move( blas::copy( M ) ), std::move( S ) };
+        return { std::move( A ), std::move( S ) };
     }
 };
 

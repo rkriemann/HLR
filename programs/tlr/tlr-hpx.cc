@@ -3,7 +3,7 @@
 // Module      : tlr-hpx.cc
 // Description : TLR LU with HPX
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <hpx/hpx_init.hpp>

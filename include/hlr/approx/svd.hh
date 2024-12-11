@@ -5,7 +5,7 @@
 // Module      : approx/svd
 // Description : low-rank approximation functions using SVD
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <list>
@@ -62,7 +62,7 @@ svd_ortho ( blas::matrix< value_t > &  M,
     auto        rk = blas::range( 0, k-1 );
     const auto  Uk = blas::matrix< value_t >( M, blas::range::all, rk );
     const auto  Vk = blas::matrix< value_t >( V, blas::range::all, rk );
-    const auto  Sk = blas::vector< value_t >( S, rk );
+    const auto  Sk = blas::vector< real_t >(  S, rk );
     auto        A = blas::copy( Uk );
     auto        B = blas::copy( Vk );
     auto        T = blas::copy( Sk );
@@ -187,7 +187,7 @@ svd_ortho ( const blas::matrix< value_t > &  U,
         auto  OV = blas::prod( value_t(1), QV, Vk );
         
         // restrict S
-        auto  Sk = blas::vector( Ss, orank_is );
+        auto  Sk = blas::vector< real_t >( Ss, orank_is );
         auto  OS = blas::copy( Sk );
         
         return { std::move( OU ), std::move( OS ), std::move( OV ) };
@@ -529,7 +529,7 @@ template < typename T_value >
 struct SVD
 {
     using  value_t = T_value;
-    using  real_t  = typename Hpro::real_type< value_t >::type_t;
+    using  real_t  = Hpro::real_type_t< value_t >;
 
     // signal support for general lin. operators
     static constexpr bool supports_general_operator = false;
@@ -575,7 +575,7 @@ struct SVD
     }
 
     //
-    // matrix approximation routines
+    // matrix approximation routines (orthogonal version)
     //
     
     std::tuple< blas::matrix< value_t >,
@@ -614,9 +614,12 @@ struct SVD
     blas::matrix< value_t >
     column_basis ( const blas::matrix< value_t > &  M,
                    const accuracy &                 acc,
-                   blas::vector< real_t > *         sv = nullptr ) const
+                   blas::vector< real_t > *         sv ) const
     {
-        if ( M.ncols() > 2 * M.nrows() )
+        if ( M.ncols() == 0 )
+            return blas::matrix< value_t >( M.nrows(), 0 );
+        
+        if ( false && ( M.ncols() > 2 * M.nrows() ))
         {
             //
             // compute eigenvalues and eigenvectors of M·M'
@@ -624,7 +627,7 @@ struct SVD
             
             auto  G        = blas::prod( M, blas::adjoint( M ) );
             auto  [ V, E ] = blas::eigen_herm( G );
-            auto  perm     = std::vector< std::pair< value_t, uint > >( E.length() );
+            auto  perm     = std::vector< std::pair< real_t, uint > >( E.length() );
             
             for ( uint  i = 0; i < E.length(); ++i )
                 perm.push_back({ E(i), i });
@@ -716,15 +719,30 @@ struct SVD
         }// else
     }
 
+    blas::matrix< value_t >
+    column_basis ( const blas::matrix< value_t > &  M,
+                   const accuracy &                 acc ) const
+    {
+        return column_basis( M, acc, nullptr );
+    }
+
+    blas::matrix< value_t >
+    column_basis ( const blas::matrix< value_t > &  M,
+                   const accuracy &                 acc,
+                   blas::vector< real_t > &         sv ) const
+    {
+        return column_basis( M, acc, & sv );
+    }
+
     //
     // compute column basis and return basis and singular values
     //
     
     std::pair< blas::matrix< value_t >,
-               blas::vector< typename Hpro::real_type_t< value_t > > >
+               blas::vector< real_type_t< value_t > > >
     column_basis ( const blas::matrix< value_t > &  M ) const
     {
-        if ( M.ncols() > 2 * M.nrows() )
+        if ( false && ( M.ncols() > 2 * M.nrows() ))
         {
             //
             // compute eigenvalues and eigenvectors of M·M'

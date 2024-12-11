@@ -5,7 +5,7 @@
 // Module      : arith/uniform
 // Description : arithmetic functions for uniform TLR matrices
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <boost/format.hpp> // DEBUG
@@ -16,6 +16,108 @@
 #include <hlr/utils/io.hh> // DEBUG
 
 namespace hlr { namespace uniform { namespace tlr { namespace detail {
+
+//
+// mat-vec : y = y + α op( M ) x
+//
+template < typename value_t >
+void
+mul_vec ( const value_t                                    alpha,
+          const Hpro::matop_t                              op_M,
+          const Hpro::TMatrix< value_t > &                 M,
+          const vector::scalar_vector< value_t > &         x,
+          vector::scalar_vector< value_t > &               y,
+          const matrix::shared_cluster_basis< value_t > &  rowcb,
+          const matrix::shared_cluster_basis< value_t > &  colcb )
+{
+    HLR_ASSERT( is_blocked( M ) );
+
+    auto  B = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+    
+    //
+    // construct uniform vector for x
+    //
+
+    const auto  nrowblocks = B->nblock_rows();
+    const auto  ncolblocks = B->nblock_cols();
+    auto        ux         = std::vector< blas::vector< value_t > >( ncolblocks );
+    
+    for ( size_t  j = 0; j < ncolblocks; ++j )
+    {
+        auto  colcb_j = colcb.son( j );
+        
+        if ( colcb_j->rank() > 0 )
+        {
+            const auto  x_j = blas::vector< value_t >( blas::vec( x ), colcb_j->is() - x.ofs() );
+
+            ux[j] = std::move( colcb_j->transform_forward( x_j ) );
+        }// if
+    }// for
+
+    //
+    // multiply while going over block rows
+    //   - collect updates in row (separate for uniform and dense)
+    //
+
+    for ( size_t  i = 0; i < nrowblocks; ++i )
+    {
+        auto  rowcb_i = rowcb.son( i );
+        auto  y_i     = blas::vector< value_t >( blas::vec( y ), rowcb_i->is() - y.ofs() );
+        auto  s_i     = blas::vector< value_t >( rowcb_i->rank() );
+
+        for ( size_t  j = 0; j < ncolblocks; ++j )
+        {
+            auto  B_ij = B->block( i, j );
+
+            if ( hlr::matrix::is_uniform_lowrank( B_ij ) )
+            {
+                auto  R = cptrcast( B_ij, hlr::matrix::uniform_lrmatrix< value_t > );
+
+                #if defined(HLR_HAS_ZBLAS_DIRECT)
+                if ( R->is_compressed() )
+                {
+                    switch ( op_M )
+                    {
+                        case apply_normal     : compress::zblas::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoeff(), ux[j].data(), s_i.data() ); break;
+                        case apply_conjugate  : { HLR_ASSERT( false ); }
+                        case apply_transposed : { HLR_ASSERT( false ); }
+                        case apply_adjoint    : compress::zblas::mulvec( R->row_rank(), R->col_rank(), op_M, alpha, R->zcoeff(), ux[j].data(), s_i.data() ); break;
+                        default               : HLR_ERROR( "unsupported matrix operator" );
+                    }// switch
+                }// if
+                else
+                #endif
+                {
+                    switch ( op_M )
+                    {
+                        case apply_normal     : blas::mulvec( alpha, R->coupling(), ux[j], value_t(1), s_i ); break;
+                        case apply_conjugate  : HLR_ASSERT( false );
+                        case apply_transposed : HLR_ASSERT( false );
+                        case apply_adjoint    : blas::mulvec( alpha, blas::adjoint( R->coupling() ), ux[j], value_t(1), s_i ); break;
+                        default               : HLR_ERROR( "unsupported matrix operator" );
+                    }// switch
+                }// else
+            }// if
+            else if ( hlr::matrix::is_dense( B_ij ) )
+            {
+                auto  x_j = blas::vector< value_t >( blas::vec( x ), B_ij->col_is( op_M ) - x.ofs() );
+        
+                B_ij->apply_add( alpha, x_j, y_i, op_M );
+            }// if
+            else
+                HLR_ERROR( "unsupported matrix type: " + B_ij->typestr() );
+        }// for
+
+        //
+        // add uniform contribution to local result
+        //
+
+        if ( s_i.length() > 0 )
+        {
+            rowcb_i->transform_backward( s_i, y_i );
+        }// if
+    }// for
+}
 
 //
 // locally add low-rank update W·X to block M_ij

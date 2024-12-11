@@ -5,7 +5,7 @@
 // Module      : utils/trace
 // Description : tracing functions based on Score-P
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #if defined(HLR_USE_SCOREP)

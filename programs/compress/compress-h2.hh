@@ -3,7 +3,7 @@
 // Program     : compress-h2
 // Description : construction and MVM for H²-matrices
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <hlr/utils/io.hh>
@@ -11,26 +11,13 @@
 #include <hlr/approx/accuracy.hh>
 #include <hlr/arith/norm.hh>
 #include <hlr/bem/aca.hh>
+#include <hlr/bem/hca.hh>
+#include <hlr/bem/dense.hh>
 
 #include "common.hh"
 #include "common-main.hh"
 
 using namespace hlr;
-
-using indexset = Hpro::TIndexSet;
-
-struct local_accuracy : public Hpro::TTruncAcc
-{
-    local_accuracy ( const double  abs_eps )
-            : Hpro::TTruncAcc( 0.0, abs_eps )
-    {}
-    
-    virtual const TTruncAcc  acc ( const indexset &  rowis,
-                                   const indexset &  colis ) const
-    {
-        return Hpro::absolute_prec( abs_eps() * std::sqrt( double(rowis.size() * colis.size()) ) );
-    }
-};
 
 //
 // main function
@@ -57,15 +44,45 @@ program_main ()
         auto  ct      = gen_ct( *coord );
         auto  bct     = gen_bct( *ct, *ct );
         auto  coeff   = problem->coeff_func();
-        auto  pcoeff  = std::make_unique< Hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-        auto  lrapx   = std::make_unique< bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > > >( *pcoeff );
+        auto  pcoeff  = Hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
         
         tic = timer::now();
-        H   = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc, nseq );
-        toc = timer::since( tic );
+        
+        if ( cmdline::capprox == "hca" )
+        {
+            if constexpr ( problem_t::supports_hca )
+            {
+                std::cout << "    using HCA" << std::endl;
+                
+                auto  hcagen = problem->hca_gen_func( *ct );
+                auto  hca    = bem::hca( pcoeff, *hcagen, cmdline::eps / 100.0, 6 );
+                auto  hcalr  = bem::hca_lrapx( hca );
+                
+                H = impl::matrix::build( bct->root(), pcoeff, hcalr, acc, nseq );
+            }// if
+            else
+                cmdline::capprox = "default";
+        }// if
 
-        if ( verbose( 2 ) )
-            io::hpro::write< value_t >( *H, "A.hm" );
+        if (( cmdline::capprox == "aca" ) || ( cmdline::capprox == "default" ))
+        {
+            std::cout << "    using ACA" << std::endl;
+
+            auto  acalr = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
+        
+            H = impl::matrix::build( bct->root(), pcoeff, acalr, acc, nseq );
+        }// else
+        
+        if ( cmdline::capprox == "dense" )
+        {
+            std::cout << "    using dense" << std::endl;
+
+            auto  dense = bem::dense_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
+        
+            H = impl::matrix::build( bct->root(), pcoeff, dense, acc, nseq );
+        }// else
+        
+        toc = timer::since( tic );
     }// if
     else
     {
@@ -87,7 +104,73 @@ program_main ()
     std::cout << "    mem   = " << format_mem( mem_H ) << std::endl;
 
     if ( verbose( 3 ) )
-        io::eps::print( *H, "H" );
+        io::eps::print( *H, "H", "noid,nosize" );
+    
+    //////////////////////////////////////////////////////////////////////
+    //
+    // coarsen matrix
+    //
+    //////////////////////////////////////////////////////////////////////
+    
+    if ( cmdline::coarsen )
+    {
+        std::cout << term::bullet << term::bold << "coarsening" << term::reset << std::endl;
+        
+        auto  apx = approx::SVD< value_t >();
+
+        tic = timer::now();
+        
+        auto  Hc = impl::matrix::coarsen( *H, acc, apx );
+        
+        toc = timer::since( tic );
+
+        auto  mem_Hc = Hc->byte_size();
+        
+        std::cout << "    done in " << format_time( toc ) << std::endl;
+        std::cout << "    mem   = " << format_mem( mem_Hc ) << std::endl;
+        std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_Hc) / double(mem_H) ) << std::endl;
+        
+        if ( verbose( 3 ) )
+            matrix::print_eps( *Hc, "Hc", "noid,nosize" );
+
+        auto  diff   = matrix::sum( 1, *H, -1, *Hc );
+        auto  norm_A = impl::norm::spectral( *H );
+        auto  error  = impl::norm::spectral( *diff );
+
+        std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
+
+        H = std::move( Hc );
+    }// if
+    
+    if ( cmdline::tohodlr )
+    {
+        std::cout << term::bullet << term::bold << "converting to HODLR" << term::reset << std::endl;
+        
+        auto  apx = approx::SVD< value_t >();
+
+        tic = timer::now();
+        
+        auto  Hc = impl::matrix::convert_to_hodlr( *H, acc, apx );
+        
+        toc = timer::since( tic );
+
+        auto  mem_Hc = Hc->byte_size();
+        
+        std::cout << "    done in " << format_time( toc ) << std::endl;
+        std::cout << "    mem   = " << format_mem( mem_Hc ) << std::endl;
+        std::cout << "      vs H  " << boost::format( "%.3f" ) % ( double(mem_Hc) / double(mem_H) ) << std::endl;
+        
+        if ( verbose( 3 ) )
+            matrix::print_eps( *Hc, "Hc", "noid,nosize" );
+
+        auto  diff   = matrix::sum( 1, *H, -1, *Hc );
+        auto  norm_A = impl::norm::spectral( *H );
+        auto  error  = impl::norm::spectral( *diff );
+
+        std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
+
+        H = std::move( Hc );
+    }// if
     
     //////////////////////////////////////////////////////////////////////
     //
@@ -97,11 +180,12 @@ program_main ()
     
     std::cout << term::bullet << term::bold << "H²-matrix" << term::reset << std::endl;
 
+    auto  h2acc = ( cmdline::tohodlr ? fixed_prec( 0.1 * cmdline::eps ) : fixed_prec( 0.4 * cmdline::eps ) );
     auto  cbapx = approx::SVD< value_t >();
 
     tic = timer::now();
 
-    auto  [ rowcb, colcb, A ] = impl::matrix::build_h2_rec( *H, cbapx, acc );
+    auto  [ rowcb, colcb, A ] = impl::matrix::build_h2_rec( *H, cbapx, h2acc, false );
     
     toc = timer::since( tic );
 
@@ -118,8 +202,7 @@ program_main ()
         matrix::print_eps( *A, "A", "noid,nosize" );
 
     {
-        auto  B     = impl::matrix::convert_to_h( *A );
-        auto  error = impl::norm::frobenius( 1, *H, -1, *B );
+        auto  error = impl::norm::frobenius( 1, *H, -1, *A );
 
         std::cout << "    error = " << format_error( error, error / norm_H ) << std::endl;
     }
@@ -144,40 +227,45 @@ program_main ()
               << "compression ("
               << "ε = " << boost::format( "%.2e" ) % cmdline::eps
               << ", "
-              << hlr::compress::provider << " + " << hlr::compress::ap::provider << ')'
+              << hlr::compress::provider << " + " << hlr::compress::aplr::provider << ')'
               << term::reset << std::endl;
 
     {
-        auto  lacc = absolute_prec( cmdline::eps );
+        auto  lacc  = relative_prec( cmdline::eps );
+        auto  niter = std::max( nbench, 1u );
         
         runtime.clear();
         
-        for ( uint  i = 0; i < std::max( nbench, 1u ); ++i )
+        for ( uint  i = 0; i < niter; ++i )
         {
             tic = timer::now();
     
             impl::matrix::compress< matrix::shared_cluster_basis< value_t > >( *zrowcb, lacc );
             impl::matrix::compress< matrix::shared_cluster_basis< value_t > >( *zcolcb, lacc );
-            impl::matrix::compress( *zA,     lacc );
+            impl::matrix::compress( *zA, lacc );
 
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
-            std::cout << "      compressed in   " << format_time( toc ) << std::endl;
+            std::cout << term::rollback << term::clearline << "      compressed in   " << format_time( toc ) << term::flush;
 
-            if ( i < nbench-1 )
+            if ( i < niter-1 )
             {
+                zA.reset( nullptr );
+                zrowcb.reset( nullptr );
+                zcolcb.reset( nullptr );
+                
                 zA     = std::move( impl::matrix::copy( *A ) );
-                zrowcb = std::move( zrowcb->copy() );
-                zcolcb = std::move( zcolcb->copy() );
+                zrowcb = std::move( rowcb->copy() );
+                zcolcb = std::move( colcb->copy() );
         
                 matrix::replace_cluster_basis( *zA, *zrowcb, *zcolcb );
             }// if
         }// for
 
         if ( nbench > 1 )
-            std::cout << "    runtime  = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                      << std::endl;
+            std::cout << term::rollback << term::clearline << "    runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime );
+        std::cout << std::endl;
     }
 
     const auto  mem_zA   = zA->byte_size();
@@ -196,8 +284,7 @@ program_main ()
     // std::cout << "    error = " << format_error( error, error / norm_A ) << std::endl;
 
     {
-        auto  B     = impl::matrix::convert_to_h( *zA );
-        auto  error = impl::norm::frobenius( 1, *H, -1, *B );
+        auto  error = impl::norm::frobenius( 1, *H, -1, *zA );
 
         std::cout << "    error = " << format_error( error, error / norm_H ) << std::endl;
     }
@@ -208,6 +295,8 @@ program_main ()
               << term::reset << std::endl;
 
     {
+        auto  niter = std::max( nbench, 1u );
+        
         runtime.clear();
         
         auto  zA2     = impl::matrix::copy( *zA );
@@ -216,7 +305,7 @@ program_main ()
         
         matrix::replace_cluster_basis( *zA2, *zrowcb2, *zcolcb2 );
         
-        for ( uint  i = 0; i < nbench; ++i )
+        for ( uint  i = 0; i < niter; ++i )
         {
             tic = timer::now();
     
@@ -226,10 +315,14 @@ program_main ()
             
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
-            std::cout << "      decompressed in   " << format_time( toc ) << std::endl;
+            std::cout << term::rollback << term::clearline << "      decompressed in   " << format_time( toc ) << term::flush;
 
-            if ( i < nbench-1 )
+            if ( i < niter-1 )
             {
+                zA2.reset( nullptr );
+                zrowcb2.reset( nullptr );
+                zcolcb2.reset( nullptr );
+
                 zA2     = std::move( impl::matrix::copy( *zA ) );
                 zrowcb2 = std::move( zrowcb->copy() );
                 zcolcb2 = std::move( zcolcb->copy() );
@@ -239,15 +332,14 @@ program_main ()
         }// for
         
         if ( nbench > 1 )
-            std::cout << "    runtime  = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                      << std::endl;
+            std::cout << term::rollback << term::clearline << "    runtime  = "
+                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime );
+        std::cout << std::endl;
 
         // auto  diffB = matrix::sum( value_t(1), *A, value_t(-1), *zA2 );
 
         {
-            auto  B     = impl::matrix::convert_to_h( *zA2 );
-            auto  error = impl::norm::frobenius( 1, *H, -1, *B );
+            auto  error = impl::norm::frobenius( 1, *H, -1, *zA2 );
 
             std::cout << "    error = " << format_error( error, error / norm_H ) << std::endl;
         }
@@ -265,6 +357,15 @@ program_main ()
                   << "mat-vec"
                   << term::reset << std::endl;
 
+        const uint  nmvm     = 50;
+        const auto  flops_h2 = nmvm * hlr::h2::mul_vec_flops( apply_normal, *A, *rowcb, *colcb );
+        const auto  bytes_h2 = nmvm * hlr::h2::mul_vec_datasize( apply_normal, *A, *rowcb, *colcb );
+        const auto  bytes_z2 = nmvm * hlr::h2::mul_vec_datasize( apply_normal, *zA, *zrowcb, *zcolcb );
+    
+        std::cout << "  " << term::bullet << term::bold << "FLOPs/byte " << term::reset() << std::endl;
+        std::cout << "    H²   = " << format_flops( flops_h2 ) << ", " << flops_h2 / bytes_h2 << std::endl;
+        std::cout << "    zH²  = " << format_flops( flops_h2 ) << ", " << flops_h2 / bytes_z2 << std::endl;
+
         double  t_orig       = 0.0;
         double  t_compressed = 0.0;
         auto    y_ref        = std::unique_ptr< vector::scalar_vector< value_t > >();
@@ -272,11 +373,8 @@ program_main ()
         {
             runtime.clear();
             
-            std::cout << "  "
-                      << term::bullet << term::bold
-                      << "uncompressed"
-                      << term::reset << std::endl;
-        
+            std::cout << "  " << term::bullet << term::bold << "uncompressed" << term::reset << std::endl;
+            
             auto  x = std::make_unique< vector::scalar_vector< value_t > >( A->col_is() );
             auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
 
@@ -286,23 +384,25 @@ program_main ()
             {
                 tic = timer::now();
     
-                for ( int j = 0; j < 50; ++j )
-                    impl::h2::mul_vec2< value_t >( 2.0, Hpro::apply_normal, *A, *x, *y, *rowcb, *colcb );
+                for ( int j = 0; j < nmvm; ++j )
+                    impl::h2::mul_vec< value_t >( 2.0, apply_normal, *A, *x, *y, *rowcb, *colcb );
 
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
         
-                std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+                std::cout << term::rollback << term::clearline << "    mvm in   " << format_time( toc ) << term::flush;
 
                 if ( i < nbench-1 )
                     y->fill( 1 );
             }// for
         
             if ( nbench > 1 )
-                std::cout << "  runtime  = "
-                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                          << std::endl;
+                std::cout << term::rollback << term::clearline << "  runtime  = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime );
+            std::cout << std::endl;
 
+            std::cout << "    flops  = " << format_flops( flops_h2, min( runtime ) ) << std::endl;
+            
             t_orig = min( runtime );
             
             y_ref = std::move( y );
@@ -311,10 +411,7 @@ program_main ()
         {
             runtime.clear();
             
-            std::cout << "  "
-                      << term::bullet << term::bold
-                      << "compressed"
-                      << term::reset << std::endl;
+            std::cout << "  " << term::bullet << term::bold << "compressed" << term::reset << std::endl;
         
             auto  x = std::make_unique< vector::scalar_vector< value_t > >( zA->col_is() );
             auto  y = std::make_unique< vector::scalar_vector< value_t > >( zA->row_is() );
@@ -325,26 +422,25 @@ program_main ()
             {
                 tic = timer::now();
     
-                for ( int j = 0; j < 50; ++j )
-                    impl::h2::mul_vec2< value_t >( 2.0, Hpro::apply_normal, *zA, *x, *y, *zrowcb, *zcolcb );
+                for ( int j = 0; j < nmvm; ++j )
+                    impl::h2::mul_vec< value_t >( 2.0, apply_normal, *zA, *x, *y, *zrowcb, *zcolcb );
 
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
         
-                std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+                std::cout << term::rollback << term::clearline << "    mvm in   " << format_time( toc ) << term::flush;
 
                 if ( i < nbench-1 )
                     y->fill( 1 );
             }// for
         
             if ( nbench > 1 )
-                std::cout << "  runtime  = "
-                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                          << std::endl;
+                std::cout << term::rollback << term::clearline << "  runtime  = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime );
+            std::cout << std::endl;
         
-            t_compressed = min( runtime );
-
-            std::cout << "    ratio  = " << boost::format( "%.02f" ) % ( t_compressed / t_orig ) << std::endl;
+            std::cout << "    ratio  = " << boost::format( "%.02f" ) % ( min( runtime ) / t_orig ) << std::endl;
+            std::cout << "    flops  = " << format_flops( flops_h2, min( runtime ) ) << std::endl;
 
             auto  diff = y_ref->copy();
 

@@ -5,7 +5,7 @@
 // Module      : tbb/compress
 // Description : matrix compression functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <tbb/parallel_for.h>
@@ -995,7 +995,7 @@ compress ( tensor::base_tensor3< value_t > &  A,
                             if ( is_null( BA->block( i, j, l ) ) )
                                 continue;
                             
-                            compress( *BA->block( i, j, l ), acc );
+                            hlr::tbb::tensor::compress( *BA->block( i, j, l ), acc );
                         }// for
                     }// for
                 }// for

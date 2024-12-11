@@ -5,7 +5,7 @@
 // Module      : multiply
 // Description : matrix multiplication functions with uniform matrices
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 namespace hlr {
@@ -102,6 +102,39 @@ multiply ( const value_t                                   alpha,
     blas::prod( value_t(1), UxS, blas::adjoint( B.col_basis( op_B ) ), value_t(1), DC );
 }
 
+template < typename value_t >
+void
+multiply ( const value_t                                   alpha,
+           const Hpro::matop_t                             op_A,
+           const Hpro::TBlockMatrix< value_t > &           A,
+           const Hpro::matop_t                             op_B,
+           const matrix::uniform_lrmatrix< value_t > &     B,
+           matrix::dense_matrix< value_t > &               C,
+           const accuracy &                                acc )
+{
+    HLR_MULT_PRINT;
+
+    HLR_ASSERT( ! C.is_compressed() );
+    
+    // (A × U)·S·V'
+    auto  UB = B.row_basis( op_B );
+    auto  UC = blas::matrix< value_t >( C.nrows(), UB.ncols() );
+
+    multiply< value_t >( alpha, op_A, A, UB, UC );
+
+    auto  UxS = blas::prod( UC, blas::mat_view( op_B, B.coupling() ) );
+
+    std::scoped_lock  lock( C.mutex() );
+    const auto        was_compressed = C.is_compressed();
+
+    C.decompress();
+    
+    blas::prod( value_t(1), UxS, blas::adjoint( B.col_basis( op_B ) ), value_t(1), C.mat_direct() );
+
+    if ( was_compressed )
+        C.compress( acc );
+}
+
 //
 // blocked x uniform = lowrank
 //
@@ -170,7 +203,7 @@ multiply ( const value_t                                   alpha,
     HLR_MULT_PRINT;
     
     // C = C + (( A U ) S) V'
-    auto  AU  = blas::prod( blas::mat_view( op_A, blas::mat( A ) ), B.row_basis( op_B ) );
+    auto  AU  = blas::prod( blas::mat_view( op_A, A.mat() ), B.row_basis( op_B ) );
     auto  AUS = blas::prod( AU, blas::mat_view( op_B, B.coupling() ) );
 
     std::scoped_lock  lock( C.mutex() );
@@ -178,7 +211,7 @@ multiply ( const value_t                                   alpha,
 
     C.decompress();
     
-    blas::prod( alpha, AUS, blas::adjoint( B.col_basis( op_B ) ), value_t(1), blas::mat( C ) );
+    blas::prod( alpha, AUS, blas::adjoint( B.col_basis( op_B ) ), value_t(1), C.mat_direct() );
 
     if ( was_compressed )
         C.compress( acc );
@@ -312,7 +345,7 @@ multiply ( const value_t                                   alpha,
 
     C.decompress();
     
-    blas::prod( value_t(1), UxS, blas::adjoint( VC ), value_t(1), blas::mat( C ) );
+    blas::prod( value_t(1), UxS, blas::adjoint( VC ), value_t(1), C.mat_direct() );
 
     if ( was_compressed )
         C.compress( acc );
@@ -386,7 +419,7 @@ multiply ( const value_t                                   alpha,
     HLR_MULT_PRINT;
     
     // C = C + U·(S·(V'×B))
-    auto  VB  = blas::prod( blas::adjoint( A.col_basis( op_A ) ), blas::mat_view( op_B, blas::mat( B ) ) );
+    auto  VB  = blas::prod( blas::adjoint( A.col_basis( op_A ) ), blas::mat_view( op_B, B.mat() ) );
     auto  SVB = blas::prod( blas::mat_view( op_A, A.coupling() ), VB );
 
     std::scoped_lock  lock( C.mutex() );
@@ -394,7 +427,7 @@ multiply ( const value_t                                   alpha,
 
     C.decompress();
     
-    blas::prod( alpha, A.row_basis( op_A ), SVB, value_t(1), blas::mat( C ) );
+    blas::prod( alpha, A.row_basis( op_A ), SVB, value_t(1), C.mat_direct() );
 
     if ( was_compressed )
         C.compress( acc );
@@ -526,7 +559,7 @@ multiply ( const value_t                                   alpha,
 
     C.decompress();
     
-    blas::prod( alpha, USVWT, blas::adjoint( B.col_basis( op_B ) ), value_t(1), blas::mat( C ) );
+    blas::prod( alpha, USVWT, blas::adjoint( B.col_basis( op_B ) ), value_t(1), C.mat_direct() );
 
     if ( was_compressed )
         C.compress( acc );

@@ -5,7 +5,7 @@
 // Module      : matrix.hh
 // Description : tensor containers based on std::vector
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <vector>
@@ -105,7 +105,7 @@ public:
 
 private:
     std::vector< value_type >  data;
-    const size_type            dim0, dim1, dim2;
+    size_type                  dim0, dim1, dim2;
 
 public:
     tensor3 ( const size_type  adim0,

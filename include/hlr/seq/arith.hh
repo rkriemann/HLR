@@ -5,7 +5,7 @@
 // Module      : arith.hh
 // Description : sequential arithmetic functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <hpro/matrix/TBlockMatrix.hh>
@@ -38,6 +38,39 @@ namespace hlr { namespace seq {
 // compute y = y + α · op( M ) · x
 //
 using hlr::mul_vec;
+
+template < typename value_t >
+void
+mul_vec_chunk ( const value_t                             alpha,
+                const Hpro::matop_t                       op_M,
+                const Hpro::TMatrix< value_t > &          M,
+                const vector::scalar_vector< value_t > &  x,
+                vector::scalar_vector< value_t > &        y )
+{
+    mul_vec( alpha, op_M, M, x, y );
+}
+
+using hlr::cluster_block_map_t;
+using hlr::cluster_blocks_t;
+using hlr::mul_vec_cl;
+using hlr::mul_vec_cl2;
+using hlr::mul_vec_hier;
+using hlr::realloc;
+using hlr::setup_cluster_block_map;
+using hlr::build_cluster_blocks;
+using hlr::build_cluster_matrix;
+
+template < typename value_t >
+void
+mul_vec_ts ( const value_t                             alpha,
+             const Hpro::matop_t                       op_M,
+             const Hpro::TMatrix< value_t > &          M,
+             const vector::scalar_vector< value_t > &  x,
+             vector::scalar_vector< value_t > &        y )
+{
+    mul_vec( alpha, op_M, M, x, y );
+}
+
 
 //
 // compute C = C + α · A
@@ -164,6 +197,8 @@ gauss_elim ( Hpro::TMatrix< value_t > &  A,
 
 namespace tlr
 {
+
+using hlr::tlr::mul_vec;
 
 //
 // LU factorization A = L·U, with unit lower triangular L and upper triangular U

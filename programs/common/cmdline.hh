@@ -31,6 +31,7 @@ size_t  k          = 16;           // constant rank
 double  eps        = 1e-4;         // constant precision
 double  tol        = 0;            // tolerance
 string  appl       = "logkernel";  // application
+string  kernel     = "newton";     // (radial) kernel to use
 string  distr      = "cyclic2d";   // block distribution
 uint    nthreads   = 0;            // number of threads to use (prefer "taskset" or "numactl")
 uint    verbosity  = 1;            // verbosity level
@@ -46,19 +47,24 @@ bool    ip_lu      = false;        // use in-place task graph
 bool    oop_lu     = false;        // use out-of-place task graph
 bool    fused      = false;        // compute fused DAG for LU and accumulators
 bool    nosparsify = false;        // do not sparsify task graph
+bool    coarsen    = false;        // coarsen matrix structure
+bool    tohodlr    = false;        // convert matrix to HODLR format
 int     coarse     = 0;            // use coarse sparse graph
 uint    nbench     = 1;            // perform computations <nbench> times (at most)
 double  tbench     = 1;            // minimal time for benchmark runs
 string  ref        = "";           // reference matrix, algorithm, etc.
 string  cluster    = "h";          // clustering technique (h,tlr,mblr,hodlr)
-string  adm        = "weak";       // admissibility (std,weak,hodlr)
+string  part       = "bsp-card";   // partitioning strategy (bsp-card/vol,pca-card/vol)
+string  adm        = "strong";     // admissibility (strong,vertex,weak,offdiagonal)
 double  eta        = 2.0;          // admissibility parameter
-string  approx     = "default";    // low-rank approximation method (svd,rrqr,randsvd,randlr,aca,lanczos)
+string  capprox    = "default";    // construction low-rank approximation method (aca,hca,dense)
+string  aapprox    = "default";    // arithmetic low-rank approximation method (svd,rrqr,randsvd,randlr,aca,lanczos)
 string  tapprox    = "default";    // tensor low-rank approximation method (hosvd,sthosvd,ghosvd,hhosvd,tcafull)
 string  arith      = "std";        // which kind of arithmetic to use
-double  compress   = 0;            // apply SZ/ZFP compression with rate (1…, ZFP only) or accuracy (0,1] (0 = off)
+bool    compress   = false;        // apply FP compression to matrix data
 auto    kappa      = std::complex< double >( 2, 0 ); // wave number for helmholtz problems
 double  sigma      = 1;            // parameter for matern covariance and gaussian kernel
+bool    sep_coup   = false;        // use separate row/column couplings for Uni-H and H²
 
 void
 read_config ( const std::string &  filename )
@@ -74,10 +80,12 @@ read_config ( const std::string &  filename )
     boost::property_tree::ini_parser::read_ini( filename, cfg );
 
     appl       = cfg.get( "app.appl",    appl );
+    kernel     = cfg.get( "app.kernel",  kernel );
     n          = cfg.get( "app.n",       n );
     adm        = cfg.get( "app.adm",     adm );
     eta        = cfg.get( "app.eta",     eta );
     cluster    = cfg.get( "app.cluster", cluster );
+    part       = cfg.get( "app.part",    part );
     gridfile   = cfg.get( "app.grid",    gridfile );
     kappa      = cfg.get( "app.kappa",   kappa );
     sigma      = cfg.get( "app.sigma",   sigma );
@@ -126,9 +134,11 @@ parse ( int argc, char ** argv )
         ;
 
     app_opts.add_options()
-        ( "adm",         value<string>(), ": admissibility (std,weak,offdiag,hodlr)" )
+        ( "adm",         value<string>(), ": admissibility (strong,vertex,weak,offdiag)" )
         ( "app",         value<string>(), ": application type (logkernel,matern,laplaceslp,helmholtzslp,exp)" )
-        ( "cluster",     value<string>(), ": clustering technique (tlr,blr,mblr(-n),tileh,bsp,h)" )
+        ( "kernel",      value<string>(), ": kernel to use (newton,log,exp,...)" )
+        ( "cluster",     value<string>(), ": clustering technique (tlr,blr,mblr(-n),tileh,bsp,h,sfc)" )
+        ( "part",        value<string>(), ": partitioning strategy (bsp-/pca-card,bsp-/pca-vol)" )
         ( "data",        value<string>(), ": data file to use" )
         ( "eta",         value<double>(), ": admissibility parameter for \"std\" and \"weak\"" )
         ( "grid",        value<string>(), ": grid file to use (intern: sphere,sphere2,cube,square)" )
@@ -137,12 +147,16 @@ parse ( int argc, char ** argv )
         ( "matrix",      value<string>(), ": matrix file to use" )
         ( "nprob,n",     value<int>(),    ": set problem size" )
         ( "sparse",      value<string>(), ": sparse matrix file to use" )
-        ( "compress",    value<double>(), ": apply SZ/ZFP compression with rate [1,…; ZFP only) or accuracy (0,1) (default: 0 = off)" )
+        ( "compress",                     ": apply FP compression to matrix data" )
+        ( "coarsen",                      ": coarsen matrix structure" )
+        ( "tohodlr",                      ": convert matrix to HODLR format" )
+        ( "capprox",     value<string>(), ": LR approximation to use (aca,hca,dense)" )
+        ( "sepcoup",                      ": use separate row/column couplings for Uni-H and H²" )
         ;
 
     ari_opts.add_options()
         ( "accu",                         ": use accumulator arithmetic" )
-        ( "approx",      value<string>(), ": LR approximation to use (svd,rrqr,randsvd,randlr,aca,lanczos)" )
+        ( "aapprox",     value<string>(), ": LR approximation to use (svd,rrqr,randsvd,randlr,aca,lanczos)" )
         ( "tapprox",     value<string>(), ": tensor LR approximation to use (hosvd,sthosvd,ghosvd,hhosvd,tcafull)" )
         ( "arith",       value<string>(), ": which arithmetic to use (hpro, std, accu, lazy, all)" )
         ( "nbench",      value<uint>(),   ": (maximal) number of benchmark iterations" )
@@ -204,7 +218,8 @@ parse ( int argc, char ** argv )
     
     if ( vm.count( "nodag"      ) ) hpro::CFG::Arith::use_dag = false;
     if ( vm.count( "accu"       ) ) hpro::CFG::Arith::use_accu = true;
-    if ( vm.count( "approx"     ) ) approx     = vm["approx"].as<string>();
+    if ( vm.count( "capprox"    ) ) capprox    = vm["capprox"].as<string>();
+    if ( vm.count( "aapprox"    ) ) aapprox    = vm["aapprox"].as<string>();
     if ( vm.count( "tapprox"    ) ) tapprox    = vm["tapprox"].as<string>();
     if ( vm.count( "arith"      ) ) arith      = vm["arith"].as<string>();
     if ( vm.count( "threads"    ) ) nthreads   = vm["threads"].as<int>();
@@ -217,6 +232,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "eps"        ) ) eps        = vm["eps"].as<double>();
     if ( vm.count( "tol"        ) ) tol        = vm["tol"].as<double>();
     if ( vm.count( "app"        ) ) appl       = vm["app"].as<string>();
+    if ( vm.count( "kernel"     ) ) kernel     = vm["kernel"].as<string>();
     if ( vm.count( "grid"       ) ) gridfile   = vm["grid"].as<string>();
     if ( vm.count( "matrix"     ) ) matrixfile = vm["matrix"].as<string>();
     if ( vm.count( "sparse"     ) ) sparsefile = vm["sparse"].as<string>();
@@ -230,6 +246,8 @@ parse ( int argc, char ** argv )
     if ( vm.count( "oop"        ) ) oop_lu     = true;
     if ( vm.count( "fused"      ) ) fused      = true;
     if ( vm.count( "nosparsify" ) ) nosparsify = true;
+    if ( vm.count( "coarsen"    ) ) coarsen    = true;
+    if ( vm.count( "tohodlr"    ) ) tohodlr    = true;
     if ( vm.count( "coarse"     ) ) coarse     = vm["coarse"].as<int>();
     if ( vm.count( "nbench"     ) ) nbench     = vm["nbench"].as<uint>();
     if ( vm.count( "tbench"     ) ) tbench     = vm["tbench"].as<double>();
@@ -237,9 +255,11 @@ parse ( int argc, char ** argv )
     if ( vm.count( "kappa"      ) ) kappa      = vm["kappa"].as<double>();
     if ( vm.count( "sigma"      ) ) sigma      = vm["sigma"].as<double>();
     if ( vm.count( "cluster"    ) ) cluster    = vm["cluster"].as<string>();
+    if ( vm.count( "part"       ) ) part       = vm["part"].as<string>();
     if ( vm.count( "adm"        ) ) adm        = vm["adm"].as<string>();
     if ( vm.count( "eta"        ) ) eta        = vm["eta"].as<double>();
-    if ( vm.count( "compress"   ) ) compress   = vm["compress"].as<double>();
+    if ( vm.count( "compress"   ) ) compress   = true;
+    if ( vm.count( "sepcoup"    ) ) sep_coup   = true;
 
     if ( appl == "help" )
     {
@@ -255,9 +275,20 @@ parse ( int argc, char ** argv )
         std::exit( 0 );
     }// if
     
-    if ( approx == "help" )
+    if ( capprox == "help" )
     {
-        std::cout << "Low-rank approximation methods:" << std::endl
+        std::cout << "Construction low-rank approximation methods:" << std::endl
+                  << "  - aca     : adaptive cross approximation" << std::endl
+                  << "  - hca     : hybrid cross approximation" << std::endl
+                  << "  - dense   : no approximation" << std::endl
+                  << "  - default : use default approximation (ACA)" << std::endl;
+
+        std::exit( 0 );
+    }// if
+    
+    if ( aapprox == "help" )
+    {
+        std::cout << "Arithmetic low-rank approximation methods:" << std::endl
                   << "  - svd     : low-rank singular value decomposition (best approximation)" << std::endl
                   << "  - rrqr    : rank-revealing QR" << std::endl
                   << "  - randsvd : randomized SVD" << std::endl
@@ -316,17 +347,30 @@ parse ( int argc, char ** argv )
                   << "  - tlr/blr : flat clustering, i.e., without hierarchy" << std::endl
                   << "  - mblr    : MBLR clustering with <nlvl> level" << std::endl
                   << "  - tileh   : Tile-H / LatticeH for first level and BSP for rest" << std::endl
-                  << "  - bsp/h   : binary space partitioning" << std::endl;
+                  << "  - bsp/h   : binary space partitioning" << std::endl
+                  << "  - sfc     : Hilber curve base partitioning (optional: -binary/-blr)" << std::endl;
+
+        std::exit( 0 );
+    }// if
+    
+    if ( part == "help" )
+    {
+        std::cout << "Partitioning Strategies:" << std::endl
+                  << "  - bsp-*   : binary space partitioning" << std::endl
+                  << "  - pca-*   : principle component analysis" << std::endl
+                  << "  - *-card  : with cardinality balancing" << std::endl
+                  << "  - *-vol   : with volume balancing" << std::endl;
 
         std::exit( 0 );
     }// if
     
     if ( adm == "help" )
     {
-        std::cout << "Clustering Techniques:" << std::endl
-                  << "  - std           : standard geometric admissibility min(diam(t),diam(s)) ≤ η dist(t,s)" << std::endl
-                  << "  - weak          : weak geometric admissibility" << std::endl
-                  << "  - offdiag/hodlr : off-diagonal addmissibility" << std::endl
+        std::cout << "Admissibility Conditions:" << std::endl
+                  << "  - strong/std    : standard geometric admissibility (min(diam(t),diam(s)) ≤ η dist(t,s))" << std::endl
+                  << "  - vertex        : vertex geometric admissibility" << std::endl
+                  << "  - weak          : weak geometric admissibility (dist(t,s) > 0)" << std::endl
+                  << "  - offdiag/hodlr : off-diagonal addmissibility (t ≠ s)"<< std::endl
                   << "  - hilo          : Hi/Low frequency addmissibility" << std::endl
                   << "  - none          : nothing admissible" << std::endl;
 
@@ -347,10 +391,14 @@ parse ( int argc, char ** argv )
              ( distr == "shiftcycrow" ) ) )
         HLR_ERROR( "unknown distribution : " + distr );
     
-    if ( ! ( ( approx == "svd"    ) || ( approx == "rrqr" ) || ( approx == "randsvd" ) ||
-             ( approx == "randlr" ) || ( approx == "aca"  ) || ( approx == "lanczos" ) ||
-             ( approx == "hpro"   ) || ( approx == "all"  ) || ( approx == "default" ) ) )
-        HLR_ERROR( "unknown approximation : " + approx );
+    if ( ! ( ( capprox == "aca" ) || ( capprox == "dense"   ) ||
+             ( capprox == "hca" ) || ( capprox == "default" ) ) )
+        HLR_ERROR( "unknown construction LR approximation : " + capprox );
+
+    if ( ! ( ( aapprox == "svd"    ) || ( aapprox == "rrqr" ) || ( aapprox == "randsvd" ) ||
+             ( aapprox == "randlr" ) || ( aapprox == "aca"  ) || ( aapprox == "lanczos" ) ||
+             ( aapprox == "hpro"   ) || ( aapprox == "all"  ) || ( aapprox == "default" ) ) )
+        HLR_ERROR( "unknown arithmetic LR approximation : " + aapprox );
 
     for ( auto &  entry : split( cmdline::tapprox, "," ) )
         if ( ! ( ( entry == "hosvd"  ) || ( entry == "sthosvd" ) || ( entry == "ghosvd" ) ||

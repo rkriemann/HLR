@@ -5,7 +5,7 @@
 // Module      : utils/io
 // Description : IO related functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <string>
@@ -24,6 +24,8 @@
 #include <hpro/io/TMatrixIO.hh>
 #include <hpro/io/TClusterVis.hh>
 #include <hpro/io/TCoordVis.hh>
+#include <hpro/io/TGridVis.hh>
+#include <hpro/io/TGridIO.hh>
 
 #if defined(HLR_USE_H2)
 #  include <hpro/io/TClusterBasisVis.hh>
@@ -33,6 +35,8 @@
 #include <hlr/arith/blas.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/matrix/print.hh>
+#include <hlr/matrix/shared_cluster_basis.hh>
+#include <hlr/matrix/nested_cluster_basis.hh>
 #include <hlr/dag/graph.hh>
 #include <hlr/tensor/base_tensor.hh>
 #include <hlr/tensor/dense_tensor.hh>
@@ -74,6 +78,20 @@ read ( const std::string &  filename )
 
     return mio.read< value_t >( filename );
 }
+
+//
+// write matrix M to file <filename>
+//
+inline
+void
+write ( const Hpro::TGrid &  grid,
+        const std::string &  filename )
+{
+    Hpro::THproGridIO  gio;
+
+    gio.write( &grid, filename );
+}
+
 
 }// namespace hpro
 
@@ -318,6 +336,42 @@ read ( const std::string &  filename = "" )
 
 //////////////////////////////////////////////////////////////////////
 //
+// raw data
+//
+//////////////////////////////////////////////////////////////////////
+
+namespace raw
+{
+
+template < typename value_t >
+blas::tensor3< value_t >
+read ( const std::string &  filename,
+       const size_t         size0,
+       const size_t         size1,
+       const size_t         size2 )
+{
+    auto  file = std::ifstream( filename, std::ios::in | std::ios::binary );
+    auto  t    = blas::tensor3< value_t >( size0, size1, size2 );
+
+    file.read( reinterpret_cast< char * >( t.data() ), sizeof(value_t) * size0 * size1 * size2 );
+
+    return  t;
+}
+
+template < typename value_t >
+void
+write ( const blas::tensor3< value_t > &  t,
+        const std::string &               filename = "" )
+{
+    auto  file = std::ofstream( filename, std::ios::out | std::ios::binary );
+
+    file.write( reinterpret_cast< const char * >( t.data() ), sizeof(value_t) * t.size(0) * t.size(1) * t.size(2) );
+}
+
+}// namespace raw
+
+//////////////////////////////////////////////////////////////////////
+//
 // NetCDF format
 //
 //////////////////////////////////////////////////////////////////////
@@ -364,18 +418,23 @@ print ( const Hpro::TCluster &  cl,
 //
 // print blockcluster <cl> to file <filename>
 //
-inline
 void
 print ( const Hpro::TBlockCluster &  cl,
-        const std::string &          filename )
-{
-    Hpro::TPSBlockClusterVis  vis;
-
-    vis.print( & cl, filename );
-}
+        const std::string &          filename,
+        const std::string &          options = "default" );
 
 //
 // print matrix <M> to file <filename>
+//
+// options:  nosize    - do not print size information in blocks
+//           pattern   - print non-zero coefficient pattern
+//           norank    - do not print rank of blocks
+//           nonempty  - only print nonempty blocks
+//           indexset  - print index set data per block
+//           noid      - do not print id of block
+//           noinnerid - do not print id of non-leaf blocks
+//
+// Multiple options need to be comma separated.
 //
 template < typename value_t >
 void
@@ -455,6 +514,16 @@ print ( const Hpro::TClusterBasis< value_t > &  cb,
 namespace vtk
 {
 
+inline
+void
+print ( const Hpro::TGrid &  grid,
+        const std::string &  filename )
+{
+    Hpro::TVTKGridVis  vis;
+
+    vis.print( & grid, filename );
+}
+
 //
 // print coordinates
 //
@@ -466,6 +535,58 @@ print ( const Hpro::TCoordinate &  coord,
     Hpro::TVTKCoordVis  vis;
 
     vis.print( & coord, filename );
+}
+
+inline
+void
+print ( const Hpro::TCoordinate &    coord,
+        const std::vector< uint > &  label,
+        const std::string &          filename )
+{
+    Hpro::TVTKCoordVis  vis;
+
+    vis.print( & coord, label, filename );
+}
+
+//
+// print (bounding boxes of geometric) clusters
+// - up to <lvl> sub levels are printed
+//
+inline
+void
+print ( const Hpro::TCluster &  cl,
+        const uint              lvl,
+        const std::string &     filename )
+{
+    detail::vtk_print_cluster( cl, lvl, filename );
+}
+
+//
+// print coordinates labeled according to clusters
+// in cluster tree on a particular level
+//
+inline
+void
+print ( const Hpro::TCoordinate &   coord,
+        const Hpro::TCluster &      ct,
+        const Hpro::TPermutation &  pi2e,
+        const uint                  lvl,
+        const std::string &         filename )
+{
+    detail::vtk_print_cluster( coord, ct, pi2e, lvl, filename );
+}
+
+//
+// print bounding box and coordinates of given block cluster
+//
+inline
+void
+print ( const Hpro::TBlockCluster &  bc,
+        const Hpro::TCoordinate &    coord,
+        const Hpro::TPermutation &   pi2e,
+        const std::string &          filename )
+{
+    detail::vtk_print_cluster( bc, coord, pi2e, filename );
 }
 
 //

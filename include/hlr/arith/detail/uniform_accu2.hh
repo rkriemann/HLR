@@ -5,7 +5,7 @@
 // Module      : arith/uniform
 // Description : arithmetic functions for uniform matrices using accumulators
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <boost/format.hpp>
@@ -431,10 +431,10 @@ struct accumulator
             
         for ( auto  [ op_A, A, op_B, B ] : pending )
         {
-            if ( is_blocked_all( *A, *B, M ) )
+            if ( hlr::is_blocked_all( *A, *B, M ) )
                 continue;
         
-            if ( is_blocked_all( A, B ) )
+            if ( hlr::is_blocked_all( *A, *B ) )
             {
                 //
                 // if M is a leaf and A _and_ B are blocked, a temporary matrix
@@ -626,7 +626,7 @@ solve_lower_tri ( const eval_side_t                  side,
 
     trace::region_end( "eval" );
     
-    if ( is_blocked_all( L, M ) )
+    if ( hlr::is_blocked_all( L, M ) )
     {
         auto  BL = cptrcast( &L, Hpro::TBlockMatrix< value_t > );
         auto  BM =  ptrcast( &M, Hpro::TBlockMatrix< value_t > );
@@ -762,7 +762,7 @@ solve_upper_tri ( const eval_side_t                  side,
 
     trace::region_end( "eval" );
     
-    if ( is_blocked_all( U, M ) )
+    if ( hlr::is_blocked_all( U, M ) )
     {
         //
         // recurse
@@ -917,7 +917,7 @@ lu ( Hpro::TMatrix< value_t > &         A,
         auto  BL = ptrcast( &L, Hpro::TBlockMatrix< value_t > );
         auto  BU = ptrcast( &U, Hpro::TBlockMatrix< value_t > );
 
-        HLR_ASSERT( is_blocked_all( L, U ) );
+        HLR_ASSERT( hlr::is_blocked_all( L, U ) );
         
         //
         // first, split accumulated updates U and recursive updates upd_rec

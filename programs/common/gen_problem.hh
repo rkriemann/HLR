@@ -62,7 +62,7 @@ gen_problem< hlr::apps::laplace_slp > ()
 
     HLR_ASSERT( gridfile != "" );
     
-    return std::make_unique< hlr::apps::laplace_slp >( gridfile );
+    return std::make_unique< hlr::apps::laplace_slp >( gridfile, cmdline::eps );
 }
 
 template <>
@@ -73,7 +73,7 @@ gen_problem< hlr::apps::helmholtz_slp > ()
 
     HLR_ASSERT( gridfile != "" );
     
-    return std::make_unique< hlr::apps::helmholtz_slp >( kappa, gridfile );
+    return std::make_unique< hlr::apps::helmholtz_slp >( kappa, gridfile, cmdline::eps );
 }
 
 template <>
@@ -84,7 +84,7 @@ gen_problem< hlr::apps::exp > ()
 
     HLR_ASSERT( gridfile != "" );
     
-    return std::make_unique< hlr::apps::exp >( gridfile );
+    return std::make_unique< hlr::apps::exp >( gridfile, cmdline::eps );
 }
 
 template <>

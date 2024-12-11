@@ -5,7 +5,7 @@
 // Module      : problem.hh
 // Description : basic interface for applications
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <hpro/cluster/TCoordinate.hh>
@@ -19,6 +19,9 @@ class application
 public:
     using  value_t = T_value;
 
+    // signal support for HCA based construction
+    static constexpr bool supports_hca = false;
+    
     // return true if problem is real/complex valued
     bool  is_real_valued    () const { return ! Hpro::is_complex_type_v< value_t >; }
     bool  is_complex_valued () const { return   Hpro::is_complex_type_v< value_t >; }

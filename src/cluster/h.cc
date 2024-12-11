@@ -3,7 +3,7 @@
 // Module      : H.cc
 // Description : H specific clustering functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <hpro/cluster/TBSPCTBuilder.hh>
@@ -19,11 +19,11 @@ namespace hlr { namespace cluster { namespace h {
 // cluster set of coordinates with minimal block size <ntile>
 //
 std::unique_ptr< cluster_tree >
-cluster ( coordinates &  coords,
-          const size_t   ntile )
+cluster ( coordinates &            coords,
+          const geom_part_strat &  part,
+          const size_t             ntile )
 {
-    Hpro::TCardBSPPartStrat  part_strat( Hpro::adaptive_split_axis );
-    Hpro::TBSPCTBuilder      ct_builder( & part_strat, ntile );
+    Hpro::TBSPCTBuilder  ct_builder( & part, ntile );
 
     return ct_builder.build( & coords );
 }

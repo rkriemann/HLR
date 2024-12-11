@@ -5,7 +5,7 @@
 // Module      : Exp.hh
 // Description : functions for Exp BEM application
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <memory>
@@ -31,6 +31,9 @@ public:
     
     using  value_t = double;
 
+    // signal support for HCA based construction
+    static constexpr bool supports_hca = false;
+    
 private:
     // BEM data
     std::unique_ptr< Hpro::TGrid >                     _grid;
@@ -41,7 +44,8 @@ public:
     //
     // ctor with grid name (plus refinement levels)
     //
-    exp ( const std::string &  grid );
+    exp ( const std::string &  grid,
+          const double         quad_error );
     
     //
     // dtor

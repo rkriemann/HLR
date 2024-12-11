@@ -5,27 +5,23 @@
 // Module      : blas/tensor
 // Description : implements dense tensor class
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <type_traits>
 #include <vector>
-// #include <numeric>
-// #include <algorithm>
+#include <array>
+#include <numeric>
+#include <algorithm>
 
 #include <hpro/blas/MemBlock.hh>
 
 #include <hlr/approx/traits.hh>
 #include <hlr/arith/blas.hh>
 
-namespace hlr
-{
+namespace hlr { namespace blas {
 
 using Hpro::idx_t;
-
-namespace blas
-{
-
 using Hpro::copy_policy_t;
 using Hpro::copy_reference;
 using Hpro::copy_value;
@@ -382,6 +378,12 @@ public:
     size_t  byte_size () const
     {
         return sizeof( value_t ) * _length[0] * _length[1] * _length[2] + sizeof(_length) + sizeof(_stride) + sizeof(super_t);
+    }
+
+    // return size of (floating point) data in bytes handled by this object
+    size_t  data_byte_size () const
+    {
+        return sizeof( value_t ) * _length[0] * _length[1] * _length[2];
     }
 
     //

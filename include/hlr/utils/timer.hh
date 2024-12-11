@@ -6,7 +6,7 @@
 // Module      : timer
 // Description : timing functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <hpro/base/System.hh>
@@ -28,18 +28,18 @@ using Hpro::Time::Wall::since;
 //
 struct auto_timer
 {
-    hpro::Time::Wall::TTimePoint  start;
+    Hpro::Time::Wall::TTimePoint  start;
     double &                      time_val;
 
     auto_timer ( double &  atime_val )
             : time_val( atime_val )
     {
-        start = hpro::Time::Wall::now();
+        start = Hpro::Time::Wall::now();
     }
 
     ~auto_timer ()
     {
-        time_val += hpro::Time::Wall::since( start ).seconds();
+        time_val += Hpro::Time::Wall::since( start ).seconds();
     }
 };
 

@@ -5,7 +5,7 @@
 // Module      : arith/uniform
 // Description : functions for handling changes in basis for uniform matrices
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 // #include <boost/format.hpp> // DEBUG
@@ -52,7 +52,7 @@ blas::matrix< value_t >
 compute_extended_row_basis ( const shared_cluster_basis< value_t > &         cb,
                              const blas::matrix< value_t > &                 W,
                              const blas::matrix< value_t > &                 T,
-                             const Hpro::TTruncAcc &                         acc,
+                             const accuracy &                                acc,
                              const approx_t &                                approx,
                              const is_matrix_map_t< value_t > &              matmap,
                              const uniform_lrmatrix< value_t > *             M  = nullptr,
@@ -206,7 +206,7 @@ blas::matrix< value_t >
 compute_updated_row_basis ( const uniform_lrmatrix< value_t > &             M,
                             const blas::matrix< value_t > &                 W,
                             const blas::matrix< value_t > &                 T,
-                            const Hpro::TTruncAcc &                         acc,
+                            const accuracy &                                acc,
                             const approx_t &                                approx,
                             const is_matrix_map_t< value_t > &              matmap,
                             blas::vector< Hpro::real_type_t< value_t > > *  sv = nullptr )
@@ -227,7 +227,7 @@ blas::matrix< value_t >
 compute_extended_col_basis ( const shared_cluster_basis< value_t > &         cb,
                              const blas::matrix< value_t > &                 T,
                              const blas::matrix< value_t > &                 X,
-                             const Hpro::TTruncAcc &                         acc,
+                             const accuracy &                                acc,
                              const approx_t &                                approx,
                              const is_matrix_map_t< value_t > &              matmap,
                              const uniform_lrmatrix< value_t > *             M  = nullptr,
@@ -379,7 +379,7 @@ blas::matrix< value_t >
 compute_updated_col_basis ( const uniform_lrmatrix< value_t > &             M,
                             const blas::matrix< value_t > &                 T,
                             const blas::matrix< value_t > &                 X,
-                            const Hpro::TTruncAcc &                         acc,
+                            const accuracy &                                acc,
                             const approx_t &                                approx,
                             const is_matrix_map_t< value_t > &              matmap,
                             blas::vector< Hpro::real_type_t< value_t > > *  sv = nullptr )
@@ -492,7 +492,7 @@ update_row_col_basis ( uniform_lrmatrix< value_t > &       M,
                        const blas::matrix< value_t > &     W,
                        const blas::matrix< value_t > &     T,
                        const blas::matrix< value_t > &     X,
-                       const Hpro::TTruncAcc &             acc,
+                       const accuracy &                    acc,
                        const approx_t &                    approx,
                        const is_matrix_map_t< value_t > &  rowmap,
                        const is_matrix_map_t< value_t > &  colmap )
@@ -627,7 +627,7 @@ void
 update_row_basis ( uniform_lrmatrix< value_t > &       M,
                    const blas::matrix< value_t > &     W,
                    const blas::matrix< value_t > &     T,
-                   const Hpro::TTruncAcc &             acc,
+                   const accuracy &                    acc,
                    const approx_t &                    approx,
                    const is_matrix_map_t< value_t > &  rowmap )
 {
@@ -714,7 +714,7 @@ void
 update_col_basis ( uniform_lrmatrix< value_t > &       M,
                    const blas::matrix< value_t > &     T,
                    const blas::matrix< value_t > &     X,
-                   const Hpro::TTruncAcc &             acc,
+                   const accuracy &                    acc,
                    const approx_t &                    approx,
                    const is_matrix_map_t< value_t > &  colmap )
 {
@@ -815,7 +815,7 @@ extend_col_basis ( Hpro::TBlockMatrix< value_t > &        M,
                    const uint                             i,
                    const uint                             j,
                    const blas::matrix< value_t > &        X,
-                   const Hpro::TTruncAcc &                acc,
+                   const accuracy &                       acc,
                    const approx_t &                       approx )
 {
     //
@@ -1009,7 +1009,7 @@ extend_col_basis_ref ( Hpro::TBlockMatrix< value_t > &        M,
                        const uint                             i,
                        const uint                             j,
                        const blas::matrix< value_t > &        X,
-                       const Hpro::TTruncAcc &                acc )
+                       const accuracy &                       acc )
 {
     using  real_t = Hpro::real_type_t< value_t >;
 
@@ -1162,7 +1162,7 @@ extend_row_basis ( Hpro::TBlockMatrix< value_t > &        M,
                    const uint                             i,
                    const uint                             j,
                    const blas::matrix< value_t > &        W,
-                   const Hpro::TTruncAcc &                acc )
+                   const accuracy &                       acc )
 {
     using  real_t = Hpro::real_type_t< value_t >;
 
@@ -1361,7 +1361,7 @@ extend_row_basis_ref ( Hpro::TBlockMatrix< value_t > &        M,
                        const uint                             i,
                        const uint                             j,
                        const blas::matrix< value_t > &        W,
-                       const Hpro::TTruncAcc &                acc )
+                       const accuracy &                       acc )
 {
     using  real_t = Hpro::real_type_t< value_t >;
 
@@ -1517,7 +1517,7 @@ replace_row_col_basis ( Hpro::TBlockMatrix< value_t > &  M,
                         blas::matrix< value_t > &        W,
                         blas::matrix< value_t > &        T,
                         blas::matrix< value_t > &        X,
-                        const Hpro::TTruncAcc &          acc )
+                        const accuracy &                 acc )
 {
     using  real_t = Hpro::real_type_t< value_t >;
 
@@ -1895,7 +1895,7 @@ replace_row_col_basis_ref ( Hpro::TBlockMatrix< value_t > &  M,
                             blas::matrix< value_t > &        W,
                             blas::matrix< value_t > &        T,
                             blas::matrix< value_t > &        X,
-                            const Hpro::TTruncAcc &          acc )
+                            const accuracy &                 acc )
 {
     using  real_t = Hpro::real_type_t< value_t >;
 

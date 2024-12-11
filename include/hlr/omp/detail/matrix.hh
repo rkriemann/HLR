@@ -5,22 +5,714 @@
 // Module      : matrix.hh
 // Description : matrix related functionality
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <hpro/matrix/TMatrix.hh>
 #include <hpro/matrix/TBlockMatrix.hh>
 
-#include <hlr/matrix/cluster_basis.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
 #include <hlr/matrix/lrsmatrix.hh>
+#include <hlr/matrix/dense_matrix.hh>
 
 namespace hlr { namespace omp { namespace matrix { namespace detail {
 
-namespace hpro = HLIB;
-
 using namespace hlr::matrix;
 
+//
+// build representation of dense matrix with
+// matrix structure defined by <bct>,
+// matrix coefficients defined by <coeff> and
+// low-rank blocks computed by <lrapx>
+//
+template < typename coeff_t,
+           typename lrapx_t >
+std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > >
+build_task ( const Hpro::TBlockCluster *  bct,
+             const coeff_t &              coeff,
+             const lrapx_t &              lrapx,
+             const Hpro::TTruncAcc &      acc,
+             const size_t                 nseq )
+{
+    static_assert( std::is_same< typename coeff_t::value_t,
+                   typename lrapx_t::value_t >::value,
+                   "coefficient function and low-rank approximation must have equal value type" );
+
+    HLR_ASSERT( bct != nullptr );
+
+    using  value_t = typename coeff_t::value_t;
+    
+    //
+    // decide upon cluster type, how to construct matrix
+    //
+
+    auto        M     = std::unique_ptr< Hpro::TMatrix< value_t > >();
+    const auto  rowis = bct->is().row_is();
+    const auto  colis = bct->is().col_is();
+
+    // parallel handling too inefficient for small matrices
+    if ( std::max( rowis.size(), colis.size() ) <= 0 )
+        return seq::matrix::build( bct, coeff, lrapx, acc );
+        
+    if ( bct->is_leaf() )
+    {
+        if ( bct->is_adm() )
+        {
+            // auto  T = lrapx.build( bct, Hpro::absolute_prec( acc.abs_eps() * std::sqrt( double(rowis.size() * colis.size()) ) ) );
+            M = std::unique_ptr< Hpro::TMatrix< value_t > >( lrapx.build( bct, acc( rowis, colis ) ) );
+
+            if ( Hpro::is_lowrank( *M ) )
+            {
+                auto  R = ptrcast( M.get(), Hpro::TRkMatrix< value_t > );
+
+                M = std::move( std::make_unique< hlr::matrix::lrmatrix< value_t > >( rowis, colis,
+                                                                                     std::move( blas::mat_U( R ) ),
+                                                                                     std::move( blas::mat_V( R ) ) ) );
+            }// if
+        }// if
+        else
+        {
+            M = coeff.build( rowis, colis );
+
+            if ( Hpro::is_dense( *M ) )
+            {
+                auto  D = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
+
+                M = std::move( std::make_unique< hlr::matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) ) );
+            }// if
+        }// else
+    }// if
+    else if ( std::min( rowis.size(), colis.size() ) <= nseq )
+    {
+        M = hlr::seq::matrix::build( bct, coeff, lrapx, acc, nseq );
+    }// if
+    else
+    {
+        M = std::make_unique< Hpro::TBlockMatrix< value_t > >( bct );
+        
+        auto  B = ptrcast( M.get(), Hpro::TBlockMatrix< value_t > );
+
+        // make sure, block structure is correct
+        if (( B->nblock_rows() != bct->nrows() ) ||
+            ( B->nblock_cols() != bct->ncols() ))
+            B->set_block_struct( bct->nrows(), bct->ncols() );
+
+        // recurse
+        #pragma omp taskgroup
+        {
+            #pragma omp taskloop collapse(2) default(shared)
+            for ( uint  i = 0; i < B->nblock_rows(); ++i )
+            {
+                for ( uint  j = 0; j < B->nblock_cols(); ++j )
+                {
+                    if ( bct->son( i, j ) != nullptr )
+                    {
+                        auto  B_ij = build_task( bct->son( i, j ), coeff, lrapx, acc, nseq );
+                        
+                        B->set_block( i, j, B_ij.release() );
+                    }// if
+                }// for
+            }// for
+        }// omp taskgroup
+    }// else
+
+    // copy properties from the cluster
+    // M->set_cluster_force( bct );
+    M->set_id( bct->id() );
+    M->set_procs( bct->procs() );
+
+    return M;
+}
+
+//
+// same as above but use compressable matrix types,
+// e.g., dense_matrix and lrmatrix, and directly compress
+// matrix data
+//
+template < typename coeff_t,
+           typename lrapx_t >
+std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > >
+build_compressed ( const Hpro::TBlockCluster *  bct,
+                   const coeff_t &              coeff,
+                   const lrapx_t &              lrapx,
+                   const Hpro::TTruncAcc &      acc,
+                   const size_t                 nseq = Hpro::CFG::Arith::max_seq_size )
+{
+    static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
+                   "coefficient function and low-rank approximation must have equal value type" );
+
+    HLR_ASSERT( bct != nullptr );
+
+    using  value_t = typename coeff_t::value_t;
+    
+    //
+    // decide upon cluster type, how to construct matrix
+    //
+
+    auto        M     = std::unique_ptr< Hpro::TMatrix< value_t > >();
+    const auto  rowis = bct->is().row_is();
+    const auto  colis = bct->is().col_is();
+
+    // parallel handling too inefficient for small matrices
+    if ( std::max( rowis.size(), colis.size() ) <= 0 )
+        return seq::matrix::build( bct, coeff, lrapx, acc );
+        
+    if ( bct->is_leaf() )
+    {
+        auto  lacc = acc( rowis, colis );
+        
+        if ( bct->is_adm() )
+        {
+            // auto  T = lrapx.build( bct, Hpro::absolute_prec( acc.abs_eps() * std::sqrt( double(rowis.size() * colis.size()) ) ) );
+            auto  T = lrapx.build( bct, lacc );
+
+            if ( Hpro::is_lowrank( *T ) )
+            {
+                auto  R  = ptrcast( T.get(), Hpro::TRkMatrix< value_t > );
+                auto  zR = std::make_unique< hlr::matrix::lrmatrix< value_t > >( rowis, colis,
+                                                                                 std::move( blas::mat_U( R ) ),
+                                                                                 std::move( blas::mat_V( R ) ) );
+                
+                zR->compress( lacc );
+                M = std::move( zR );
+            }// if
+            else
+            {
+                M = std::move( T );
+            }// else
+        }// if
+        else
+        {
+            M = coeff.build( rowis, colis );
+
+            if ( Hpro::is_dense( *M ) )
+            {
+                auto  D  = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
+                auto  zD = std::make_unique< hlr::matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) );
+
+                zD->compress( lacc );
+                M = std::move( zD );
+            }// if
+        }// else
+    }// if
+    else if ( std::min( rowis.size(), colis.size() ) <= nseq )
+    {
+        M = hlr::seq::matrix::build_compressed( bct, coeff, lrapx, acc, nseq );
+    }// if
+    else
+    {
+        M = std::make_unique< Hpro::TBlockMatrix< value_t > >( bct );
+        
+        auto  B = ptrcast( M.get(), Hpro::TBlockMatrix< value_t > );
+
+        // make sure, block structure is correct
+        if (( B->nblock_rows() != bct->nrows() ) ||
+            ( B->nblock_cols() != bct->ncols() ))
+            B->set_block_struct( bct->nrows(), bct->ncols() );
+
+        // recurse
+        #pragma omp taskgroup
+        {
+            #pragma omp taskloop collapse(2) default(shared)
+            for ( uint  i = 0; i < B->nblock_rows(); ++i )
+            {
+                for ( uint  j = 0; j < B->nblock_cols(); ++j )
+                {
+                    if ( bct->son( i, j ) != nullptr )
+                    {
+                        auto  B_ij = build_compressed( bct->son( i, j ), coeff, lrapx, acc, nseq );
+                        
+                        B->set_block( i, j, B_ij.release() );
+                    }// if
+                }// for
+            }// for
+        }// omp taskgroup
+    }// else
+
+    // copy properties from the cluster
+    M->set_id( bct->id() );
+    M->set_procs( bct->procs() );
+
+    return M;
+}
+
+//
+// use lrsvmatrix instead of lrmatrix
+//
+template < typename coeff_t,
+           typename lrapx_t >
+std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > >
+build_mixedprec ( const Hpro::TBlockCluster *  bct,
+                  const coeff_t &              coeff,
+                  const lrapx_t &              lrapx,
+                  const Hpro::TTruncAcc &      acc,
+                  const size_t                 nseq )
+{
+    static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
+                   "coefficient function and low-rank approximation must have equal value type" );
+
+    HLR_ASSERT( bct != nullptr );
+
+    using  value_t = typename coeff_t::value_t;
+    
+    //
+    // decide upon cluster type, how to construct matrix
+    //
+
+    auto        M     = std::unique_ptr< Hpro::TMatrix< value_t > >();
+    const auto  rowis = bct->is().row_is();
+    const auto  colis = bct->is().col_is();
+
+    // parallel handling too inefficient for small matrices
+    if ( std::max( rowis.size(), colis.size() ) <= 0 )
+        return seq::matrix::build( bct, coeff, lrapx, acc );
+        
+    if ( bct->is_leaf() )
+    {
+        auto  lacc = acc( rowis, colis );
+        
+        if ( bct->is_adm() )
+        {
+            M = std::unique_ptr< Hpro::TMatrix< value_t > >( lrapx.build( bct, lacc ) );
+
+            if ( Hpro::is_lowrank( *M ) )
+            {
+                auto  R  = ptrcast( M.get(), Hpro::TRkMatrix< value_t > );
+                auto  zR = std::make_unique< hlr::matrix::lrsvmatrix< value_t > >( rowis, colis,
+                                                                                   std::move( blas::mat_U( R ) ),
+                                                                                   std::move( blas::mat_V( R ) ) );
+
+                zR->compress( lacc );
+                M = std::move( zR );
+            }// if
+            else if ( hlr::matrix::is_lowrank( *M ) )
+            {
+                auto  R  = ptrcast( M.get(), hlr::matrix::lrmatrix< value_t > );
+                auto  zR = std::make_unique< hlr::matrix::lrsvmatrix< value_t > >( rowis, colis, R->U(), R->V() );
+                
+                zR->compress( lacc );
+                M = std::move( zR );
+            }// if
+            else if ( hlr::matrix::is_lowrank_sv( *M ) )
+            {
+                auto  R = ptrcast( M.get(), hlr::matrix::lrsvmatrix< value_t > );
+
+                R->compress( lacc );
+            }// if
+            else if ( Hpro::is_dense( *M ) )
+            {
+                auto  D  = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
+                auto  zD = std::make_unique< hlr::matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) );
+
+                zD->compress( lacc );
+                M = std::move( zD );
+            }// if
+            else if ( hlr::matrix::is_dense( *M ) )
+            {
+                auto  D = ptrcast( M.get(), hlr::matrix::dense_matrix< value_t > );
+
+                D->compress( lacc );
+            }// if
+            else
+            {
+                HLR_LOG( 0, M->typestr() );
+            }// else
+        }// if
+        else
+        {
+            M = coeff.build( rowis, colis );
+
+            if ( Hpro::is_dense( *M ) )
+            {
+                auto  D  = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
+                auto  zD = std::make_unique< hlr::matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) );
+
+                zD->compress( lacc );
+                M = std::move( zD );
+            }// if
+            else if ( hlr::matrix::is_dense( *M ) )
+            {
+                auto  D = ptrcast( M.get(), hlr::matrix::dense_matrix< value_t > );
+
+                D->compress( lacc );
+            }// if
+            else
+            {
+                HLR_LOG( 0, M->typestr() );
+            }// else
+        }// else
+    }// if
+    else if ( std::min( rowis.size(), colis.size() ) <= nseq )
+    {
+        M = hlr::seq::matrix::build_mixedprec( bct, coeff, lrapx, acc, nseq );
+    }// if
+    else
+    {
+        M = std::make_unique< Hpro::TBlockMatrix< value_t > >( bct );
+        
+        auto  B = ptrcast( M.get(), Hpro::TBlockMatrix< value_t > );
+
+        // make sure, block structure is correct
+        if (( B->nblock_rows() != bct->nrows() ) ||
+            ( B->nblock_cols() != bct->ncols() ))
+            B->set_block_struct( bct->nrows(), bct->ncols() );
+
+        // recurse
+        #pragma omp taskgroup
+        {
+            #pragma omp taskloop collapse(2) default(shared)
+            for ( uint  i = 0; i < B->nblock_rows(); ++i )
+            {
+                for ( uint  j = 0; j < B->nblock_cols(); ++j )
+                {
+                    if ( bct->son( i, j ) != nullptr )
+                    {
+                        auto  B_ij = build_mixedprec( bct->son( i, j ), coeff, lrapx, acc, nseq );
+                        
+                        B->set_block( i, j, B_ij.release() );
+                    }// if
+                }// for
+            }// for
+        }// omp taskgroup
+    }// else
+
+    // copy properties from the cluster
+    M->set_id( bct->id() );
+    M->set_procs( bct->procs() );
+
+    return M;
+}
+
+//
+// build representation of nearfield of dense matrix with
+// matrix structure defined by <bct>, matrix coefficients
+// defined by <coeff>
+//
+template < typename coeff_t >
+std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > >
+build_nearfield ( const Hpro::TBlockCluster *  bct,
+                  const coeff_t &              coeff,
+                  const size_t                 nseq )
+{
+    using  value_t = typename coeff_t::value_t;
+    
+    HLR_ASSERT( bct != nullptr );
+
+    //
+    // decide upon cluster type, how to construct matrix
+    //
+
+    auto        M     = std::unique_ptr< Hpro::TMatrix< value_t > >();
+    const auto  rowis = bct->is().row_is();
+    const auto  colis = bct->is().col_is();
+
+    // parallel handling too inefficient for small matrices
+    if ( std::max( rowis.size(), colis.size() ) <= 0 )
+        return seq::matrix::build_nearfield( bct, coeff );
+        
+    if ( bct->is_leaf() )
+    {
+        if ( bct->is_adm() )
+            return nullptr;
+        else
+        {
+            M = coeff.build( rowis, colis );
+
+            if ( Hpro::is_dense( *M ) )
+            {
+                auto  D = ptrcast( M.get(), Hpro::TDenseMatrix< value_t > );
+
+                M = std::move( std::make_unique< hlr::matrix::dense_matrix< value_t > >( rowis, colis, std::move( blas::mat( D ) ) ) );
+            }// if
+        }// else
+    }// if
+    else if ( std::min( rowis.size(), colis.size() ) <= nseq )
+    {
+        M = hlr::seq::matrix::build_nearfield( bct, coeff, nseq );
+    }// if
+    else
+    {
+        M = std::make_unique< Hpro::TBlockMatrix< value_t > >( bct );
+        
+        auto  B = ptrcast( M.get(), Hpro::TBlockMatrix< value_t > );
+
+        // make sure, block structure is correct
+        if (( B->nblock_rows() != bct->nrows() ) ||
+            ( B->nblock_cols() != bct->ncols() ))
+            B->set_block_struct( bct->nrows(), bct->ncols() );
+
+        // recurse
+        #pragma omp taskgroup
+        {
+            #pragma omp taskloop collapse(2) default(shared)
+            for ( uint  i = 0; i < B->nblock_rows(); ++i )
+            {
+                for ( uint  j = 0; j < B->nblock_cols(); ++j )
+                {
+                    if ( bct->son( i, j ) != nullptr )
+                    {
+                        auto  B_ij = build_nearfield( bct->son( i, j ), coeff, nseq );
+                        
+                        B->set_block( i, j, B_ij.release() );
+                    }// if
+                }// for
+            }// for
+        }// omp taskgroup
+    }// else
+
+    // copy properties from the cluster
+    // M->set_cluster_force( bct );
+    M->set_id( bct->id() );
+    M->set_procs( bct->procs() );
+
+    return M;
+}
+
+//
+// build representation of sparse matrix with matrix structure defined by <bct>,
+// matrix coefficients defined by <M>. If low rank blocks are not zero, they are
+// truncated to accuracy <acc> using approximation method <apx>
+//
+template < typename value_t,
+           typename approx_t >
+std::unique_ptr< Hpro::TMatrix< value_t > >
+build ( const Hpro::TBlockCluster &             bct,
+        const Hpro::TSparseMatrix< value_t > &  S,
+        const Hpro::TTruncAcc &                 acc,
+        const approx_t &                        apx,
+        const size_t                            nseq ) // ignored
+{
+    // std::cout << "build    : " << bct.to_string() << std::endl;
+    
+    //
+    // decide upon cluster type, how to construct matrix
+    //
+
+    std::unique_ptr< Hpro::TMatrix< value_t > >  M;
+    
+    if ( bct.is_leaf() )
+    {
+        //
+        // restrict to local cluster and convert to desired format
+        //
+
+        auto  S_bct = hlr::matrix::restrict( S, bct.is() );
+        
+        if ( bct.is_adm() )
+        {
+            M = hlr::matrix::convert_to_lowrank( *S_bct, acc, apx );
+        }// if
+        else
+        {
+            M = hlr::matrix::convert_to_dense< value_t >( *S_bct );
+        }// else
+    }// if
+    else
+    {
+        M = std::make_unique< Hpro::TBlockMatrix< value_t > >( &bct );
+        
+        auto  B = ptrcast( M.get(), Hpro::TBlockMatrix< value_t > );
+
+        // make sure, block structure is correct
+        if (( B->nblock_rows() != bct.nrows() ) ||
+            ( B->nblock_cols() != bct.ncols() ))
+            B->set_block_struct( bct.nrows(), bct.ncols() );
+
+        // recurse
+        #pragma omp taskgroup
+        {
+            #pragma omp taskloop collapse(2) default(shared)
+            for ( uint  i = 0; i < B->nblock_rows(); ++i )
+            {
+                for ( uint  j = 0; j < B->nblock_cols(); ++j )
+                {
+                    if ( bct.son( i, j ) != nullptr )
+                    {
+                        auto  B_ij = build( bct.son( i, j ), S, acc, apx, nseq );
+                        
+                        B->set_block( i, j, B_ij.release() );
+                    }// if
+                }// for
+            }// for
+        }// omp taskgroup
+    }// else
+
+    // M->set_cluster_force( bct );
+    M->set_id( bct.id() );
+    M->set_procs( bct.procs() );
+
+    return M;
+}
+
+template < typename value_t,
+           typename approx_t >
+std::unique_ptr< Hpro::TMatrix< value_t > >
+build_nd ( const Hpro::TBlockCluster &             bct,
+           const Hpro::TSparseMatrix< value_t > &  S,
+           const Hpro::TTruncAcc &                 acc,
+           const approx_t &                        apx,
+           const size_t                            nseq = Hpro::CFG::Arith::max_seq_size ) // ignored
+{
+    // std::cout << "build_nd : " << bct.to_string() << std::endl;
+    
+    //
+    // decide upon cluster type, how to construct matrix
+    //
+
+    std::unique_ptr< Hpro::TMatrix< value_t > >  M;
+    
+    if ( bct.is_leaf() )
+    {
+        return build( bct, S, acc, apx, nseq );
+    }// if
+    else
+    {
+        M = std::make_unique< Hpro::TBlockMatrix< value_t > >( &bct );
+        
+        auto  B = ptrcast( M.get(), Hpro::TBlockMatrix< value_t > );
+
+        // make sure, block structure is correct
+        if (( B->nblock_rows() != bct.nrows() ) ||
+            ( B->nblock_cols() != bct.ncols() ))
+            B->set_block_struct( bct.nrows(), bct.ncols() );
+
+        const auto  nbr = B->nblock_rows();
+        const auto  nbc = B->nblock_cols();
+
+        #pragma omp taskgroup
+        {
+            #pragma omp taskloop collapse(2) default(shared)
+            for ( uint  i = 0; i < B->nblock_rows(); ++i )
+            {
+                for ( uint  j = 0; j < B->nblock_cols(); ++j )
+                {
+                    if ( ! is_null( bct.son( i, j ) ) )
+                    {
+                        if ( i == j )
+                        {
+                            if ( i < std::min( nbr, nbc ) - 1 )
+                            {
+                                //
+                                // recurse for diagonal
+                                //
+                                auto  B_ij = build_nd( *bct.son( i, j ), S, acc, apx, nseq );
+                            
+                                B->set_block( i, j, B_ij.release() );
+                            }// if
+                            else
+                            {
+                                //
+                                // standard construction for interface-interface couplings
+                                //
+                                auto  B_ij = build( *bct.son( i, j ), S, acc, apx, nseq );
+                            
+                                B->set_block( i, j, B_ij.release() );
+                            }// else
+                        }// if
+                        else
+                        {
+                            if (( i == nbr-1 ) || ( j == nbc-1 ))
+                            {
+                                //
+                                // standard construction for domain-interface couplings
+                                //
+                                auto  B_ij = build( *bct.son( i, j ), S, acc, apx, nseq );
+                            
+                                B->set_block( i, j, B_ij.release() );
+                            }// if
+                        }// else
+                    }// if
+                }// for
+            }// for
+        }// omp taskgroup
+    }// else
+
+    // M->set_cluster_force( bct );
+    M->set_id( bct.id() );
+    M->set_procs( bct.procs() );
+
+    return M;
+}
+
+//
+// same as above but use sparse matrices instead of dense matrices
+// for non-admissible blocks
+//
+template < typename value_t,
+           typename approx_t >
+std::unique_ptr< Hpro::TMatrix< value_t > >
+build_sparse ( const Hpro::TBlockCluster &             bct,
+               const Hpro::TSparseMatrix< value_t > &  S,
+               const Hpro::TTruncAcc &                 acc,
+               const approx_t &                        apx,
+               const size_t                            nseq = Hpro::CFG::Arith::max_seq_size ) // ignored
+{
+    //
+    // decide upon cluster type, how to construct matrix
+    //
+
+    std::unique_ptr< Hpro::TMatrix< value_t > >  M;
+    
+    if ( bct.is_leaf() )
+    {
+        //
+        // restrict to local cluster and convert to desired format
+        //
+
+        auto  S_bct = hlr::matrix::restrict( S, bct.is() );
+        
+        if ( bct.is_adm() )
+        {
+            M = hlr::matrix::convert_to_lowrank( *S_bct, acc, apx );
+        }// if
+        else if ( is_sparse( *S_bct ) )
+        {
+            // M = std::make_unique< hlr::matrix::sparse_matrix< value_t > >( * ptrcast( S_bct.get(), Hpro::TSparseMatrix< value_t > ) );
+            M = std::move( S_bct );
+        }// else
+        else
+        {
+            M = hlr::matrix::convert_to_dense< value_t >( *S_bct );
+        }// else
+    }// if
+    else
+    {
+        M = std::make_unique< Hpro::TBlockMatrix< value_t > >( &bct );
+        
+        auto  B = ptrcast( M.get(), Hpro::TBlockMatrix< value_t > );
+
+        // make sure, block structure is correct
+        if (( B->nblock_rows() != bct.nrows() ) ||
+            ( B->nblock_cols() != bct.ncols() ))
+            B->set_block_struct( bct.nrows(), bct.ncols() );
+
+        // recurse
+        #pragma omp taskgroup
+        {
+            #pragma omp taskloop collapse(2) default(shared)
+            for ( uint  i = 0; i < B->nblock_rows(); ++i )
+            {
+                for ( uint  j = 0; j < B->nblock_cols(); ++j )
+                {
+                    if ( ! is_null( bct.son( i, j ) ) )
+                    {
+                        auto  B_ij = build_sparse( *bct.son( i, j ), S, acc, apx, nseq );
+                            
+                        B->set_block( i, j, B_ij.release() );
+                    }// if
+                }// for
+            }// for
+        }// omp taskgroup
+    }// else
+
+    // M->set_cluster_force( bct );
+    M->set_id( bct.id() );
+    M->set_procs( bct.procs() );
+
+    return M;
+}
+
+#if 0
 //
 // build representation of dense matrix with matrix structure defined by <bct>,
 // matrix coefficients defined by <coeff> and low-rank blocks computed by <lrapx>
@@ -30,14 +722,14 @@ using namespace hlr::matrix;
 template < typename coeff_t,
            typename lrapx_t,
            typename basisapx_t >
-std::tuple< std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
-            std::unique_ptr< hlr::matrix::cluster_basis< typename coeff_t::value_t > >,
-            std::unique_ptr< hpro::TMatrix > >
-build_uniform_lvl ( const hpro::TBlockCluster *  bct,
+std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< hlr::matrix::shared_cluster_basis< typename coeff_t::value_t > >,
+            std::unique_ptr< Hpro::TMatrix< typename coeff_t::value_t > > >
+build_uniform_lvl ( const Hpro::TBlockCluster *  bct,
                     const coeff_t &              coeff,
                     const lrapx_t &              lrapx,
                     const basisapx_t &           basisapx,
-                    const hpro::TTruncAcc &      acc )
+                    const Hpro::TTruncAcc &      acc )
 {
     static_assert( std::is_same_v< typename coeff_t::value_t, typename lrapx_t::value_t >,
                    "coefficient function and low-rank approximation must have equal value type" );
@@ -47,10 +739,10 @@ build_uniform_lvl ( const hpro::TBlockCluster *  bct,
     assert( bct != nullptr );
 
     using value_t       = typename coeff_t::value_t;
-    using cluster_basis = hlr::matrix::cluster_basis< value_t >;
+    using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
     using basis_map_t   = std::unordered_map< indexset, cluster_basis *, indexset_hash >;
-    using lrmat_map_t   = std::unordered_map< indexset, std::list< hpro::TRkMatrix * >, indexset_hash >;
-    using bmat_map_t    = std::unordered_map< hpro::idx_t, hpro::TBlockMatrix * >;
+    using lrmat_map_t   = std::unordered_map< indexset, std::list< hlr::matrix::lrmatrix< value_t > * >, indexset_hash >;
+    using bmat_map_t    = std::unordered_map< Hpro::idx_t, Hpro::TBlockMatrix< value_t > * >;
 
     //
     // go BFS-style through block cluster tree and construct leaves per level
@@ -66,9 +758,9 @@ build_uniform_lvl ( const hpro::TBlockCluster *  bct,
     auto  rowcb_map  = basis_map_t();
     auto  colcb_map  = basis_map_t();
 
-    auto  M_root     = std::unique_ptr< hpro::TMatrix >();
+    auto  M_root     = std::unique_ptr< Hpro::TMatrix< value_t > >();
 
-    auto  nodes      = std::deque< const hpro::TBlockCluster * >{ bct };
+    auto  nodes      = std::deque< const Hpro::TBlockCluster * >{ bct };
     auto  bmat_map   = bmat_map_t();
 
     auto  bmtx       = std::mutex(); // for bmat_map
@@ -79,8 +771,8 @@ build_uniform_lvl ( const hpro::TBlockCluster *  bct,
     //
     // local function to set up hierarchy (parent <-> M)
     //
-    auto  insert_hier = [&] ( const hpro::TBlockCluster *         node,
-                              std::unique_ptr< hpro::TMatrix > &  M )
+    auto  insert_hier = [&] ( const Hpro::TBlockCluster *                    node,
+                              std::unique_ptr< Hpro::TMatrix< value_t > > &  M )
     {
         if ( is_null( node->parent() ) )
         {
@@ -114,7 +806,7 @@ build_uniform_lvl ( const hpro::TBlockCluster *  bct,
     //
     // local function to create cluster basis objects (with hierarchy)
     //
-    auto  create_cb = [&] ( const hpro::TBlockCluster *  node )
+    auto  create_cb = [&] ( const Hpro::TBlockCluster *  node )
     {
         //
         // build row/column cluster basis objects and set up
@@ -186,22 +878,22 @@ build_uniform_lvl ( const hpro::TBlockCluster *  bct,
         auto  children = decltype( nodes )();
         auto  rowmap   = lrmat_map_t();
         auto  colmap   = lrmat_map_t();
-        auto  lrmat    = std::deque< hpro::TRkMatrix * >();
+        auto  lrmat    = std::deque< Hpro::TMatrix< value_t > * >();
         
         #pragma omp taskloop default(shared)
         for ( auto  node : nodes )
         {
-            auto  M = std::unique_ptr< hpro::TMatrix >();
+            auto  M = std::unique_ptr< Hpro::TMatrix< value_t > >();
 
             if ( node->is_leaf() )
             {
                 if ( node->is_adm() )
                 {
-                    M = std::unique_ptr< hpro::TMatrix >( lrapx.build( node, acc ) );
+                    M = std::unique_ptr< Hpro::TMatrix< value_t > >( lrapx.build( node, acc ) );
                         
                     if ( is_lowrank( *M ) )
                     {
-                        auto  R    = ptrcast( M.get(), hpro::TRkMatrix );
+                        auto  R    = ptrcast( M.get(), hlr::matrix::lrmatrix< value_t > );
                         auto  lock = std::scoped_lock( lmtx );
                             
                         lrmat.push_back( R );
@@ -224,9 +916,9 @@ build_uniform_lvl ( const hpro::TBlockCluster *  bct,
                                 children.push_back( node->son( i, j ) );
                 }
 
-                M = std::make_unique< hpro::TBlockMatrix >( node );
+                M = std::make_unique< Hpro::TBlockMatrix< value_t > >( node );
         
-                auto  B = ptrcast( M.get(), hpro::TBlockMatrix );
+                auto  B = ptrcast( M.get(), Hpro::TBlockMatrix< value_t > );
 
                 // make sure, block structure is correct
                 if (( B->nblock_rows() != node->nrows() ) ||
@@ -453,8 +1145,9 @@ build_uniform_lvl ( const hpro::TBlockCluster *  bct,
         //
 
         #pragma omp taskloop default(shared)
-        for ( auto  R : lrmat )
+        for ( auto  M : lrmat )
         {
+            auto  R     = ptrcast( M, hlr::matrix::lrmatrix< value_t > );
             auto  rowcb = rowcb_map.at( R->row_is() );
             auto  colcb = colcb_map.at( R->col_is() );
             auto  Un    = rowcb->basis();
@@ -490,8 +1183,10 @@ build_uniform_lvl ( const hpro::TBlockCluster *  bct,
 // recursively build uniform H-matrix while also constructing row/column cluster basis
 // by updating bases after constructing low-rank blocks
 //
-using  matrix_list_t = std::vector< hpro::TMatrix * >;
-using  matrix_map_t  = std::unordered_map< indexset, matrix_list_t, indexset_hash >;
+template < typename value_t >
+using  matrix_list_t = std::vector< Hpro::TMatrix< value_t > * >;
+template < typename value_t >
+using  matrix_map_t  = std::unordered_map< indexset, matrix_list_t< value_t >, indexset_hash >;
 using  mutex_map_t   = std::unordered_map< indexset, std::mutex, indexset_hash >;
 
 struct rec_basis_data_t
@@ -513,13 +1208,13 @@ struct rec_basis_data_t
     compute_extended_basis ( const cluster_basis< value_t > &  cb,
                              const blas::matrix< value_t > &   W,
                              const blas::matrix< value_t > &   T,
-                             const hpro::TTruncAcc &           acc,
+                             const Hpro::TTruncAcc &           acc,
                              const basis_approx_t &            basisapx,
                              matrix_map_t &                    matmap,
                              std::mutex &                      matmapmtx,
                              const matop_t                     op )
     {
-        using  real_t = hpro::real_type_t< value_t >;
+        using  real_t = Hpro::real_type_t< value_t >;
 
         // zero basis implies empty matrix list
         if ( cb.basis().ncols() == 0 )
@@ -638,7 +1333,7 @@ struct rec_basis_data_t
     compute_extended_row_basis ( const cluster_basis< value_t > &  cb,
                                  const blas::matrix< value_t > &   W,
                                  const blas::matrix< value_t > &   T,
-                                 const hpro::TTruncAcc &           acc,
+                                 const Hpro::TTruncAcc &           acc,
                                  const basis_approx_t &            basisapx )
     {
         return compute_extended_basis( cb, W, T, acc, basisapx, rowmap, rowmapmtx, apply_adjoint );
@@ -650,7 +1345,7 @@ struct rec_basis_data_t
     compute_extended_col_basis ( const cluster_basis< value_t > &  cb,
                                  const blas::matrix< value_t > &   X,
                                  const blas::matrix< value_t > &   T,
-                                 const hpro::TTruncAcc &           acc,
+                                 const Hpro::TTruncAcc &           acc,
                                  const basis_approx_t &            basisapx )
     {
         return compute_extended_basis( cb, X, T, acc, basisapx, colmap, colmapmtx, apply_normal );
@@ -717,12 +1412,12 @@ struct rec_basis_data_t
 template < typename coeff_t,
            typename lrapx_t,
            typename basisapx_t >
-std::unique_ptr< hpro::TMatrix >
-build_uniform_rec ( const hpro::TBlockCluster *                   bct,
+std::unique_ptr< Hpro::TMatrix< value_t > >
+build_uniform_rec ( const Hpro::TBlockCluster *                   bct,
                     const coeff_t &                               coeff,
                     const lrapx_t &                               lrapx,
                     const basisapx_t &                            basisapx,
-                    const hpro::TTruncAcc &                       acc,
+                    const Hpro::TTruncAcc &                       acc,
                     cluster_basis< typename coeff_t::value_t > &  rowcb,
                     cluster_basis< typename coeff_t::value_t > &  colcb,
                     rec_basis_data_t &                            basis_data )
@@ -733,15 +1428,15 @@ build_uniform_rec ( const hpro::TBlockCluster *                   bct,
     // decide upon cluster type, how to construct matrix
     //
 
-    auto  M = std::unique_ptr< hpro::TMatrix >();
+    auto  M = std::unique_ptr< Hpro::TMatrix< value_t > >();
     
     if ( bct->is_leaf() )
     {
         if ( bct->is_adm() )
         {
-            M = std::unique_ptr< hpro::TMatrix >( lrapx.build( bct, acc ) );
+            M = std::unique_ptr< Hpro::TMatrix< value_t > >( lrapx.build( bct, acc ) );
 
-            if ( is_lowrank( *M ) )
+            if ( hlr::matrix::is_lowrank( *M ) )
             {
                 // std::cout << bct->id() << '{' << std::endl;
                 
@@ -749,7 +1444,7 @@ build_uniform_rec ( const hpro::TBlockCluster *                   bct,
                 // compute LRS representation W·T·X' = U·V' = M
                 //
 
-                auto  R  = ptrcast( M.get(), hpro::TRkMatrix );
+                auto  R  = ptrcast( M.get(), hlr::matrix::lrmatrix< value_t > );
                 auto  W  = std::move( blas::mat_U< value_t >( R ) ); // reuse storage from R
                 auto  X  = std::move( blas::mat_V< value_t >( R ) );
                 auto  Rw = blas::matrix< value_t >();
@@ -822,9 +1517,9 @@ build_uniform_rec ( const hpro::TBlockCluster *                   bct,
     }// if
     else
     {
-        M = std::make_unique< hpro::TBlockMatrix >( bct );
+        M = std::make_unique< Hpro::TBlockMatrix< value_t > >( bct );
 
-        auto  B = ptrcast( M.get(), hpro::TBlockMatrix );
+        auto  B = ptrcast( M.get(), Hpro::TBlockMatrix< value_t > );
         
         // make sure, block structure is correct
         B->set_block_struct( bct->nrows(), bct->ncols() );
@@ -865,10 +1560,10 @@ build_uniform_rec ( const hpro::TBlockCluster *                   bct,
 }
 
 template < typename basisapx_t >
-std::unique_ptr< hpro::TMatrix >
-build_uniform_rec ( const hpro::TMatrix &                            A,
+std::unique_ptr< Hpro::TMatrix< value_t > >
+build_uniform_rec ( const Hpro::TMatrix< value_t > &                            A,
                     const basisapx_t &                               basisapx,
-                    const hpro::TTruncAcc &                          acc,
+                    const Hpro::TTruncAcc &                          acc,
                     cluster_basis< typename basisapx_t::value_t > &  rowcb,
                     cluster_basis< typename basisapx_t::value_t > &  colcb,
                     rec_basis_data_t &                               basis_data )
@@ -879,15 +1574,15 @@ build_uniform_rec ( const hpro::TMatrix &                            A,
     // decide upon cluster type, how to construct matrix
     //
 
-    auto  M = std::unique_ptr< hpro::TMatrix >();
+    auto  M = std::unique_ptr< Hpro::TMatrix< value_t > >();
     
-    if ( is_lowrank( A ) )
+    if ( hlr::matrix::is_lowrank( A ) )
     {
         //
         // compute LRS representation W·T·X' = U·V' = M
         //
 
-        auto  R  = cptrcast( &A, hpro::TRkMatrix );
+        auto  R  = cptrcast( &A, hlr::matrix::lrmatrix< value_t > );
         auto  W  = blas::copy( blas::mat_U< value_t >( R ) );
         auto  X  = blas::copy( blas::mat_V< value_t >( R ) );
         auto  Rw = blas::matrix< value_t >();
@@ -947,11 +1642,11 @@ build_uniform_rec ( const hpro::TMatrix &                            A,
     }// if
     else if ( is_blocked( A ) )
     {
-        auto  BA = cptrcast( &A, hpro::TBlockMatrix );
+        auto  BA = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
         
-        M = std::make_unique< hpro::TBlockMatrix >();
+        M = std::make_unique< Hpro::TBlockMatrix< value_t > >();
 
-        auto  BM = ptrcast( M.get(), hpro::TBlockMatrix );
+        auto  BM = ptrcast( M.get(), Hpro::TBlockMatrix< value_t > );
 
         BM->copy_struct_from( BA );
 
@@ -990,7 +1685,7 @@ build_uniform_rec ( const hpro::TMatrix &                            A,
 
 template < typename value_t >
 void
-init_cluster_bases ( const hpro::TBlockCluster *  bct,
+init_cluster_bases ( const Hpro::TBlockCluster *  bct,
                      cluster_basis< value_t > &   rowcb,
                      cluster_basis< value_t > &   colcb )
 {
@@ -998,7 +1693,7 @@ init_cluster_bases ( const hpro::TBlockCluster *  bct,
     // decide upon cluster type, how to construct matrix
     //
 
-    auto  M = std::unique_ptr< hpro::TMatrix >();
+    auto  M = std::unique_ptr< Hpro::TMatrix< value_t > >();
     
     if ( ! bct->is_leaf() )
     {
@@ -1058,13 +1753,13 @@ init_cluster_bases ( const hpro::TBlockCluster *  bct,
 
 template < typename value_t >
 void
-init_cluster_bases ( const hpro::TMatrix &       M,
+init_cluster_bases ( const Hpro::TMatrix< value_t > &       M,
                      cluster_basis< value_t > &  rowcb,
                      cluster_basis< value_t > &  colcb )
 {
     if ( is_blocked( M ) )
     {
-        auto  B = cptrcast( &M, hpro::TBlockMatrix );
+        auto  B = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
         
         {
             auto  lock = std::scoped_lock( rowcb.mutex(), colcb.mutex() );
@@ -1087,7 +1782,7 @@ init_cluster_bases ( const hpro::TMatrix &       M,
                         }// if
             
                         if ( is_blocked( M_ij ) && ( rowcb_i->nsons() == 0 ))
-                            rowcb_i->set_nsons( cptrcast( M_ij, hpro::TBlockMatrix )->nblock_rows() );
+                            rowcb_i->set_nsons( cptrcast( M_ij, Hpro::TBlockMatrix< value_t > )->nblock_rows() );
                         
                         if ( is_null( colcb_j ) )
                         {
@@ -1096,7 +1791,7 @@ init_cluster_bases ( const hpro::TMatrix &       M,
                         }// if
             
                         if ( is_blocked( M_ij ) && ( colcb_j->nsons() == 0 ))
-                            colcb_j->set_nsons( cptrcast( M_ij, hpro::TBlockMatrix )->nblock_cols() );
+                            colcb_j->set_nsons( cptrcast( M_ij, Hpro::TBlockMatrix< value_t > )->nblock_cols() );
                     }// if
                 }// for
             }// for
@@ -1120,6 +1815,8 @@ init_cluster_bases ( const hpro::TMatrix &       M,
         }// for
     }// if
 }
+
+#endif
 
 }}}}// namespace hlr::omp::matrix::detail
 

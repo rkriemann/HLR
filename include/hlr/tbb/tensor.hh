@@ -5,7 +5,7 @@
 // Module      : tbb/tensor
 // Description : tensor algorithms using TBB
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <tbb/blocked_range3d.h>
@@ -204,10 +204,10 @@ build_hierarchical_tucker ( const indexset &                  is0,
                             auto  X1_ijl = blas::matrix< value_t >( X1, D_ijl->is(1) - is1.first(), k1 );
                             auto  X2_ijl = blas::matrix< value_t >( X2, D_ijl->is(2) - is2.first(), k2 );
 
-                            blas::copy( D_ijl->G_decompressed(), G_ijl );
-                            blas::copy( D_ijl->X_decompressed( 0 ), X0_ijl );
-                            blas::copy( D_ijl->X_decompressed( 1 ), X1_ijl );
-                            blas::copy( D_ijl->X_decompressed( 2 ), X2_ijl );
+                            blas::copy( D_ijl->G(),  G_ijl );
+                            blas::copy( D_ijl->X(0), X0_ijl );
+                            blas::copy( D_ijl->X(1), X1_ijl );
+                            blas::copy( D_ijl->X(2), X2_ijl );
 
                             ofs[0] += D_ijl->rank(0);
                             ofs[1] += D_ijl->rank(1);
@@ -367,9 +367,9 @@ to_dense ( const base_tensor3< value_t > &  X,
     else if ( is_tucker( X ) )
     {
         auto  TX    = cptrcast( &X, tucker_tensor3< value_t > );
-        auto  T0    = blas::tensor_product( TX->G_decompressed(), TX->X_decompressed(0), 0 );
-        auto  T1    = blas::tensor_product( T0,                   TX->X_decompressed(1), 1 );
-        auto  DX    = blas::tensor_product( T1,                   TX->X_decompressed(2), 2 );
+        auto  T0    = blas::tensor_product( TX->G(), TX->X(0), 0 );
+        auto  T1    = blas::tensor_product( T0,      TX->X(1), 1 );
+        auto  DX    = blas::tensor_product( T1,      TX->X(2), 2 );
         auto  D_sub = D( X.is(0), X.is(1), X.is(2) );
         
         blas::copy( DX, D_sub );
@@ -379,7 +379,7 @@ to_dense ( const base_tensor3< value_t > &  X,
         auto  DX    = cptrcast( &X, dense_tensor3< value_t > );
         auto  D_sub = D( X.is(0), X.is(1), X.is(2) );
 
-        blas::copy( DX->tensor_decompressed(), D_sub );
+        blas::copy( DX->tensor(), D_sub );
     }// if
     else
     {
@@ -409,11 +409,11 @@ to_dense ( const base_tensor3< value_t > &  X )
     }// if
     else
     {
-        auto  D = std::make_unique< dense_tensor3< value_t > >( X.is(0), X.is(1), X.is(2) );
+        auto  DT = blas::tensor3< value_t >( X.dim(0), X.dim(1), X.dim(2) );
         
-        detail::to_dense( X, D->tensor() );
+        detail::to_dense( X, DT );
 
-        return D;
+        return std::make_unique< dense_tensor3< value_t > >( X.is(0), X.is(1), X.is(2), std::move( DT ) );
     }// if
 }
 

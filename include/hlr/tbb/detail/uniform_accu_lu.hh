@@ -5,7 +5,7 @@
 // Module      : arith/detail/uniform_accu
 // Description : arithmetic functions for uniform matrices using accumulators
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <tbb/parallel_for.h>
@@ -465,10 +465,10 @@ struct accumulator
 
         for ( auto  [ op_A, A, op_B, B ] : pending )
         {
-            if ( is_blocked_all( *A, *B, M ) )
+            if ( hlr::is_blocked_all( *A, *B, M ) )
                 continue;
         
-            if ( is_blocked_all( A, B ) )
+            if ( hlr::is_blocked_all( *A, *B ) )
             {
                 //
                 // if M is a leaf and A _and_ B are blocked, a temporary matrix
@@ -915,7 +915,7 @@ struct rec_lu_factorization
 
         trace::region_end( "eval" );
     
-        if ( is_blocked_all( L, M ) )
+        if ( hlr::is_blocked_all( L, M ) )
         {
             auto  BL = ptrcast( &L, Hpro::TBlockMatrix< value_t > );
             auto  BM = ptrcast( &M, Hpro::TBlockMatrix< value_t > );
@@ -1085,7 +1085,7 @@ struct rec_lu_factorization
     
         trace::region_end( "eval" );
         
-        if ( is_blocked_all( U, M ) )
+        if ( hlr::is_blocked_all( U, M ) )
         {
             auto  BU = ptrcast( &U, Hpro::TBlockMatrix< value_t > );
             auto  BM = ptrcast( &M, Hpro::TBlockMatrix< value_t > );

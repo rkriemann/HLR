@@ -3,7 +3,7 @@
 // Module      : mblr.cc
 // Description : MBLR specific clustering functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <hpro/cluster/TBSPCTBuilder.hh>
@@ -15,18 +15,16 @@
 
 namespace hlr { namespace cluster { namespace mblr {
 
-using namespace HLIB;
-
 //
 // cluster set of coordinates with minimal block size <ntile>
 //
-std::unique_ptr< HLIB::TClusterTree >
-cluster ( HLIB::TCoordinate &  coords,
-          const size_t         ntile,
-          const size_t         nlvl )
+std::unique_ptr< Hpro::TClusterTree >
+cluster ( Hpro::TCoordinate &          coords,
+          const Hpro::TBSPPartStrat &  part,
+          const size_t                 ntile,
+          const size_t                 nlvl )
 {
-    TCardBSPPartStrat  part_strat;
-    TMBLRCTBuilder     ct_builder( nlvl, & part_strat, ntile );
+    Hpro::TMBLRCTBuilder     ct_builder( nlvl, & part, ntile );
 
     return ct_builder.build( & coords );
 }
@@ -34,12 +32,12 @@ cluster ( HLIB::TCoordinate &  coords,
 //
 // build block cluster tree based on given row/column cluster trees
 //
-std::unique_ptr< HLIB::TBlockClusterTree >
-blockcluster ( HLIB::TClusterTree &  rowct,
-               HLIB::TClusterTree &  colct )
+std::unique_ptr< Hpro::TBlockClusterTree >
+blockcluster ( Hpro::TClusterTree &  rowct,
+               Hpro::TClusterTree &  colct )
 {
-    TWeakStdGeomAdmCond  adm_cond;
-    TBCBuilder           bct_builder;
+    Hpro::TWeakStdGeomAdmCond  adm_cond;
+    Hpro::TBCBuilder           bct_builder;
 
     return bct_builder.build( & rowct, & colct, & adm_cond );
 }

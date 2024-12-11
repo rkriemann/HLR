@@ -5,7 +5,7 @@
 // Module      : tbb/arith_lazy.hh
 // Description : arithmetic functions for lazy evaluation using TBB
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <tbb/parallel_for.h>
@@ -20,13 +20,12 @@
 #include "hlr/arith/multiply.hh"
 #include "hlr/matrix/lrsmatrix.hh"
 #include "hlr/matrix/convert.hh"
+#include "hlr/matrix/product.hh"
 #include "hlr/utils/checks.hh"
 #include "hlr/utils/log.hh"
 #include "hlr/utils/io.hh"
 
 namespace hlr { namespace tbb { namespace lazy {
-
-namespace hpro = HLIB;
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -48,9 +47,9 @@ struct linopsum_operator
 {
     using  value_t = T_value;
 
-    const std::list< const hpro::TLinearOperator< value_t > * > &  ops;
+    const std::list< const Hpro::TLinearOperator< value_t > * > &  ops;
 
-    linopsum_operator ( const std::list< const hpro::TLinearOperator< value_t > * > &  aops )
+    linopsum_operator ( const std::list< const Hpro::TLinearOperator< value_t > * > &  aops )
             : ops( aops )
     {
         HLR_ASSERT( ! aops.empty() );
@@ -151,7 +150,7 @@ prod ( const value_t                         alpha,
 
 template < typename value_t >
 linopsum_operator< value_t >
-operator_wrapper ( const std::list< const hpro::TLinearOperator< value_t > * > &  M )
+operator_wrapper ( const std::list< const Hpro::TLinearOperator< value_t > * > &  M )
 {
     return linopsum_operator< value_t > ( M );
 }
@@ -162,9 +161,9 @@ operator_wrapper ( const std::list< const hpro::TLinearOperator< value_t > * > &
 template < typename value_t >
 struct lazy_accumulator
 {
-    using  update_t      = std::pair< const hpro::TMatrix< value_t > *, const hpro::TMatrix< value_t > * >;
+    using  update_t      = std::pair< const Hpro::TMatrix< value_t > *, const Hpro::TMatrix< value_t > * >;
     using  update_list_t = std::list< update_t >;
-    using  create_list_t = std::list< std::unique_ptr< hpro::TMatrix< value_t > > >;
+    using  create_list_t = std::list< std::unique_ptr< Hpro::TMatrix< value_t > > >;
 
     // list of collected updates
     update_list_t  updates;
@@ -180,32 +179,32 @@ struct lazy_accumulator
     // - α is applied _only_ if possible
     //
     void
-    add_update ( const hpro::TMatrix< value_t > *  A,
-                 const hpro::TMatrix< value_t > *  B )
+    add_update ( const Hpro::TMatrix< value_t > *  A,
+                 const Hpro::TMatrix< value_t > *  B )
     {
         HLR_ASSERT( ! is_null( A ) );
         
-        if ( is_lowrank_all( A, B ) )
+        if ( matrix::is_lowrank_all( A, B ) )
         {
             //
             // create U·T·V' representation with T=V(A)'·U(B)
             //
 
-            auto  RA = cptrcast( A, hpro::TRkMatrix< value_t > );
-            auto  RB = cptrcast( B, hpro::TRkMatrix< value_t > );
+            auto  RA = cptrcast( A, matrix::lrmatrix< value_t > );
+            auto  RB = cptrcast( B, matrix::lrmatrix< value_t > );
 
-            auto  U  = blas::mat_U< value_t >( RA );
-            auto  T  = blas::prod( blas::adjoint( blas::mat_V< value_t >( RA ) ), blas::mat_U< value_t >( RB ) );
-            auto  V  = blas::mat_V< value_t >( RB );
+            auto  U  = RA->U();
+            auto  T  = blas::prod( blas::adjoint( RA->V() ), RB->U() );
+            auto  V  = RB->V();
             
-            auto  AxB = std::make_unique< hlr::matrix::lrsmatrix< value_t > >( A->row_is(), B->col_is(), std::move( U ), std::move( T ), std::move( V ) );
+            auto  AxB = std::make_unique< matrix::lrsmatrix< value_t > >( A->row_is(), B->col_is(), std::move( U ), std::move( T ), std::move( V ) );
             
             updates.push_back( { AxB.get(), nullptr } );
             created.push_back( std::move( AxB ) );
         }// if
         else
         {
-            if ( is_dense_all( A, B ) )
+            if ( matrix::is_dense_all( A, B ) )
                 handle_dense = true;
             
             updates.push_back( { A, B } );
@@ -213,7 +212,7 @@ struct lazy_accumulator
     }
 
     void
-    add_update ( const hpro::TMatrix< value_t > *  A )
+    add_update ( const Hpro::TMatrix< value_t > *  A )
     {
         add_update( A, nullptr );
     }
@@ -222,10 +221,9 @@ struct lazy_accumulator
     // split given set of updates to set of updates for sub blocks
     //
     tensor2< lazy_accumulator >
-    split ( const hpro::TBlockMatrix< value_t > &  M )
+    split ( const Hpro::TBlockMatrix< value_t > &  M )
     {
         using  hlr::matrix::lrsmatrix;
-        using  hlr::matrix::is_lowrankS;
         
         auto  sub_accu = tensor2< lazy_accumulator >( M.nblock_rows(), M.nblock_cols() );
 
@@ -245,11 +243,11 @@ struct lazy_accumulator
 
                     if ( is_blocked( A ) )
                     {
-                        auto  BA = cptrcast( A, hpro::TBlockMatrix< value_t > );
+                        auto  BA = cptrcast( A, Hpro::TBlockMatrix< value_t > );
                         
                         if ( is_blocked( B ) )
                         {
-                            auto  BB = cptrcast( B, hpro::TBlockMatrix< value_t > );
+                            auto  BB = cptrcast( B, Hpro::TBlockMatrix< value_t > );
 
                             for ( uint  k = 0; k < BA->nblock_cols(); ++k )
                             {
@@ -258,10 +256,12 @@ struct lazy_accumulator
                                 sub_accu(i,j).add_update( BA->block( i, k ), BB->block( k, j ) );
                             }// for
                         }// if
-                        else if ( is_lowrank( B ) )
+                        else if ( matrix::is_lowrank( B ) )
                         {
-                            auto  RB = cptrcast( B, hpro::TRkMatrix< value_t > );
+                            auto  RB = cptrcast( B, matrix::lrmatrix< value_t > );
 
+                            HLR_ASSERT( ! RB->is_compressed() );
+                            
                             for ( uint  k = 0; k < BA->nblock_cols(); ++k )
                             {
                                 HLR_ASSERT( ! is_null( BA->block( i, k ) ) );
@@ -270,19 +270,21 @@ struct lazy_accumulator
                                 auto  col_k = A_ik->col_is();
 
                                 // restrict B to col_k × col_j
-                                auto  U_k = blas::matrix< value_t >( blas::mat_U< value_t >( RB ), col_k - B->row_ofs(), blas::range::all );
-                                auto  V_j = blas::matrix< value_t >( blas::mat_V< value_t >( RB ), col_j - B->col_ofs(), blas::range::all );
-                                auto  B_kj = std::make_unique< hpro::TRkMatrix< value_t > >( col_k, col_j, U_k, V_j );
+                                auto  U_k  = blas::matrix< value_t >( RB->U(), col_k - B->row_ofs(), blas::range::all );
+                                auto  V_j  = blas::matrix< value_t >( RB->V(), col_j - B->col_ofs(), blas::range::all );
+                                auto  B_kj = std::make_unique< matrix::lrmatrix< value_t > >( col_k, col_j, U_k, V_j );
                                 
                                 sub_accu(i,j).add_update( A_ik, B_kj.get() );
 
                                 created.push_back( std::move( B_kj ) );
                             }// for
                         }// if
-                        else if ( is_dense( B ) )
+                        else if ( matrix::is_dense( B ) )
                         {
-                            auto  DB = cptrcast( B, hpro::TDenseMatrix< value_t > );
+                            auto  DB = cptrcast( B, matrix::dense_matrix< value_t > );
 
+                            HLR_ASSERT( ! DB->is_compressed() );
+                            
                             for ( uint  k = 0; k < BA->nblock_cols(); ++k )
                             {
                                 HLR_ASSERT( ! is_null( BA->block( i, k ) ) );
@@ -291,8 +293,8 @@ struct lazy_accumulator
                                 auto  col_k = A_ik->col_is();
 
                                 // restrict B to col_k × col_j
-                                auto  D_kj = blas::matrix< value_t >( blas::mat< value_t >( DB ), col_k - B->row_ofs(), col_j - B->col_ofs() );
-                                auto  B_kj = std::make_unique< hpro::TDenseMatrix< value_t > >( col_k, col_j, D_kj );
+                                auto  D_kj = blas::matrix< value_t >( DB->mat(), col_k - B->row_ofs(), col_j - B->col_ofs() );
+                                auto  B_kj = std::make_unique< matrix::dense_matrix< value_t > >( col_k, col_j, D_kj );
                                 
                                 sub_accu(i,j).add_update( A_ik, B_kj.get() );
 
@@ -302,13 +304,17 @@ struct lazy_accumulator
                         else
                             HLR_ERROR( "unsupported matrix type: " + B->typestr() );
                     }// if
-                    else if ( is_lowrank( A ) )
+                    else if ( matrix::is_lowrank( A ) )
                     {
-                        auto  RA = cptrcast( A, hpro::TRkMatrix< value_t > );
+                        auto  RA = cptrcast( A, matrix::lrmatrix< value_t > );
+                        auto  AU = RA->U();
+                        auto  AV = RA->V();
+
+                        HLR_ASSERT( ! RA->is_compressed() );
                         
                         if ( is_blocked( B ) )
                         {
-                            auto  BB = cptrcast( B, hpro::TBlockMatrix< value_t > );
+                            auto  BB = cptrcast( B, Hpro::TBlockMatrix< value_t > );
 
                             for ( uint  k = 0; k < BB->nblock_rows(); ++k )
                             {
@@ -318,43 +324,50 @@ struct lazy_accumulator
                                 auto  col_k = B_kj->row_is();
                                 
                                 // restrict A to row_i × col_k
-                                auto  U_i  = blas::matrix< value_t >( blas::mat_U< value_t >( RA ), row_i - A->row_ofs(), blas::range::all );
-                                auto  V_k  = blas::matrix< value_t >( blas::mat_V< value_t >( RA ), col_k - A->col_ofs(), blas::range::all );
-                                auto  A_ik = std::make_unique< hpro::TRkMatrix< value_t > >( row_i, col_k, U_i, V_k );
+                                auto  U_i  = blas::matrix< value_t >( RA->U(), row_i - A->row_ofs(), blas::range::all );
+                                auto  V_k  = blas::matrix< value_t >( RA->V(), col_k - A->col_ofs(), blas::range::all );
+                                auto  A_ik = std::make_unique< matrix::lrmatrix< value_t > >( row_i, col_k, U_i, V_k );
                                 
                                 sub_accu(i,j).add_update( A_ik.get(), B_kj );
 
                                 created.push_back( std::move( A_ik ) );
                             }// for
                         }// if
-                        else if ( is_lowrank( B ) )
+                        else if ( matrix::is_lowrank( B ) )
                         {
-                            auto  RB = cptrcast( B, hpro::TRkMatrix< value_t > );
+                            auto  RB = cptrcast( B, matrix::lrmatrix< value_t > );
+                            auto  BU = RB->U();
+                            auto  BV = RB->V();
 
+                            HLR_ASSERT( ! RB->is_compressed() );
+                            
                             // restrict A to row_i
-                            auto  U_i = blas::matrix< value_t >( blas::mat_U< value_t >( RA ), row_i - A->row_ofs(), blas::range::all );
-                            auto  A_i = std::make_unique< hpro::TRkMatrix< value_t > >( row_i, A->col_is(), U_i, blas::mat_V< value_t >( RA ) );
+                            auto  U_i = blas::matrix< value_t >( AU, row_i - A->row_ofs(), blas::range::all );
+                            auto  A_i = std::make_unique< matrix::lrmatrix< value_t > >( row_i, A->col_is(), U_i, AV );
                             
                             // restrict B to col_j
-                            auto  V_j = blas::matrix< value_t >( blas::mat_V< value_t >( RB ), col_j - B->col_ofs(), blas::range::all );
-                            auto  B_j = std::make_unique< hpro::TRkMatrix< value_t > >( B->row_is(), col_j, blas::mat_U< value_t >( RB ), V_j );
+                            auto  V_j = blas::matrix< value_t >( BV, col_j - B->col_ofs(), blas::range::all );
+                            auto  B_j = std::make_unique< matrix::lrmatrix< value_t > >( B->row_is(), col_j, BU, V_j );
                                 
                             sub_accu(i,j).add_update( A_i.get(), B_j.get() );
 
                             created.push_back( std::move( A_i ) );
                             created.push_back( std::move( B_j ) );
                         }// if
-                        else if ( is_dense( B ) )
+                        else if ( matrix::is_dense( B ) )
                         {
-                            auto  DB = cptrcast( B, hpro::TDenseMatrix< value_t > );
+                            auto  DB = cptrcast( B, matrix::dense_matrix< value_t > );
+                            auto  BD = DB->mat();
+
+                            HLR_ASSERT( ! DB->is_compressed() );
 
                             // restrict A to row_i
-                            auto  U_i = blas::matrix< value_t >( blas::mat_U< value_t >( RA ), row_i - A->row_ofs(), blas::range::all );
-                            auto  A_i = std::make_unique< hpro::TRkMatrix< value_t > >( row_i, A->col_is(), U_i, blas::mat_V< value_t >( RA ) );
+                            auto  U_i = blas::matrix< value_t >( AU, row_i - A->row_ofs(), blas::range::all );
+                            auto  A_i = std::make_unique< matrix::lrmatrix< value_t > >( row_i, A->col_is(), U_i, AV );
                             
                             // restrict B to col_j
-                            auto  D_j = blas::matrix< value_t >( blas::mat< value_t >( DB ), blas::range::all, col_j - B->col_ofs() );
-                            auto  B_j = std::make_unique< hpro::TDenseMatrix< value_t > >( B->row_is(), col_j, D_j );
+                            auto  D_j = blas::matrix< value_t >( BD, blas::range::all, col_j - B->col_ofs() );
+                            auto  B_j = std::make_unique< matrix::dense_matrix< value_t > >( B->row_is(), col_j, D_j );
                                 
                             sub_accu(i,j).add_update( A_i.get(), B_j.get() );
 
@@ -364,7 +377,7 @@ struct lazy_accumulator
                         else
                             HLR_ERROR( "unsupported matrix type: " + B->typestr() );
                     }// if
-                    else if ( is_lowrankS( A ) )
+                    else if ( matrix::is_lowrankS( A ) )
                     {
                         auto  RA = cptrcast( A, lrsmatrix< value_t > );
 
@@ -379,13 +392,16 @@ struct lazy_accumulator
                         sub_accu(i,j).add_update( A_ij.get() );
                         created.push_back( std::move( A_ij ) );
                     }// if
-                    else if ( is_dense( A ) )
+                    else if ( matrix::is_dense( A ) )
                     {
-                        auto  DA = cptrcast( A, hpro::TDenseMatrix< value_t > );
+                        auto  DA = cptrcast( A, matrix::dense_matrix< value_t > );
+                        auto  AD = DA->mat();
+
+                        HLR_ASSERT( ! DA->is_compressed() );
                         
                         if ( is_blocked( B ) )
                         {
-                            auto  BB = cptrcast( B, hpro::TBlockMatrix< value_t > );
+                            auto  BB = cptrcast( B, Hpro::TBlockMatrix< value_t > );
 
                             for ( uint  k = 0; k < BB->nblock_rows(); ++k )
                             {
@@ -395,42 +411,49 @@ struct lazy_accumulator
                                 auto  col_k = B_kj->row_is();
                                 
                                 // restrict A to row_i × col_k
-                                auto  D_ik = blas::matrix< value_t >( blas::mat< value_t >( DA ), row_i - A->row_ofs(), col_k - A->col_ofs() );
-                                auto  A_ik = std::make_unique< hpro::TDenseMatrix< value_t > >( row_i, col_k, D_ik );
+                                auto  D_ik = blas::matrix< value_t >( AD, row_i - A->row_ofs(), col_k - A->col_ofs() );
+                                auto  A_ik = std::make_unique< matrix::dense_matrix< value_t > >( row_i, col_k, D_ik );
                                 
                                 sub_accu(i,j).add_update( A_ik.get(), B_kj );
 
                                 created.push_back( std::move( A_ik ) );
                             }// for
                         }// if
-                        else if ( is_lowrank( B ) )
+                        else if ( matrix::is_lowrank( B ) )
                         {
-                            auto  RB = cptrcast( B, hpro::TRkMatrix< value_t > );
+                            auto  RB = cptrcast( B, matrix::lrmatrix< value_t > );
+                            auto  BU = RB->U();
+                            auto  BV = RB->V();
+                            
+                            HLR_ASSERT( ! RB->is_compressed() );
                             
                             // restrict A to row_i
-                            auto  D_i = blas::matrix< value_t >( blas::mat< value_t >( DA ), row_i - A->row_ofs(), blas::range::all );
-                            auto  A_i = std::make_unique< hpro::TDenseMatrix< value_t > >( row_i, A->col_is(), D_i );
+                            auto  D_i = blas::matrix< value_t >( AD, row_i - A->row_ofs(), blas::range::all );
+                            auto  A_i = std::make_unique< matrix::dense_matrix< value_t > >( row_i, A->col_is(), D_i );
                             
                             // restrict B to col_j
-                            auto  V_j = blas::matrix< value_t >( blas::mat_V< value_t >( RB ), col_j - B->col_ofs(), blas::range::all );
-                            auto  B_j = std::make_unique< hpro::TRkMatrix< value_t > >( B->row_is(), col_j, blas::mat_U< value_t >( RB ), V_j );
+                            auto  V_j = blas::matrix< value_t >( BV, col_j - B->col_ofs(), blas::range::all );
+                            auto  B_j = std::make_unique< matrix::lrmatrix< value_t > >( B->row_is(), col_j, BU, V_j );
                                 
                             sub_accu(i,j).add_update( A_i.get(), B_j.get() );
 
                             created.push_back( std::move( A_i ) );
                             created.push_back( std::move( B_j ) );
                         }// if
-                        else if ( is_dense( B ) )
+                        else if ( matrix::is_dense( B ) )
                         {
-                            auto  DB = cptrcast( B, hpro::TDenseMatrix< value_t > );
+                            auto  DB = cptrcast( B, matrix::dense_matrix< value_t > );
+                            auto  BD = DB->mat();
+
+                            HLR_ASSERT( ! DB->is_compressed() );
 
                             // restrict A to row_i
-                            auto  D_i = blas::matrix< value_t >( blas::mat< value_t >( DA ), row_i - A->row_ofs(), blas::range::all );
-                            auto  A_i = std::make_unique< hpro::TDenseMatrix< value_t > >( row_i, A->col_is(), D_i );
+                            auto  D_i = blas::matrix< value_t >( AD, row_i - A->row_ofs(), blas::range::all );
+                            auto  A_i = std::make_unique< matrix::dense_matrix< value_t > >( row_i, A->col_is(), D_i );
                             
                             // restrict B to col_j
-                            auto  D_j = blas::matrix< value_t >( blas::mat< value_t >( DB ), blas::range::all, col_j - B->col_ofs() );
-                            auto  B_j = std::make_unique< hpro::TDenseMatrix< value_t > >( B->row_is(), col_j, D_j );
+                            auto  D_j = blas::matrix< value_t >( BD, blas::range::all, col_j - B->col_ofs() );
+                            auto  B_j = std::make_unique< matrix::dense_matrix< value_t > >( B->row_is(), col_j, D_j );
                                 
                             sub_accu(i,j).add_update( A_i.get(), B_j.get() );
 
@@ -454,17 +477,16 @@ struct lazy_accumulator
     //
     template < typename approx_t >
     void
-    apply_leaf ( const value_t            alpha,
-                 hpro::TMatrix< value_t > &          M,
-                 const hpro::TTruncAcc &  acc,
-                 const approx_t &         approx )
+    apply_leaf ( const value_t               alpha,
+                 Hpro::TMatrix< value_t > &  M,
+                 const accuracy &            acc,
+                 const approx_t &            approx )
     {
         using  hlr::matrix::lrsmatrix;
-        using  hlr::matrix::is_lowrankS;
         
-        if ( is_lowrank( M ) )
+        if ( matrix::is_lowrank( M ) )
         {
-            auto  R = ptrcast( &M, hpro::TRkMatrix< value_t > );
+            auto  R = ptrcast( &M, matrix::lrmatrix< value_t > );
 
             //
             // an update resulted in a dense matrix, so handle all in dense format
@@ -476,7 +498,8 @@ struct lazy_accumulator
 
                 apply_leaf( alpha, *D, acc, approx );
 
-                auto  [ U, V ] = approx( blas::mat< value_t >( D ), acc );
+                auto  DD       = D->mat();
+                auto  [ U, V ] = approx( DD, acc );
                     
                 R->set_lrmat( std::move( U ), std::move( V ) );
             }// if
@@ -492,23 +515,23 @@ struct lazy_accumulator
                     // set up operator for sum of matrix products plus C
                     //
         
-                    auto  op_list = std::list< const hpro::TLinearOperator< value_t > * >();
-                    auto  deleted = std::list< const hpro::TLinearOperator< value_t > * >();
+                    auto  op_list = std::list< const Hpro::TLinearOperator< value_t > * >();
+                    auto  deleted = std::list< const Hpro::TLinearOperator< value_t > * >();
 
                     for ( auto  [ A, B ] : updates )
                     {
-                        if ( is_lowrankS( A ) )
+                        if ( matrix::is_lowrankS( A ) )
                         {
                             HLR_ASSERT( is_null( B ) );
                         
-                            auto  op_AxB = hpro::matrix_product( alpha, A );
+                            auto  op_AxB = matrix::product( alpha, *A );
                         
                             deleted.push_back( op_AxB.get() );
                             op_list.push_back( op_AxB.release() );
                         }// if
                         else
                         {
-                            auto  op_AxB = hpro::matrix_product( alpha, A, value_t(1), B );
+                            auto  op_AxB = matrix::product( alpha, *A, 1, *B );
                         
                             deleted.push_back( op_AxB.get() );
                             op_list.push_back( op_AxB.release() );
@@ -542,15 +565,15 @@ struct lazy_accumulator
                 
                     for ( auto  [ A, B ] : updates )
                     {
-                        if ( is_lowrankS( A ) )
+                        if ( matrix::is_lowrankS( A ) )
                         {
                             HLR_ASSERT( is_null( B ) );
                     
-                            auto  RA = cptrcast( A, lrsmatrix< value_t > );
+                            auto  RA = cptrcast( A, matrix::lrsmatrix< value_t > );
                             auto  US = blas::prod( alpha, RA->U(), RA->S() );
 
-                            auto  [ U, V ] = approx( { blas::mat_U< value_t >( R ), US },
-                                                     { blas::mat_V< value_t >( R ), RA->V() },
+                            auto  [ U, V ] = approx( { R->U(), US },
+                                                     { R->V(), RA->V() },
                                                      acc );
             
                             R->set_lrmat( std::move( U ), std::move( V ) );
@@ -563,20 +586,21 @@ struct lazy_accumulator
                 }// else
             }// if
         }// if
-        else if ( is_dense( M ) )
+        else if ( matrix::is_dense( M ) )
         {
-            auto  D = ptrcast( &M, hpro::TDenseMatrix< value_t > );
+            auto  D = ptrcast( &M, matrix::dense_matrix< value_t > );
 
             for ( auto  [ A, B ] : updates )
             {
-                if ( is_lowrankS( A ) )
+                if ( matrix::is_lowrankS( A ) )
                 {
                     HLR_ASSERT( is_null( B ) );
                     
                     auto  RA = cptrcast( A, lrsmatrix< value_t > );
                     auto  US = blas::prod( RA->U(), RA->S() );
+                    auto  DD = D->mat();
 
-                    blas::prod( alpha, US, blas::adjoint( RA->V() ), value_t(1), blas::mat< value_t >( D ) );
+                    blas::prod( alpha, US, blas::adjoint( RA->V() ), value_t(1), DD );
                 }// if
                 else
                 {
@@ -603,14 +627,14 @@ template < typename value_t,
            typename approx_t >
 void
 multiply ( const value_t                  alpha,
-           hpro::TMatrix< value_t > &     C,
+           Hpro::TMatrix< value_t > &     C,
            lazy_accumulator< value_t > &  accu,
-           const hpro::TTruncAcc &        acc,
+           const accuracy &               acc,
            const approx_t &               approx )
 {
     if ( is_blocked( C ) )
     {
-        auto  BC = ptrcast( &C, hpro::TBlockMatrix< value_t > );
+        auto  BC = ptrcast( &C, Hpro::TBlockMatrix< value_t > );
 
         //
         // restrict set of updates for all subblocks
@@ -648,12 +672,12 @@ template < typename value_t,
            typename approx_t >
 void
 multiply ( const value_t                       alpha,
-           const hpro::matop_t                 /* op_A */,
-           const hpro::TMatrix< value_t > &    A,
-           const hpro::matop_t                 /* op_B */,
-           const hpro::TMatrix< value_t > &    B,
-           hpro::TMatrix< value_t > &          C,
-           const hpro::TTruncAcc &             acc,
+           const Hpro::matop_t                 /* op_A */,
+           const Hpro::TMatrix< value_t > &    A,
+           const Hpro::matop_t                 /* op_B */,
+           const Hpro::TMatrix< value_t > &    B,
+           Hpro::TMatrix< value_t > &          C,
+           const accuracy &                    acc,
            const approx_t &                    approx )
 {
     detail::lazy_accumulator< value_t >  accu;
@@ -675,18 +699,18 @@ namespace detail
 template < typename value_t,
            typename approx_t >
 void
-solve_lower_tri ( const eval_side_t        side,
-                  const diag_type_t        diag,
-                  const hpro::TMatrix< value_t > &    L,
-                  hpro::TMatrix< value_t > &          M,
-                  lazy_accumulator< value_t > &       accu,
-                  const hpro::TTruncAcc &  acc,
-                  const approx_t &         approx )
+solve_lower_tri ( const eval_side_t                 side,
+                  const diag_type_t                 diag,
+                  const Hpro::TMatrix< value_t > &  L,
+                  Hpro::TMatrix< value_t > &        M,
+                  lazy_accumulator< value_t > &     accu,
+                  const accuracy &                  acc,
+                  const approx_t &                  approx )
 {
-    if ( is_blocked_all( L, M ) )
+    if ( hlr::is_blocked_all( L, M ) )
     {
-        auto  BL = cptrcast( &L, hpro::TBlockMatrix< value_t > );
-        auto  BM =  ptrcast( &M, hpro::TBlockMatrix< value_t > );
+        auto  BL = cptrcast( &L, Hpro::TBlockMatrix< value_t > );
+        auto  BM =  ptrcast( &M, Hpro::TBlockMatrix< value_t > );
         
         //
         // restrict set of updates for all subblocks
@@ -731,18 +755,18 @@ solve_lower_tri ( const eval_side_t        side,
 template < typename value_t,
            typename approx_t >
 void
-solve_upper_tri ( const eval_side_t                side,
-                  const diag_type_t                diag,
-                  const hpro::TMatrix< value_t > & U,
-                  hpro::TMatrix< value_t > &       M,
-                  lazy_accumulator< value_t > &               accu,
-                  const hpro::TTruncAcc &          acc,
-                  const approx_t &                 approx )
+solve_upper_tri ( const eval_side_t                 side,
+                  const diag_type_t                 diag,
+                  const Hpro::TMatrix< value_t > &  U,
+                  Hpro::TMatrix< value_t > &        M,
+                  lazy_accumulator< value_t > &     accu,
+                  const accuracy &                  acc,
+                  const approx_t &                  approx )
 {
-    if ( is_blocked_all( U, M ) )
+    if ( hlr::is_blocked_all( U, M ) )
     {
-        auto  BU = cptrcast( &U, hpro::TBlockMatrix< value_t > );
-        auto  BM =  ptrcast( &M, hpro::TBlockMatrix< value_t > );
+        auto  BU = cptrcast( &U, Hpro::TBlockMatrix< value_t > );
+        auto  BM =  ptrcast( &M, Hpro::TBlockMatrix< value_t > );
         
         //
         // restrict set of updates for all subblocks
@@ -787,10 +811,10 @@ solve_upper_tri ( const eval_side_t                side,
 template < typename value_t,
            typename approx_t >
 void
-lu ( hpro::TMatrix< value_t > &  M,
-     lazy_accumulator< value_t > &          accu,
-     const hpro::TTruncAcc &     acc,
-     const approx_t &            approx )
+lu ( Hpro::TMatrix< value_t > &     M,
+     lazy_accumulator< value_t > &  accu,
+     const accuracy &               acc,
+     const approx_t &               approx )
 {
     //
     // (recursive) LU factorization
@@ -798,7 +822,7 @@ lu ( hpro::TMatrix< value_t > &  M,
     
     if ( is_blocked( M ) )
     {
-        auto  BM = ptrcast( &M, hpro::TBlockMatrix< value_t > );
+        auto  BM = ptrcast( &M, Hpro::TBlockMatrix< value_t > );
 
         //
         // restrict set of updates for all subblocks
@@ -845,13 +869,17 @@ lu ( hpro::TMatrix< value_t > &  M,
     }// if
     else
     {
-        if ( is_dense( M ) )
+        if ( matrix::is_dense( M ) )
         {
             accu.apply_leaf( value_t(-1), M, acc, approx );
         
-            auto  D = ptrcast( &M, hpro::TDenseMatrix< value_t > );
+            auto  D  = ptrcast( &M, matrix::dense_matrix< value_t > );
+            auto  DD = D->mat();
 
-            invert< value_t >( *D );
+            blas::invert( DD );
+        
+            if ( D->is_compressed() )
+                D->set_matrix( std::move( DD ), acc );
         }// if
         else
             HLR_ERROR( "unsupported matrix type : " + M.typestr() );
@@ -863,8 +891,8 @@ lu ( hpro::TMatrix< value_t > &  M,
 template < typename value_t,
            typename approx_t >
 void
-lu ( hpro::TMatrix< value_t > &  M,
-     const hpro::TTruncAcc &     acc,
+lu ( Hpro::TMatrix< value_t > &  M,
+     const accuracy &            acc,
      const approx_t &            approx )
 {
     detail::lazy_accumulator< value_t >  accu;

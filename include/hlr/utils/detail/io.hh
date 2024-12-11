@@ -5,12 +5,14 @@
 // Module      : utils/io
 // Description : IO related functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <fstream>
 #include <filesystem>
 #include <array>
+
+#include <hpro/cluster/TGeomCluster.hh>
 
 #include <hlr/tensor/structured_tensor.hh>
 #include <hlr/tensor/tucker_tensor.hh>
@@ -313,6 +315,355 @@ h5_read_blas_tensor ( H5::H5File &         file,
 //
 //////////////////////////////////////////////////////////////////////
 
+inline
+void
+vtk_print_cluster ( const Hpro::TCluster &  cl,
+                    const uint              nlvl,
+                    const std::string &     filename )
+{
+    //
+    // collecting clusters for visualization
+    //
+
+    auto  current = std::list< const Hpro::TGeomCluster * >();
+    uint  lvl     = 0;
+
+    HLR_ASSERT( Hpro::is_geom_cluster( cl ) );
+    
+    current.push_back( cptrcast( &cl, Hpro::TGeomCluster ) );
+    
+    while ( lvl < nlvl )
+    {
+        auto  sons = std::list< const Hpro::TGeomCluster * >();
+
+        for ( auto  cluster : current )
+        {
+            for ( uint  i = 0; i < cluster->nsons(); ++i )
+            {
+                auto  son_i = cluster->son(i);
+
+                if ( is_null( son_i ) )
+                    continue;
+
+                HLR_ASSERT( Hpro::is_geom_cluster( son_i ) );
+                    
+                sons.push_back( cptrcast( son_i, Hpro::TGeomCluster ) );
+            }// for
+        }// for
+
+        current = std::move( sons );
+        ++lvl;
+    }// while
+
+    auto  clusters = std::move( current );
+    
+    std::cout << clusters.size() << std::endl;
+    
+    //
+    // print bounding boxes
+    //
+    // vertex order:
+    //
+    //     6───────7
+    //    ╱│      ╱│
+    //   4─┼─────5 │
+    //   │ 2─────┼─3
+    //   │╱      │╱
+    //   0───────1
+    //
+    
+    auto  outname = std::filesystem::path( filename );
+    auto  out     = std::ofstream( outname.has_extension() ? filename : filename + ".vtk", std::ios::binary );
+    
+    out << "# vtk DataFile Version 2.0" << std::endl
+        << "HLR cluster tree" << std::endl
+        << "ASCII" << std::endl
+        << "DATASET UNSTRUCTURED_GRID" << std::endl;
+
+    const size_t  nc = clusters.size();
+
+    if constexpr ( std::same_as< Hpro::TBoundingVolume, Hpro::TBBox > )
+    {
+        out << "POINTS " << 8*nc << " FLOAT" << std::endl;
+
+        for ( auto  cluster : clusters )
+        {
+            auto  bbmin = cluster->bvol().min();
+            auto  bbmax = cluster->bvol().max();
+            
+            HLR_ASSERT(( bbmin.dim() == 3 ) && ( bbmax.dim() == 3 ));
+        
+            out << bbmin[0] << ' ' << bbmin[1] << ' ' << bbmin[2] << std::endl
+                << bbmax[0] << ' ' << bbmin[1] << ' ' << bbmin[2] << std::endl
+                << bbmin[0] << ' ' << bbmax[1] << ' ' << bbmin[2] << std::endl
+                << bbmax[0] << ' ' << bbmax[1] << ' ' << bbmin[2] << std::endl
+                << bbmin[0] << ' ' << bbmin[1] << ' ' << bbmax[2] << std::endl
+                << bbmax[0] << ' ' << bbmin[1] << ' ' << bbmax[2] << std::endl
+                << bbmin[0] << ' ' << bbmax[1] << ' ' << bbmax[2] << std::endl
+                << bbmax[0] << ' ' << bbmax[1] << ' ' << bbmax[2] << std::endl;
+        }// for
+        
+        out << "CELLS " << nc << ' ' << 9 * nc << std::endl;
+        
+        for ( size_t  i = 0; i < nc; ++i )
+            out << "8 "
+                << 8*i   << ' '
+                << 8*i+1 << ' '
+                << 8*i+2 << ' '
+                << 8*i+3 << ' '
+                << 8*i+4 << ' '
+                << 8*i+5 << ' '
+                << 8*i+6 << ' '
+                << 8*i+7 << std::endl;
+        
+        out << "CELL_TYPES " << nc << std::endl;
+        
+        for ( size_t  i = 0; i < nc; ++i )
+            out << "11 ";
+        out << std::endl;
+        
+        out << "CELL_DATA " << nc << std::endl
+            << "COLOR_SCALARS label 1" << std::endl;
+    }// if
+    
+    uint  label = 1;
+
+    for ( auto  cluster : clusters )
+    {
+        out << label << " ";
+        ++label;
+    }// for
+    out << std::endl;
+}
+
+inline
+void
+vtk_print_cluster ( const Hpro::TCoordinate &   coord,
+                    const Hpro::TCluster &      cl,
+                    const Hpro::TPermutation &  i2e,
+                    const uint                  nlvl,
+                    const std::string &         filename )
+{
+    //
+    // collecting clusters
+    //
+
+    auto  current  = std::list< const Hpro::TGeomCluster * >();
+    uint  lvl      = 0;
+
+    HLR_ASSERT( Hpro::is_geom_cluster( cl ) );
+    
+    current.push_back( cptrcast( &cl, Hpro::TGeomCluster ) );
+    
+    while ( lvl < nlvl )
+    {
+        auto  sons = std::list< const Hpro::TGeomCluster * >();
+
+        for ( auto  cluster : current )
+        {
+            for ( uint  i = 0; i < cluster->nsons(); ++i )
+            {
+                auto  son_i = cluster->son(i);
+
+                if ( is_null( son_i ) )
+                    continue;
+
+                HLR_ASSERT( Hpro::is_geom_cluster( son_i ) );
+                    
+                sons.push_back( cptrcast( son_i, Hpro::TGeomCluster ) );
+            }// for
+        }// for
+
+        current = std::move( sons );
+        ++lvl;
+    }// while
+
+    auto    clusters = std::move( current );
+    size_t  ncoord   = 0;
+    
+    for ( auto  cluster : clusters )
+        ncoord += cluster->size();
+
+    //
+    // print (labeled) coordinates
+    //
+
+    auto  outname = std::filesystem::path( filename );
+    auto  out     = std::ofstream( outname.has_extension() ? filename : filename + ".vtk", std::ios::binary );
+    
+    out << "# vtk DataFile Version 2.0" << std::endl
+        << "HLR coordinates" << std::endl
+        << "ASCII" << std::endl
+        << "DATASET UNSTRUCTURED_GRID" << std::endl
+        << "POINTS " << ncoord << " FLOAT" << std::endl;
+
+    for ( auto  cluster : clusters )
+    {
+        for ( idx_t  idx = cluster->first(); idx <= cluster->last(); ++idx )
+        {
+            const auto  pidx = i2e.permute( idx );
+            const auto  vtx  = coord.coord( pidx );
+
+            out << vtx[0] << " " << vtx[1] << " " << vtx[2] << std::endl;
+        }// for
+    }// for
+
+    out << "CELLS " << ncoord << " " << 2 * ncoord << std::endl;
+    
+    for ( size_t  i = 0; i < ncoord; ++i )
+        out << "1 " << i << " ";
+
+    out << std::endl;
+
+    out << "CELL_TYPES " << ncoord << std::endl;
+
+    for ( size_t  i = 0; i < ncoord; ++i )
+        out << "1 ";
+
+    out << std::endl;
+
+    out << "CELL_DATA " << ncoord << std::endl
+        << "COLOR_SCALARS label 1" << std::endl;
+    
+    uint  label = 1;
+
+    for ( auto  cluster : clusters )
+    {
+        for ( idx_t  idx = cluster->first(); idx <= cluster->last(); ++idx )
+            out << label << " ";
+        out << std::endl;
+
+        ++label;
+    }// for
+}
+
+inline
+void
+vtk_print_cluster ( const Hpro::TBlockCluster &  bc,
+                    const Hpro::TCoordinate &    coord,
+                    const Hpro::TPermutation &   pi2e,
+                    const std::string &          filename )
+{
+    //
+    // compute bounding boxes of row/column clusters
+    //
+
+    auto  dim   = coord.dim();
+    auto  rowcl = bc.rowcl();
+    auto  colcl = bc.colcl();
+    auto  rmin  = Hpro::TPoint( dim, coord.coord( pi2e.permute( rowcl->first() ) ) );
+    auto  rmax  = Hpro::TPoint( dim, coord.coord( pi2e.permute( rowcl->first() ) ) );
+    auto  cmin  = Hpro::TPoint( dim, coord.coord( pi2e.permute( colcl->first() ) ) );
+    auto  cmax  = Hpro::TPoint( dim, coord.coord( pi2e.permute( colcl->first() ) ) );
+
+    for ( idx_t  i = rowcl->first(); i <= rowcl->last(); ++i )
+    {
+        auto  c_i = coord.coord( pi2e.permute( i ) );
+
+        for ( uint  j = 0; j < dim; ++j )
+        {
+            rmin[j] = std::min( rmin[j], c_i[j] );
+            rmax[j] = std::max( rmax[j], c_i[j] );
+        }// for
+    }// for
+    
+    for ( idx_t  i = colcl->first(); i <= colcl->last(); ++i )
+    {
+        auto  c_i = coord.coord( pi2e.permute( i ) );
+
+        for ( uint  j = 0; j < dim; ++j )
+        {
+            cmin[j] = std::min( cmin[j], c_i[j] );
+            cmax[j] = std::max( cmax[j], c_i[j] );
+        }// for
+    }// for
+    
+    //
+    // print (labeled) coordinates
+    //
+
+    auto  outname = std::filesystem::path( filename );
+    auto  out     = std::ofstream( outname.has_extension() ? filename : filename + ".vtk", std::ios::binary );
+    auto  ncoord  = rowcl->size() + colcl->size();
+    
+    out << "# vtk DataFile Version 2.0" << std::endl
+        << "HLR coordinates" << std::endl
+        << "ASCII" << std::endl
+        << "DATASET UNSTRUCTURED_GRID" << std::endl
+        << "POINTS " << ncoord + 2*8 << " FLOAT" << std::endl;
+
+    // first the bounding boxes
+    if ( dim == 3 )
+    {
+        out << rmin[0] << ' ' << rmin[1] << ' ' << rmin[2] << std::endl
+            << rmax[0] << ' ' << rmin[1] << ' ' << rmin[2] << std::endl
+            << rmin[0] << ' ' << rmax[1] << ' ' << rmin[2] << std::endl
+            << rmax[0] << ' ' << rmax[1] << ' ' << rmin[2] << std::endl
+            << rmin[0] << ' ' << rmin[1] << ' ' << rmax[2] << std::endl
+            << rmax[0] << ' ' << rmin[1] << ' ' << rmax[2] << std::endl
+            << rmin[0] << ' ' << rmax[1] << ' ' << rmax[2] << std::endl
+            << rmax[0] << ' ' << rmax[1] << ' ' << rmax[2] << std::endl;
+
+        out << cmin[0] << ' ' << cmin[1] << ' ' << cmin[2] << std::endl
+            << cmax[0] << ' ' << cmin[1] << ' ' << cmin[2] << std::endl
+            << cmin[0] << ' ' << cmax[1] << ' ' << cmin[2] << std::endl
+            << cmax[0] << ' ' << cmax[1] << ' ' << cmin[2] << std::endl
+            << cmin[0] << ' ' << cmin[1] << ' ' << cmax[2] << std::endl
+            << cmax[0] << ' ' << cmin[1] << ' ' << cmax[2] << std::endl
+            << cmin[0] << ' ' << cmax[1] << ' ' << cmax[2] << std::endl
+            << cmax[0] << ' ' << cmax[1] << ' ' << cmax[2] << std::endl;
+    }// if
+
+    // now the coordinates in the clusters
+    for ( idx_t  i = rowcl->first(); i <= rowcl->last(); ++i )
+    {
+        auto  vtx = coord.coord( pi2e.permute( i ) );
+
+        if ( dim == 3 )
+            out << vtx[0] << " " << vtx[1] << " " << vtx[2] << std::endl;
+    }// for
+    
+    for ( idx_t  i = colcl->first(); i <= colcl->last(); ++i )
+    {
+        auto  vtx = coord.coord( pi2e.permute( i ) );
+
+        if ( dim == 3 )
+            out << vtx[0] << " " << vtx[1] << " " << vtx[2] << std::endl;
+    }// for
+
+    out << "CELLS " << ncoord + 2 << " " << 2 * ncoord + 2*9 << std::endl;
+    
+    out << "8 0 1 2 3 4 5 6 7" << std::endl;
+    out << "8 8 9 10 11 12 13 14 15" << std::endl;
+    
+    for ( size_t  i = 0; i < ncoord; ++i )
+        out << "1 " << i << " ";
+
+    out << std::endl;
+
+    out << "CELL_TYPES " << ncoord + 2 << std::endl;
+
+    out << "11 11 ";
+    
+    for ( size_t  i = 0; i < ncoord; ++i )
+        out << "1 ";
+
+    out << std::endl;
+
+    out << "CELL_DATA " << ncoord + 2 << std::endl
+        << "COLOR_SCALARS label 1" << std::endl;
+    
+    out << 1 << ' ' << 2 << ' ';
+    
+    for ( idx_t  i = rowcl->first(); i <= rowcl->last(); ++i )
+        out << 1 << ' ';
+    
+    for ( idx_t  i = colcl->first(); i <= colcl->last(); ++i )
+        out << 2 << ' ';
+
+    out << std::endl;
+}
+
 template < typename value_t >
 void
 vtk_print_full_tensor ( const blas::tensor3< value_t > &  t,
@@ -394,8 +745,30 @@ vtk_print_full_tensor ( const blas::tensor3< value_t > &  t,
         //
         // write all directly
         //
+
+        if constexpr ( std::same_as< value_t, double > )
+        {
+            out.write( reinterpret_cast< const char * >( t.data() ), t.size(0) * t.size(1) * t.size(2) * sizeof(value_t) );
+        }// if
+        else
+        {
+            //
+            // convert to double
+            //
         
-        out.write( reinterpret_cast< const char * >( t.data() ), t.size(0) * t.size(1) * t.size(2) * sizeof(value_t) );
+            auto  buf = std::vector< double >( t.size(0) );
+    
+            for ( size_t  l = 0; l < t.size(2); ++l )
+            {
+                for ( size_t  j = 0; j < t.size(1); ++j )
+                {
+                    for ( size_t  i = 0; i < t.size(0); ++i )
+                        buf[i] = double( t(i,j,l) );
+
+                    out.write( reinterpret_cast< const char * >( buf.data() ), buf.size() * sizeof(double) );
+                }// for
+            }// for
+        }// else
     }// if
     else
     {
@@ -424,7 +797,7 @@ vtk_print_full_tensor ( const blas::tensor3< value_t > &  t,
                 for ( size_t  i = 0; i < t.size(0); ++i )
                     buf[i] = change_endian( t(i,j,l) );
 
-                out.write( reinterpret_cast< const char * >( buf.data() ), t.size(0) * sizeof(value_t) );
+                out.write( reinterpret_cast< const char * >( buf.data() ), buf.size() * sizeof(double) );
             }// for
         }// for
     }// else
@@ -455,12 +828,12 @@ vtk_print_full_tensor ( const blas::tensor3< value_t > &  t,
                 out << i * h << ' ' << j * h << ' ' << l * h << std::endl;
 
     //
-    //     6-------7
-    //    /|      /|
-    //   4-------5 |
-    //   | 2-----|-3
-    //   |/      |/
-    //   0 ----- 1
+    //     6───────7
+    //    ╱│      ╱│
+    //   4─┼─────5 │
+    //   │ 2─────┼─3
+    //   │╱      │╱
+    //   0───────1
     //
             
     out << "CELLS " << nc << ' ' << 9 * nc << std::endl;

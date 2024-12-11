@@ -3,7 +3,7 @@
 // Program     : compress-lu
 // Description : LU factorization with compressed matrix blocks
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <hlr/utils/io.hh>
@@ -557,9 +557,9 @@ program_main ()
             }
         };
 
-    if      ( cmdline::approx == "default" ) comp_lu( approx::SVD< value_t >(),  "SVD" );
-    else if ( cmdline::approx == "svd"     ) comp_lu( approx::SVD< value_t >(),  "SVD" );
-    // else if ( cmdline::approx == "rrqr"    ) comp_lu( approx::RRQR< value_t >(), "RRQR" );
-    // else if ( cmdline::approx == "randsvd" ) comp_lu( approx::RandSVD< value_t >(), "RandSVD" );
+    if      ( cmdline::aapprox == "default" ) comp_lu( approx::SVD< value_t >(),  "SVD" );
+    else if ( cmdline::aapprox == "svd"     ) comp_lu( approx::SVD< value_t >(),  "SVD" );
+    else if ( cmdline::aapprox == "rrqr"    ) comp_lu( approx::RRQR< value_t >(), "RRQR" );
+    else if ( cmdline::aapprox == "randsvd" ) comp_lu( approx::RandSVD< value_t >(), "RandSVD" );
 }
     

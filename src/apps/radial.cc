@@ -3,7 +3,7 @@
 // Module      : apps/radial
 // Description : use radial kernel functions to fill matrix
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <cmath>
@@ -108,18 +108,18 @@ make_vertices ( const std::string &  gridfile )
         {
             vertices.reserve( nsize * nsize * nsize );
             
-            const double  h = 1.0 / double(nsize);
+            const double  h = 1.0 / double(nsize-1);
 
-            for ( size_t  x = 0; x < nsize; ++x )
+            for ( size_t  z = 0; z < nsize; ++z )
                 for ( size_t  y = 0; y < nsize; ++y )
-                    for ( size_t  z = 0; z < nsize; ++z )
+                    for ( size_t  x = 0; x < nsize; ++x )
                         vertices.push_back( point_t( x * h, y * h, z * h ) );
         }// if
         else if ( geometry == "jittercube" )
         {
             vertices.reserve( nsize * nsize * nsize );
             
-            const double                      h = 1.0 / double(nsize);
+            const double                      h = 1.0 / double(nsize-1);
             std::mt19937_64                   generator{ 1 };
             std::uniform_real_distribution<>  distr{ -h/2.0, h/2.0 };
 

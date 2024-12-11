@@ -3,7 +3,7 @@
 // Module      : matrix/print
 // Description : printing functions for matrices
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <list>
@@ -18,20 +18,39 @@
 #include <hpro/matrix/TDenseMatrix.hh>
 #include <hpro/matrix/TRkMatrix.hh>
 
-#if defined(USE_LIC_CHECK)  // hack to test for full HLIBpro
-#include <hpro/matrix/TUniformMatrix.hh>
-#endif
-
 #include <hlr/matrix/lrmatrix.hh>
 #include <hlr/matrix/lrsvmatrix.hh>
 #include <hlr/matrix/uniform_lrmatrix.hh>
+#include <hlr/matrix/uniform_lr2matrix.hh>
 #include <hlr/matrix/h2_lrmatrix.hh>
+#include <hlr/matrix/h2_lr2matrix.hh>
 #include <hlr/matrix/dense_matrix.hh>
 #include <hlr/matrix/sparse_matrix.hh>
 #include <hlr/utils/eps_printer.hh>
 #include <hlr/utils/tools.hh>
 
 #include <hlr/matrix/print.hh>
+
+namespace hlr { namespace io { namespace eps {
+
+void
+print ( const Hpro::TBlockCluster &  cl,
+        const std::string &          filename,
+        const std::string &          options )
+{
+    std::vector< std::string >  optarr;
+
+    boost::split( optarr, options, [] ( char c ) { return c == ','; } );
+
+    Hpro::TPSBlockClusterVis  vis;
+
+    if ( contains( optarr, "id" ) )      vis.id( true );
+    if ( contains( optarr, "innerid" ) ) vis.inner_id( true );
+    
+    vis.print( & cl, filename );
+}
+
+}}}// hlr::io::eps
 
 namespace hlr { namespace matrix {
 
@@ -90,7 +109,45 @@ const uint colors[] = {
     0x204A87,   // id (SkyBlue3)
     0x000000    // pattern
 };
+
+//
+// print singular values
+//
+template < typename value_t >
+void
+print_sv ( eps_printer &                                    prn,
+           const Hpro::TMatrix< value_t > &                 M,
+           const blas::vector< real_type_t< value_t > > &   S )
+{
+    const auto  k = S.length();
+
+    if ( k == 0 )
+        return;
     
+    const auto  max_k  = std::log10( S(0) );
+    const auto  min_k  = std::log10( S(k-1) / 5.0 );
+    const auto  rbrd   = std::min( 75.0, M.nrows() * 0.1 );
+    const auto  cbrd   = std::min( 75.0, M.ncols() * 0.1 );
+    
+    prn.save();
+    
+    prn.translate( M.col_ofs()             + cbrd,
+                   M.row_ofs() + M.nrows() - rbrd );
+
+    prn.scale(  ( M.ncols() - 2 * cbrd ) / double(k),
+               -( M.nrows() - 2 * rbrd ) / ( max_k - min_k + 1.0 ) );
+        
+    for ( uint  i = 0; i < k; i++ )
+    {
+        const auto  y = std::log10( S(i) ) - min_k + 1;
+
+        if ( y > 0.0 )
+            prn.fill_rect( 0, 0, i+1, y );
+    }// for
+
+    prn.restore();
+}
+
 //
 // actual print function
 //
@@ -215,6 +272,73 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
                                M.col_ofs() + M.ncols(),
                                M.row_ofs() + M.nrows() );
 
+                if ( contains( options, "sv" ) )
+                {
+                    auto  U = R->U();
+                    auto  V = R->V();
+
+                    if ( U.ncols() > 0 )
+                    {
+                        auto  S = blas::sv( U, V );
+                    
+                        prn.set_gray( 128 );
+                        print_sv( prn, M, S );
+                    }// if
+                }// if
+
+                if ( ! contains( options, "norank" ) )
+                {
+                    prn.save();
+                    prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 4.0 ) );
+                    
+                    prn.set_rgb( colors[HLR_COLOR_FG_RANK] );
+                    prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
+                                   double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
+                                   Hpro::to_string( "%d", rank ) );
+                    
+                    prn.restore();
+                }// if
+
+                if ( contains( options, "pattern" ) )
+                {
+                    auto  D = blas::prod( R->U(), blas::adjoint( R->V() ) );
+                    
+                    prn.set_gray( 0 );
+                
+                    for ( uint  i = 0; i < D.nrows(); ++i )
+                        for ( uint  j = 0; j < D.ncols(); ++j )
+                            if ( D(i,j) != value_t(0) )
+                                prn.fill_rect( j     + M.col_ofs(), i     + M.row_ofs(),
+                                               j + 1 + M.col_ofs(), i + 1 + M.row_ofs() );
+                }// if
+            }// if
+        }// if
+        else if ( matrix::is_lowrank_sv( M ) )
+        {
+            auto  R    = cptrcast( &M, matrix::lrsvmatrix< value_t > );
+            auto  rank = R->rank();
+
+            if ( ! contains( options, "nonempty" ) || ( rank > 0 ))
+            {
+                if ( R->is_compressed() ) prn.set_rgb( colors[HLR_COLOR_BG_LOWRANK_COMPRESSED] );
+                else                      prn.set_rgb( colors[HLR_COLOR_BG_LOWRANK] );
+
+                prn.fill_rect( M.col_ofs(),
+                               M.row_ofs(),
+                               M.col_ofs() + M.ncols(),
+                               M.row_ofs() + M.nrows() );
+
+                if ( contains( options, "sv" ) )
+                {
+                    auto  S = R->S();
+
+                    if ( S.length() > 0 )
+                    {
+                        prn.set_gray( 128 );
+                        print_sv( prn, M, S );
+                    }// if
+                }// if
+
                 if ( ! contains( options, "norank" ) )
                 {
                     prn.save();
@@ -247,7 +371,9 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
             auto  R = cptrcast( &M, matrix::uniform_lrmatrix< value_t > );
 
             // background
-            prn.set_rgb( colors[HLR_COLOR_BG_UNIFORM] );
+            if ( R->is_compressed() ) prn.set_rgb( colors[HLR_COLOR_BG_UNIFORM_COMPRESSED] );
+            else                      prn.set_rgb( colors[HLR_COLOR_BG_UNIFORM] );
+
             prn.fill_rect( M.col_ofs(),
                            M.row_ofs(),
                            M.col_ofs() + M.ncols(),
@@ -262,6 +388,32 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
                 prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
                                double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
                                Hpro::to_string( "%dx%d", R->row_rank(), R->col_rank() ) );
+                
+                prn.restore();
+            }// if
+        }// if
+        else if ( matrix::is_uniform_lowrank2( M ) )
+        {
+            auto  R = cptrcast( &M, matrix::uniform_lr2matrix< value_t > );
+
+            // background
+            if ( R->is_compressed() ) prn.set_rgb( colors[HLR_COLOR_BG_UNIFORM_COMPRESSED] );
+            else                      prn.set_rgb( colors[HLR_COLOR_BG_UNIFORM] );
+
+            prn.fill_rect( M.col_ofs(),
+                           M.row_ofs(),
+                           M.col_ofs() + M.ncols(),
+                           M.row_ofs() + M.nrows() );
+
+            if ( ! contains( options, "norank" ) )
+            {
+                prn.save();
+                prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 7.0 ) );
+                
+                prn.set_rgb( colors[HLR_COLOR_FG_RANK] );
+                prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
+                               double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
+                               Hpro::to_string( "%dx%dx%d", R->row_rank(), R->rank(), R->col_rank() ) );
                 
                 prn.restore();
             }// if
@@ -270,7 +422,9 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
         {
             auto  R = cptrcast( &M, matrix::h2_lrmatrix< value_t > );
 
-            prn.set_rgb( colors[HLR_COLOR_BG_H2] );
+            if ( R->is_compressed() ) prn.set_rgb( colors[HLR_COLOR_BG_H2_COMPRESSED] );
+            else                      prn.set_rgb( colors[HLR_COLOR_BG_H2] );
+
             prn.fill_rect( M.col_ofs(),
                            M.row_ofs(),
                            M.col_ofs() + M.ncols(),
@@ -289,12 +443,13 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
                 prn.restore();
             }// if
         }// if
-        #if defined(USE_LIC_CHECK)
-        else if ( Hpro::is_uniform( &M ) )
+        else if ( matrix::is_h2_lowrank2( &M ) )
         {
-            auto  R = cptrcast( &M, Hpro::TUniformMatrix< value_t > );
+            auto  R = cptrcast( &M, matrix::h2_lr2matrix< value_t > );
 
-            prn.set_rgb( colors[HLR_COLOR_BG_H2] );
+            if ( R->is_compressed() ) prn.set_rgb( colors[HLR_COLOR_BG_H2_COMPRESSED] );
+            else                      prn.set_rgb( colors[HLR_COLOR_BG_H2] );
+
             prn.fill_rect( M.col_ofs(),
                            M.row_ofs(),
                            M.col_ofs() + M.ncols(),
@@ -303,17 +458,16 @@ print_eps ( const Hpro::TMatrix< value_t > &    M,
             if ( ! contains( options, "norank" ) )
             {
                 prn.save();
-                prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 4.0 ) );
+                prn.set_font( "Helvetica", std::max( 1.0, double( std::min(M.nrows(),M.ncols()) ) / 7.0 ) );
                 
                 prn.set_rgb( colors[HLR_COLOR_FG_RANK] );
                 prn.draw_text( double(M.col_ofs()) + (double(M.cols()) / 14.0),
                                double(M.row_ofs() + M.rows()) - (double(M.rows()) / 14.0),
-                               Hpro::to_string( "%dx%d", R->row_rank(), R->col_rank() ) );
+                               Hpro::to_string( "%dx%dx%d", R->row_rank(), R->rank(), R->col_rank() ) );
                 
                 prn.restore();
             }// if
         }// if
-        #endif
         else if ( is_sparse( M ) )
         {
             auto  S = cptrcast( &M, Hpro::TSparseMatrix< value_t > );

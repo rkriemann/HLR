@@ -5,7 +5,7 @@
 // Module      : norm
 // Description : norm related functions
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <hpro/matrix/TMatrix.hh>
@@ -76,7 +76,7 @@ frobenius ( const alpha_t                     alpha,
             const beta_t                      beta,
             const Hpro::TMatrix< value_t > &  B )
 {
-    return std::sqrt( detail::frobenius_squared( value_t(alpha), A, value_t(beta), B ) );
+    return std::sqrt( detail::frobenius_squared( alpha, A, beta, B ) );
 }
 
 ////////////////////////////////////////////////////////////////////////////////

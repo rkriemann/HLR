@@ -5,7 +5,7 @@
 // Module      : arith/blas
 // Description : basic linear algebra functions for eigenvalue computations
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <hlr/arith/blas.hh>
@@ -20,8 +20,16 @@ namespace hlr { namespace blas {
 
 struct eigen_stat
 {
-    uint  nsweeps   = 0;
-    bool  converged = false;
+    uint    nsweeps   = 0;
+    bool    converged = false;
+    double  error     = -1;
+
+    void reset ()
+    {
+        nsweeps   = 0;
+        converged = false;
+        error     = -1;
+    }
 };
 
 //
@@ -228,7 +236,7 @@ make_diag_dom ( matrix< value_t > &                                M,
 
     while ( ! converged && ( sweep < max_sweeps ))
     {
-        real_t  max_err = 0.0;
+        real_t  max_err = real_t(0);
         
         sweep++;
         converged = true;
@@ -279,8 +287,8 @@ make_diag_dom ( matrix< value_t > &                                M,
         //
         
         const auto  xi = (b - a) / ( value_t(2) * c );
-        const auto  t  = ( math::sign( xi ) / ( std::abs(xi) + std::sqrt( 1.0 + xi*xi ) ) );
-        const auto  cs = value_t(1) / std::sqrt( 1.0 + t*t );
+        const auto  t  = ( math::sign( xi ) / ( std::abs(xi) + std::sqrt( value_t(1) + xi*xi ) ) );
+        const auto  cs = value_t(1) / std::sqrt( value_t(1) + t*t );
         const auto  sn = cs * t;
         
         M(i,i) = a - c * t;
@@ -342,13 +350,12 @@ make_diag_dom ( matrix< value_t > &                                M,
 }
 
 //
-// compute eigenvalues and eigenvectors of M using DPT iteration.
-// - algorithm from "Lapack Working Notes 15"
+// compute eigenvalues and eigenvectors of M using IPT iteration.
 //
 template < typename value_t >
 std::pair< blas::vector< value_t >,
            blas::matrix< value_t > >
-eigen_dpt ( matrix< value_t > &                                M,
+eigen_ipt ( matrix< value_t > &                                M,
             const size_t                                       amax_sweeps = 0,
             const typename hpro::real_type< value_t >::type_t  atolerance  = 0,
             const std::string &                                error_type  = "frobenius",
@@ -359,6 +366,9 @@ eigen_dpt ( matrix< value_t > &                                M,
 
     // assumption
     HLR_ASSERT( M.nrows() == M.ncols() );
+    
+    if ( ! is_null( stat ) )
+        stat->reset();
     
     const auto    nrows      = M.nrows();
     const real_t  tolerance  = ( atolerance  > 0 ? atolerance : real_t(10) * std::numeric_limits< real_t >::epsilon() );
@@ -378,17 +388,15 @@ eigen_dpt ( matrix< value_t > &                                M,
     }// for
 
     //
-    // compute I - Θ⊗M with Θ_ij = 1 / ( m_ii - m_jj )
+    // compute I + Θ⊗M with Θ_ij = 1 / ( m_ii - m_jj ), i ≠ j
     //
     auto  hmul_theta =  [&diag_M] ( matrix< value_t > &  A )
                         {
                             for ( size_t  j = 0; j < A.ncols(); ++j )
                                 for ( size_t  i = 0; i < A.nrows(); ++i )
                                 {
-                                    if ( i == j )
-                                        A(i,j)  =   value_t(1);
-                                    else
-                                        A(i,j) *= - value_t(1) / ( diag_M(i) - diag_M(j) );
+                                    if ( i == j ) A(i,j)  = value_t(1); // Θ_ii = 0 ⇒ (Θ⊗M)_ii = 0
+                                    else          A(i,j) *= value_t(1) / ( diag_M(i) - diag_M(j) );
                                 }// for
                         };
 
@@ -400,18 +408,17 @@ eigen_dpt ( matrix< value_t > &                                M,
     uint    sweep     = 0;
 
     if ( ! is_null( stat ) )
-    {
-        stat->nsweeps   = 0;
-        stat->converged = false;
-    }// if
+        stat->reset();
     
     do
     {
         // T = Δ·V
         blas::prod( value_t(1), Delta, V, value_t(0), T );
+
+        // io::matlab::write( T, Hpro::to_string( "Ta%d", sweep ) );
         
-        // T = Δ·V - V·diag(Δ·V) = T - V·diag(T) 
-        // computed as T(i,:) = T(i,:) - T(i,i) · V(i,:)
+        // T = V·diag(Δ·V) - Δ·V = V·diag(T) - T
+        // computed as T(i,:) = T(i,i) · V(:,i) - T(:,i)
         for ( size_t  i = 0; i < nrows; ++i )
             diag_T(i) = T(i,i);
         
@@ -420,12 +427,17 @@ eigen_dpt ( matrix< value_t > &                                M,
             auto  V_i = V.column(i);
             auto  T_i = T.column(i);
 
-            blas::add( -diag_T(i), V_i, T_i );
+            blas::scale( value_t(-1), T_i );
+            blas::add( diag_T(i), V_i, T_i );
         }// for
 
-        // I - Θ ∗ (Δ·V - V·diag(Δ·V)) = I - Θ ∗ T
+        // io::matlab::write( T, Hpro::to_string( "Tb%d", sweep ) );
+        
+        // I - Θ ∗ (V·diag(Δ·V) - Δ·V) = I - Θ ∗ T
         hmul_theta( T );
 
+        // io::matlab::write( T, Hpro::to_string( "Tc%d", sweep ) );
+        
         //
         // compute error ||V-T||_F
         //
@@ -457,7 +469,7 @@ eigen_dpt ( matrix< value_t > &                                M,
             // for ( int  i = 0; i < n; ++i )
             // {
             //     axpy( n, -E[i], T.data() + i*n, 1, V.data() + i*n, 1 );
-            //     M[ i*n+i ] = 0.0; // reset diagonal for Delta
+            //     M[ i*n+i ] = value_t(0); // reset diagonal for Delta
             // }// for
             
             // error = normF( n, n, V ) / ( M_norm * norm1( n, n, T ) );
@@ -471,6 +483,8 @@ eigen_dpt ( matrix< value_t > &                                M,
 
         copy( T, V );
 
+        // io::matlab::write( V, Hpro::to_string( "V%d", sweep ) );
+        
         if ( verbosity >= 1 )
         {
             std::cout << "    sweep " << sweep << " : error = " << error;
@@ -481,7 +495,7 @@ eigen_dpt ( matrix< value_t > &                                M,
             std::cout << std::endl;
         }// if
 
-        if (( sweep > 0 ) && ( error / old_error > 10.0 ))
+        if (( sweep > 0 ) && ( error / old_error > real_t(10) ))
             return { vector< value_t >(), matrix< value_t >() };
         
         old_error = error;
@@ -550,7 +564,7 @@ svd_jac ( matrix< value_t > &                                      M,
         V = std::move( matrix< value_t >( minrc, ncols ) );
     
     for ( size_t  i = 0; i < minrc; i++ )
-        V(i,i) = 1.0;
+        V(i,i) = value_t(1);
 
     while ( ! converged and (( max_sweeps > 0 ) && ( sweep < max_sweeps )) )
     {
@@ -582,8 +596,8 @@ svd_jac ( matrix< value_t > &                                      M,
                 //
 
                 const auto  xi = (b - a) / ( value_t(2) * c );
-                const auto  t  = ( math::sign( xi ) / ( std::abs(xi) + std::sqrt( 1.0 + xi*xi ) ) );
-                const auto  cs = value_t(1) / std::sqrt( 1.0 + t*t );
+                const auto  t  = ( math::sign( xi ) / ( std::abs(xi) + std::sqrt( value_t(1) + xi*xi ) ) );
+                const auto  cs = value_t(1) / std::sqrt( value_t(1) + t*t );
                 const auto  sn = cs * t;
 
                 //
@@ -634,7 +648,7 @@ svd_jac ( matrix< value_t > &                                      M,
         }// if
         else
         {
-            S(i) = 0.0;
+            S(i) = real_t(0);
             fill( value_t(0), m_i );
 
             auto  v_i = V.column(i);

@@ -5,7 +5,7 @@
 // Module      : apps/helmholtz
 // Description : functions for Helmholtz SLP/DLP BEM application
 // Author      : Ronald Kriemann
-// Copyright   : Max Planck Institute MIS 2004-2023. All Rights Reserved.
+// Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
 #include <memory>
@@ -24,6 +24,9 @@ public:
     // public types
     using  value_t = std::complex< double >;
 
+    // signal support for HCA based construction
+    static constexpr bool supports_hca = true;
+
 private:
     // BEM data
     std::unique_ptr< Hpro::TGrid >                     _grid;
@@ -33,7 +36,8 @@ private:
 public:
     // ctor with grid name (plus refinement levels)
     helmholtz_slp ( const std::complex< double >  kappa,
-                    const std::string &           grid );
+                    const std::string &           grid,
+                    const double                  quad_error );
     
     // dtor
     virtual ~helmholtz_slp () {}
