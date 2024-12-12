@@ -278,6 +278,26 @@ write ( const blas::tensor3< value_t > &  t,
     #endif
 }
 
+template < typename value_t >
+void
+write ( const blas::tensor4< value_t > &  t,
+        const std::string &               tname,
+        const std::string &               fname = "" )
+{
+    #if defined(HLR_USE_HDF5)
+
+    const std::string  filename = ( fname == "" ? tname + ".h5" : fname );
+    auto               file     = H5::H5File( filename, H5F_ACC_TRUNC );
+    
+    detail::h5_write_tensor( file, tname, t );
+
+    #else
+
+    HLR_ERROR( "no HDF5 support available" );
+    
+    #endif
+}
+
 template < blas::matrix_type  T >
 T
 read ( const std::string &  filename )
@@ -302,7 +322,16 @@ read ( const std::string &  filename = "" )
     
     auto  file = H5::H5File( filename, H5F_ACC_RDONLY );
 
-    return  detail::h5_read_blas_tensor< value_t >( file, "" );
+    if constexpr ( std::same_as< T, blas::tensor3< value_t > > )
+    {
+        return  detail::h5_read_blas_tensor3< value_t >( file, "" );
+    }// if
+    else if constexpr ( std::same_as< T, blas::tensor4< value_t > > )
+    {
+        return  detail::h5_read_blas_tensor4< value_t >( file, "" );
+    }// if
+    else
+        HLR_ERROR( "unsupported tensor type" );
 
     #else
 
