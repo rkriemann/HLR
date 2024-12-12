@@ -36,6 +36,17 @@ std::tuple< tensor3< value_t >,
 hosvd ( const tensor3< value_t > &  X,
         const accuracy &            acc );
 
+template < typename                    value_t,
+           approx::approximation_type  approx_t >
+std::tuple< tensor4< value_t >,
+            matrix< value_t >,
+            matrix< value_t >,
+            matrix< value_t >,
+            matrix< value_t > >
+hosvd ( const tensor4< value_t > &  X,
+        const accuracy &            acc,
+        const approx_t &            apx );
+
 //
 // sequentially truncated HOSVD
 //
