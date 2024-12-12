@@ -39,6 +39,15 @@ template < typename T > inline constexpr bool is_tensor_v = is_tensor< T >::valu
 // tensor type concept
 template < typename T > concept tensor_type = is_tensor_v< T >;
 
+// stream output
+std::ostream &
+operator << ( std::ostream &            os,
+              const tensor_type auto &  M )
+{
+    print( M, os );
+    return os;
+}
+
 }}// namespace hlr::blas
 
 #include <hlr/arith/tensor3.hh>

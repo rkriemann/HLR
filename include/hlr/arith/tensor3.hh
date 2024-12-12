@@ -463,14 +463,6 @@ print ( const tensor3< value_t > &  t,
     }// for
 }
 
-std::ostream &
-operator << ( std::ostream &            os,
-              const tensor_type auto &  M )
-{
-    print( M, os );
-    return os;
-}
-
 ////////////////////////////////////////////////////////////////
 //
 // BLAS functions
