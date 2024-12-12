@@ -1010,9 +1010,9 @@ vtk_print_tensor ( const tensor::base_tensor3< value_t > &  t,
             voxels.push_back({ nvoxel, nvoxel+1, nvoxel+2, nvoxel+3, nvoxel+4, nvoxel+5, nvoxel+6, nvoxel+7 });
             nvoxel += 8;
 
-            if      ( tensor::is_tucker( *T ) ) colors.push_back( 1 );
-            else if ( tensor::is_dense(  *T ) ) colors.push_back( 2 );
-            else                                colors.push_back( 0 );
+            if      ( tensor::is_tucker_tensor3( *T ) ) colors.push_back( 1 );
+            else if ( tensor::is_dense_tensor3(  *T ) ) colors.push_back( 2 );
+            else                                        colors.push_back( 0 );
         }// else
     }// while
 

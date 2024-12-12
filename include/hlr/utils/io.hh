@@ -626,7 +626,7 @@ void
 print ( const tensor::base_tensor3< value_t > &  t,
         const std::string &                      filename )
 {
-    if ( tensor::is_dense( t ) )
+    if ( tensor::is_dense_tensor3( t ) )
         detail::vtk_print_full_tensor( cptrcast( &t, tensor::dense_tensor3< value_t > )->tensor(), filename );
     else
         detail::vtk_print_tensor( t, filename );

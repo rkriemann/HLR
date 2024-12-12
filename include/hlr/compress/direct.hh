@@ -658,6 +658,14 @@ compress ( const zconfig_t &                      config,
 
 template < typename value_t >
 zarray
+compress ( const zconfig_t &                      config,
+           const hlr::blas::tensor4< value_t > &  T )
+{
+    return compress< value_t >( config, T.data(), T.size(0), T.size(1), T.size(2), T.size(3) );
+}
+
+template < typename value_t >
+zarray
 compress ( const zconfig_t &                     config,
            const hlr::blas::matrix< value_t > &  M )
 {
@@ -678,6 +686,14 @@ decompress ( const zarray &                   zdata,
              hlr::blas::tensor3< value_t > &  T )
 {
     return decompress< value_t >( zdata, T.data(), T.size(0), T.size(1), T.size(2) );
+}
+
+template < typename value_t >
+void
+decompress ( const zarray &                   zdata,
+             hlr::blas::tensor4< value_t > &  T )
+{
+    return decompress< value_t >( zdata, T.data(), T.size(0), T.size(1), T.size(2), T.size(3) );
 }
 
 template < typename value_t >

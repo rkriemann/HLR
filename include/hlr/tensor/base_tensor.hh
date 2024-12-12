@@ -153,6 +153,135 @@ public:
     virtual std::string  typestr () const { return "base_tensor3"; }
 };
 
+template < typename T_value >
+class base_tensor4 : public compress::compressible
+{
+public:
+    using  value_t = T_value;
+    using  real_t  = Hpro::real_type_t< value_t >;
+
+    static constexpr uint  dimension = 4;
+
+private:
+    // globally unique id
+    int                        _id;
+
+    // index sets per dimensions
+    std::array< indexset, 4 >  _indexsets;
+
+public:
+    //
+    // ctors
+    //
+
+    base_tensor4 ()
+            : _id(-1)
+    {}
+
+    base_tensor4 ( const base_tensor4 &  t )
+            : _id( t._id )
+            , _indexsets( t._indexsets )
+    {}
+
+    base_tensor4 ( base_tensor4 &&  t )
+            : _id( std::move( t._id ) )
+            , _indexsets( std::move( t._indexsets ) )
+    {}
+
+    base_tensor4 ( const indexset &  is0,
+                   const indexset &  is1,
+                   const indexset &  is2,
+                   const indexset &  is3 )
+            : _id(-1)
+            , _indexsets{ is0, is1, is2, is3 }
+    {}
+    
+    base_tensor4 ( const std::array< indexset, 4 > &  ais )
+            : _id(-1)
+            , _indexsets{ ais[0], ais[1], ais[2], ais[3] }
+    {}
+    
+    // dtor
+    virtual ~base_tensor4 ()
+    {}
+
+    // assignment
+    base_tensor4 &  operator = ( const base_tensor4 &  t )
+    {
+        _id        = t._id;
+        _indexsets = t._indexsets;
+    }
+
+    base_tensor4 &  operator = ( base_tensor4 &&  t )
+    {
+        _indexsets = std::move( t._indexsets );
+
+        t._indexsets.fill( is( 0, -1 ) );
+    }
+
+    //
+    // access internal data
+    //
+
+    int       id   () const { return _id; }
+    
+    uint      rank ()                const { return dimension; }
+    size_t    dim  ( const uint  d ) const { HLR_DBG_ASSERT( d < dimension ); return _indexsets[d].size(); }
+    indexset  is   ( const uint  d ) const { HLR_DBG_ASSERT( d < dimension ); return _indexsets[d]; }
+    
+    //
+    // compression
+    //
+
+    // same but compress based on given accuracy
+    virtual void   compress      ( const accuracy &  /* acc */ ) { HLR_ERROR( "TODO" ); }
+
+    // decompress internal data
+    virtual void   decompress    ()  { HLR_ERROR( "TODO" ); }
+
+    // return true if data is compressed
+    virtual bool   is_compressed () const { return false; }
+
+    //
+    // misc
+    //
+
+    // return copy of local object
+    virtual
+    std::unique_ptr< base_tensor4< value_t > >
+    copy () const
+    {
+        auto  T = create();
+
+        T->_id        = _id;
+        T->_indexsets = _indexsets;
+
+        return T;
+    }
+    
+    // create object of same type but without data
+    virtual
+    std::unique_ptr< base_tensor4< value_t > >
+    create () const
+    {
+        return std::make_unique< base_tensor4< value_t > >();
+    }
+    
+    // return size in bytes used by this object
+    virtual
+    size_t
+    byte_size () const
+    {
+        return sizeof(_indexsets) + sizeof(_id);
+    }
+
+    // return size of (floating point) data in bytes handled by this object
+    virtual size_t data_byte_size () const { return 0; }
+    
+    // return name of type
+    virtual std::string  typestr () const { return "base_tensor4"; }
+};
+
 }}// namespace hlr::tensor
 
-#endif // __HLR_TENSOR_BASE_TENSOR3_HH
+#endif // __HLR_TENSOR_BASE_TENSOR_HH
