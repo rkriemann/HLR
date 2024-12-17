@@ -17,7 +17,7 @@
 #include <hlr/compress/byte_n.hh>
 
 // for tests
-// #undef HLR_HAS_ZFP
+#undef HLR_HAS_ZFP
 
 #if defined(HLR_HAS_ZFP)
 #include <zfp/bitstream.h>
@@ -102,12 +102,19 @@ using FP64 = FP_info< double >;
 //   |d_i - ~d_i| ≤ 2^(-m) ≤ ε with mantissa length m = ⌈-log₂ ε⌉
 //
 inline byte_t eps_to_rate      ( const double  eps ) { return std::max< double >( 1, std::ceil( -std::log2( eps ) ) ); }
-inline byte_t eps_to_rate_aplr ( const double  eps ) { return eps_to_rate( eps ) + 1; }
+inline byte_t eps_to_rate_aplr ( const double  eps ) { return eps_to_rate( eps ); }
 
 struct config
 {
     byte_t  bitrate;
 };
+
+inline
+std::ostream &
+operator << ( std::ostream &  os, const config &  conf )
+{
+    return os << "rate " << conf.bitrate;
+}
 
 // holds compressed data
 using  zarray = std::vector< byte_t >;
@@ -147,7 +154,7 @@ compress ( const float *   data,
         
     zdata[0] = exp_bits;
     zdata[1] = prec_bits;
-    memcpy( zdata + 2, & scale, 4 );
+    memcpy( zdata + FP32::scale_ofs, & scale, sizeof(scale) );
 
     //
     // compress data in "vectorized" form
@@ -159,13 +166,13 @@ compress ( const float *   data,
     bool              sign[ nbuf ]; // holds sign per entry
     float             fbuf[ nbuf ]; // holds rescaled value
     uint32_t          ibuf[ nbuf ]; // holds value in compressed format
-    size_t            pos  = 6;
+    size_t            pos  = FP32::header_ofs;
     uint32_t          bpos = 0; // start bit position in current byte
     size_t            i    = 0;
 
     #if defined(HLR_HAS_ZFP)
     const size_t      bssize = byte_pad( nsize * nbits ) / 8;
-    auto              bs     = stream_open( zdata + 6, bssize );
+    auto              bs     = stream_open( zdata + pos, bssize );
     #endif
     
     for ( ; i < nbsize; i += nbuf )
@@ -311,7 +318,7 @@ decompress ( float *         data,
     float           scale;
 
     // read scaling factor
-    memcpy( & scale, zdata, 4 );
+    memcpy( & scale, zdata + FP32::scale_ofs, sizeof(scale) );
 
     //
     // decompress in "vectorised" form
@@ -322,13 +329,13 @@ decompress ( float *         data,
     bool              zero[ nbuf ]; // mark zero entries
     uint32_t          ibuf[ nbuf ]; // holds value in compressed format
     float             fbuf[ nbuf ]; // holds uncompressed values
-    size_t            pos  = 4;
+    size_t            pos  = FP32::header_ofs;
     uint32_t          bpos = 0;
     size_t            i    = 0;
 
     #if defined(HLR_HAS_ZFP)
     const size_t      bssize = byte_pad( nsize * nbits ) / 8;
-    auto              bs     = stream_open( const_cast< byte_t * >( zdata ) + 4, bssize );
+    auto              bs     = stream_open( const_cast< byte_t * >( zdata ) + pos, bssize );
     #endif
     
     for ( ; i < nbsize; i += nbuf )
@@ -463,7 +470,7 @@ compress ( const double *  data,
     
     zdata[0] = exp_bits;
     zdata[1] = prec_bits;
-    memcpy( zdata + 2, & scale, 8 );
+    memcpy( zdata + FP64::scale_ofs, & scale, sizeof(scale) );
 
     //
     // compress data in "vectorized" form
@@ -475,16 +482,13 @@ compress ( const double *  data,
     bool              sign[ nbuf ]; // holds sign per entry
     double            fbuf[ nbuf ]; // holds rescaled value
     uint64_t          ibuf[ nbuf ]; // holds value in compressed format
-    size_t            pos  = 10;
+    size_t            pos  = FP64::header_ofs;
     uint32_t          bpos = 0; // start bit position in current byte
     size_t            i    = 0;
 
-    // size_t    nexp     = 0;
-    // uint64_t  zexp_old = -1;
-        
     #if defined(HLR_HAS_ZFP)
     const size_t      bssize = byte_pad( nsize * nbits ) / 8;
-    auto              bs     = stream_open( zdata + 10, bssize );
+    auto              bs     = stream_open( zdata + pos, bssize );
     #endif
     
     for ( ; i < nbsize; i += nbuf )
@@ -516,12 +520,6 @@ compress ( const double *  data,
             const uint64_t  smant = ( isval & ((1ul << FP64::mant_bits) - 1) );
             const uint64_t  zexp  = sexp & exp_mask;
             const uint64_t  zmant = smant >> prec_ofs;
-                
-            // if ( zexp != zexp_old )
-            // {
-            //     zexp_old = zexp;
-            //     nexp++;
-            // }// if
             
             ibuf[j] = (((sign[j] << exp_bits) | zexp) << prec_bits) | zmant;
         }// for
@@ -579,12 +577,6 @@ compress ( const double *  data,
             const uint64_t  smant = ( isval & ((1ul << FP64::mant_bits) - 1) );
             const uint64_t  zexp  = sexp & exp_mask;
             const uint64_t  zmant = smant >> prec_ofs;
-
-            // if ( zexp != zexp_old )
-            // {
-            //     zexp_old = zexp;
-            //     nexp++;
-            // }// if
             
             zval  = (((zsign << exp_bits) | zexp) << prec_bits) | zmant;
 
@@ -642,7 +634,7 @@ decompress ( double *        data,
     double          scale;
 
     // read scaling factor
-    memcpy( & scale, zdata, 8 );
+    memcpy( & scale, zdata + FP64::scale_ofs, sizeof(scale) );
 
     //
     // decompress in "vectorised" form
@@ -653,13 +645,13 @@ decompress ( double *        data,
     bool              zero[ nbuf ]; // mark zero entries
     uint64_t          ibuf[ nbuf ]; // holds value in compressed format
     double            fbuf[ nbuf ]; // holds uncompressed values
-    size_t            pos  = 8;
+    size_t            pos  = FP64::header_ofs;
     uint32_t          bpos = 0;                          // bit position in current byte
     size_t            i    = 0;
 
     #if defined(HLR_HAS_ZFP)
     const size_t      bssize = byte_pad( nsize * nbits ) / 8;
-    auto              bs     = stream_open( const_cast< byte_t * >( zdata ) + 8, bssize );
+    auto              bs     = stream_open( const_cast< byte_t * >( zdata ) + pos, bssize );
     #endif
     
     for ( ; i < nbsize; i += nbuf )
@@ -827,7 +819,7 @@ compress ( const config &   config,
     const uint32_t  prec_bits = std::min< uint32_t >( FP_info< real_t >::mant_bits, config.bitrate );        // total no. of bits per value
     const size_t    nbits     = 1 + exp_bits + prec_bits;                                                    // number of bits per value
     const auto      scale     = vmin;                                                                        // scale all values v_i such that |v_i| >= 1
-    auto            zdata     = std::vector< byte_t >( sizeof(real_t) + 1 + 1 + byte_pad( nsize * nbits ) / 8 );
+    auto            zdata     = std::vector< byte_t >( FP_info< real_t >::header_ofs + byte_pad( nsize * nbits ) / 8 );
 
     HLR_ASSERT( nbits <= sizeof(value_t) * 8 );
     HLR_ASSERT( std::isfinite( scale ) );
@@ -906,7 +898,7 @@ decompress ( const zarray &  zdata,
             dest[i] = value_t(0);
     }// if
     else
-        decompress( dest, nsize, zdata.data() + 2, exp_bits, prec_bits );
+        decompress( dest, nsize, zdata.data(), exp_bits, prec_bits );
 }
 
 template <>
@@ -954,7 +946,8 @@ compress_lr ( const blas::matrix< value_t > &                       U,
 {
     using  real_t = Hpro::real_type_t< value_t >;
     
-    constexpr real_t  fp_maximum = FP_info< real_t >::maximum;
+    constexpr real_t  fp_maximum  = FP_info< real_t >::maximum;
+    constexpr size_t  header_size = FP_info< real_t >::header_ofs;
     
     //
     // first, determine exponent bits and mantissa bits for all columns
@@ -989,21 +982,16 @@ compress_lr ( const blas::matrix< value_t > &                       U,
         
         const size_t  nbits = 1 + e[l] + m[l]; // number of bits per value
         
-        zsize += sizeof(real_t) + 1 + 1 + byte_pad( n * nbits ) / 8;
+        zsize += header_size + byte_pad( n * nbits ) / 8;
     }// for
-
-    // for ( uint32_t  l = 0; l < k; ++l )
-    //     std::cout << e[l] << '/' << m[l] << std::endl;
-    // std::cout << std::endl;
 
     //
     // convert each column to compressed form
     //
 
-    auto              zdata       = std::vector< byte_t >( zsize );
-    size_t            pos         = 0;
-    constexpr size_t  header_size = sizeof(real_t) + 2;
-    const real_t *    U_ptr       = reinterpret_cast< const real_t * >( U.data() );
+    auto    zdata = std::vector< byte_t >( zsize );
+    size_t  pos   = 0;
+    auto    U_ptr = reinterpret_cast< const real_t * >( U.data() );
         
     for ( uint32_t  l = 0; l < k; ++l )
     {
@@ -1036,7 +1024,8 @@ compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double
 {
     using  real_t = double;
     
-    constexpr real_t  fp_maximum = FP_info< real_t >::maximum;
+    constexpr real_t  fp_maximum  = FP_info< real_t >::maximum;
+    constexpr size_t  header_size = FP_info< real_t >::header_ofs;
     
     //
     // first, determine exponent bits and mantissa bits for all columns
@@ -1075,17 +1064,16 @@ compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double
 
         const size_t  nbits = 1 + e[l] + m[l]; // number of bits per value
         
-        zsize += sizeof(real_t) + 1 + 1 + byte_pad( n2 * nbits ) / 8; // twice because real+imag
+        zsize += header_size + byte_pad( n2 * nbits ) / 8; // twice because real+imag
     }// for
 
     //
     // convert each column to compressed form
     //
 
-    auto              zdata       = std::vector< byte_t >( zsize );
-    size_t            pos         = 0;
-    constexpr size_t  header_size = sizeof(real_t) + 2;
-    const real_t *    U_ptr       = reinterpret_cast< const real_t * >( U.data() );
+    auto    zdata = std::vector< byte_t >( zsize );
+    size_t  pos   = 0;
+    auto    U_ptr = reinterpret_cast< const real_t * >( U.data() );
         
     for ( uint32_t  l = 0; l < k; ++l )
     {
@@ -1107,11 +1095,12 @@ decompress_lr ( const zarray &             zdata,
                 blas::matrix< value_t > &  U )
 {
     using  real_t = Hpro::real_type_t< value_t >;
+
+    constexpr size_t  header_size = FP_info< real_t >::header_ofs;
     
-    const size_t      n           = U.nrows();
-    const uint32_t    k           = U.ncols();
-    size_t            pos         = 0;
-    constexpr size_t  header_size = sizeof(real_t) + 2;
+    const size_t    n   = U.nrows();
+    const uint32_t  k   = U.ncols();
+    size_t          pos = 0;
 
     for ( uint32_t  l = 0; l < k; ++l )
     {
@@ -1124,7 +1113,7 @@ decompress_lr ( const zarray &             zdata,
         const uint32_t  prec_bits = zdata[ pos+1 ];
         const uint32_t  nbits     = 1 + exp_bits + prec_bits;
 
-        decompress( U.data() + l * n, n, zdata.data() + pos + 2, exp_bits, prec_bits );
+        decompress( U.data() + l * n, n, zdata.data() + pos, exp_bits, prec_bits );
         pos += header_size + byte_pad( nbits * n ) / 8;
     }// for
 }
@@ -1146,13 +1135,14 @@ decompress_lr< std::complex< double > > ( const zarray &                        
                                           blas::matrix< std::complex< double > > &  U )
 {
     using  real_t = double;
+
+    constexpr size_t  header_size = FP_info< real_t >::header_ofs;
     
-    const size_t      n           = U.nrows();
-    const uint32_t    k           = U.ncols();
-    size_t            pos         = 0;
-    constexpr size_t  header_size = sizeof(real_t) + 2;
-    real_t *          U_ptr       = reinterpret_cast< real_t * >( U.data() );
-    const size_t      n2          = 2 * n;
+    const size_t    n     = U.nrows();
+    const uint32_t  k     = U.ncols();
+    size_t          pos   = 0;
+    auto            U_ptr = reinterpret_cast< real_t * >( U.data() );
+    const size_t    n2    = 2 * n;
 
     for ( uint32_t  l = 0; l < k; ++l )
     {
@@ -1165,7 +1155,7 @@ decompress_lr< std::complex< double > > ( const zarray &                        
         const uint32_t  prec_bits = zdata[ pos+1 ];
         const uint32_t  nbits     = 1 + exp_bits + prec_bits;
 
-        decompress( U_ptr + l * n2, n2, zdata.data() + pos + 2, exp_bits, prec_bits );
+        decompress( U_ptr + l * n2, n2, zdata.data() + pos, exp_bits, prec_bits );
         pos += header_size + byte_pad( nbits * n2 ) / 8;
     }// for
 }
