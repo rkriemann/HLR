@@ -183,16 +183,16 @@ COMPRESSORS_HELP = { 'none'   : 'no compression used',
                      'dfl2'   : 'use DFL2',
                      'mp3'    : 'use mixed precision storage with FP64/FP32/BF16',
                      'fp32'   : 'use FP32 for storage',
-                     'zfp'    : 'use ZFP     (see also {0}zfp/zfp_dir{1})',
-                     'posits' : 'use Posits  (see also {0}universal/universal_dir{1})',
-                     'cfloat' : 'use CFloats (see also {0}universal/universal_dir{1})',
-                     'sz'     : 'use SZ      (see also {0}sz/sz_dir{1})',
-                     'sz3'    : 'use SZ3     (see also {0}sz3/sz3_dir{1})',
-                     'mgard'  : 'use MGARD   (see also {0}mgard/mgard_dir{1})',
-                     'blosc'  : 'use Blosc   (see also {0}blosc/blosc_dir{1})',
-                     'lz4'    : 'use LZ4     (see also {0}lz4/lz4_dir{1})',
-                     'zlib'   : 'use Zlib    (see also {0}zlib/zlib_dir{1})',
-                     'zstd'   : 'use Zstd    (see also {0}zstd/zstd_dir{1})',
+                     'zfp'    : 'use ZFP     (see also {0}zfp_dir{1})',
+                     'posits' : 'use Posits  (see also {0}universal_dir{1})',
+                     'cfloat' : 'use CFloats (see also {0}universal_dir{1})',
+                     'sz'     : 'use SZ      (see also {0}sz_dir{1})',
+                     'sz3'    : 'use SZ3     (see also {0}sz3_dir{1})',
+                     'mgard'  : 'use MGARD   (see also {0}mgard_dir{1})',
+                     'blosc'  : 'use Blosc   (see also {0}blosc_dir{1})',
+                     'lz4'    : 'use LZ4     (see also {0}lz4_dir{1})',
+                     'zlib'   : 'use Zlib    (see also {0}zlib_dir{1})',
+                     'zstd'   : 'use Zstd    (see also {0}zstd_dir{1})',
                     }
 
 # supported and active APLR compressor
@@ -210,17 +210,19 @@ APLR_COMPRESSORS = [ 'help',      # print help
                      'mp2',
                      'mp3',
                      'posits',
+                     'cfloat',
                      'blosc' ]
 aplr = 'none'
 
 APLR_HELP =        { 'none'    : 'no APLR compression used',
                      'default' : 'use APLR from {0}compressor{1} setting',
-                     'zfp'     : 'use ZFP    (see also {0}zfp/zfp_dir{1})',
-                     'posits'  : 'use Posits (see also {0}universal/universal_dir{1})',
-                     'sz'      : 'use SZ     (see also {0}sz/sz_dir{1})',
-                     'sz3'     : 'use SZ3    (see also {0}sz3/sz3_dir{1})',
-                     'mgard'   : 'use MGARD  (see also {0}mgard/mgard_dir{1})',
-                     'blosc'   : 'use Blosc  (see also {0}blosc/blosc_dir{1})',
+                     'zfp'     : 'use ZFP    (see also {0}zfp_dir{1})',
+                     'posits'  : 'use Posits (see also {0}universal_dir{1})',
+                     'cfloat'  : 'use CFloat (see also {0}universal_dir{1})',
+                     'sz'      : 'use SZ     (see also {0}sz_dir{1})',
+                     'sz3'     : 'use SZ3    (see also {0}sz3_dir{1})',
+                     'mgard'   : 'use MGARD  (see also {0}mgard_dir{1})',
+                     'blosc'   : 'use Blosc  (see also {0}blosc_dir{1})',
                      'afl'     : 'use AFL',
                      'aflp'    : 'use AFLP',
                      'bfl'     : 'use BFL',
@@ -710,7 +712,7 @@ if zfp :
     env.Append( CPPDEFINES = 'HLR_HAS_ZFP' )
     env.Append( CPPPATH    = os.path.join( ZFP_DIR, 'include' ) )
     env.Append( LIBPATH    = os.path.join( ZFP_DIR, 'lib' ) )
-    env.Append( LIBS       = [ 'zfp' ] )
+    env.Append( LIBS       = [ 'zfp', 'gomp' ] ) # in case ZFP comes with OpenMP support
     
 if   compressor == 'none' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=0' )
@@ -806,6 +808,7 @@ if aplr == 'default'  :
     elif compressor == 'sz3'    : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=7' )
     elif compressor == 'mgard'  : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=8' )
     elif compressor == 'posits' : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=12' )
+    elif compressor == 'cfloat' : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=20' )
     elif compressor == 'blosc'  : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=21' )
 elif aplr == 'none'  :
     env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=0' )
@@ -845,6 +848,10 @@ elif aplr == 'mgard'   :
     env.Append( LIBS       = [ 'mgard' ] )
 elif aplr == 'posits'   :
     env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=12' )
+    env.Append( CPPDEFINES = 'HLR_HAS_UNIVERSAL' )
+    env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
+elif aplr == 'cfloat'   :
+    env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=20' )
     env.Append( CPPDEFINES = 'HLR_HAS_UNIVERSAL' )
     env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
 elif aplr == 'mp3'  :
