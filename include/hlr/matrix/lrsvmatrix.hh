@@ -826,65 +826,20 @@ lrsvmatrix< value_t >::compress ( const accuracy &  acc )
     //                              ptrcast( R1.get(), lrsvmatrix< value_t > )->S() );
     // auto  M1  = blas::prod( US1, blas::adjoint( ptrcast( R1.get(), lrsvmatrix< value_t > )->V() ) );
     
-    auto  oU = _U;
-    auto  oV = _V;
+    auto  oU    = _U;
+    auto  oV    = _V;
+    auto  S_tol = compress::aplr::get_tolerances( acc( this->row_is(), this->col_is() ), _S );
+    auto  zU    = compress::aplr::compress_lr( oU, S_tol );
+    auto  zV    = compress::aplr::compress_lr( oV, S_tol );
+
+    // std::cout << S_tol << std::endl;
     
-    //
-    // compute Frobenius norm and set tolerance
-    //
-
-    // defaults to absolute error: δ = ε
-    auto  lacc = acc( this->row_is(), this->col_is() );
-    auto  tol  = lacc.abs_eps();
-
-    if ( lacc.abs_eps() != 0 )
-    {
-        tol = lacc.abs_eps();
-    }// if
-    else if ( lacc.rel_eps() != 0 )
-    {
-        // use relative error: δ = ε |M|
-        real_t  norm = real_t(0);
-
-        if ( lacc.norm_mode() == Hpro::spectral_norm )
-        {
-            norm = _S(0);
-        }// if
-        else if ( lacc.norm_mode() == Hpro::frobenius_norm )
-        {
-            for ( uint  i = 0; i < _S.length(); ++i )
-                norm += math::square( _S(i) );
-
-            norm = math::sqrt( norm );
-        }// if
-        else
-            HLR_ERROR( "unsupported norm mode" );
-    
-        tol = lacc.rel_eps() * norm;
-    }// if
-        
-    //
-    // we aim for σ_i ≈ δ u_i and hence choose u_i = δ / σ_i
-    //
-    
-    auto        S_tol = blas::copy( _S );
-    const auto  k     = this->rank();
-
-    for ( uint  l = 0; l < k; ++l )
-        S_tol(l) = tol / _S(l);
-
-    auto          zU     = compress::aplr::compress_lr( oU, S_tol );
-    auto          zV     = compress::aplr::compress_lr( oV, S_tol );
-    const size_t  mem_lr = sizeof(value_t) * k * ( oU.nrows() + oV.nrows() );
-    const size_t  mem_zU = compress::aplr::compressed_size( zU );
-    const size_t  mem_zV = compress::aplr::compressed_size( zV );
-
     // // DEBUG
     // {
     //     auto  tU  = blas::copy( oU );
     //     auto  tV  = blas::copy( oV );
     //     auto  tT1 = blas::prod_diag( oU, _S );
-    //     auto  tM1 = blas::prod( tT1, blas::adjoint( oV ) );
+    //     auto  M1  = blas::prod( tT1, blas::adjoint( oV ) );
                                
     //     auto  dU = blas::matrix< value_t >( oU.nrows(), oU.ncols() );
     //     auto  dV = blas::matrix< value_t >( oV.nrows(), oV.ncols() );
@@ -893,33 +848,29 @@ lrsvmatrix< value_t >::compress ( const accuracy &  acc )
     //     compress::aplr::decompress_lr( zV, dV );
 
     //     auto  tT2 = blas::prod_diag( dU, _S );
-    //     auto  tM2 = blas::prod( tT2, blas::adjoint( dV ) );
+    //     auto  M2  = blas::prod( tT2, blas::adjoint( dV ) );
 
-    //     io::matlab::write( tM1, "M1" );
-    //     io::matlab::write( tM2, "M2" );
+    //     // io::matlab::write( M1, "M1" );
+    //     // io::matlab::write( M2, "M2" );
 
-    //     blas::add( value_t(-1), tM1, tM2 );
+    //     blas::add( value_t(-1), M1, M2 );
 
-    //     if ( lacc.norm_mode() == Hpro::spectral_norm )
-    //     {
-    //         auto  n1 = blas::norm_2( tM1 );
-    //         auto  n2 = blas::norm_2( tM2 );
-
-    //         std::cout << "Rs: tol = " << boost::format( "%.4e" ) % tol
-    //                   << " / norm = " << boost::format( "%.4e" ) % n1
-    //                   << " / abs = " << boost::format( "%.4e" ) % n2
-    //                   << " / rel = " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
-    //     }// if
+    //     if ( acc.norm_mode() == Hpro::spectral_norm )
+    //         std::cout << "R" // << this->block_is().to_string()
+    //                   << " / nrm = " << boost::format( "%.4e" ) % ( blas::norm_2( M1 ) )
+    //                   << " / abs = " << boost::format( "%.4e" ) % ( blas::norm_2( M2 ) )
+    //                   << " / rel = " << boost::format( "%.4e" ) % ( blas::norm_2( M2 ) / blas::norm_2(M1) )
+    //                   << " / max val = " << boost::format( "%.4e" ) % blas::max_abs_val( M2 )
+    //                   << " / max rat = " << boost::format( "%.4e" ) % ( blas::max_abs_val( M2 ) / blas::max_abs_val( M1 ) )
+    //                   << std::endl;
     //     else
-    //     {
-    //         auto  n1 = blas::norm_F( tM1 );
-    //         auto  n2 = blas::norm_F( tM2 );
-
-    //         std::cout << "Rf: tol = " << boost::format( "%.4e" ) % tol
-    //                   << " / norm = " << boost::format( "%.4e" ) % n1
-    //                   << " / abs = " << boost::format( "%.4e" ) % n2
-    //                   << " / rel = " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
-    //     }// else
+    //         std::cout << "R" // << this->block_is().to_string()
+    //                   << " / nrm = " << boost::format( "%.4e" ) % ( blas::norm_F( M1 ) )
+    //                   << " / abs = " << boost::format( "%.4e" ) % ( blas::norm_F( M2 ) )
+    //                   << " / rel = " << boost::format( "%.4e" ) % ( blas::norm_F( M2 ) / blas::norm_F(M1) )
+    //                   << " / max val = " << boost::format( "%.4e" ) % blas::max_abs_val( M2 )
+    //                   << " / max rat = " << boost::format( "%.4e" ) % ( blas::max_abs_val( M2 ) / blas::max_abs_val( M1 ) )
+    //                   << std::endl;
     // }
     
     // // DEBUG
@@ -969,6 +920,10 @@ lrsvmatrix< value_t >::compress ( const accuracy &  acc )
     //               << std::endl;
     // }
     
+    const size_t  mem_lr = sizeof(value_t) * oU.ncols() * ( oU.nrows() + oV.nrows() );
+    const size_t  mem_zU = compress::aplr::compressed_size( zU );
+    const size_t  mem_zV = compress::aplr::compressed_size( zV );
+
     if (( mem_zU != 0 ) && ( mem_zV != 0 ) && ( mem_zU + mem_zV < mem_lr ))
     {
         _zU = std::move( zU );

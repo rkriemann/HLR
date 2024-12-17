@@ -506,40 +506,12 @@ dense_matrix< value_t >::compress ( const accuracy &  acc )
     if ( this->nrows() * this->ncols() == 0 )
         return;
 
-    // // DEBUG
-    // auto  D1 = this->copy();
-    // auto  M1 = ptrcast( D1.get(), dense_matrix< value_t > )->mat();
-
-    //
-    // determine compression accuracy
-    //
-    
-    auto        M    = _mat;
-    const auto  lacc = acc( this->row_is(), this->col_is() );
-    auto        tol  = lacc.abs_eps();
-
-    if ( lacc.abs_eps() != 0 )
-    {
-        if      ( lacc.norm_mode() == Hpro::spectral_norm  ) tol = lacc.abs_eps() / blas::norm_2( M );
-        else if ( lacc.norm_mode() == Hpro::frobenius_norm ) tol = lacc.abs_eps() / blas::norm_F( M );
-        else
-            HLR_ERROR( "unsupported norm mode" );
-    }// if
-    else if ( lacc.rel_eps() != 0 )
-    {
-        if      ( lacc.norm_mode() == Hpro::spectral_norm  ) tol = lacc.rel_eps(); // * blas::norm_2( M );
-        else if ( lacc.norm_mode() == Hpro::frobenius_norm ) tol = lacc.rel_eps(); // * blas::norm_F( M );
-        else
-            HLR_ERROR( "unsupported norm mode" );
-    }// if
-    else
-        HLR_ERROR( "zero error" );
-
     //
     // compress
     //
 
-    const auto    zconfig   = compress::get_config( tol );
+    auto          M         = _mat;
+    const auto    zconfig   = compress::get_config( acc( this->row_is(), this->col_is() ), M );
     const size_t  mem_dense = sizeof(value_t) * M.nrows() * M.ncols();
     auto          zM        = compress::compress< value_t >( zconfig, M );
     const auto    zmem      = compress::compressed_size( zM );
@@ -551,31 +523,27 @@ dense_matrix< value_t >::compress ( const accuracy &  acc )
 
     //     compress::decompress( zM, M2 );
 
-    //     io::matlab::write( M1, "M1" );
-    //     io::matlab::write( M2, "M2" );
+    //     // io::matlab::write( M1, "M1" );
+    //     // io::matlab::write( M2, "M2" );
         
     //     blas::add( -1.0, M1, M2 );
 
-    //     if ( lacc.norm_mode() == Hpro::spectral_norm )
-    //     {
-    //         auto  n1 = blas::norm_2( M1 );
-    //         auto  n2 = blas::norm_2( M2 );
-
-    //         std::cout << "Ds: tol = " << boost::format( "%.4e" ) % tol
-    //                   << " / norm = " << boost::format( "%.4e" ) % n1
-    //                   << " / abs = " << boost::format( "%.4e" ) % n2
-    //                   << " / rel = " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
-    //     }// if
+    //     if ( acc.norm_mode() == Hpro::spectral_norm )
+    //         std::cout << "D"
+    //                   << " / nrm = " << boost::format( "%.4e" ) % ( blas::norm_2( M1 ) )
+    //                   << " / abs = " << boost::format( "%.4e" ) % ( blas::norm_2( M2 ) )
+    //                   << " / rel = " << boost::format( "%.4e" ) % ( blas::norm_2( M2 ) / blas::norm_2(M1) )
+    //                   << " / max val = " << boost::format( "%.4e" ) % blas::max_abs_val( M2 )
+    //                   << " / max rat = " << boost::format( "%.4e" ) % ( blas::max_abs_val( M2 ) / blas::max_abs_val( M1 ) )
+    //                   << std::endl;
     //     else
-    //     {
-    //         auto  n1 = blas::norm_F( M1 );
-    //         auto  n2 = blas::norm_F( M2 );
-
-    //         std::cout << "Df: tol = " << boost::format( "%.4e" ) % tol
-    //                   << " / norm = " << boost::format( "%.4e" ) % n1
-    //                   << " / abs = " << boost::format( "%.4e" ) % n2
-    //                   << " / rel = " << boost::format( "%.4e" ) % ( n2 / n1 ) << std::endl;
-    //     }// else
+    //         std::cout << "D"
+    //                   << " / nrm = " << boost::format( "%.4e" ) % ( blas::norm_F( M1 ) )
+    //                   << " / abs = " << boost::format( "%.4e" ) % ( blas::norm_F( M2 ) )
+    //                   << " / rel = " << boost::format( "%.4e" ) % ( blas::norm_F( M2 ) / blas::norm_F(M1) )
+    //                   << " / max val = " << boost::format( "%.4e" ) % blas::max_abs_val( M2 )
+    //                   << " / max rat = " << boost::format( "%.4e" ) % ( blas::max_abs_val( M2 ) / blas::max_abs_val( M1 ) )
+    //                   << std::endl;
     // }
     // // DEBUG
 
