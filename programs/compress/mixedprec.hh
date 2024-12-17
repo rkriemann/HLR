@@ -47,7 +47,7 @@ void
 program_main ()
 {
     using value_t = typename problem_t::value_t;
-
+    
     auto  tic     = timer::now();
     auto  toc     = timer::since( tic );
     auto  runtime = std::vector< double >();
@@ -215,7 +215,7 @@ program_main ()
 
     {
         // auto  lacc = local_accuracy( delta );
-        auto  lacc  = relative_prec( Hpro::spectral_norm, delta );
+        auto  lacc  = relative_prec( Hpro::frobenius_norm, delta );
         auto  niter = std::max( nbench, 1u );
         
         runtime.clear();
@@ -253,8 +253,7 @@ program_main ()
               << boost::format( "%.3f" ) % ( double(mem_zA) / double(mem_A) ) << " / "
               << boost::format( "%.3f" ) % ( double(dmem_zA) / double(dmem_A) ) << " / "
               << boost::format( "%.3f" ) % ( double(dmem_zA_d) / double(dmem_A_d) ) << " / "
-              << boost::format( "%.3f" ) % ( double(dmem_zA_lr) / double(dmem_A_lr) ) << " / "
-              << std::endl;
+              << boost::format( "%.3f" ) % ( double(dmem_zA_lr) / double(dmem_A_lr) ) << std::endl;
 
     if ( verbose( 3 ) )
         matrix::print_eps( *zA, "zA", "noid,norank,nosize" );
