@@ -8,6 +8,8 @@
 // Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
+#include <cstdlib>
+
 #include <hlr/utils/log.hh>
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/tensor.hh>
@@ -135,6 +137,7 @@ using hlr::compress::cfloat::compress;
 using hlr::compress::cfloat::decompress;
 using hlr::compress::cfloat::get_config;
 using hlr::compress::cfloat::byte_size;
+using hlr::compress::cfloat::compressed_size;
 
 }} // namespace hlr::compress
 
@@ -710,6 +713,76 @@ decompress ( const zarray &                  zdata,
              hlr::blas::vector< value_t > &  v )
 {
     return decompress< value_t >( zdata, v.data(), v.length() );
+}
+
+//
+// return compression configuration based on accuracy and matrix
+//
+template < typename value_t >
+zconfig_t
+get_config ( const accuracy &                 acc,
+             const blas::matrix< value_t > &  M )
+{
+    //
+    // Assumption: compression with relative error per coefficient, i.e. |a_ij - ã_ij| ≤ ε|a_ij|
+    // Then also |M-~M|_F ≤ ε|M|_F holds.
+    //
+    // TODO: adjust for |·|_2
+    //
+    
+    auto  tol = acc.abs_eps();
+
+    if ( acc.abs_eps() != 0 )
+    {
+        switch ( acc.norm_mode() )
+        {
+            case  Hpro::spectral_norm  : tol = acc.abs_eps() / blas::norm_2( M ); break;
+            case  Hpro::frobenius_norm : tol = acc.abs_eps() / blas::norm_F( M ); break;
+            default :
+                HLR_ERROR( "unsupported norm mode" );
+        }// switch
+    }// if
+    else if ( acc.rel_eps() != 0 )
+    {
+        switch ( acc.norm_mode() )
+        {
+            case  Hpro::spectral_norm  : tol = acc.rel_eps(); break;
+            case  Hpro::frobenius_norm : tol = acc.rel_eps(); break;
+            default :
+                HLR_ERROR( "unsupported norm mode" );
+        }// switch
+    }// if
+    else
+        HLR_ERROR( "zero error" );
+
+    return get_config( tol );
+}
+
+//
+// test compression/decompression
+//
+inline
+void
+test ()
+{
+    srand48( 1 );
+    
+    auto    rand  = [] () { return 2.0 * drand48() - 1.0; };
+    size_t  n     = 12;
+    auto    M     = blas::matrix< double >( n, n );
+
+    blas::fill_fn( M, rand );
+    
+    auto    zconf = get_config( relative_prec( Hpro::frobenius_norm, 1e-4 ), M );
+    auto    zM    = compress( zconf, M );
+    auto    D     = blas::matrix< double >( n, n );
+
+    decompress( zM, D );
+
+    blas::add( -1.0, M, D );
+
+    std::cout << blas::norm_F( D ) << std::endl
+              << blas::norm_F( D ) / blas::norm_F( M ) << std::endl;
 }
 
 }}// namespace hlr::compress
