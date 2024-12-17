@@ -336,6 +336,25 @@ static const char provider[] = "posits";
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
+#elif HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_CFLOAT
+
+#include <hlr/compress/cfloat.hh>
+
+namespace hlr { namespace compress { namespace aplr {
+
+using zarray = hlr::compress::cfloat::zarray;
+using hlr::compress::cfloat::compress_lr;
+using hlr::compress::cfloat::decompress_lr;
+using hlr::compress::cfloat::byte_size;
+using hlr::compress::cfloat::compressed_size;
+
+static const char provider[] = "cfloat";
+
+}}}// namespace hlr::compress::aplr
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
 #elif HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_BLOSC
 
 #include <hlr/compress/blosc.hh>
@@ -460,6 +479,64 @@ mulvec ( const size_t     nrows,
 //////////////////////////////////////////////////////////////////////
 
 #endif // compare(HLR_APLR_COMPRESSOR)
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+namespace hlr { namespace compress { namespace aplr {
+
+template < typename value_t >
+blas::vector< value_t >
+get_tolerances ( const accuracy &                 acc,
+                 const blas::vector< value_t > &  sv )
+{
+    auto  tol = acc.abs_eps();
+
+    if ( acc.abs_eps() != 0 )
+    {
+        tol = acc.abs_eps();
+    }// if
+    else if ( acc.rel_eps() != 0 )
+    {
+        // use relative error: δ = ε |M|
+        auto  norm = value_t(0);
+
+        switch ( acc.norm_mode() )
+        {
+            case  Hpro::spectral_norm  : norm = sv(0); break;
+                
+            case  Hpro::frobenius_norm :
+            {
+                for ( uint  i = 0; i < sv.length(); ++i )
+                    norm += math::square( sv(i) );
+
+                norm = math::sqrt( norm );
+            }// case
+            break;
+
+            default : HLR_ERROR( "unsupported norm mode" );
+        }// switch
+        
+        tol = acc.rel_eps() * norm;
+    }// if
+        
+    //
+    // we aim for σ_i ≈ δ u_i and hence choose u_i = δ / σ_i
+    //
+    
+    auto        sv_tol = blas::copy( sv );
+    const auto  k      = sv.length();
+
+    for ( uint  l = 0; l < k; ++l )
+        sv_tol(l) = tol / sv(l);
+
+    return  sv_tol;
+}
+
+}}}// namespace hlr::compress::aplr
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
 
 //
 // deactivate if requested by user
