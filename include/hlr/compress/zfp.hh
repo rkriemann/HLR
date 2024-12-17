@@ -29,11 +29,26 @@ struct config
     uint      rate;
 };
 
+inline
+std::ostream &
+operator << ( std::ostream &  os, const config &  conf )
+{
+    switch ( conf.mode )
+    {
+        case  zfp_mode_reversible      : return os << "reversible";
+        case  zfp_mode_fixed_rate      : return os << "fixed rate " << conf.rate;
+        case  zfp_mode_fixed_precision : return os << "fixed precision " << conf.precision;
+        case  zfp_mode_fixed_accuracy  : return os << "fixed accuracy " << conf.accuracy;
+            
+        default : HLR_ERROR( "invalid ZFP mode" );
+    }// switch
+}
+
 //
 // return bitrate for given accuracy
 //
-inline uint  eps_to_rate      ( const double  eps ) { return std::max< double >( 0, std::ceil( -std::log2( eps ) ) ) + 2; }
-inline uint  eps_to_rate_aplr ( const double  eps ) { return std::max< double >( 0, std::ceil( -1.1 * std::log2( eps ) ) ) + 5; }
+inline uint  eps_to_rate      ( const double  eps ) { return std::max< double >( 0, std::ceil( -std::log2( 1e-1 * eps ) ) ); }
+inline uint  eps_to_rate_aplr ( const double  eps ) { return std::max< double >( 0, std::ceil( -std::log2( 1e-1 * eps ) ) ); }
 
 //
 // define various compression modes
@@ -42,8 +57,9 @@ inline config  reversible       ()                     { return config{ zfp_mode
 inline config  fixed_rate       ( const uint    rate ) { return config{ zfp_mode_fixed_rate, 0.0, 0, rate }; }      // fixed number of bits
 inline config  fixed_precision  ( const uint    prec ) { return config{ zfp_mode_fixed_precision, 0.0, prec, 0 }; } // fixed number of bitplanes
 inline config  fixed_accuracy   ( const double  tol  ) { return config{ zfp_mode_fixed_accuracy, tol, 0, 0 }; }     // absolute error
+
 // inline config  get_config       ( const double  acc  ) { return fixed_rate( eps_to_rate( acc ) ); }
-inline config  get_config       ( const double  tol  ) { return fixed_precision( eps_to_rate( 0.25 * tol ) ); }
+inline config  get_config       ( const double  tol  ) { return fixed_precision( eps_to_rate( tol ) ); }
 // inline config  get_config       ( const double  tol  ) { return fixed_accuracy( tol ); }
 
 // holds compressed data
