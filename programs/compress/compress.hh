@@ -1,6 +1,5 @@
 //
 // Project     : HLR
-// Program     : compress
 // Description : construction and MVM with compressed data blocks
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
@@ -46,116 +45,6 @@ program_main ()
 {
     using value_t = typename problem_t::value_t;
 
-    // if ( false )
-    // {
-    //     auto  tic     = timer::now();
-    //     auto  toc     = timer::since( tic );
-        
-    //     size_t  n = 4;
-    //     auto    M = blas::matrix< value_t >( n, n );
-
-    //     for ( int i = 0; i < n*n; ++i )
-    //         M.data()[i] = i+1;
-
-    //     for ( int i = 0; i < n; ++i )
-    //     {
-    //         for ( int j = 0; j < n; ++j )
-    //             std::cout << M(i,j) << ", ";
-    //         std::cout << std::endl;
-    //     }// for
-        
-    //     auto  x = blas::vector< value_t >( M.ncols() );
-    //     auto  y1 = blas::vector< value_t >( M.nrows() );
-    //     auto  y2 = blas::vector< value_t >( M.nrows() );
-    //     auto  y3 = blas::vector< value_t >( M.nrows() );
-
-    //     for ( int i = 0; i < M.ncols(); ++i )
-    //         x(i) = i+1;
-
-    //     auto  zcfg = compress::get_config( 1e-4 );
-    //     auto  zM   = compress::compress( zcfg, M.data(), M.nrows(), M.ncols() );
-
-    //     tic = timer::now();
-    //     blas::mulvec( value_t(0.5), blas::adjoint( M ), x, value_t(1), y1 );
-    //     toc = timer::since( tic );
-    //     std::cout << toc.seconds() << std::endl;
-        
-    //     std::cout << y1(0) << " / " << y1(1) << " / " << y1(2) << std::endl;
-        
-    //     tic = timer::now();
-    //     compress::blas::mulvec( M.nrows(), M.ncols(), apply_adjoint, 0.5, zM, x.data(), y2.data() );
-    //     toc = timer::since( tic );
-    //     std::cout << toc.seconds() << std::endl;
-
-    //     std::cout << y2(0) << " / " << y2(1) << " / " << y2(2) << std::endl;
-
-    //     return;
-    // }
-    
-    // if ( false )
-    // {
-    //     auto  tic     = timer::now();
-    //     auto  toc     = timer::since( tic );
-        
-    //     size_t  n = 6;
-    //     size_t  k = 4;
-    //     auto    M = blas::matrix< value_t >( n, k );
-
-    //     for ( int i = 0; i < n*k; ++i )
-    //         M.data()[i] = i+1;
-
-    //     for ( int i = 0; i < M.nrows(); ++i )
-    //     {
-    //         for ( int j = 0; j < M.ncols(); ++j )
-    //             std::cout << M(i,j) << ", ";
-    //         std::cout << std::endl;
-    //     }// for
-
-    //     auto  op = apply_adjoint;
-    //     auto  x  = blas::vector< value_t >( op == apply_normal ? M.ncols() : M.nrows() );
-    //     auto  y1 = blas::vector< value_t >( op == apply_normal ? M.nrows() : M.ncols() );
-    //     auto  y2 = blas::vector< value_t >( op == apply_normal ? M.nrows() : M.ncols() );
-    //     auto  y3 = blas::vector< value_t >( op == apply_normal ? M.nrows() : M.ncols() );
-
-    //     for ( int i = 0; i < x.length(); ++i )
-    //         x(i) = i+1;
-
-    //     auto  S = blas::vector< value_t >( k );
-
-    //     S(0) = 1e-8;
-    //     S(1) = 1e-7;
-    //     S(2) = 1e-6;
-    //     S(3) = 1e-5;
-        
-    //     auto  zM   = compress::aplr::compress_lr( M, S );
-
-    //     blas::mulvec( value_t(1), blas::mat_view( op, M ), x, value_t(1), y1 );
-
-    //     // for ( uint  i = 0; i < k; ++i )
-    //     //     y1(i) *= S(i);
-        
-    //     std::cout << y1(0) << " / " << y1(1) << " / " << y1(2) << std::endl;
-        
-    //     compress::aplr::zblas::mulvec( M.nrows(), M.ncols(), op, 1.0, zM, x.data(), y2.data() );
-
-    //     // for ( uint  i = 0; i < k; ++i )
-    //     //     y2(i) *= S(i);
-
-    //     std::cout << y2(0) << " / " << y2(1) << " / " << y2(2) << std::endl;
-
-    //     return;
-    // }
-
-    // {
-    //     auto  grid = Hpro::read_grid( cmdline::gridfile );
-
-    //     grid->rotate( Hpro::T3Point( 0, 0, 1 ), 3.1415926 * 45 / 180.0 );
-    //     grid->rotate( Hpro::T3Point( 0, 1, 0 ), 3.1415926 * 45 / 180.0 );
-        
-    //     io::vtk::print( *grid, "grid" );
-    //     io::hpro::write( *grid, "rot-" + cmdline::gridfile );
-    // }
-    
     auto  tic     = timer::now();
     auto  toc     = timer::since( tic );
     auto  runtime = std::vector< double >();
@@ -318,7 +207,7 @@ program_main ()
 
     {
         // auto  lacc = local_accuracy( delta );
-        auto  lacc  = relative_prec( delta );
+        auto  lacc  = relative_prec( Hpro::frobenius_norm, delta );
         auto  niter = std::max( nbench, 1u );
         
         runtime.clear();
