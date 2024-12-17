@@ -34,20 +34,16 @@ using byte_t = uint8_t;
 constexpr float   fp32_infinity = std::numeric_limits< float >::infinity();
 constexpr double  fp64_infinity = std::numeric_limits< double >::infinity();
 
-inline
-byte_t
-eps_to_rate ( const double eps )
-{
-    // |d_i - ~d_i| ≤ 2^(-m) ≤ ε with m = remaining mantissa length
-    return std::max< double >( 0, std::ceil( -std::log2( eps ) ) );
-}
+template< class T > inline constexpr T  fp_infinity = std::numeric_limits< T >::infinity();
+template< class T > inline constexpr T  fp_maximum  = std::numeric_limits< T >::max();
 
-inline
-uint32_t
-tol_to_rate ( const double  tol )
-{
-    return uint32_t( std::max< double >( 0, -std::log2( tol ) ) ) + 1;
-}
+//
+// return bitrate for given accuracy
+//
+//   |d_i - ~d_i| ≤ 2^(-m) ≤ ε with mantissa length m = ⌈-log₂ ε⌉
+//
+inline byte_t eps_to_rate      ( const double  eps ) { return std::max< double >( 0, std::ceil( -std::log2( eps ) ) ); }
+inline byte_t eps_to_rate_aplr ( const double  eps ) { return eps_to_rate( eps ); }
 
 struct config
 {
@@ -58,10 +54,12 @@ struct config
 using  zarray = std::vector< byte_t >;
 
 // return actual memory size of compressed data
-inline size_t  byte_size  ( const zarray &  v   ) { return sizeof(v) + v.size(); }
+inline size_t  byte_size       ( const zarray &  v   ) { return sizeof(v) + v.size(); }
+
+inline size_t  compressed_size ( const zarray &  v   ) { return v.size(); }
 
 // return compression configuration for desired accuracy eps
-inline config  get_config ( const double    eps ) { return config{ eps_to_rate( eps ) }; }
+inline config  get_config      ( const double    eps ) { return config{ eps_to_rate( eps ) }; }
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -849,6 +847,463 @@ decompress< std::complex< double > > ( const zarray &            zdata,
     else                  decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, dim2, dim3 * 2 );
 }
     
+//////////////////////////////////////////////////////////////////////////////////////
+//
+// special version for lowrank matrices
+//
+//////////////////////////////////////////////////////////////////////////////////////
+
+template < typename value_t >
+zarray
+compress_lr ( const blas::matrix< value_t > &                       U,
+              const blas::vector< Hpro::real_type_t< value_t > > &  S )
+{
+    using  real_t = Hpro::real_type_t< value_t >;
+    
+    constexpr size_t  header_size = 2 * sizeof(real_t);
+    
+    //
+    // first, determine exponent bits and mantissa bits for all columns
+    //
+
+    const size_t  n = U.nrows();
+    const size_t  k = U.ncols();
+    auto          m = std::vector< uint32_t >( k );
+    auto          e = std::vector< uint32_t >( k );
+    auto          s = std::vector< real_t >( k );
+    size_t        zsize = 0;
+
+    for ( uint32_t  l = 0; l < k; ++l )
+    {
+        auto  vmin = fp_maximum< real_t >;
+        auto  vmax = real_t(0);
+
+        for ( size_t  i = 0; i < n; ++i )
+        {
+            const auto  u_il = std::abs( U(i,l) );
+            const auto  val  = ( u_il == real_t(0) ? fp_maximum< real_t > : u_il );
+            
+            vmin = std::min( vmin, val );
+            vmax = std::max( vmax, u_il );
+        }// for
+
+        s[l] = 1.0 / vmax;
+        e[l] = uint32_t( std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ) );
+        m[l] = eps_to_rate_aplr( S(l) );
+
+        HLR_ASSERT( std::isfinite( s[l] ) );
+        
+        const size_t  nbits = 1 + e[l] + m[l]; // number of bits per value
+        
+        zsize += header_size + n * byte_pad( nbits ) / 8;
+    }// for
+
+    //
+    // convert each column to compressed form
+    //
+
+    auto    zdata = std::vector< byte_t >( zsize );
+    size_t  pos   = 0;
+    auto    U_ptr = reinterpret_cast< const real_t * >( U.data() );
+        
+    for ( uint32_t  l = 0; l < k; ++l )
+    {
+        const uint32_t  exp_bits  = e[l];
+        const uint32_t  prec_bits = m[l];
+        const real_t    scale     = s[l];
+        const size_t    nbits     = byte_pad( 1 + exp_bits + prec_bits ); // number of bits per value
+
+        zdata[pos]   = exp_bits;
+        zdata[pos+1] = prec_bits;
+        memcpy( zdata.data() + pos + 2, & scale, sizeof(value_t) );
+        
+        pos += header_size;
+        
+        switch ( nbits )
+        {
+            case  8:
+            {
+                using  storage_t = uint8_t;
+            
+                switch ( exp_bits )
+                {
+                    case 1  : to_cfloat< value_t, 8, 1, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 2  : to_cfloat< value_t, 8, 2, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 3  : to_cfloat< value_t, 8, 3, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 4  : to_cfloat< value_t, 8, 4, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 5  : to_cfloat< value_t, 8, 5, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 6  : to_cfloat< value_t, 8, 6, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    default : HLR_ERROR( "TODO" );
+                }// switch
+            }
+            break;
+
+            case 16:
+            {
+                using  storage_t = uint16_t;
+            
+                switch ( exp_bits )
+                {
+                    case 1  : to_cfloat< value_t, 16, 1, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 2  : to_cfloat< value_t, 16, 2, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 3  : to_cfloat< value_t, 16, 3, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 4  : to_cfloat< value_t, 16, 4, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 5  : to_cfloat< value_t, 16, 5, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 6  : to_cfloat< value_t, 16, 6, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 7  : to_cfloat< value_t, 16, 7, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 8  : to_cfloat< value_t, 16, 8, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    default : HLR_ERROR( "TODO" );
+                }// switch
+            }
+            break;
+
+            case 24:
+            {
+                using  storage_t = uint8_t;
+            
+                switch ( exp_bits )
+                {
+                    case 1  : to_cfloat< value_t, 24, 1, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 2  : to_cfloat< value_t, 24, 2, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 3  : to_cfloat< value_t, 24, 3, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 4  : to_cfloat< value_t, 24, 4, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 5  : to_cfloat< value_t, 24, 5, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 6  : to_cfloat< value_t, 24, 6, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 7  : to_cfloat< value_t, 24, 7, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 8  : to_cfloat< value_t, 24, 8, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    default : HLR_ERROR( "TODO" );
+                }// switch
+            }
+            break;
+
+            case 32:
+            {
+                using  storage_t = uint32_t;
+            
+                switch ( exp_bits )
+                {
+                    case 1  : to_cfloat< value_t, 32, 1, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 2  : to_cfloat< value_t, 32, 2, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 3  : to_cfloat< value_t, 32, 3, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 4  : to_cfloat< value_t, 32, 4, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 5  : to_cfloat< value_t, 32, 5, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 6  : to_cfloat< value_t, 32, 6, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 7  : to_cfloat< value_t, 32, 7, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 8  : to_cfloat< value_t, 32, 8, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    default : HLR_ERROR( "TODO" );
+                }// switch
+            }
+            break;
+
+            case 40:
+            {
+                using  storage_t = uint8_t;
+            
+                switch ( exp_bits )
+                {
+                    case 1  : to_cfloat< value_t, 40, 1, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 2  : to_cfloat< value_t, 40, 2, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 3  : to_cfloat< value_t, 40, 3, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 4  : to_cfloat< value_t, 40, 4, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 5  : to_cfloat< value_t, 40, 5, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 6  : to_cfloat< value_t, 40, 6, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 7  : to_cfloat< value_t, 40, 7, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 8  : to_cfloat< value_t, 40, 8, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    default : HLR_ERROR( "TODO" );
+                }// switch
+            }
+            break;
+
+            case 48:
+            {
+                using  storage_t = uint16_t;
+            
+                switch ( exp_bits )
+                {
+                    case 1  : to_cfloat< value_t, 48, 1, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 2  : to_cfloat< value_t, 48, 2, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 3  : to_cfloat< value_t, 48, 3, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 4  : to_cfloat< value_t, 48, 4, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 5  : to_cfloat< value_t, 48, 5, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 6  : to_cfloat< value_t, 48, 6, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 7  : to_cfloat< value_t, 48, 7, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 8  : to_cfloat< value_t, 48, 8, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    default : HLR_ERROR( "TODO" );
+                }// switch
+            }
+            break;
+
+            case 56:
+            {
+                using  storage_t = uint8_t;
+            
+                switch ( exp_bits )
+                {
+                    case 1  : to_cfloat< value_t, 56, 1, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 2  : to_cfloat< value_t, 56, 2, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 3  : to_cfloat< value_t, 56, 3, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 4  : to_cfloat< value_t, 56, 4, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 5  : to_cfloat< value_t, 56, 5, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 6  : to_cfloat< value_t, 56, 6, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 7  : to_cfloat< value_t, 56, 7, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 8  : to_cfloat< value_t, 56, 8, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    default : HLR_ERROR( "TODO" );
+                }// switch
+            }
+            break;
+
+            case 64:
+            {
+                using  storage_t = uint64_t;
+            
+                switch ( exp_bits )
+                {
+                    case 1  : to_cfloat< value_t, 64, 1, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 2  : to_cfloat< value_t, 64, 2, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 3  : to_cfloat< value_t, 64, 3, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 4  : to_cfloat< value_t, 64, 4, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 5  : to_cfloat< value_t, 64, 5, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 6  : to_cfloat< value_t, 64, 6, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 7  : to_cfloat< value_t, 64, 7, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    case 8  : to_cfloat< value_t, 64, 8, storage_t >( zdata.data() + pos, U.data() + l*n, n, scale ); break;
+                    default : HLR_ERROR( "TODO" );
+                }// switch
+            }
+            break;
+
+            default : HLR_ERROR( "TODO" );
+        }// switch
+        
+        pos += n * byte_pad( nbits ) / 8;
+    }// for
+
+    return zdata;
+}
+
+template <>
+inline
+zarray
+compress_lr< std::complex< float > > ( const blas::matrix< std::complex< float > > &  U,
+                                       const blas::vector< float > &                  S )
+{
+    HLR_ERROR( "TODO" );
+}
+                                     
+template <>
+inline
+zarray
+compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double > > &  U,
+                                        const blas::vector< double > &                  S )
+{
+    HLR_ERROR( "TODO" );
+}
+
+template < typename value_t >
+void
+decompress_lr ( const zarray &             zdata,
+                blas::matrix< value_t > &  U )
+{
+    using  real_t = Hpro::real_type_t< value_t >;
+
+    constexpr size_t  header_size = 2 * sizeof(real_t);
+    
+    const size_t    n   = U.nrows();
+    const uint32_t  k   = U.ncols();
+    size_t          pos = 0;
+
+    for ( uint32_t  l = 0; l < k; ++l )
+    {
+        //
+        // read compression header (scaling, exponent and precision bits)
+        // and decompress data
+        //
+    
+        const uint32_t  exp_bits  = zdata[ pos ];
+        const uint32_t  prec_bits = zdata[ pos+1 ];
+        const uint32_t  nbits     = byte_pad( 1 + exp_bits + prec_bits );
+        value_t         scale     = 0;
+
+        memcpy( & scale, zdata.data() + pos + 2, sizeof(value_t) );
+        pos += header_size;
+        
+        switch ( nbits )
+        {
+            case  8:
+            {
+                using  storage_t = uint8_t;
+            
+                switch ( exp_bits )
+                {
+                    case 1  : from_cfloat< value_t, 8, 1, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 2  : from_cfloat< value_t, 8, 2, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 3  : from_cfloat< value_t, 8, 3, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 4  : from_cfloat< value_t, 8, 4, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 5  : from_cfloat< value_t, 8, 5, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 6  : from_cfloat< value_t, 8, 6, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    default : HLR_ERROR( "TODO" );
+                }// switch
+            }
+            break;
+
+            case 16:
+            {
+                using  storage_t = uint16_t;
+            
+                switch ( exp_bits )
+                {
+                    case 1  : from_cfloat< value_t, 16, 1, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 2  : from_cfloat< value_t, 16, 2, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 3  : from_cfloat< value_t, 16, 3, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 4  : from_cfloat< value_t, 16, 4, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 5  : from_cfloat< value_t, 16, 5, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 6  : from_cfloat< value_t, 16, 6, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 7  : from_cfloat< value_t, 16, 7, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 8  : from_cfloat< value_t, 16, 8, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    default : HLR_ERROR( "TODO" );
+                }// switch
+            }
+            break;
+
+            case 24:
+            {
+                using  storage_t = uint8_t;
+            
+                switch ( exp_bits )
+                {
+                    case 1  : from_cfloat< value_t, 24, 1, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 2  : from_cfloat< value_t, 24, 2, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 3  : from_cfloat< value_t, 24, 3, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 4  : from_cfloat< value_t, 24, 4, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 5  : from_cfloat< value_t, 24, 5, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 6  : from_cfloat< value_t, 24, 6, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 7  : from_cfloat< value_t, 24, 7, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 8  : from_cfloat< value_t, 24, 8, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    default : HLR_ERROR( "TODO" );
+                }// switch
+            }
+            break;
+
+            case 32:
+            {
+                using  storage_t = uint32_t;
+            
+                switch ( exp_bits )
+                {
+                    case 1  : from_cfloat< value_t, 32, 1, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 2  : from_cfloat< value_t, 32, 2, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 3  : from_cfloat< value_t, 32, 3, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 4  : from_cfloat< value_t, 32, 4, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 5  : from_cfloat< value_t, 32, 5, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 6  : from_cfloat< value_t, 32, 6, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 7  : from_cfloat< value_t, 32, 7, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 8  : from_cfloat< value_t, 32, 8, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    default : HLR_ERROR( "TODO" );
+                }// switch
+            }
+            break;
+
+            case 40:
+            {
+                using  storage_t = uint8_t;
+            
+                switch ( exp_bits )
+                {
+                    case 1  : from_cfloat< value_t, 40, 1, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 2  : from_cfloat< value_t, 40, 2, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 3  : from_cfloat< value_t, 40, 3, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 4  : from_cfloat< value_t, 40, 4, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 5  : from_cfloat< value_t, 40, 5, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 6  : from_cfloat< value_t, 40, 6, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 7  : from_cfloat< value_t, 40, 7, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 8  : from_cfloat< value_t, 40, 8, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    default : HLR_ERROR( "TODO" );
+                }// switch
+            }
+            break;
+
+            case 48:
+            {
+                using  storage_t = uint16_t;
+            
+                switch ( exp_bits )
+                {
+                    case 1  : from_cfloat< value_t, 48, 1, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 2  : from_cfloat< value_t, 48, 2, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 3  : from_cfloat< value_t, 48, 3, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 4  : from_cfloat< value_t, 48, 4, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 5  : from_cfloat< value_t, 48, 5, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 6  : from_cfloat< value_t, 48, 6, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 7  : from_cfloat< value_t, 48, 7, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 8  : from_cfloat< value_t, 48, 8, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    default : HLR_ERROR( "TODO" );
+                }// switch
+            }
+            break;
+
+            case 56:
+            {
+                using  storage_t = uint8_t;
+            
+                switch ( exp_bits )
+                {
+                    case 1  : from_cfloat< value_t, 56, 1, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 2  : from_cfloat< value_t, 56, 2, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 3  : from_cfloat< value_t, 56, 3, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 4  : from_cfloat< value_t, 56, 4, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 5  : from_cfloat< value_t, 56, 5, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 6  : from_cfloat< value_t, 56, 6, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 7  : from_cfloat< value_t, 56, 7, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 8  : from_cfloat< value_t, 56, 8, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    default : HLR_ERROR( "TODO" );
+                }// switch
+            }
+            break;
+
+            case 64:
+            {
+                using  storage_t = uint64_t;
+            
+                switch ( exp_bits )
+                {
+                    case 1  : from_cfloat< value_t, 64, 1, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 2  : from_cfloat< value_t, 64, 2, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 3  : from_cfloat< value_t, 64, 3, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 4  : from_cfloat< value_t, 64, 4, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 5  : from_cfloat< value_t, 64, 5, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 6  : from_cfloat< value_t, 64, 6, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 7  : from_cfloat< value_t, 64, 7, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    case 8  : from_cfloat< value_t, 64, 8, storage_t >( zdata.data() + pos, U.data() + l * n, n, scale ); break;
+                    default : HLR_ERROR( "TODO" );
+                }// switch
+            }
+            break;
+
+            default : HLR_ERROR( "TODO" );
+        }// switch
+        
+        pos += n * byte_pad( nbits ) / 8;
+    }// for
+}
+
+
+template <>
+inline
+void
+decompress_lr< std::complex< float > > ( const zarray &                           zdata,
+                                         blas::matrix< std::complex< float > > &  U )
+{
+    HLR_ERROR( "TODO" );
+}
+
+template <>
+inline
+void
+decompress_lr< std::complex< double > > ( const zarray &                            zdata,
+                                          blas::matrix< std::complex< double > > &  U )
+{
+    HLR_ERROR( "TODO" );
+}
+
 }}}// namespace hlr::compress::cfloat
 
 #endif // HLR_HAS_UNIVERSAL
