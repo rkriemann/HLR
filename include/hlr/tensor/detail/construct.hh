@@ -869,10 +869,10 @@ build_hierarchical_tucker ( const indexset &                  is0,
                     
                     HLR_ASSERT( sub_D(i,j,l).get() != nullptr );
 
-                    if ( ! is_tucker( *sub_D(i,j,l) ) )
+                    if ( ! is_tucker_tensor3( *sub_D(i,j,l) ) )
                         all_tucker = false;
 
-                    if ( ! is_dense( *sub_D(i,j,l) ) )
+                    if ( ! is_dense_tensor3( *sub_D(i,j,l) ) )
                         all_dense = false;
                 }// for
             }// for

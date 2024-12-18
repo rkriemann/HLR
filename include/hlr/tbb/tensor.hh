@@ -125,10 +125,10 @@ build_hierarchical_tucker ( const indexset &                  is0,
             for ( uint  j = 0; j < 2; ++j )
                 for ( uint  i = 0; i < 2; ++i )
                 {
-                    if ( ! is_tucker( *sub_D(i,j,l) ) )
+                    if ( ! is_tucker_tensor3( *sub_D(i,j,l) ) )
                         all_tucker = false;
 
-                    if ( ! is_dense( *sub_D(i,j,l) ) )
+                    if ( ! is_dense_tensor3( *sub_D(i,j,l) ) )
                         all_dense = false;
                 }// for
         
@@ -244,7 +244,7 @@ to_dense ( const base_tensor3< value_t > &  X,
             }
         );
     }// if
-    else if ( is_tucker( X ) )
+    else if ( is_tucker_tensor3( X ) )
     {
         auto  TX    = cptrcast( &X, tucker_tensor3< value_t > );
         auto  T0    = blas::tensor_product( TX->G(), TX->X(0), 0 );
@@ -254,7 +254,7 @@ to_dense ( const base_tensor3< value_t > &  X,
         
         blas::copy( DX, D_sub );
     }// if
-    else if ( is_dense( X ) )
+    else if ( is_dense_tensor3( X ) )
     {
         auto  DX    = cptrcast( &X, dense_tensor3< value_t > );
         auto  D_sub = D( X.is(0), X.is(1), X.is(2) );
@@ -281,7 +281,7 @@ to_dense ( const base_tensor3< value_t > &  X )
                 ( X.is(1).first() == 0 ) &&
                 ( X.is(2).first() == 0 ) )
         
-    if ( is_dense( X ) )
+    if ( is_dense_tensor3( X ) )
     {
         auto  D = X.copy();
 
