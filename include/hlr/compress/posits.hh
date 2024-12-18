@@ -27,7 +27,7 @@ constexpr uint8_t  ES = 2;
 // return bitrate for given accuracy
 //
 inline byte_t eps_to_rate      ( const double  eps ) { return std::max< double >( 0, std::ceil( -std::log2( eps ) ) ); }
-inline byte_t eps_to_rate_aplr ( const double  eps ) { return eps_to_rate( eps ) + 2; }
+inline byte_t eps_to_rate_aplr ( const double  eps ) { return eps_to_rate( eps ); }
 
 //
 // compression configuration
@@ -95,11 +95,13 @@ struct convert
         for ( size_t  i = 0; i < nsize; ++i )
         {
             auto        raw  = ptr[i];
-            bitblock_t  bits;
+            // bitblock_t  bits;
             posit_t     p;
             
-            bits = uint64_t(raw);
-            p.set( bits );
+            // bits = uint64_t(raw);
+            // p.setbits( bits );
+
+            p.setbits( raw );
 
             data[i] = value_t( p ) / scale;
         }// for
@@ -152,6 +154,9 @@ compress ( const config &   config,
     
     switch ( nbits )
     {
+        case  3: { convert< value_t,  3, byte_t   >::to_posit( zdata.data() + ofs, data, nsize, scale ); } break;
+        case  4: { convert< value_t,  4, byte_t   >::to_posit( zdata.data() + ofs, data, nsize, scale ); } break;
+        case  5: { convert< value_t,  5, byte_t   >::to_posit( zdata.data() + ofs, data, nsize, scale ); } break;
         case  6: { convert< value_t,  6, byte_t   >::to_posit( zdata.data() + ofs, data, nsize, scale ); } break;
         case  7: { convert< value_t,  7, byte_t   >::to_posit( zdata.data() + ofs, data, nsize, scale ); } break;
         case  8: { convert< value_t,  8, byte_t   >::to_posit( zdata.data() + ofs, data, nsize, scale ); } break;
@@ -251,6 +256,9 @@ decompress ( const zarray &  zdata,
     
     switch ( bitsize )
     {
+        case  3: { convert< value_t,  3, byte_t   >::from_posit( zdata.data() + ofs, dest, nsize, scale ); } break;
+        case  4: { convert< value_t,  4, byte_t   >::from_posit( zdata.data() + ofs, dest, nsize, scale ); } break;
+        case  5: { convert< value_t,  5, byte_t   >::from_posit( zdata.data() + ofs, dest, nsize, scale ); } break;
         case  6: { convert< value_t,  6, byte_t   >::from_posit( zdata.data() + ofs, dest, nsize, scale ); } break;
         case  7: { convert< value_t,  7, byte_t   >::from_posit( zdata.data() + ofs, dest, nsize, scale ); } break;
         case  8: { convert< value_t,  8, byte_t   >::from_posit( zdata.data() + ofs, dest, nsize, scale ); } break;
@@ -406,11 +414,12 @@ struct convert
                 else                  { bpos += zrest; }
             } while ( sbits < nbits );
 
-            bitblock_t  bits;
+            // bitblock_t  bits;
             posit_t     p;
             
-            bits = zval;
-            p.set( bits );
+            // bits = zval;
+            // p.setbits( bits );
+            p.setbits( zval );
 
             data[count] = value_t( p ) / scale;
             
@@ -688,6 +697,7 @@ compress_lr ( const blas::matrix< value_t > &                 U,
         
         switch ( nbits )
         {
+            case  3: { convert< value_t,  3 >::to_posit( zdata.data() + ofs, U.data() + l*n, n, scale ); } break;
             case  4: { convert< value_t,  4 >::to_posit( zdata.data() + ofs, U.data() + l*n, n, scale ); } break;
             case  5: { convert< value_t,  5 >::to_posit( zdata.data() + ofs, U.data() + l*n, n, scale ); } break;
             case  6: { convert< value_t,  6 >::to_posit( zdata.data() + ofs, U.data() + l*n, n, scale ); } break;
@@ -764,6 +774,7 @@ decompress_lr ( const zarray &             zdata,
 
         switch ( nbits )
         {
+            case  3: { convert< value_t,  3 >::from_posit( zdata.data() + ofs, U.data() + l*n, n, scale ); } break;
             case  4: { convert< value_t,  4 >::from_posit( zdata.data() + ofs, U.data() + l*n, n, scale ); } break;
             case  5: { convert< value_t,  5 >::from_posit( zdata.data() + ofs, U.data() + l*n, n, scale ); } break;
             case  6: { convert< value_t,  6 >::from_posit( zdata.data() + ofs, U.data() + l*n, n, scale ); } break;
