@@ -115,15 +115,14 @@ program_main ()
         toc = timer::since( tic );
     }// else
     
-    const auto  mem_A     = A->byte_size();
-    const auto  dmem_A    = matrix::data_byte_size( *A );
-    const auto  dmem_A_d  = matrix::data_byte_size_dense( *A );
-    const auto  dmem_A_lr = matrix::data_byte_size_lowrank( *A );
-    const auto  norm_A    = impl::norm::frobenius( *A );
+    const auto  mem_A    = matrix::data_byte_size( *A );
+    const auto  mem_A_d  = matrix::data_byte_size_dense( *A );
+    const auto  mem_A_lr = matrix::data_byte_size_lowrank( *A );
+    const auto  norm_A   = impl::norm::frobenius( *A );
         
     std::cout << "    dims  = " << A->nrows() << " × " << A->ncols() << std::endl;
     std::cout << "    done in " << format_time( toc ) << std::endl;
-    std::cout << "    mem   = " << format_mem( mem_A, dmem_A, dmem_A_d, dmem_A_lr ) << std::endl;
+    std::cout << "    mem   = " << format_mem( mem_A, mem_A_d, mem_A_lr ) << std::endl;
     std::cout << "      idx = " << format_mem( mem_A / A->nrows() ) << std::endl;
     std::cout << "    |A|   = " << format_norm( norm_A ) << std::endl;
 
@@ -243,17 +242,15 @@ program_main ()
         std::cout << std::endl;
     }
 
-    const auto  mem_zA     = zA->byte_size();
-    const auto  dmem_zA    = matrix::data_byte_size( *zA );
-    const auto  dmem_zA_d  = matrix::data_byte_size_dense( *zA );
-    const auto  dmem_zA_lr = matrix::data_byte_size_lowrank( *zA );
+    const auto  mem_zA    = matrix::data_byte_size( *zA );
+    const auto  mem_zA_d  = matrix::data_byte_size_dense( *zA );
+    const auto  mem_zA_lr = matrix::data_byte_size_lowrank( *zA );
     
-    std::cout << "    mem     = " << format_mem( mem_zA, dmem_zA, dmem_zA_d, dmem_zA_lr ) << std::endl;
+    std::cout << "    mem     = " << format_mem( mem_zA, mem_zA_d, mem_zA_lr ) << std::endl;
     std::cout << "        vs H  "
               << boost::format( "%.3f" ) % ( double(mem_zA) / double(mem_A) ) << " / "
-              << boost::format( "%.3f" ) % ( double(dmem_zA) / double(dmem_A) ) << " / "
-              << boost::format( "%.3f" ) % ( double(dmem_zA_d) / double(dmem_A_d) ) << " / "
-              << boost::format( "%.3f" ) % ( double(dmem_zA_lr) / double(dmem_A_lr) ) << std::endl;
+              << boost::format( "%.3f" ) % ( double(mem_zA_d) / double(mem_A_d) ) << " / "
+              << boost::format( "%.3f" ) % ( double(mem_zA_lr) / double(mem_A_lr) ) << std::endl;
 
     if ( verbose( 3 ) )
         matrix::print_eps( *zA, "zA", "noid,norank,nosize" );
