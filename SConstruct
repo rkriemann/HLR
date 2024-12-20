@@ -170,9 +170,10 @@ COMPRESSORS   = [ 'help',       # print help
                   'sz3',
                   'mgard',
                   'blosc',
-                  'lz4',
-                  'zlib',
-                  'zstd' ]
+                  # 'lz4',
+                  # 'zlib',
+                  # 'zstd'
+                 ]
 compressor    = 'none'
 
 COMPRESSORS_HELP = { 'none'   : 'no compression used',
@@ -190,9 +191,9 @@ COMPRESSORS_HELP = { 'none'   : 'no compression used',
                      'sz3'    : 'use SZ3     (see also {0}sz3_dir{1})',
                      'mgard'  : 'use MGARD   (see also {0}mgard_dir{1})',
                      'blosc'  : 'use Blosc   (see also {0}blosc_dir{1})',
-                     'lz4'    : 'use LZ4     (see also {0}lz4_dir{1})',
-                     'zlib'   : 'use Zlib    (see also {0}zlib_dir{1})',
-                     'zstd'   : 'use Zstd    (see also {0}zstd_dir{1})',
+                     # 'lz4'    : 'use LZ4     (see also {0}lz4_dir{1})',
+                     # 'zlib'   : 'use Zlib    (see also {0}zlib_dir{1})',
+                     # 'zstd'   : 'use Zstd    (see also {0}zstd_dir{1})',
                     }
 
 # supported and active APLR compressor
@@ -398,12 +399,12 @@ opts.Add( BoolVariable( 'sz3',           'use SZ3 compression library',        s
 opts.Add( PathVariable( 'sz3_dir',       'SZ3 installation directory',         SZ3_DIR, PathVariable.PathIsDir ) )
 opts.Add( BoolVariable( 'mgard',         'use MGARD compression library',      mgard ) )
 opts.Add( PathVariable( 'mgard_dir',     'MGARD installation directory',       MGARD_DIR, PathVariable.PathIsDir ) )
-opts.Add( BoolVariable( 'lz4',           'use LZ4 compression library',        lz4 ) )
-opts.Add( PathVariable( 'lz4_dir',       'LZ4 installation directory',         LZ4_DIR, PathVariable.PathIsDir ) )
-opts.Add( BoolVariable( 'zlib',          'use ZLIB compression library',       zlib ) )
-opts.Add( PathVariable( 'zlib_dir',      'ZLIB installation directory',        ZLIB_DIR, PathVariable.PathIsDir ) )
-opts.Add( BoolVariable( 'zstd',          'use Zstd compression library',       zstd ) )
-opts.Add( PathVariable( 'zstd_dir',      'Zstd installation directory',        ZSTD_DIR, PathVariable.PathIsDir ) )
+# opts.Add( BoolVariable( 'lz4',           'use LZ4 compression library',        lz4 ) )
+# opts.Add( PathVariable( 'lz4_dir',       'LZ4 installation directory',         LZ4_DIR, PathVariable.PathIsDir ) )
+# opts.Add( BoolVariable( 'zlib',          'use ZLIB compression library',       zlib ) )
+# opts.Add( PathVariable( 'zlib_dir',      'ZLIB installation directory',        ZLIB_DIR, PathVariable.PathIsDir ) )
+# opts.Add( BoolVariable( 'zstd',          'use Zstd compression library',       zstd ) )
+# opts.Add( PathVariable( 'zstd_dir',      'Zstd installation directory',        ZSTD_DIR, PathVariable.PathIsDir ) )
 opts.Add( BoolVariable( 'universal',     'use universal number library',       universal ) )
 opts.Add( PathVariable( 'universal_dir', 'universal installation directory',   UNIVERSAL_DIR, PathVariable.PathIsDir ) )
 opts.Add( BoolVariable( 'blosc',         'use blosc compression library',      blosc ) )
@@ -485,12 +486,12 @@ sz3           = opt_env['sz3']
 SZ3_DIR       = opt_env['sz3_dir']
 mgard         = opt_env['mgard']
 MGARD_DIR     = opt_env['mgard_dir']
-lz4           = opt_env['lz4']
-LZ4_DIR       = opt_env['lz4_dir']
-zlib          = opt_env['zlib']
-ZLIB_DIR      = opt_env['zlib_dir']
-zstd          = opt_env['zstd']
-ZSTD_DIR      = opt_env['zstd_dir']
+# lz4           = opt_env['lz4']
+# LZ4_DIR       = opt_env['lz4_dir']
+# zlib          = opt_env['zlib']
+# ZLIB_DIR      = opt_env['zlib_dir']
+# zstd          = opt_env['zstd']
+# ZSTD_DIR      = opt_env['zstd_dir']
 universal     = opt_env['universal']
 UNIVERSAL_DIR = opt_env['universal_dir']
 blosc         = opt_env['blosc']
@@ -752,24 +753,24 @@ elif compressor == 'mgard' :
     env.Append( CPPPATH    = os.path.join( MGARD_DIR, 'include' ) )
     env.Append( LIBPATH    = os.path.join( MGARD_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'mgard' ] )
-elif compressor == 'lz4' :
-    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=9' )
-    env.Append( CPPDEFINES = 'HLR_HAS_LZ4' )
-    env.Append( CPPPATH    = os.path.join( LZ4_DIR, 'include' ) )
-    env.Append( LIBPATH    = os.path.join( LZ4_DIR, 'lib' ) )
-    env.Append( LIBS       = [ 'lz4' ] )
-elif compressor == 'zlib' :
-    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=10' )
-    env.Append( CPPDEFINES = 'HLR_HAS_ZLIB' )
-    env.Append( CPPPATH    = os.path.join( ZLIB_DIR, 'include' ) )
-    env.Append( LIBPATH    = os.path.join( ZLIB_DIR, 'lib' ) )
-    env.Append( LIBS       = [ 'z' ] )
-elif compressor == 'zstd' :
-    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=11' )
-    env.Append( CPPDEFINES = 'HLR_HAS_ZSTD' )
-    env.Append( CPPPATH    = os.path.join( ZSTD_DIR, 'include' ) )
-    env.Append( LIBPATH    = os.path.join( ZSTD_DIR, 'lib' ) )
-    env.Append( LIBS       = [ 'zstd' ] )
+# elif compressor == 'lz4' :
+#     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=9' )
+#     env.Append( CPPDEFINES = 'HLR_HAS_LZ4' )
+#     env.Append( CPPPATH    = os.path.join( LZ4_DIR, 'include' ) )
+#     env.Append( LIBPATH    = os.path.join( LZ4_DIR, 'lib' ) )
+#     env.Append( LIBS       = [ 'lz4' ] )
+# elif compressor == 'zlib' :
+#     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=10' )
+#     env.Append( CPPDEFINES = 'HLR_HAS_ZLIB' )
+#     env.Append( CPPPATH    = os.path.join( ZLIB_DIR, 'include' ) )
+#     env.Append( LIBPATH    = os.path.join( ZLIB_DIR, 'lib' ) )
+#     env.Append( LIBS       = [ 'z' ] )
+# elif compressor == 'zstd' :
+#     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=11' )
+#     env.Append( CPPDEFINES = 'HLR_HAS_ZSTD' )
+#     env.Append( CPPPATH    = os.path.join( ZSTD_DIR, 'include' ) )
+#     env.Append( LIBPATH    = os.path.join( ZSTD_DIR, 'lib' ) )
+#     env.Append( LIBS       = [ 'zstd' ] )
 elif compressor == 'posits' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=12' )
     env.Append( CPPDEFINES = 'HLR_HAS_UNIVERSAL' )
@@ -786,14 +787,14 @@ elif compressor == 'blosc' :
     env.Append( LIBS       = [ 'blosc2' ] )
 elif compressor == 'fp32' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=13' )
-elif compressor == 'fp16' :
-    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=14' )
-elif compressor == 'bf16' :
-    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=15' )
-elif compressor == 'tf32' :
-    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=16' )
-elif compressor == 'bf24' :
-    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=17' )
+# elif compressor == 'fp16' :
+#     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=14' )
+# elif compressor == 'bf16' :
+#     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=15' )
+# elif compressor == 'tf32' :
+#     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=16' )
+# elif compressor == 'bf24' :
+#     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=17' )
 
 if aplr == 'default'  :
     if   compressor == 'none'   : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=0' )
@@ -856,8 +857,8 @@ elif aplr == 'cfloat'   :
     env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
 elif aplr == 'mp3'  :
     env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=18' )
-elif aplr == 'mp2'  :
-    env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=19' )
+# elif aplr == 'mp2'  :
+#     env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=19' )
 elif aplr == 'blosc'   :
     env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=20' )
     env.Append( CPPDEFINES = 'HLR_HAS_BLOSC' )
@@ -967,12 +968,12 @@ def show_help ( target, source, env ):
     print( '  {0}mgard_dir{1}    │ path to MGARD library         │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}half{1}         │ use half number library       │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}half_dir{1}     │ path to half library          │'.format( colors['bold'], colors['reset'] ) )
-    print( '  {0}lz4{1}          │ use LZ4 library               │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( '  {0}lz4_dir{1}      │ path to LZ4 library           │'.format( colors['bold'], colors['reset'] ) )
-    print( '  {0}zlib{1}         │ use zlib library              │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( '  {0}zlib_dir{1}     │ path to zlib library          │'.format( colors['bold'], colors['reset'] ) )
-    print( '  {0}zstd{1}         │ use Zstd library              │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( '  {0}zstd_dir{1}     │ path to Zstd library          │'.format( colors['bold'], colors['reset'] ) )
+    # print( '  {0}lz4{1}          │ use LZ4 library               │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    # print( '  {0}lz4_dir{1}      │ path to LZ4 library           │'.format( colors['bold'], colors['reset'] ) )
+    # print( '  {0}zlib{1}         │ use zlib library              │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    # print( '  {0}zlib_dir{1}     │ path to zlib library          │'.format( colors['bold'], colors['reset'] ) )
+    # print( '  {0}zstd{1}         │ use Zstd library              │'.format( colors['bold'], colors['reset'] ), '0/1' )
+    # print( '  {0}zstd_dir{1}     │ path to Zstd library          │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}blosc{1}        │ use Blosc2 library            │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}blosc_dir{1}    │ path to Blosc2 library        │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}atc{1}          │ use ATC library               │'.format( colors['bold'], colors['reset'] ), '0/1' )
@@ -1050,9 +1051,9 @@ def show_options ( target, source, env ):
     print( '  {0}mgard{1}        │ use MGARD compression library │ {2}'.format( colors['bold'], colors['reset'], bool_str[ mgard ] ),      pathstr( MGARD_DIR     if mgard     else '' ) )
     print( '  {0}universal{1}    │ use Universal number library  │ {2}'.format( colors['bold'], colors['reset'], bool_str[ universal ] ),  pathstr( UNIVERSAL_DIR if universal else '' ) )
     print( '  {0}half{1}         │ use half number library       │ {2}'.format( colors['bold'], colors['reset'], bool_str[ half ] ),       pathstr( HALF_DIR      if half      else '' ) )
-    print( '  {0}lz4{1}          │ use LZ4 library               │ {2}'.format( colors['bold'], colors['reset'], bool_str[ lz4 ] ),        pathstr( LZ4_DIR       if lz4       else '' ) )
-    print( '  {0}zlib{1}         │ use zlib library              │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zlib ] ),       pathstr( ZLIB_DIR      if zlib      else '' ) )
-    print( '  {0}zstd{1}         │ use Zstd library              │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zstd ] ),       pathstr( ZSTD_DIR      if zstd      else '' ) )
+    # print( '  {0}lz4{1}          │ use LZ4 library               │ {2}'.format( colors['bold'], colors['reset'], bool_str[ lz4 ] ),        pathstr( LZ4_DIR       if lz4       else '' ) )
+    # print( '  {0}zlib{1}         │ use zlib library              │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zlib ] ),       pathstr( ZLIB_DIR      if zlib      else '' ) )
+    # print( '  {0}zstd{1}         │ use Zstd library              │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zstd ] ),       pathstr( ZSTD_DIR      if zstd      else '' ) )
     print( '  {0}blosc{1}        │ use BLOSC2 library            │ {2}'.format( colors['bold'], colors['reset'], bool_str[ blosc ] ),      pathstr( BLOSC_DIR     if blosc     else '' ) )
     print( '  {0}atc{1}          │ use ATC compression library   │ {2}'.format( colors['bold'], colors['reset'], bool_str[ atc ] ),        pathstr( ATC_DIR       if atc       else '' ) )
     print( ' ──────────────┼───────────────────────────────┼──────────' )
