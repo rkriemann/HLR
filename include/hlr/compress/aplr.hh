@@ -519,7 +519,57 @@ get_tolerances ( const accuracy &                 acc,
         
         tol = acc.rel_eps() * norm;
     }// if
+
+    //
+    // adjust tolerance for additional error due to APLR,
+    // e.g., look for ε, such that Σ 1/σ_i ε² + (1+2k)ε = δ
+    //
+    
+    {
+        auto  k = sv.length();
+        auto  δ = tol;
+        auto  Σ = value_t(0);
+
+        for ( uint  i = 0; i < sv.length(); ++i )
+            Σ += 1.0 / sv(i);
+
+        // std::cout << "δ: " << δ << " / sum: " << Σ << " / err: " << δ*(1 + 2*k) + δ*δ * Σ;
+
+        //
+        // using both terms in the error formula
+        //
         
+        // solve via p/q since more robust than direct approach
+        auto  p = ( 1 + 2*k ) / Σ;
+        auto  q = δ / Σ;
+        auto  t = p*p / 4 - q;
+
+        if ( t < 0 ) t = 0;
+            
+        auto  d1 = std::abs( p/2 + std::sqrt( t ) );
+        auto  d2 = std::abs( p/2 - std::sqrt( t ) );
+        
+        tol = std::min( std::abs( d1 ), std::abs( d2 ) ); // std::max( δ, δ * δ * Σ ) / ( 3 * k ); // "/ 2"
+
+        // //
+        // // using just sum of sing. values.
+        // //
+        
+        // auto  p = 1 / Σ;
+        // auto  q = δ / Σ;
+        // auto  t = p*p / 4 - q;
+
+        // if ( t < 0 ) t = 0;
+            
+        // auto  d1 = std::abs( p/2 + std::sqrt( t ) );
+        // auto  d2 = std::abs( p/2 - std::sqrt( t ) );
+        
+        // tol = std::min( std::abs( d1 ), std::abs( d2 ) );
+
+        // std::cout << " / tol: " << tol << ", " << tol * ( 1 + 2*k + tol * Σ );
+        // std::cout << std::endl;
+    }
+    
     //
     // we aim for σ_i ≈ δ u_i and hence choose u_i = δ / σ_i
     //
