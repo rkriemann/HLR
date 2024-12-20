@@ -237,6 +237,51 @@ hosvd_sv ( const tensor3< value_t > &  X,
              std::move(U2), std::move( S2 ) };
 }
 
+template < typename                    value_t,
+           approx::approximation_type  approx_t >
+std::tuple< tensor4< value_t >,
+            matrix< value_t >,
+            vector< real_type_t< value_t > >,
+            matrix< value_t >,
+            vector< real_type_t< value_t > >,
+            matrix< value_t >,
+            vector< real_type_t< value_t > >,
+            matrix< value_t >,
+            vector< real_type_t< value_t > > >
+hosvd_sv ( const tensor4< value_t > &  X,
+           const accuracy &            acc,
+           const approx_t &            apx )
+{
+    using  real_t = real_type_t< value_t >;
+    
+    auto  X0 = X.unfold( 0 );
+    auto  S0 = vector< real_t >();
+    auto  U0 = apx.column_basis( X0, acc, S0 );
+
+    auto  X1 = X.unfold( 1 );
+    auto  S1 = vector< real_t >();
+    auto  U1 = apx.column_basis( X1, acc, S1 );
+
+    auto  X2 = X.unfold( 2 );
+    auto  S2 = vector< real_t >();
+    auto  U2 = apx.column_basis( X2, acc, S2 );
+
+    auto  X3 = X.unfold( 3 );
+    auto  S3 = vector< real_t >();
+    auto  U3 = apx.column_basis( X3, acc, S3 );
+
+    auto  Y0 = tensor_product( X,  adjoint( U0 ), 0 );
+    auto  Y1 = tensor_product( Y0, adjoint( U1 ), 1 );
+    auto  Y2 = tensor_product( Y1, adjoint( U2 ), 2 );
+    auto  G  = tensor_product( Y2, adjoint( U3 ), 3 );
+
+    return { std::move(G),
+             std::move(U0), std::move( S0 ),
+             std::move(U1), std::move( S1 ), 
+             std::move(U2), std::move( S2 ), 
+             std::move(U3), std::move( S3 ) };
+}
+
 //
 // sequentially truncated HOSVD
 //
