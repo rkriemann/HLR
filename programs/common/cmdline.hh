@@ -65,7 +65,7 @@ bool    compress   = false;        // apply FP compression to matrix data
 auto    kappa      = std::complex< double >( 2, 0 ); // wave number for helmholtz problems
 double  sigma      = 1;            // parameter for matern covariance and gaussian kernel
 bool    sep_coup   = false;        // use separate row/column couplings for Uni-H and H²
-string  lrformat   = "std";        // lowrank format: uv (std), usv, usvv
+string  lrformat   = "uv";         // lowrank format: uv (std), usv, usvv
 
 void
 read_config ( const std::string &  filename )
