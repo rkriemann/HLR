@@ -12,6 +12,7 @@
 #include <cstring>
 
 #if defined(HLR_USE_HDF5)
+#  define H5_USE_110_API  // define to use classical API
 #  include <H5Cpp.h>
 #endif
 
