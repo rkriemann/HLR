@@ -65,6 +65,7 @@ bool    compress   = false;        // apply FP compression to matrix data
 auto    kappa      = std::complex< double >( 2, 0 ); // wave number for helmholtz problems
 double  sigma      = 1;            // parameter for matern covariance and gaussian kernel
 bool    sep_coup   = false;        // use separate row/column couplings for Uni-H and H²
+string  lrformat   = "std";        // lowrank format: uv (std), usv, usvv
 
 void
 read_config ( const std::string &  filename )
@@ -93,7 +94,9 @@ read_config ( const std::string &  filename )
     sparsefile = cfg.get( "app.sparse",  sparsefile );
     datafile   = cfg.get( "app.data",    datafile );
         
-    ntile      = cfg.get( "arith.ntile",  ntile );
+    ntile      = cfg.get( "build.ntile",    ntile );
+    lrformat   = cfg.get( "build.lrformat", lrformat );
+    
     nbench     = cfg.get( "arith.nbench", nbench );
     tbench     = cfg.get( "arith.tbench", tbench );
     eps        = cfg.get( "arith.eps",    eps );
@@ -178,6 +181,7 @@ parse ( int argc, char ** argv )
         ( "rank,k",      value<uint>(),   ": set H-algebra rank k" )
         ( "ref",         value<string>(), ": reference matrix or algorithm" )
         ( "tol",         value<double>(), ": tolerance for some algorithms" )
+        ( "lrformat",    value<string>(), ": lowrank format: uv (default), usv, usvv" )
         ;
 
     opts.add( gen_opts ).add( app_opts ).add( ari_opts );
@@ -260,6 +264,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "eta"        ) ) eta        = vm["eta"].as<double>();
     if ( vm.count( "compress"   ) ) compress   = true;
     if ( vm.count( "sepcoup"    ) ) sep_coup   = true;
+    if ( vm.count( "lrformat"   ) ) lrformat   = vm["lrformat"].as<string>();
 
     if ( appl == "help" )
     {
@@ -377,6 +382,16 @@ parse ( int argc, char ** argv )
         std::exit( 0 );
     }// if
     
+    if ( lrformat == "help" )
+    {
+        std::cout << "Low-rank memory format:" << std::endl
+                  << "  - uv      : M = U·V' with n×k U and V (default)" << std::endl
+                  << "  - usv     : M = U·S·V' with (orthogonal) n×k U,V and k×k matrix S" << std::endl
+                  << "  - usvv    : M = U·Sv·V' with (orthogonal) n×k U,V and k-dim vector Sv" << std::endl;
+
+        std::exit( 0 );
+    }// if
+    
     if ( ! ( ( appl == "logkernel" )    ||
              ( appl == "log" )          ||
              ( appl == "laplaceslp" )   ||
@@ -410,6 +425,11 @@ parse ( int argc, char ** argv )
              ( arith == "lazy" ) || ( arith == "daglazy" ) ||
              ( arith == "all" )  || ( arith == "default" ) ) )
         HLR_ERROR( "unknown arithmetic : " + arith );
+
+    if ( ! ( ( lrformat == "uv" )  ||
+             ( lrformat == "usv" ) ||
+             ( lrformat == "usvv" ) ) )
+        HLR_ERROR( "unknown lowrank format : " + lrformat );
 }
 
 }}// namespace hlr::cmdline

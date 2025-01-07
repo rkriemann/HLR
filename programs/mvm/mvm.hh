@@ -65,9 +65,14 @@ program_main ()
                 
             auto  hcagen = problem->hca_gen_func( *ct );
             auto  hca    = bem::hca( pcoeff, *hcagen, cmdline::eps / 100.0, 6 );
-            auto  hcalr  = bem::hca_lrapx( hca );
-                
-            A = impl::matrix::build_sv( bct->root(), pcoeff, hcalr, acc, cmdline::compress, nseq );
+            auto  lrapx  = bem::hca_lrapx( hca );
+
+            if ( lrformat == "uv" )
+                A = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, cmdline::compress, nseq );
+            else if ( lrformat == "usvv" )
+                A = impl::matrix::build_sv( bct->root(), pcoeff, lrapx, acc, cmdline::compress, nseq );
+            else
+                HLR_ERROR( "unsupported lowrank format: " + lrformat );
         }// if
         else
             cmdline::capprox = "default";
@@ -79,9 +84,14 @@ program_main ()
                   << ( cmdline::compress ? std::string( " (" ) + hlr::compress::provider + " + " + hlr::compress::aplr::provider + ")" : "" )
                   << std::endl;
 
-        auto  acalr = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
+        auto  lrapx = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
 
-        A = impl::matrix::build_sv( bct->root(), pcoeff, acalr, acc, cmdline::compress, nseq );
+        if ( lrformat == "uv" )
+            A = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, cmdline::compress, nseq );
+        else if ( lrformat == "usvv" )
+            A = impl::matrix::build_sv( bct->root(), pcoeff, lrapx, acc, cmdline::compress, nseq );
+        else
+            HLR_ERROR( "unsupported lowrank format: " + lrformat );
     }// else
         
     if ( cmdline::capprox == "dense" )
@@ -90,9 +100,14 @@ program_main ()
                   << ( cmdline::compress ? std::string( " (" ) + hlr::compress::provider + " + " + hlr::compress::aplr::provider + ")" : "" )
                   << std::endl;
 
-        auto  dense = bem::dense_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
+        auto  lrapx = bem::dense_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
         
-        A = impl::matrix::build_sv( bct->root(), pcoeff, dense, acc, cmdline::compress, nseq );
+        if ( lrformat == "uv" )
+            A = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, cmdline::compress, nseq );
+        else if ( lrformat == "usvv" )
+            A = impl::matrix::build_sv( bct->root(), pcoeff, lrapx, acc, cmdline::compress, nseq );
+        else
+            HLR_ERROR( "unsupported lowrank format: " + lrformat );
     }// else
         
     toc = timer::since( tic );
@@ -354,8 +369,6 @@ program_main ()
                           << format_time( min( runtime ), median( runtime ), max( runtime ) );
             std::cout << std::endl;
 
-            t_ref = min( runtime );
-            
             std::cout << "      ratio   = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
             std::cout << "      flops   = " << format_flops( flops_h, min( runtime ) ) << std::endl;
             
