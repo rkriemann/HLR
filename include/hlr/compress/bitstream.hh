@@ -18,7 +18,7 @@ namespace hlr { namespace compress {
 struct bitstream
 {
 public:
-    constexpr static auto  WSIZE = sizeof(uint64_t) * CHAR_BIT;
+    constexpr static auto  WSIZE = sizeof(uint64_t) * 8;
 
     size_t      bits;   // number of buffered bits (0 <= bits < WSIZE)
     uint64_t    buffer; // incoming/outgoing bits (buffer < 2^bits)
@@ -58,8 +58,6 @@ public:
     write_bits ( uint64_t  value,
                  size_t    n )
     {
-        constexpr auto  WSIZE = sizeof(uint64_t) * CHAR_BIT;
-        
         // append bit string to buffer
         buffer += value << bits;
         bits   += n;
@@ -94,8 +92,6 @@ public:
     uint64_t
     read_bits ( const size_t  n )
     {
-        constexpr auto  WSIZE = sizeof(uint64_t) * CHAR_BIT;
-
         uint64_t  value = buffer;
         
         if ( bits < n )
@@ -154,6 +150,15 @@ public:
         }// if
     }
 };
+
+//
+// pad given sizes to multiple of 8 (storage size within bitstream)
+//
+#if defined(HLR_USE_BITSTREAM)
+inline size_t  pad_bs  ( const size_t  n ) { return ( n % 8 != 0 ) ? n + (8 - n % 8) : n; }
+#else
+inline size_t  pad_bs  ( const size_t  n ) { return n; }
+#endif
 
 }}// namespace hlr::compress
 
