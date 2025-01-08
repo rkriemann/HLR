@@ -47,8 +47,8 @@ operator << ( std::ostream &  os, const config &  conf )
 //
 // return bitrate for given accuracy
 //
-inline uint  eps_to_rate      ( const double  eps ) { return std::max< double >( 0, std::ceil( -std::log2( 1e-1 * eps ) ) ); }
-inline uint  eps_to_rate_aplr ( const double  eps ) { return std::max< double >( 0, std::ceil( -std::log2( 1e-1 * eps ) ) ); }
+inline uint  eps_to_rate      ( const double  eps ) { return std::max< double >( 0, std::ceil( -std::log2( eps ) ) ); }
+inline uint  eps_to_rate_aplr ( const double  eps ) { return std::max< double >( 0, std::ceil( -std::log2( eps ) ) ); }
 
 //
 // define various compression modes
@@ -59,7 +59,7 @@ inline config  fixed_precision  ( const uint    prec ) { return config{ zfp_mode
 inline config  fixed_accuracy   ( const double  tol  ) { return config{ zfp_mode_fixed_accuracy, tol, 0, 0 }; }     // absolute error
 
 // inline config  get_config       ( const double  acc  ) { return fixed_rate( eps_to_rate( acc ) ); }
-inline config  get_config       ( const double  tol  ) { return fixed_precision( eps_to_rate( tol ) ); }
+inline config  get_config       ( const double  tol  ) { return fixed_precision( eps_to_rate( 0.1 * tol ) ); }
 // inline config  get_config       ( const double  tol  ) { return fixed_accuracy( tol ); }
 
 // holds compressed data
