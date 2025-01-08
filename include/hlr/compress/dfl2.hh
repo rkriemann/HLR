@@ -15,6 +15,10 @@
 #include <hlr/arith/blas.hh>
 #include <hlr/compress/byte_n.hh>
 
+// activate/deactivate bitstreams
+#define HLR_USE_BITSTREAM
+#include <hlr/compress/bitstream.hh>
+
 ////////////////////////////////////////////////////////////
 //
 // compression using adaptive float representation
@@ -374,6 +378,11 @@ compress ( const double *  data,
     size_t    pos  = 2; // position in compressed storage
     uint32_t  bpos = 0; // start bit position in current byte
 
+    #if defined(HLR_USE_BITSTREAM)
+    const size_t  bssize = pad_bs( byte_pad( nsize * nbits ) / 8 );
+    auto          bs     = bitstream( zdata + pos, bssize );
+    #endif
+    
     for ( size_t  i = 0; i < nsize; ++i )
     {
         const double    val   = data[i];
@@ -381,12 +390,11 @@ compress ( const double *  data,
         uint64_t        zval  = ( isval >> shift );
         uint32_t        sbits = 0;
 
-        // {
-        //     const uint64_t  irval = ( zval << shift );
-        //     const double    rval  = * reinterpret_cast< const double * >( & irval );
-
-        //     // std::cout << isval << " / " << irval << " / " << std::abs( val - rval ) << std::endl;
-        // }
+        #if defined(HLR_USE_BITSTREAM)
+        
+        bs.write_bits( zval, nbits );
+        
+        #else
         
         do
         {
@@ -403,6 +411,8 @@ compress ( const double *  data,
             if ( crest <= zrest ) { bpos  = 0; ++pos; }
             else                  { bpos += zrest; }
         } while ( sbits < nbits );
+
+        #endif
     }// for
 }
 
@@ -424,11 +434,23 @@ decompress ( double *        data,
     size_t    pos  = 2;
     uint32_t  bpos = 0;                          // bit position in current byte
 
+    #if defined(HLR_USE_BITSTREAM)
+    const size_t  bssize = pad_bs( byte_pad( nsize * nbits ) / 8 );
+    auto          bs     = bitstream( const_cast< byte_t * >( zdata ) + pos, bssize );
+    #endif
+    
     for ( size_t  i = 0; i < nsize; ++i )
     {
         uint64_t  zval  = 0;
-        uint32_t  sbits = 0;
             
+        #if defined(HLR_USE_BITSTREAM)
+
+        zval = bs.read_bits( nbits );
+
+        #else
+        
+        uint32_t  sbits = 0;
+        
         do
         {
             // HLR_DBG_ASSERT( pos < zdata );
@@ -445,6 +467,8 @@ decompress ( double *        data,
             else                  { bpos += zrest; }
         } while ( sbits < nbits );
 
+        #endif
+        
         const uint64_t  irval = ( zval << shift );
         const double    rval  = * reinterpret_cast< const double * >( & irval );
 
@@ -477,7 +501,7 @@ compress ( const config &   config,
     const uint32_t  exp_bits  = 11;
     const uint32_t  prec_bits = std::min< uint32_t >( fp_info< real_t >::mant_bits, config.bitrate );        // total no. of bits per value
     const size_t    nbits     = 1 + exp_bits + prec_bits;                                                    // number of bits per value
-    auto            zdata     = std::vector< byte_t >( 1 + 1 + byte_pad( nsize * nbits ) / 8 );
+    auto            zdata     = std::vector< byte_t >( 1 + 1 + pad_bs( byte_pad( nsize * nbits ) / 8 ) );
 
     compress( data, nsize, zdata.data(), exp_bits, prec_bits );
 
@@ -618,7 +642,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
 
         const size_t  nbits = 1 + exp_bits + m[l]; // number of bits per value
         
-        zsize += 1 + 1 + byte_pad( n * nbits ) / 8;
+        zsize += 1 + 1 + pad_bs( byte_pad( n * nbits ) / 8 );
     }// for
 
     // for ( uint32_t  l = 0; l < k; ++l )
@@ -640,7 +664,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
         const size_t    nbits     = 1 + exp_bits + prec_bits; // number of bits per value
 
         compress( U.data() + l*n, n, zdata.data() + pos, exp_bits, prec_bits );
-        pos += header_size + byte_pad( n * nbits ) / 8;
+        pos += header_size + pad_bs( byte_pad( n * nbits ) / 8 );
     }// for
 
     return zdata;
@@ -681,7 +705,7 @@ compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double
 
         const size_t  nbits = 1 + exp_bits + m[l]; // number of bits per value
         
-        zsize += 1 + 1 + byte_pad( n2 * nbits ) / 8; // twice because real+imag
+        zsize += 1 + 1 + pad_bs( byte_pad( n2 * nbits ) / 8 ); // twice because real+imag
     }// for
 
     //
@@ -699,7 +723,7 @@ compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double
         const size_t    nbits     = 1 + exp_bits + prec_bits; // number of bits per value
 
         compress( U_ptr + l * n2, n2, zdata.data() + pos, exp_bits, prec_bits );
-        pos += header_size + byte_pad( n2 * nbits ) / 8;
+        pos += header_size + pad_bs( byte_pad( n2 * nbits ) / 8 );
     }// for
 
     return zdata;
@@ -729,7 +753,7 @@ decompress_lr ( const zarray &             zdata,
         const uint32_t  nbits     = 1 + exp_bits + prec_bits;
 
         decompress( U.data() + l * n, n, zdata.data() + pos, exp_bits, prec_bits );
-        pos += header_size + byte_pad( nbits * n ) / 8;
+        pos += header_size + pad_bs( byte_pad( nbits * n ) / 8 );
     }// for
 }
 
@@ -770,7 +794,7 @@ decompress_lr< std::complex< double > > ( const zarray &                        
         const uint32_t  nbits     = 1 + exp_bits + prec_bits;
 
         decompress( U_ptr + l * n2, n2, zdata.data() + pos, exp_bits, prec_bits );
-        pos += header_size + byte_pad( nbits * n2 ) / 8;
+        pos += header_size + pad_bs( byte_pad( nbits * n2 ) / 8 );
     }// for
 }
 
