@@ -13,10 +13,7 @@
 namespace hlr { namespace compress {
 
 //
-// based on ZFP bitstream but simplified internal usage
-//
-// TODO: if size of given buffer is not multiple of 8 byte, data
-//       is written beyond buffer end
+// based on ZFP bitstream but simplified for internal usage
 //
 struct bitstream
 {
@@ -27,17 +24,19 @@ public:
     uint64_t    buffer; // incoming/outgoing bits (buffer < 2^bits)
     uint64_t *  ptr;    // pointer to next word to be read/written
     uint64_t *  begin;  // beginning of stream
-    uint64_t *  end;    // end of stream (not enforced)
+    // uint64_t *  end;    // end of stream (not enforced)
 
 public:
     //
     // ctor for given buffer
     //
     bitstream ( void *  data,
-                size_t  bytes )
+                size_t  nbytes )
     {
+        HLR_ASSERT( nbytes % sizeof(uint64_t) == 0 ); // multiple of storage size
+        
         begin  = reinterpret_cast< uint64_t * >( data );
-        end    = begin + bytes / sizeof(uint64_t);
+        // end    = begin + nbytes / sizeof(uint64_t);
 
         ptr    = begin;
         buffer = 0;
