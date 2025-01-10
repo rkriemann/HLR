@@ -15,16 +15,19 @@ namespace hlr { namespace compress {
 //
 // based on ZFP bitstream but simplified for internal usage
 //
+template < typename T_storage >
 struct bitstream
 {
 public:
-    constexpr static auto  WSIZE = sizeof(uint64_t) * 8;
+    using  storage_t = T_storage;
+    
+    constexpr static auto  WSIZE = sizeof(storage_t) * 8;
 
-    size_t      bits;   // number of buffered bits (0 <= bits < WSIZE)
-    uint64_t    buffer; // incoming/outgoing bits (buffer < 2^bits)
-    uint64_t *  ptr;    // pointer to next word to be read/written
-    uint64_t *  begin;  // beginning of stream
-    // uint64_t *  end;    // end of stream (not enforced)
+    size_t       bits;   // number of buffered bits (0 <= bits < WSIZE)
+    storage_t    buffer; // incoming/outgoing bits (buffer < 2^bits)
+    storage_t *  ptr;    // pointer to next word to be read/written
+    storage_t *  begin;  // beginning of stream
+    storage_t *  end;    // end of stream (not enforced)
 
 public:
     //
@@ -33,10 +36,10 @@ public:
     bitstream ( void *  data,
                 size_t  nbytes )
     {
-        HLR_ASSERT( nbytes % sizeof(uint64_t) == 0 ); // multiple of storage size
+        HLR_ASSERT( nbytes % sizeof(storage_t) == 0 ); // multiple of storage size
         
-        begin  = reinterpret_cast< uint64_t * >( data );
-        // end    = begin + nbytes / sizeof(uint64_t);
+        begin  = reinterpret_cast< storage_t * >( data );
+        end    = begin + ( nbytes / sizeof(storage_t) );
 
         ptr    = begin;
         buffer = 0;
@@ -54,9 +57,9 @@ public:
     //
     // write given bits to stream
     //
-    uint64_t
-    write_bits ( uint64_t  value,
-                 size_t    n )
+    storage_t
+    write_bits ( storage_t  value,
+                 size_t     n )
     {
         // append bit string to buffer
         buffer += value << bits;
@@ -72,7 +75,7 @@ public:
             // assert: 0 <= n < 64; WSIZE <= s->bits <= WSIZE + n
             do
             {
-                
+                HLR_DBG_ASSERT( ptr < end );
                 bits  -= WSIZE;                // output WSIZE bits while buffer is full
                 *ptr++ = buffer;               // assert: 0 <= s->bits <= n
                 buffer = value >> (n - bits);  // assert: 0 <= n - s->bits < 64
@@ -89,15 +92,16 @@ public:
     //
     // return <n> bits from stream
     //
-    uint64_t
+    storage_t
     read_bits ( const size_t  n )
     {
-        uint64_t  value = buffer;
+        storage_t  value = buffer;
         
         if ( bits < n )
         {
             // keep fetching WSIZE bits until enough bits are buffered
             do {
+                HLR_DBG_ASSERT( ptr < end );
                 buffer = *ptr++; // assert: 0 <= bits < n <= 64
                 value += buffer << bits;
                 bits  += WSIZE;
@@ -136,12 +140,13 @@ public:
     {
         auto  rest = (WSIZE - bits) % WSIZE;
         
-        if ( rest )
+        if ( rest && ( buffer != 0 ))
         {
             auto  b = bits;
             
             for ( b += rest; b >= WSIZE; b -= WSIZE )
             {
+                HLR_DBG_ASSERT( ptr < end );
                 *ptr++ = buffer;
                 buffer = 0;
             }// for
@@ -152,12 +157,12 @@ public:
 };
 
 //
-// pad given sizes to multiple of 8 (storage size within bitstream)
+// pad given sizes to multiple of storage size of bitstream
 //
 #if defined(HLR_USE_BITSTREAM)
-inline size_t  pad_bs  ( const size_t  n ) { return ( n % 8 != 0 ) ? n + (8 - n % 8) : n; }
+template < typename storage_t > size_t  pad_bs  ( const size_t  n ) { return ( n % sizeof(storage_t) != 0 ) ? n + (sizeof(storage_t) - n % sizeof(storage_t)) : n; }
 #else
-inline size_t  pad_bs  ( const size_t  n ) { return n; }
+template < typename storage_t > size_t  pad_bs  ( const size_t  n ) { return n; }
 #endif
 
 }}// namespace hlr::compress
