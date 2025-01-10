@@ -15,6 +15,7 @@ namespace hlr { namespace seq { namespace tensor {
 
 using hlr::tensor::build_hierarchical_tucker;
 using hlr::tensor::to_dense;
+using hlr::tensor::compress_tucker;
 
 }}}// namespace hlr::seq::tensor
 
