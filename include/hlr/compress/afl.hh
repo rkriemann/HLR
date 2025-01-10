@@ -72,6 +72,8 @@ struct FP_info< float >
 
     constexpr static uint32_t  zero_val    = 0xffffffff;
     constexpr static float     maximum     = std::numeric_limits< float >::max();
+
+    using  bs_storage_t = uint32_t;
 };
     
 template <>
@@ -87,6 +89,8 @@ struct FP_info< double >
 
     constexpr static uint64_t  zero_val    = 0xffffffffffffffff;
     constexpr static float     maximum     = std::numeric_limits< float >::max();
+
+    using  bs_storage_t = uint64_t;
 };
 
 using FP32 = FP_info< float >;
@@ -167,8 +171,8 @@ compress ( const float *   data,
     size_t            i    = 0;
 
     #if defined(HLR_USE_BITSTREAM)
-    const size_t      bssize = pad_bs( byte_pad( nsize * nbits ) / 8 );
-    auto              bs     = bitstream( zdata + pos, bssize );
+    const size_t      bssize = pad_bs< uint32_t >( byte_pad( nsize * nbits ) / 8 );
+    auto              bs     = bitstream< uint32_t >( zdata + pos, bssize );
     #endif
     
     for ( ; i < nbsize; i += nbuf )
@@ -326,8 +330,8 @@ decompress ( float *         data,
     size_t            i    = 0;
 
     #if defined(HLR_USE_BITSTREAM)
-    const size_t      bssize = pad_bs( byte_pad( nsize * nbits ) / 8 );
-    auto              bs     = bitstream( const_cast< byte_t * >( zdata ) + pos, bssize );
+    const size_t      bssize = pad_bs< uint32_t >( byte_pad( nsize * nbits ) / 8 );
+    auto              bs     = bitstream< uint32_t >( const_cast< byte_t * >( zdata ) + pos, bssize );
     #endif
     
     for ( ; i < nbsize; i += nbuf )
@@ -475,8 +479,8 @@ compress ( const double *  data,
     size_t            i    = 0;
 
     #if defined(HLR_USE_BITSTREAM)
-    const size_t      bssize = pad_bs( byte_pad( nsize * nbits ) / 8 );
-    auto              bs     = bitstream( zdata + pos, bssize );
+    const size_t      bssize = pad_bs< uint64_t >( byte_pad( nsize * nbits ) / 8 );
+    auto              bs     = bitstream< uint64_t >( zdata + pos, bssize );
     #endif
     
     for ( ; i < nbsize; i += nbuf )
@@ -634,8 +638,8 @@ decompress ( double *        data,
     size_t            i    = 0;
 
     #if defined(HLR_USE_BITSTREAM)
-    const size_t      bssize = pad_bs( byte_pad( nsize * nbits ) / 8 );
-    auto              bs     = bitstream( const_cast< byte_t * >( zdata ) + pos, bssize );
+    const size_t      bssize = pad_bs< uint64_t >( byte_pad( nsize * nbits ) / 8 );
+    auto              bs     = bitstream< uint64_t >( const_cast< byte_t * >( zdata ) + pos, bssize );
     #endif
     
     for ( ; i < nbsize; i += nbuf )
@@ -758,7 +762,8 @@ compress ( const config &   config,
            const size_t     dim2 = 0,
            const size_t     dim3 = 0 )
 {
-    using  real_t = Hpro::real_type_t< value_t >;
+    using  real_t       = Hpro::real_type_t< value_t >;
+    using  bs_storage_t = typename FP_info< value_t >::bs_storage_t;
     
     constexpr real_t  fp_maximum = FP_info< real_t >::maximum;
 
@@ -799,7 +804,7 @@ compress ( const config &   config,
     const uint32_t  prec_bits = std::min< uint32_t >( FP_info< real_t >::mant_bits, config.bitrate );        // total no. of bits per value
     const size_t    nbits     = 1 + exp_bits + prec_bits;                                                    // number of bits per value
     const auto      scale     = vmin;                                                                        // scale all values v_i such that |v_i| >= 1
-    auto            zdata     = std::vector< byte_t >( FP_info< real_t >::header_ofs + pad_bs( byte_pad( nsize * nbits ) / 8 ) );
+    auto            zdata     = std::vector< byte_t >( FP_info< real_t >::header_ofs + pad_bs< bs_storage_t >( byte_pad( nsize * nbits ) / 8 ) );
 
     HLR_ASSERT( nbits <= sizeof(value_t) * 8 );
     HLR_ASSERT( std::isfinite( scale ) );
@@ -924,7 +929,8 @@ zarray
 compress_lr ( const blas::matrix< value_t > &                       U,
               const blas::vector< Hpro::real_type_t< value_t > > &  S )
 {
-    using  real_t = Hpro::real_type_t< value_t >;
+    using  real_t       = Hpro::real_type_t< value_t >;
+    using  bs_storage_t = typename FP_info< value_t >::bs_storage_t;
     
     constexpr real_t  fp_maximum  = FP_info< real_t >::maximum;
     constexpr size_t  header_size = FP_info< real_t >::header_ofs;
@@ -962,7 +968,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
         
         const size_t  nbits = 1 + e[l] + m[l]; // number of bits per value
         
-        zsize += header_size + pad_bs( byte_pad( n * nbits ) / 8 );
+        zsize += header_size + pad_bs< bs_storage_t >( byte_pad( n * nbits ) / 8 );
     }// for
 
     //
@@ -981,7 +987,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
         const size_t    nbits     = 1 + exp_bits + prec_bits; // number of bits per value
 
         compress( U.data() + l*n, n, zdata.data() + pos, scale, exp_bits, prec_bits );
-        pos += header_size + pad_bs( byte_pad( n * nbits ) / 8 );
+        pos += header_size + pad_bs< bs_storage_t >( byte_pad( n * nbits ) / 8 );
     }// for
 
     return zdata;
@@ -1002,7 +1008,8 @@ zarray
 compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double > > &  U,
                                         const blas::vector< double > &                  S )
 {
-    using  real_t = double;
+    using  real_t       = double;
+    using  bs_storage_t = typename FP_info< real_t >::bs_storage_t;
     
     constexpr real_t  fp_maximum  = FP_info< real_t >::maximum;
     constexpr size_t  header_size = FP_info< real_t >::header_ofs;
@@ -1044,7 +1051,7 @@ compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double
 
         const size_t  nbits = 1 + e[l] + m[l]; // number of bits per value
         
-        zsize += header_size + pad_bs( byte_pad( n2 * nbits ) / 8 ); // twice because real+imag
+        zsize += header_size + pad_bs< bs_storage_t >( byte_pad( n2 * nbits ) / 8 ); // twice because real+imag
     }// for
 
     //
@@ -1063,7 +1070,7 @@ compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double
         const size_t    nbits     = 1 + exp_bits + prec_bits; // number of bits per value
 
         compress( U_ptr + l * n2, n2, zdata.data() + pos, scale, exp_bits, prec_bits );
-        pos += header_size + pad_bs( byte_pad( n2 * nbits ) / 8 );
+        pos += header_size + pad_bs< bs_storage_t >( byte_pad( n2 * nbits ) / 8 );
     }// for
 
     return zdata;
@@ -1074,7 +1081,8 @@ void
 decompress_lr ( const zarray &             zdata,
                 blas::matrix< value_t > &  U )
 {
-    using  real_t = Hpro::real_type_t< value_t >;
+    using  real_t       = Hpro::real_type_t< value_t >;
+    using  bs_storage_t = typename FP_info< real_t >::bs_storage_t;
 
     constexpr size_t  header_size = FP_info< real_t >::header_ofs;
     
@@ -1094,7 +1102,7 @@ decompress_lr ( const zarray &             zdata,
         const uint32_t  nbits     = 1 + exp_bits + prec_bits;
 
         decompress( U.data() + l * n, n, zdata.data() + pos, exp_bits, prec_bits );
-        pos += header_size + pad_bs( byte_pad( nbits * n ) / 8 );
+        pos += header_size + pad_bs< bs_storage_t >( byte_pad( nbits * n ) / 8 );
     }// for
 }
 
@@ -1114,7 +1122,8 @@ void
 decompress_lr< std::complex< double > > ( const zarray &                            zdata,
                                           blas::matrix< std::complex< double > > &  U )
 {
-    using  real_t = double;
+    using  real_t       = double;
+    using  bs_storage_t = typename FP_info< real_t >::bs_storage_t;
 
     constexpr size_t  header_size = FP_info< real_t >::header_ofs;
     
@@ -1136,7 +1145,7 @@ decompress_lr< std::complex< double > > ( const zarray &                        
         const uint32_t  nbits     = 1 + exp_bits + prec_bits;
 
         decompress( U_ptr + l * n2, n2, zdata.data() + pos, exp_bits, prec_bits );
-        pos += header_size + pad_bs( byte_pad( nbits * n2 ) / 8 );
+        pos += header_size + pad_bs< bs_storage_t >( byte_pad( nbits * n2 ) / 8 );
     }// for
 }
 
@@ -1160,6 +1169,8 @@ mulvec ( const size_t                        nrows,
          const uint8_t                       exp_bits,
          const uint8_t                       prec_bits )
 {
+    using  bs_storage_t = typename FP_info< value_t >::bs_storage_t;
+    
     const uint8_t     nbits      = 1 + exp_bits + prec_bits;
     const uint64_t    prec_mask  = ( 1ul << prec_bits ) - 1;
     const uint8_t     prec_ofs   = FP64::mant_bits - prec_bits;
@@ -1169,8 +1180,8 @@ mulvec ( const size_t                        nrows,
     const auto        scale      = alpha * zscale;
 
     #if defined(HLR_USE_BITSTREAM)
-    const size_t      bssize = pad_bs( byte_pad( nrows * ncols * nbits ) / 8 );
-    auto              bs     = bitstream( const_cast< byte_t * >( zA ), bssize );
+    const size_t      bssize = pad_bs< bs_storage_t >( byte_pad( nrows * ncols * nbits ) / 8 );
+    auto              bs     = bitstream< bs_storage_t >( const_cast< byte_t * >( zA ), bssize );
     #else
     size_t            pos    = 0; // current byte position in zA
     uint32_t          bpos   = 0; // bit position in current byte
@@ -1325,7 +1336,8 @@ mulvec_lr ( const size_t     nrows,
             const value_t *  x,
             value_t *        y )
 {
-    using  real_t = Hpro::real_type_t< value_t >;
+    using  real_t       = Hpro::real_type_t< value_t >;
+    using  bs_storage_t = typename FP_info< value_t >::bs_storage_t;
 
     constexpr size_t  scale_ofs = FP_info< real_t >::scale_ofs;
     constexpr size_t  data_ofs  = FP_info< real_t >::header_ofs;
@@ -1339,7 +1351,7 @@ mulvec_lr ( const size_t     nrows,
             {
                 const uint8_t  exp_bits  = zA[pos];
                 const uint8_t  prec_bits = zA[pos+1];
-                const uint8_t  nbyte     = pad_bs( byte_pad( 1 + exp_bits + prec_bits ) / 8 );
+                const uint8_t  nbyte     = pad_bs< bs_storage_t >( byte_pad( 1 + exp_bits + prec_bits ) / 8 );
                 const real_t   scale     = * ( reinterpret_cast< const real_t * >( zA.data() + pos + scale_ofs ) );
         
                 mulvec( nrows, 1, op_A, alpha, scale, zA.data() + pos + data_ofs, x+l, y, exp_bits, prec_bits );
@@ -1361,7 +1373,7 @@ mulvec_lr ( const size_t     nrows,
             {
                 const uint8_t  exp_bits  = zA[pos];
                 const uint8_t  prec_bits = zA[pos+1];
-                const uint8_t  nbyte     = pad_bs( byte_pad( 1 + exp_bits + prec_bits ) / 8 );
+                const uint8_t  nbyte     = pad_bs< bs_storage_t >( byte_pad( 1 + exp_bits + prec_bits ) / 8 );
                 const real_t   scale     = * ( reinterpret_cast< const real_t * >( zA.data() + pos + scale_ofs ) );
         
                 mulvec( nrows, 1, op_A, alpha, scale, zA.data() + pos + data_ofs, x, y+l, exp_bits, prec_bits );
