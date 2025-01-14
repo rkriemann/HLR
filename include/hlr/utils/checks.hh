@@ -236,6 +236,10 @@ bool is_blocked_all ( const Hpro::TMatrix< value_t > &  A,
                       T&&...                            mtrs )  noexcept { return is_blocked( A ) && hlr::is_blocked_all( std::forward< T >( mtrs )... ); }
 
 template < typename value_t, typename... T >
+bool is_blocked_all ( const Hpro::TMatrix< value_t > *  A,
+                      T&&...                            mtrs )  noexcept { return is_blocked( A ) && hlr::is_blocked_all( std::forward< T >( mtrs )... ); }
+
+template < typename value_t, typename... T >
 bool is_blocked_any ( const Hpro::TMatrix< value_t > &  A,
                       T&&...                            mtrs )  noexcept { return is_blocked( A ) || hlr::is_blocked_any( std::forward< T >( mtrs )... ); }
 

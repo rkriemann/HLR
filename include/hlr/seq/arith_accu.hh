@@ -156,7 +156,7 @@ struct accumulator
         for ( auto  [ op_A, A, op_B, B, op_D, D ] : pending )
         {
             // filter out non-recursive updates
-            if ( ! is_blocked_all( A, B ) )
+            if ( ! hlr::is_blocked_all( A, B ) )
                 continue;
 
             if ( ! ( is_null( D ) || is_blocked( D ) ))
@@ -225,7 +225,7 @@ struct accumulator
         {
             if ( is_null( D ) )
             {
-                if ( ! is_blocked_all( A, B ) && ! ( matrix::is_lowrank_any( A, B ) || matrix::is_lowrank_sv_any( A, B ) ) )
+                if ( ! hlr::is_blocked_all( A, B ) && ! ( matrix::is_lowrank_any( A, B ) || matrix::is_lowrank_sv_any( A, B ) ) )
                 {
                     handle_dense = true;
                     break;
@@ -233,7 +233,7 @@ struct accumulator
             }// if
             else
             {
-                if ( ! is_blocked_all( A, B, D ) && ! ( matrix::is_lowrank_any( A, B ) || matrix::is_lowrank_sv_any( A, B ) ) )
+                if ( ! hlr::is_blocked_all( A, B, D ) && ! ( matrix::is_lowrank_any( A, B ) || matrix::is_lowrank_sv_any( A, B ) ) )
                 {
                     handle_dense = true;
                     break;
@@ -243,10 +243,10 @@ struct accumulator
         
         for ( auto  [ op_A, A, op_B, B, op_D, D ] : pending )
         {
-            if (( is_null( D ) && is_blocked_all( A, B, &M ) ) || is_blocked_all( A, B, D, &M ) )
+            if (( is_null( D ) && hlr::is_blocked_all( A, B, &M ) ) || hlr::is_blocked_all( A, B, D, &M ) )
                 continue;
         
-            if (( is_null( D ) && is_blocked_all( A, B ) ) || is_blocked_all( A, B, D ) )
+            if (( is_null( D ) && hlr::is_blocked_all( A, B ) ) || hlr::is_blocked_all( A, B, D ) )
             {
                 //
                 // if M is a leaf and A _and_ B are blocked, a temporary matrix
@@ -512,7 +512,7 @@ solve_diag ( const eval_side_t                side,
 
     trace::region_end( "eval" );
     
-    if ( is_blocked_all( D, M ) )
+    if ( hlr::is_blocked_all( D, M ) )
     {
         auto  BD = cptrcast( &D, Hpro::TBlockMatrix< value_t > );
         auto  BM =  ptrcast( &M, Hpro::TBlockMatrix< value_t > );

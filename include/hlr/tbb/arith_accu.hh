@@ -142,7 +142,7 @@ struct accumulator
         for ( auto  [ op_A, A, op_B, B ] : pending )
         {
             // filter out non-recursive updates
-            if ( ! is_blocked_all( A, B ) )
+            if ( ! hlr::is_blocked_all( A, B ) )
                 continue;
                                             
             auto  BA = cptrcast( A, Hpro::TBlockMatrix< value_t > );

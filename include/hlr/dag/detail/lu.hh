@@ -287,7 +287,7 @@ solve_upper_node< value_t, approx_t >::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked_all( A, U ) && ! is_small_any( min_size, A, U ) )
+    if ( hlr::is_blocked_all( A, U ) && ! is_small_any( min_size, A, U ) )
     {
         auto        BU  = cptrcast( U, Hpro::TBlockMatrix< value_t > );
         auto        BA  = ptrcast(  A, Hpro::TBlockMatrix< value_t > );
@@ -361,7 +361,7 @@ solve_lower_node< value_t, approx_t >::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked_all( A, L ) && ! is_small_any( min_size, A, L ) )
+    if ( hlr::is_blocked_all( A, L ) && ! is_small_any( min_size, A, L ) )
     {
         auto        BL  = cptrcast( L, Hpro::TBlockMatrix< value_t > );
         auto        BA  = ptrcast(  A, Hpro::TBlockMatrix< value_t > );
@@ -435,7 +435,7 @@ update_node< value_t, approx_t >::refine_ ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked_all( A, B, C ) && ! is_small_any( min_size, A, B, C ) )
+    if ( hlr::is_blocked_all( A, B, C ) && ! is_small_any( min_size, A, B, C ) )
     {
         //
         // generate sub nodes assuming 2x2 block structure

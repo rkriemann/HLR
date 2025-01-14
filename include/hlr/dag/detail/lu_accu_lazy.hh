@@ -122,7 +122,7 @@ struct accumulator
                  const matrix_t &  C,
                  const accuracy &  acc )
     {
-        // if ( is_blocked_all( A, B ) )
+        // if ( hlr::is_blocked_all( A, B ) )
         {
             std::scoped_lock  lock( mtx_pending );
             
@@ -134,7 +134,7 @@ struct accumulator
         //     // determine if to prefer dense format
         //     //
             
-        //     const bool  handle_dense = check_dense( C ) || ( ! is_blocked_all( A, B ) && ! is_lowrank_any( A, B ) );
+        //     const bool  handle_dense = check_dense( C ) || ( ! hlr::is_blocked_all( A, B ) && ! is_lowrank_any( A, B ) );
                 
         //     //
         //     // compute update (either A or B is a leaf)
@@ -190,7 +190,7 @@ struct accumulator
         for ( auto  [ op_A, A, op_B, B ] : pending )
         {
             // filter out non-recursive updates
-            if ( ! is_blocked_all( A, B ) )
+            if ( ! hlr::is_blocked_all( A, B ) )
                 continue;
                                             
             auto  BA = cptrcast( A, Hpro::TBlockMatrix< value_t > );
@@ -252,7 +252,7 @@ struct accumulator
 
         for ( auto  [ op_A, A, op_B, B ] : pending )
         {
-            if ( ! is_blocked_all( A, B ) && ! ( matrix::is_lowrank_any( A, B ) || matrix::is_lowrank_sv_any( A, B ) ) )
+            if ( ! hlr::is_blocked_all( A, B ) && ! ( matrix::is_lowrank_any( A, B ) || matrix::is_lowrank_sv_any( A, B ) ) )
             {
                 handle_dense = true;
                 break;
@@ -262,10 +262,10 @@ struct accumulator
         for ( auto  [ op_A, A, op_B, B ] : pending )
         {
             // can not handle pure recursive updates
-            if ( is_blocked_all( A, B, &M ) )
+            if ( hlr::is_blocked_all( A, B, &M ) )
                 continue;
         
-            if ( is_blocked_all( A, B ) )
+            if ( hlr::is_blocked_all( A, B ) )
             {
                 //
                 // if M is a leaf and A _and_ B are blocked, a temporary matrix
@@ -974,7 +974,7 @@ solve_upper_node< value_t, approx_t >::refine_  ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked_all( A, U ) && ! is_small_any( min_size, A, U ) )
+    if ( hlr::is_blocked_all( A, U ) && ! is_small_any( min_size, A, U ) )
     {
         auto        BU  = cptrcast( U, Hpro::TBlockMatrix< value_t > );
         auto        BA  = ptrcast(  A, Hpro::TBlockMatrix< value_t > );
@@ -1069,7 +1069,7 @@ solve_lower_node< value_t, approx_t >::refine_  ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked_all( A, L ) && ! is_small_any( min_size, A, L ) )
+    if ( hlr::is_blocked_all( A, L ) && ! is_small_any( min_size, A, L ) )
     {
         auto        BL  = cptrcast( L, Hpro::TBlockMatrix< value_t > );
         auto        BA  = ptrcast(  A, Hpro::TBlockMatrix< value_t > );
@@ -1127,7 +1127,7 @@ update_node< value_t, approx_t >::refine_  ( const size_t  min_size )
 {
     local_graph  g;
 
-    if ( is_blocked_all( A, B, C ) && ! is_small_any( min_size, A, B, C ) )
+    if ( hlr::is_blocked_all( A, B, C ) && ! is_small_any( min_size, A, B, C ) )
     {
         //
         // generate sub nodes assuming 2x2 block structure
