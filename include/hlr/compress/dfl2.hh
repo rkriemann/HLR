@@ -379,8 +379,8 @@ compress ( const double *  data,
     uint32_t  bpos = 0; // start bit position in current byte
 
     #if defined(HLR_USE_BITSTREAM)
-    const size_t  bssize = pad_bs( byte_pad( nsize * nbits ) / 8 );
-    auto          bs     = bitstream( zdata + pos, bssize );
+    const size_t  bssize = pad_bs< uint64_t >( byte_pad( nsize * nbits ) / 8 );
+    auto          bs     = bitstream< uint64_t >( zdata + pos, bssize );
     #endif
     
     for ( size_t  i = 0; i < nsize; ++i )
@@ -435,8 +435,8 @@ decompress ( double *        data,
     uint32_t  bpos = 0;                          // bit position in current byte
 
     #if defined(HLR_USE_BITSTREAM)
-    const size_t  bssize = pad_bs( byte_pad( nsize * nbits ) / 8 );
-    auto          bs     = bitstream( const_cast< byte_t * >( zdata ) + pos, bssize );
+    const size_t  bssize = pad_bs< uint64_t >( byte_pad( nsize * nbits ) / 8 );
+    auto          bs     = bitstream< uint64_t >( const_cast< byte_t * >( zdata ) + pos, bssize );
     #endif
     
     for ( size_t  i = 0; i < nsize; ++i )
@@ -501,7 +501,7 @@ compress ( const config &   config,
     const uint32_t  exp_bits  = 11;
     const uint32_t  prec_bits = std::min< uint32_t >( fp_info< real_t >::mant_bits, config.bitrate );        // total no. of bits per value
     const size_t    nbits     = 1 + exp_bits + prec_bits;                                                    // number of bits per value
-    auto            zdata     = std::vector< byte_t >( 1 + 1 + pad_bs( byte_pad( nsize * nbits ) / 8 ) );
+    auto            zdata     = std::vector< byte_t >( 1 + 1 + pad_bs< uint64_t >( byte_pad( nsize * nbits ) / 8 ) );
 
     compress( data, nsize, zdata.data(), exp_bits, prec_bits );
 
@@ -642,7 +642,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
 
         const size_t  nbits = 1 + exp_bits + m[l]; // number of bits per value
         
-        zsize += 1 + 1 + pad_bs( byte_pad( n * nbits ) / 8 );
+        zsize += 1 + 1 + pad_bs< uint64_t >( byte_pad( n * nbits ) / 8 );
     }// for
 
     // for ( uint32_t  l = 0; l < k; ++l )
@@ -664,7 +664,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
         const size_t    nbits     = 1 + exp_bits + prec_bits; // number of bits per value
 
         compress( U.data() + l*n, n, zdata.data() + pos, exp_bits, prec_bits );
-        pos += header_size + pad_bs( byte_pad( n * nbits ) / 8 );
+        pos += header_size + pad_bs< uint64_t >( byte_pad( n * nbits ) / 8 );
     }// for
 
     return zdata;
@@ -705,7 +705,7 @@ compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double
 
         const size_t  nbits = 1 + exp_bits + m[l]; // number of bits per value
         
-        zsize += 1 + 1 + pad_bs( byte_pad( n2 * nbits ) / 8 ); // twice because real+imag
+        zsize += 1 + 1 + pad_bs< uint64_t >( byte_pad( n2 * nbits ) / 8 ); // twice because real+imag
     }// for
 
     //
@@ -723,7 +723,7 @@ compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double
         const size_t    nbits     = 1 + exp_bits + prec_bits; // number of bits per value
 
         compress( U_ptr + l * n2, n2, zdata.data() + pos, exp_bits, prec_bits );
-        pos += header_size + pad_bs( byte_pad( n2 * nbits ) / 8 );
+        pos += header_size + pad_bs< uint64_t >( byte_pad( n2 * nbits ) / 8 );
     }// for
 
     return zdata;
@@ -753,7 +753,7 @@ decompress_lr ( const zarray &             zdata,
         const uint32_t  nbits     = 1 + exp_bits + prec_bits;
 
         decompress( U.data() + l * n, n, zdata.data() + pos, exp_bits, prec_bits );
-        pos += header_size + pad_bs( byte_pad( nbits * n ) / 8 );
+        pos += header_size + pad_bs< uint64_t >( byte_pad( nbits * n ) / 8 );
     }// for
 }
 
@@ -794,7 +794,7 @@ decompress_lr< std::complex< double > > ( const zarray &                        
         const uint32_t  nbits     = 1 + exp_bits + prec_bits;
 
         decompress( U_ptr + l * n2, n2, zdata.data() + pos, exp_bits, prec_bits );
-        pos += header_size + pad_bs( byte_pad( nbits * n2 ) / 8 );
+        pos += header_size + pad_bs< uint64_t >( byte_pad( nbits * n2 ) / 8 );
     }// for
 }
 
