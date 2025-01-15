@@ -124,28 +124,29 @@ using zarray = hlr::compress::sz3::zarray;
 using hlr::compress::sz3::compress_lr;
 using hlr::compress::sz3::decompress_lr;
 using hlr::compress::sz3::byte_size;
+using hlr::compress::sz3::compressed_size;
 
 static const char provider[] = "sz3";
 
 }}}// namespace hlr::compress::aplr
 
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////
 
-#elif HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_MGARD
+// #elif HLR_APLR_COMPRESSOR == HLR_COMPRESSOR_MGARD
 
-#include <hlr/compress/mgard.hh>
+// #include <hlr/compress/mgard.hh>
 
-namespace hlr { namespace compress { namespace aplr {
+// namespace hlr { namespace compress { namespace aplr {
 
-using zarray = hlr::compress::mgard::zarray;
-using hlr::compress::mgard::compress_lr;
-using hlr::compress::mgard::decompress_lr;
-using hlr::compress::mgard::byte_size;
+// using zarray = hlr::compress::mgard::zarray;
+// using hlr::compress::mgard::compress_lr;
+// using hlr::compress::mgard::decompress_lr;
+// using hlr::compress::mgard::byte_size;
 
-static const char provider[] = "mgard";
+// static const char provider[] = "mgard";
 
-}}}// namespace hlr::compress::aplr
+// }}}// namespace hlr::compress::aplr
 
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
