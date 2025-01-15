@@ -15,6 +15,11 @@
 //
 ////////////////////////////////////////////////////////////
 
+//
+// signal availability of compressed BLAS
+//
+#define HLR_HAS_ZBLAS_DIRECT
+
 namespace hlr { namespace compress { namespace fp32 {
 
 using fp32_t = float;
@@ -25,8 +30,9 @@ struct config
 // holds compressed data
 using  zarray = std::vector< fp32_t >;
 
-inline size_t  byte_size  ( const zarray &  v   ) { return v.size() * sizeof(fp32_t); }
-inline config  get_config ( const double    eps ) { return config{}; }
+inline size_t  compressed_size ( const zarray &  v   ) { return v.size() * sizeof(fp32_t); }
+inline size_t  byte_size       ( const zarray &  v   ) { return sizeof(v) + compressed_size( v ); }
+inline config  get_config      ( const double    eps ) { return config{}; }
 
 template < typename value_t >
 zarray
@@ -195,6 +201,114 @@ decompress< std::complex< double > > ( const zarray &            zdata,
     
     for ( size_t  i = 0; i < nsize; ++i )
         dest[i] = std::complex< double >( zdata[2*i], zdata[2*i+1] );
+}
+
+//
+// compressed blas
+//
+
+template < typename value_t >
+void
+mulvec ( const size_t     nrows,
+         const size_t     ncols,
+         const matop_t    op_A,
+         const value_t    alpha,
+         const zarray &   zA,
+         const value_t *  x,
+         value_t *        y )
+{
+    using  real_t = Hpro::real_type_t< value_t >;
+
+    // if constexpr ( std::same_as< value_t, float > )
+    // {
+    //     blas::gemv( char( op_A ),
+    //                 blas::blas_int_t(nrows),
+    //                 blas::blas_int_t(ncols),
+    //                 alpha,
+    //                 zA.data(),
+    //                 blas::blas_int_t(nrows),
+    //                 x,
+    //                 blas::blas_int_t(1),
+    //                 float(1),
+    //                 y,
+    //                 blas::blas_int_t(1) );
+    // }// if
+    // else if constexpr ( std::same_as< value_t, std::complex< float > > )
+    // {
+    //     blas::gemv( char( op_A ),
+    //                 blas::blas_int_t(nrows),
+    //                 blas::blas_int_t(ncols),
+    //                 alpha,
+    //                 zA.data(),
+    //                 blas::blas_int_t(nrows),
+    //                 x,
+    //                 blas::blas_int_t(1),
+    //                 std::complex< float >( 1 ),
+    //                 y,
+    //                 blas::blas_int_t(1) );
+    // }// if
+    // else
+    {
+        auto  ptr = zA.data();
+        
+        switch ( op_A )
+        {
+            case apply_normal :
+            {
+                for ( blas::idx_t j = 0; j < ncols; ++j )
+                {
+                    const auto  x_j = alpha * x[j];
+            
+                    for ( blas::idx_t i = 0; i < nrows; ++i )
+                        y[i] += *ptr++ * x_j;
+                }// for
+            }
+            break;
+            
+            case apply_conjugate :
+            {
+                for ( blas::idx_t j = 0; j < ncols; ++j )
+                {
+                    const auto  x_j = alpha * x[j];
+            
+                    for ( blas::idx_t i = 0; i < nrows; ++i )
+                        y[i] += math::conj( *ptr++ ) * x_j;
+                }// for
+            }
+            break;
+            
+            case apply_transposed :
+            {
+                for ( blas::idx_t j = 0; j < ncols; ++j )
+                {
+                    value_t  f = value_t(0);
+            
+                    for ( blas::idx_t i = 0; i < nrows; ++i )
+                        f += *ptr++ * x[i];
+            
+                    y[j] += alpha * f;
+                }// for
+            }
+            break;
+            
+            case apply_adjoint :
+            {
+                for ( blas::idx_t j = 0; j < ncols; ++j )
+                {
+                    value_t  f = value_t(0);
+            
+                    for ( blas::idx_t i = 0; i < nrows; ++i )
+                        f += math::conj(*ptr++) * x[i];
+            
+                    y[j] += alpha * f;
+                }// for
+            }
+            break;
+
+            default:
+                HLR_ERROR( "unknown matrix mode" );
+        }// switch
+    }// else
 }
 
 }}}// namespace hlr::compress::fp32
