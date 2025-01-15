@@ -811,6 +811,8 @@ if aplr == 'default'  :
     elif compressor == 'posits' : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=12' )
     elif compressor == 'cfloat' : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=20' )
     elif compressor == 'blosc'  : env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=21' )
+    else :
+        env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=0' )
 elif aplr == 'none'  :
     env.Append( CPPDEFINES = 'HLR_APLR_COMPRESSOR=0' )
 elif aplr == 'afl'  :
