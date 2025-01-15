@@ -35,6 +35,9 @@ using hlr::compress::fp32::compress;
 using hlr::compress::fp32::decompress;
 using hlr::compress::fp32::get_config;
 using hlr::compress::fp32::byte_size;
+using hlr::compress::fp32::compressed_size;
+
+namespace zblas { using hlr::compress::fp32::mulvec; }
 
 }} // namespace hlr::compress
 
@@ -187,6 +190,7 @@ using hlr::compress::sz::compress;
 using hlr::compress::sz::decompress;
 using hlr::compress::sz::get_config;
 using hlr::compress::sz::byte_size;
+using hlr::compress::sz::compressed_size;
 
 }} // namespace hlr::compress
 
@@ -212,6 +216,7 @@ using hlr::compress::sz3::compress;
 using hlr::compress::sz3::decompress;
 using hlr::compress::sz3::get_config;
 using hlr::compress::sz3::byte_size;
+using hlr::compress::sz3::compressed_size;
 
 }} // namespace hlr::compress
 
@@ -489,6 +494,7 @@ using hlr::compress::mgard::compress;
 using hlr::compress::mgard::decompress;
 using hlr::compress::mgard::get_config;
 using hlr::compress::mgard::byte_size;
+using hlr::compress::mgard::compressed_size;
 
 }} // namespace hlr::compress
 
