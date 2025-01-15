@@ -536,27 +536,12 @@ get_tolerances ( const accuracy &                 acc,
 
         // std::cout << "δ: " << δ << " / sum: " << Σ << " / err: " << δ*(1 + 2*k) + δ*δ * Σ;
 
-        //
-        // using both terms in the error formula
-        //
-        
-        // solve via p/q since more robust than direct approach
-        auto  p = ( 1 + 2*k ) / Σ;
-        auto  q = δ / Σ;
-        auto  t = p*p / 4 - q;
-
-        if ( t < 0 ) t = 0;
-            
-        auto  d1 = std::abs( p/2 + std::sqrt( t ) );
-        auto  d2 = std::abs( p/2 - std::sqrt( t ) );
-        
-        tol = std::min( std::abs( d1 ), std::abs( d2 ) ); // std::max( δ, δ * δ * Σ ) / ( 3 * k ); // "/ 2"
-
         // //
-        // // using just sum of sing. values.
+        // // using both terms in the error formula
         // //
         
-        // auto  p = 1 / Σ;
+        // // solve via p/q since more robust than direct approach
+        // auto  p = ( 1 + 2*k ) / Σ;
         // auto  q = δ / Σ;
         // auto  t = p*p / 4 - q;
 
@@ -565,7 +550,22 @@ get_tolerances ( const accuracy &                 acc,
         // auto  d1 = std::abs( p/2 + std::sqrt( t ) );
         // auto  d2 = std::abs( p/2 - std::sqrt( t ) );
         
-        // tol = std::min( std::abs( d1 ), std::abs( d2 ) );
+        // tol = std::min( std::abs( d1 ), std::abs( d2 ) ); // std::max( δ, δ * δ * Σ ) / ( 3 * k ); // "/ 2"
+
+        //
+        // using just sum of sing. values.
+        //
+        
+        auto  p = 1 / Σ;
+        auto  q = δ / Σ;
+        auto  t = p*p / 4 - q;
+
+        if ( t < 0 ) t = 0;
+            
+        auto  d1 = std::abs( p/2 + std::sqrt( t ) );
+        auto  d2 = std::abs( p/2 - std::sqrt( t ) );
+        
+        tol = std::min( std::abs( d1 ), std::abs( d2 ) );
 
         // std::cout << " / tol: " << tol << ", " << tol * ( 1 + 2*k + tol * Σ );
         // std::cout << std::endl;
