@@ -38,7 +38,7 @@ struct config
     double  pwr_bound_ratio;
 };
 
-inline config  get_config ( double  eps ) { return config{ REL, 0.0, eps, 0.0 }; }
+inline config  get_config ( double  eps ) { return config{ REL, 0.0, 0.5 * eps, 0.0 }; }
 
 //
 // handles arrays allocated _within_ SZ
@@ -116,9 +116,11 @@ public:
     byte_t *  begin () const { return _ptr; }
     byte_t *  end   () const { return _ptr + _size; }
     
-    byte_t *  data () const { return _ptr; }
-    size_t    size () const { return _size; }
+    byte_t *  data  () const { return _ptr; }
+    size_t    size  () const { return _size; }
 
+    bool      empty () const { return _size == 0; }
+    
     void  free ()
     {
         ::free( _ptr );
@@ -127,7 +129,8 @@ public:
     }
 };
 
-inline size_t  byte_size ( const zarray &  v ) { return sizeof(zarray) + v.size(); }
+inline size_t  byte_size       ( const zarray &  v ) { return sizeof(zarray) + v.size(); }
+inline size_t  compressed_size ( const zarray &  v ) { return v.size(); }
 
 template < typename value_t >
 zarray
