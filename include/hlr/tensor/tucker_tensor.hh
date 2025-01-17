@@ -376,10 +376,7 @@ tucker_tensor3< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     //     // }// for
     // }
 
-    const size_t  mem  = sizeof(value_t) * ( _G.size(0) * _G.size(1) * _G.size(2) +
-                                             _X[0].nrows() + _X[0].ncols() +
-                                             _X[1].nrows() + _X[1].ncols() +
-                                             _X[2].nrows() + _X[2].ncols() );
+    const size_t  mem  = _G.data_byte_size() + _X[0].data_byte_size() + _X[1].data_byte_size() + _X[2].data_byte_size();
     const size_t  zmem = compress::byte_size( zG ) + compress::byte_size( zX0 ) + compress::byte_size( zX1 ) + compress::byte_size( zX2 );
 
     if ( zmem < mem )
@@ -723,17 +720,25 @@ tucker_tensor4< value_t >::compress ( const accuracy &  acc )
     auto  zX2     = compress::compress< value_t >( zconf_X, _X[2] );
     auto  zX3     = compress::compress< value_t >( zconf_X, _X[3] );
     
-    const size_t  mem  = sizeof(value_t) * ( _G.size(0) * _G.size(1) * _G.size(2) * _G.size(3) +
-                                             _X[0].nrows() + _X[0].ncols() +
-                                             _X[1].nrows() + _X[1].ncols() +
-                                             _X[2].nrows() + _X[2].ncols() +
-                                             _X[3].nrows() + _X[3].ncols() );
+    const size_t  mem  = _G.data_byte_size() + _X[0].data_byte_size() + _X[1].data_byte_size() + _X[2].data_byte_size() + _X[3].data_byte_size();
     const size_t  zmem = ( compress::byte_size( zG )
                            + compress::byte_size( zX0 )
                            + compress::byte_size( zX1 )
                            + compress::byte_size( zX2 )
                            + compress::byte_size( zX3 ) );
 
+    // std::cout << _G.data_byte_size()
+    //           << " / " << _X[0].data_byte_size()
+    //           << " / " << _X[1].data_byte_size()
+    //           << " / " << _X[2].data_byte_size()
+    //           << " / " << _X[3].data_byte_size() << std::endl;
+
+    // std::cout << compress::byte_size( zG )
+    //           << " / " << compress::byte_size( zX0 )
+    //           << " / " << compress::byte_size( zX1 )
+    //           << " / " << compress::byte_size( zX2 )
+    //           << " / " << compress::byte_size( zX3 ) << std::endl;
+    
     if ( zmem < mem )
     {
         _zG    = std::move( zG );
