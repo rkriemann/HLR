@@ -128,6 +128,8 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
+    auto  luacc = relative_prec( aeps );
+    
     auto  comp_lu =
         [&] ( const auto  apx, const std::string &  apxname )
         {
@@ -161,7 +163,7 @@ program_main ()
                 {
                     tic = timer::now();
                 
-                    impl::lu< value_t >( *LU, acc, apx );
+                    impl::lu< value_t >( *LU, luacc, apx );
                 
                     toc = timer::since( tic );
                     runtime.push_back( toc.seconds() );
@@ -201,7 +203,7 @@ program_main ()
                 {
                     tic = timer::now();
                 
-                    impl::accu::lu< value_t >( *LU, acc, apx );
+                    impl::accu::lu< value_t >( *LU, luacc, apx );
                 
                     toc = timer::since( tic );
                     runtime.push_back( toc.seconds() );
@@ -244,7 +246,7 @@ program_main ()
                 {
                     tic = timer::now();
 
-                    impl::dag::run( dag, acc );
+                    impl::dag::run( dag, luacc );
                 
                     toc = timer::since( tic );
                     runtime.push_back( toc.seconds() );
@@ -291,7 +293,7 @@ program_main ()
             
                     tic = timer::now();
 
-                    impl::dag::run( dag, acc );
+                    impl::dag::run( dag, luacc );
                 
                     toc = timer::since( tic );
                     runtime.push_back( toc.seconds() );
@@ -336,7 +338,7 @@ program_main ()
             
                     tic = timer::now();
 
-                    impl::dag::run( dag, acc );
+                    impl::dag::run( dag, luacc );
                 
                     toc = timer::since( tic );
                     runtime.push_back( toc.seconds() );
@@ -376,7 +378,7 @@ program_main ()
                 {
                     tic = timer::now();
                 
-                    impl::lu< value_t >( *LU, acc, apx );
+                    impl::lu< value_t >( *LU, luacc, apx );
                 
                     toc = timer::since( tic );
                     runtime.push_back( toc.seconds() );
@@ -423,7 +425,7 @@ program_main ()
                 {
                     tic = timer::now();
                 
-                    impl::accu::lu< value_t >( *LU, acc, apx );
+                    impl::accu::lu< value_t >( *LU, luacc, apx );
                 
                     toc = timer::since( tic );
                     runtime.push_back( toc.seconds() );
@@ -473,7 +475,7 @@ program_main ()
                 {
                     tic = timer::now();
 
-                    impl::dag::run( dag, acc );
+                    impl::dag::run( dag, luacc );
                 
                     toc = timer::since( tic );
                     runtime.push_back( toc.seconds() );
@@ -523,7 +525,7 @@ program_main ()
             
                     tic = timer::now();
 
-                    impl::dag::run( dag, acc );
+                    impl::dag::run( dag, luacc );
                 
                     toc = timer::since( tic );
                     runtime.push_back( toc.seconds() );
