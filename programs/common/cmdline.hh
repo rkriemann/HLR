@@ -28,7 +28,8 @@ size_t  ntile      = 128;          // tile size (nmin)
 size_t  nseq       = 0;            // use sequential arithmetic below
 size_t  nlvl       = 0;            // number of level, e.g., for Tile-H or MBLR
 size_t  k          = 16;           // constant rank
-double  eps        = 1e-4;         // constant precision
+double  eps        = 1e-4;         // build precision
+double  aeps       = -1;           // arithmetic precision (if <1, then "eps" is used)
 double  tol        = 0;            // tolerance
 string  appl       = "logkernel";  // application
 string  kernel     = "newton";     // (radial) kernel to use
@@ -63,7 +64,7 @@ string  tapprox    = "default";    // tensor low-rank approximation method (hosv
 string  arith      = "std";        // which kind of arithmetic to use
 bool    compress   = false;        // apply FP compression to matrix data
 auto    kappa      = std::complex< double >( 2, 0 ); // wave number for helmholtz problems
-double  sigma      = 1;            // parameter for matern covariance and gaussian kernel
+double  sigma      = 2.5;          // parameter for matern covariance and gaussian kernel
 bool    sep_coup   = false;        // use separate row/column couplings for Uni-H and H²
 string  lrformat   = "uv";         // lowrank format: uv (std), usv, usvv
 
@@ -139,49 +140,50 @@ parse ( int argc, char ** argv )
     app_opts.add_options()
         ( "adm",         value<string>(), ": admissibility (strong,vertex,weak,offdiag)" )
         ( "app",         value<string>(), ": application type (logkernel,matern,laplaceslp,helmholtzslp,exp)" )
-        ( "kernel",      value<string>(), ": kernel to use (newton,log,exp,...)" )
+        ( "capprox",     value<string>(), ": LR approximation to use (aca,hca,dense)" )
         ( "cluster",     value<string>(), ": clustering technique (tlr,blr,mblr(-n),tileh,bsp,h,sfc)" )
-        ( "part",        value<string>(), ": partitioning strategy (bsp-/pca-card,bsp-/pca-vol)" )
+        ( "coarsen",                      ": coarsen matrix structure" )
+        ( "compress",                     ": apply FP compression to matrix data" )
         ( "data",        value<string>(), ": data file to use" )
         ( "eta",         value<double>(), ": admissibility parameter for \"std\" and \"weak\"" )
         ( "grid",        value<string>(), ": grid file to use (intern: sphere,sphere2,cube,square)" )
         ( "kappa",       value<double>(), ": wavenumber for Helmholtz problems" )
-        ( "sigma",       value<double>(), ": parameter σ for Matérn and Gaussian" )
+        ( "kernel",      value<string>(), ": kernel to use (newton,log,exp,...)" )
         ( "matrix",      value<string>(), ": matrix file to use" )
         ( "nprob,n",     value<int>(),    ": set problem size" )
-        ( "sparse",      value<string>(), ": sparse matrix file to use" )
-        ( "compress",                     ": apply FP compression to matrix data" )
-        ( "coarsen",                      ": coarsen matrix structure" )
-        ( "tohodlr",                      ": convert matrix to HODLR format" )
-        ( "capprox",     value<string>(), ": LR approximation to use (aca,hca,dense)" )
+        ( "part",        value<string>(), ": partitioning strategy (bsp-/pca-card,bsp-/pca-vol)" )
         ( "sepcoup",                      ": use separate row/column couplings for Uni-H and H²" )
+        ( "sigma",       value<double>(), ": parameter σ for Matérn and Gaussian" )
+        ( "sparse",      value<string>(), ": sparse matrix file to use" )
+        ( "tohodlr",                      ": convert matrix to HODLR format" )
         ;
 
     ari_opts.add_options()
-        ( "accu",                         ": use accumulator arithmetic" )
         ( "aapprox",     value<string>(), ": LR approximation to use (svd,rrqr,randsvd,randlr,aca,lanczos)" )
-        ( "tapprox",     value<string>(), ": tensor LR approximation to use (hosvd,sthosvd,ghosvd,hhosvd,tcafull)" )
+        ( "accu",                         ": use accumulator arithmetic" )
+        ( "aeps",        value<double>(), ": set H-alrithmetic accuracy (default: ε)" )
         ( "arith",       value<string>(), ": which arithmetic to use (hpro, std, accu, lazy, all)" )
-        ( "nbench",      value<uint>(),   ": (maximal) number of benchmark iterations" )
-        ( "tbench",      value<double>(), ": minimal time for benchmark loop" )
         ( "coarse",      value<int>(),    ": use coarse DAG for LU" )
         ( "distr",       value<string>(), ": block cluster distribution (cyclic2d,shiftcycrow)" )
-        ( "eps,e",       value<double>(), ": set H-algebra precision ε" )
+        ( "eps,e",       value<double>(), ": set H-matrix accuracy ε" )
         ( "fused",                        ": compute fused DAG for LU and accumulators" )
+        ( "ip",                           ": do in-place LU" )
         ( "lvl",                          ": do level-wise LU" )
+        ( "lrformat",    value<string>(), ": lowrank format: uv (default), usv, usvv" )
+        ( "nbench",      value<uint>(),   ": (maximal) number of benchmark iterations" )
         ( "nlvl",        value<int>(),    ": number of levels, e.g. for Tile-H or MBLR" )
-        ( "nseq",        value<int>(),    ": set size of sequential arithmetic" )
-        ( "ntile",       value<int>(),    ": set tile size" )
         ( "nocopy",                       ": do not copy matrix before arithmetic" )
         ( "nodag",                        ": do not use DAG in arithmetic" )
         ( "nosparsify",                   ": do not sparsify DAG" )
+        ( "nseq",        value<int>(),    ": set size of sequential arithmetic" )
+        ( "ntile",       value<int>(),    ": set tile size" )
         ( "onlydag",                      ": only compute DAG but do not execute it" )
-        ( "ip",                           ": do in-place LU" )
         ( "oop",                          ": do out-of-place LU" )
         ( "rank,k",      value<uint>(),   ": set H-algebra rank k" )
         ( "ref",         value<string>(), ": reference matrix or algorithm" )
         ( "tol",         value<double>(), ": tolerance for some algorithms" )
-        ( "lrformat",    value<string>(), ": lowrank format: uv (default), usv, usvv" )
+        ( "tapprox",     value<string>(), ": tensor LR approximation to use (hosvd,sthosvd,ghosvd,hhosvd,tcafull)" )
+        ( "tbench",      value<double>(), ": minimal time for benchmark loop" )
         ;
 
     opts.add( gen_opts ).add( app_opts ).add( ari_opts );
@@ -234,6 +236,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "nlvl"       ) ) nlvl       = vm["nlvl"].as<int>();
     if ( vm.count( "rank"       ) ) k          = vm["rank"].as<uint>();
     if ( vm.count( "eps"        ) ) eps        = vm["eps"].as<double>();
+    if ( vm.count( "aeps"       ) ) aeps       = vm["aeps"].as<double>();
     if ( vm.count( "tol"        ) ) tol        = vm["tol"].as<double>();
     if ( vm.count( "app"        ) ) appl       = vm["app"].as<string>();
     if ( vm.count( "kernel"     ) ) kernel     = vm["kernel"].as<string>();
@@ -266,6 +269,9 @@ parse ( int argc, char ** argv )
     if ( vm.count( "sepcoup"    ) ) sep_coup   = true;
     if ( vm.count( "lrformat"   ) ) lrformat   = vm["lrformat"].as<string>();
 
+    if ( aeps < 0 )
+        aeps = eps;
+    
     if ( appl == "help" )
     {
         std::cout << "Applications:" << std::endl
