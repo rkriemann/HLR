@@ -265,9 +265,8 @@ dense_tensor3< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     else
         HLR_ERROR( "zero error" );
 
-    const auto    zconf     = compress::get_config( tol );
-    const size_t  mem_dense = sizeof(value_t) * T.size(0) * T.size(1) * T.size(2);
-    auto          zT        = compress::compress< value_t >( zconf, T );
+    const auto    zconf = compress::get_config( tol );
+    auto          zT    = compress::compress< value_t >( zconf, T );
 
     // // DEBUG
     // {
@@ -303,7 +302,10 @@ dense_tensor3< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     //     // }// for
     // }
     
-    if ( compress::byte_size( zT ) < mem_dense )
+    const size_t  mem  = T.data_byte_size();
+    const size_t  zmem = compress::byte_size( zT );
+    
+    if ( zmem < mem )
     {
         _ztensor = std::move( zT );
         _tensor  = std::move( blas::tensor3< value_t >() );
@@ -573,11 +575,13 @@ dense_tensor4< value_t >::compress ( const Hpro::TTruncAcc &  acc )
     else
         HLR_ERROR( "zero error" );
 
-    const auto    zconf     = compress::get_config( tol );
-    const size_t  mem_dense = sizeof(value_t) * T.size(0) * T.size(1) * T.size(2) * T.size(3);
-    auto          zT        = compress::compress< value_t >( zconf, T );
+    const auto    zconf = compress::get_config( tol );
+    auto          zT    = compress::compress< value_t >( zconf, T );
 
-    if ( compress::byte_size( zT ) < mem_dense )
+    const size_t  mem  = T.data_byte_size();
+    const size_t  zmem = compress::byte_size( zT );
+    
+    if ( zmem < mem )
     {
         _ztensor = std::move( zT );
         _tensor  = std::move( blas::tensor4< value_t >() );
