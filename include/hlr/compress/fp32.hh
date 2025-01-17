@@ -219,35 +219,35 @@ mulvec ( const size_t     nrows,
 {
     using  real_t = Hpro::real_type_t< value_t >;
 
-    // if constexpr ( std::same_as< value_t, float > )
-    // {
-    //     blas::gemv( char( op_A ),
-    //                 blas::blas_int_t(nrows),
-    //                 blas::blas_int_t(ncols),
-    //                 alpha,
-    //                 zA.data(),
-    //                 blas::blas_int_t(nrows),
-    //                 x,
-    //                 blas::blas_int_t(1),
-    //                 float(1),
-    //                 y,
-    //                 blas::blas_int_t(1) );
-    // }// if
-    // else if constexpr ( std::same_as< value_t, std::complex< float > > )
-    // {
-    //     blas::gemv( char( op_A ),
-    //                 blas::blas_int_t(nrows),
-    //                 blas::blas_int_t(ncols),
-    //                 alpha,
-    //                 zA.data(),
-    //                 blas::blas_int_t(nrows),
-    //                 x,
-    //                 blas::blas_int_t(1),
-    //                 std::complex< float >( 1 ),
-    //                 y,
-    //                 blas::blas_int_t(1) );
-    // }// if
-    // else
+    if constexpr ( std::same_as< value_t, float > )
+    {
+        blas::gemv( char( op_A ),
+                    blas::blas_int_t(nrows),
+                    blas::blas_int_t(ncols),
+                    alpha,
+                    zA.data(),
+                    blas::blas_int_t(nrows),
+                    x,
+                    blas::blas_int_t(1),
+                    float(1),
+                    y,
+                    blas::blas_int_t(1) );
+    }// if
+    else if constexpr ( std::same_as< value_t, std::complex< float > > )
+    {
+        blas::gemv( char( op_A ),
+                    blas::blas_int_t(nrows),
+                    blas::blas_int_t(ncols),
+                    alpha,
+                    zA.data(),
+                    blas::blas_int_t(nrows),
+                    x,
+                    blas::blas_int_t(1),
+                    std::complex< float >( 1 ),
+                    y,
+                    blas::blas_int_t(1) );
+    }// if
+    else
     {
         auto  ptr = zA.data();
         
