@@ -439,6 +439,152 @@ compress_tucker ( blas::tensor4< value_t > &  D,
     return zmem.load();
 }
 
+//
+// construct blockwise compression representation of given dense tensor
+//
+template < typename                    value_t,
+           approx::approximation_type  approx_t >
+std::unique_ptr< tensor::structured_tensor3< value_t > >
+blockwise_tucker ( blas::tensor3< value_t > &  D,
+                   const size_t                ntile,
+                   const accuracy &            acc,
+                   const accuracy &            cacc,
+                   const approx_t &            apx )
+{
+    using  real_t = real_type_t< value_t >;
+    
+    const auto    N = D.size(0); // assuming equal size in all dimensions
+
+    HLR_ASSERT( ( N / ntile ) * ntile == N ); // no padding for now
+
+    auto  T = std::make_unique< tensor::structured_tensor3< value_t > >( indexset( 0, N-1 ), indexset( 0, N-1 ), indexset( 0, N-1 ) );
+
+    T->set_structure( N / ntile,
+                      N / ntile,
+                      N / ntile );
+    
+    // for ( size_t  nz = 0; nz < N; nz += ntile )
+    // {
+    //     for ( size_t  ny = 0; ny < N; ny += ntile )
+    //     {
+    //         for ( size_t  nx = 0; nx < N; nx += ntile )
+    //         {
+    ::tbb::parallel_for(
+        ::tbb::blocked_range3d< size_t >( 0, N / ntile,
+                                          0, N / ntile,
+                                          0, N / ntile ),
+        [&,ntile] ( const auto &  r )
+        {
+            for ( auto  z = r.pages().begin(); z != r.pages().end(); ++z )
+            {
+                const auto  nz = z * ntile;
+                
+                for ( auto  y = r.cols().begin(); y != r.cols().end(); ++y )
+                {
+                    const auto  ny = y * ntile;
+                
+                    for ( auto  x = r.rows().begin(); x != r.rows().end(); ++x )
+                    {
+                        const auto  nx = x * ntile;
+
+                        const auto  is0 = indexset( nx, std::min( nx + ntile - 1, N-1 ) );
+                        const auto  is1 = indexset( ny, std::min( ny + ntile - 1, N-1 ) );
+                        const auto  is2 = indexset( nz, std::min( nz + ntile - 1, N-1 ) );
+
+                        auto        D_ijk      = blas::copy( D( is0, is1, is2 ) );
+                        const auto  norm_D_ijk = blas::norm_F( D_ijk );
+
+                        // std::cout << is0 << " × " << is1 << " × " << is2 << " : " << format_norm( norm_D_ijk, acc.abs_eps() * norm_D_ijk ) << std::endl;
+
+                        if ( norm_D_ijk == value_t(0) )
+                            return;
+
+                        auto  G  = blas::tensor3< value_t >();
+                        auto  X0 = blas::matrix< value_t >();
+                        auto  X1 = blas::matrix< value_t >();
+                        auto  X2 = blas::matrix< value_t >();
+                        
+                        //
+                        // HOSVD
+                        //
+                
+                        // if (( tapprox == "hosvd" ) || ( tapprox == "default" ))
+                        {
+                            auto  S0 = blas::vector< real_t >();
+                            auto  S1 = blas::vector< real_t >();
+                            auto  S2 = blas::vector< real_t >();
+                            
+                            std::tie( G, X0, S0, X1, S1, X2, S2 ) = blas::hosvd_sv( D_ijk, acc, apx );
+                            
+                            // if ( verbose(2) && ( std::min( std::min( G.size(0), G.size(1) ), G.size(2) ) ) > 0 )
+                                // std::cout << is0 << " × " << is1 << " × " << is2 << " : "
+                                //           << boost::format( "%.4e" ) % std::max( std::max( S0(0), S1(0) ), S2(0) ) << std::endl;
+
+                            // std::tie( G, X0, X1, X2 ) = blas::hosvd( D_ijk, acc, apx );
+                        }// if
+
+                        //
+                        // ST-HOSVD
+                        //
+
+                        // if ( tapprox == "sthosvd" )
+                        // {
+                        //     std::tie( G, X0, X1, X2 ) = blas::sthosvd( D_ijk, acc, apx );
+                        // }// if
+
+                        //
+                        // Greedy-HOSVD
+                        //
+
+                        // if ( tapprox == "ghosvd" )
+                        // {
+                        //     HLR_ERROR( "TODO" );
+                        //     // std::tie( G, X0, X1, X2 ) = impl::blas::greedy_hosvd( D_ijk, acc, apx );
+                        // }// if
+
+                        // std::cout << is0 << " × " << is1 << " × " << is2 << " : " << G.size(0) << " × " << G.size(1) << " × " << G.size(2) << std::endl;
+                        
+                        //
+                        // decide about format
+                        //
+
+                        const auto  mem_full   = D_ijk.data_byte_size();
+                        const auto  mem_tucker = G.data_byte_size() + X0.data_byte_size() + X1.data_byte_size() + X2.data_byte_size();
+                        
+                        if ( mem_tucker < mem_full )
+                        {
+                            auto  T_sub = std::make_unique< tensor::tucker_tensor3< value_t > >( is0, is1, is2,
+                                                                                                 std::move( G ),
+                                                                                                 std::move( X0 ),
+                                                                                                 std::move( X1 ),
+                                                                                                 std::move( X2 ) );
+
+                            if ( ! cacc.is_exact() )
+                                T_sub->compress( cacc );
+                    
+                            T->set_block( x, y, z, T_sub.release() );
+                        }// if
+                        else
+                        {
+                            auto  T_sub = std::make_unique< tensor::dense_tensor3< value_t > >( is0, is1, is2, std::move( D_ijk ) );
+                    
+                            if ( ! cacc.is_exact() )
+                                T_sub->compress( cacc );
+                    
+                            T->set_block( x, y, z, T_sub.release() );
+                        }// else
+
+                        // std::cout << is0 << " × " << is1 << " × " << is2 << " : "
+                        //           << "mem = " << T->block(x,y,z)->data_byte_size() << " / "
+                        //           << boost::format( "%.1fx" ) % ( double(mem_full) / double(T->block(x,y,z)->data_byte_size()) ) << std::endl;
+                    }// for
+                }// for
+            }// for
+        } );
+
+    return  T;
+}
+
 }}}// namespace hlr::tbb::tensor
 
 #endif // __HLR_TBB_TENSOR_HH
