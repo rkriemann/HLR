@@ -84,6 +84,10 @@ ATC_DIR       = '/'
 
 zblas         = True
 
+# default values for programs and frameworks
+programs     = ''
+frameworks   = 'seq,tbb'
+
 # set of frameworks to use: seq, openmp, tbb, tf, hpx, mpi, gpi2 (or 'all')
 FRAMEWORKS   = [ 'help',        # print help
                  'seq',
@@ -213,7 +217,7 @@ APLR_COMPRESSORS = [ 'help',      # print help
                      'posits',
                      'cfloat',
                      'blosc' ]
-aplr = 'none'
+aplr = 'default'
 
 APLR_HELP =        { 'none'    : 'no APLR compression used',
                      'default' : 'use APLR from {0}compressor{1} setting',
@@ -353,12 +357,12 @@ else :
 # set up command line parameters
 opts = Variables( opts_file )
 
-opts.Add( ListVariable( 'programs',      'programs to build',                 'all', PROGRAMS   ) )
-opts.Add( ListVariable( 'addprograms',   'add programs to build',             '',    PROGRAMS   ) )
-opts.Add( ListVariable( 'remprograms',   'remove programs to build',          '',    PROGRAMS   ) )
-opts.Add( ListVariable( 'frameworks',    'parallelization frameworks to use', 'all', FRAMEWORKS ) )
-opts.Add( ListVariable( 'addframeworks', 'add parallelization frameworks',    '',    FRAMEWORKS ) )
-opts.Add( ListVariable( 'remframeworks', 'remove parallelization frameworks', '',    FRAMEWORKS ) )
+opts.Add( ListVariable( 'programs',      'programs to build',                 programs,   PROGRAMS   ) )
+opts.Add( ListVariable( 'addprograms',   'add programs to build',             '',         PROGRAMS   ) )
+opts.Add( ListVariable( 'remprograms',   'remove programs to build',          '',         PROGRAMS   ) )
+opts.Add( ListVariable( 'frameworks',    'parallelization frameworks to use', frameworks, FRAMEWORKS ) )
+opts.Add( ListVariable( 'addframeworks', 'add parallelization frameworks',    '',         FRAMEWORKS ) )
+opts.Add( ListVariable( 'remframeworks', 'remove parallelization frameworks', '',         FRAMEWORKS ) )
 
 opts.Add(               'cxx',       'C++ compiler to use',           CXX )
 opts.Add(               'cxxflags',  'C++ compiler flags',            CXXFLAGS )
