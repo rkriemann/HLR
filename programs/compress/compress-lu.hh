@@ -138,15 +138,15 @@ program_main ()
 
             // define methods to execute
             const auto methods = std::set< std::string >{
-                //"H+rec",
+                "H+rec",
                 //"H+rec+accu",
                 //"H+dag",
-                "H+dag+accu+lazy",
+                //"H+dag+accu+lazy",
                 // "H+dag+accu+eager",
-                //"zH+rec",
+                "zH+rec",
                 //"zH+rec+accu",
                 //"zH+dag",
-                "zH+dag+accu+lazy"
+                //"zH+dag+accu+lazy"
             };
 
             std::cout << term::bullet << term::bold << "H-LU (" << apxname << ")" << term::reset << std::endl;
@@ -159,7 +159,7 @@ program_main ()
                 
                 runtime.clear();
 
-                for ( int i = 0; i < nbench; ++i )
+                for ( int i = 0; i < std::min( nbench, 2u ); ++i )
                 {
                     tic = timer::now();
                 
@@ -170,7 +170,7 @@ program_main ()
             
                     std::cout << "    done in  " << format_time( toc ) << std::endl;
 
-                    if ( i < nbench-1 )
+                    if ( i < std::min( nbench, 2u )-1 )
                         impl::matrix::copy_to( *A, *LU );
                 }// for
         
