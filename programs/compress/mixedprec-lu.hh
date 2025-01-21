@@ -149,19 +149,26 @@ program_main ()
     auto  luacc   = relative_prec( aeps );
 
     // define methods to execute
-    const auto methods = std::set< std::string >{
-        // "H+rec",
-        // "H+rec+accu",
-        // "H+dag",
-        "H+dag+accu+lazy",
-        // "H+dag+accu+eager",
-        // "zH+rec",
-        // "zH+rec+accu",
-        // "zH+dag",
-        "zH+dag+accu+lazy"
-    };
+    const auto methods = cmdline::arith;
+    // const auto methods = std::set< std::string >{
+    //     // "H+rec",
+    //     // "H+rec+accu",
+    //     // "H+dag",
+    //     "H+dag+accu+lazy",
+    //     // "H+dag+accu+eager",
+    //     // "zH+rec",
+    //     // "zH+rec+accu",
+    //     // "zH+dag",
+    //     "zH+dag+accu+lazy"
+    // };
     
-    if ( methods.contains( "H+rec" ) )
+    if ( contains( methods, "help" ) )
+    {
+        std::cout << "H-LU versions: H+rec, H+rec+accu, H+dag, H+dag+accu+lazy, H+dag+accu+eager" << std::endl;
+        return;
+    }// if
+            
+    if ( contains( methods, "H+rec" ) )
     {
         std::cout << "  " << term::bullet << term::bold << "uncompressed (recursive)" << term::reset << std::endl;
 
@@ -201,7 +208,7 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }// if
 
-    if ( methods.contains( "H+rec+accu" ) )
+    if ( contains( methods, "H+rec+accu" ) )
     {
         std::cout << "  " << term::bullet << term::bold << "uncompressed (accumulator)" << term::reset << std::endl;
 
@@ -241,7 +248,7 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }// if
 
-    if ( methods.contains( "H+dag" ) )
+    if ( contains( methods, "H+dag" ) )
     {
         std::cout << "  " << term::bullet << term::bold << "uncompressed (DAG)" << term::reset << std::endl;
 
@@ -286,7 +293,7 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }// if
     
-    if ( methods.contains( "H+dag+accu+lazy" ) )
+    if ( contains( methods, "H+dag+accu+lazy" ) )
     {
         std::cout << "  " << term::bullet << term::bold << "uncompressed (accumulator, DAG, lazy)" << term::reset << std::endl;
 
@@ -331,7 +338,7 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }
     
-    if ( methods.contains( "zH+rec" ) )
+    if ( contains( methods, "zH+rec" ) )
     {
         std::cout << "  " << term::bullet << term::bold << "compressed (recursive, " << compstr << ")" << term::reset << std::endl;
 
@@ -378,7 +385,7 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }// if
 
-    if ( methods.contains( "zH+rec+accu" ) )
+    if ( contains( methods, "zH+rec+accu" ) )
     {
         std::cout << "  " << term::bullet << term::bold << "compressed (accumulator, " << compstr << ")" << term::reset << std::endl;
 
@@ -425,7 +432,7 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }// if
 
-    if ( methods.contains( "zH+dag" ) )
+    if ( contains( methods, "zH+dag" ) )
     {
         std::cout << "  " << term::bullet << term::bold << "compressed (DAG, " << compstr << ")" << term::reset << std::endl;
 
@@ -475,7 +482,7 @@ program_main ()
         std::cout << "    error  = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }// if
 
-    if ( methods.contains( "zH+dag+accu+lazy" ) )
+    if ( contains( methods, "zH+dag+accu+lazy" ) )
     {
         std::cout << "  " << term::bullet << term::bold << "compressed (accumulator, DAG, lazy, " << hlr::compress::provider << ")" << term::reset << std::endl;
 

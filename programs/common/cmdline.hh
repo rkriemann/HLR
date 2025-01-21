@@ -11,6 +11,8 @@ using std::string;
 #include <boost/program_options.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/trim.hpp>
 
 using boost::format;
 using namespace boost::program_options;
@@ -22,6 +24,8 @@ namespace hpro = HLIB;
 #include <hlr/utils/log.hh>
 
 namespace hlr { namespace cmdline {
+
+using  vstring = std::vector< std::string >;
 
 size_t  n          = 1024;         // problem size
 size_t  ntile      = 128;          // tile size (nmin)
@@ -61,7 +65,7 @@ double  eta        = 2.0;          // admissibility parameter
 string  capprox    = "default";    // construction low-rank approximation method (aca,hca,dense)
 string  aapprox    = "default";    // arithmetic low-rank approximation method (svd,rrqr,randsvd,randlr,aca,lanczos)
 string  tapprox    = "default";    // tensor low-rank approximation method (hosvd,sthosvd,ghosvd,hhosvd,tcafull)
-string  arith      = "std";        // which kind of arithmetic to use
+vstring arith      = { "std" };    // which kind of arithmetic to use
 bool    compress   = false;        // apply FP compression to matrix data
 auto    kappa      = std::complex< double >( 2, 0 ); // wave number for helmholtz problems
 double  sigma      = 2.5;          // parameter for matern covariance and gaussian kernel
@@ -221,13 +225,15 @@ parse ( int argc, char ** argv )
     // first read from config file
     if ( vm.count( "config" ) )
         read_config( vm["config"].as<string>() );
+
+    std::string  sarith = "";
     
     if ( vm.count( "nodag"      ) ) hpro::CFG::Arith::use_dag = false;
     if ( vm.count( "accu"       ) ) hpro::CFG::Arith::use_accu = true;
     if ( vm.count( "capprox"    ) ) capprox    = vm["capprox"].as<string>();
     if ( vm.count( "aapprox"    ) ) aapprox    = vm["aapprox"].as<string>();
     if ( vm.count( "tapprox"    ) ) tapprox    = vm["tapprox"].as<string>();
-    if ( vm.count( "arith"      ) ) arith      = vm["arith"].as<string>();
+    if ( vm.count( "arith"      ) ) sarith     = vm["arith"].as<string>();
     if ( vm.count( "threads"    ) ) nthreads   = vm["threads"].as<int>();
     if ( vm.count( "verbosity"  ) ) verbosity  = vm["verbosity"].as<int>();
     if ( vm.count( "nprob"      ) ) n          = vm["nprob"].as<int>();
@@ -326,7 +332,7 @@ parse ( int argc, char ** argv )
         std::exit( 0 );
     }// if
     
-    if ( arith == "help" )
+    if ( sarith == "help" )
     {
         std::cout << "Arithmetic to use:" << std::endl
                   << "  - (dag)std  : standard H-arithmetic (immediate updates)" << std::endl
@@ -336,6 +342,14 @@ parse ( int argc, char ** argv )
                   << "  - default   : use default arithmetic (std)" << std::endl;
 
         std::exit( 0 );
+    }// if
+
+    if ( sarith != "" )
+    {
+        boost::split( arith, sarith, boost::is_any_of( "," ) );
+
+        for ( auto &  a : arith )
+            boost::algorithm::trim( a );
     }// if
     
     if ( gridfile == "help" )
@@ -426,11 +440,14 @@ parse ( int argc, char ** argv )
                  ( entry == "hhosvd" ) || ( entry == "tcafull" ) || ( entry == "default" ) ) )
             HLR_ERROR( "unknown tensor approximation : " + entry );
 
-    if ( ! ( ( arith == "std" )  || ( arith == "dagstd" )  ||
-             ( arith == "accu" ) || ( arith == "dagaccu" ) ||
-             ( arith == "lazy" ) || ( arith == "daglazy" ) ||
-             ( arith == "all" )  || ( arith == "default" ) ) )
-        HLR_ERROR( "unknown arithmetic : " + arith );
+    // for ( auto &  a : arith )
+    // {
+    //     if ( ! ( ( a == "std" )  || ( a == "dagstd" )  ||
+    //              ( a == "accu" ) || ( a == "dagaccu" ) ||
+    //              ( a == "lazy" ) || ( a == "daglazy" ) ||
+    //              ( a == "all" )  || ( a == "default" ) ) )
+    //         HLR_ERROR( "unknown arithmetic : " + a );
+    // }// for
 
     if ( ! ( ( lrformat == "uv" )  ||
              ( lrformat == "usv" ) ||
