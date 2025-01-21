@@ -738,6 +738,41 @@ get_config ( const accuracy &                 acc,
     
     auto  tol = acc.abs_eps();
 
+    #if HLR_COMPRESSOR == HLR_COMPRESSOR_ZFP
+
+    //
+    // ZFP with fixed accuracy uses absolute error
+    //
+    
+    if ( acc.abs_eps() != 0 )
+    {
+        switch ( acc.norm_mode() )
+        {
+            case  Hpro::spectral_norm  : tol = acc.abs_eps(); break;
+            case  Hpro::frobenius_norm : tol = acc.abs_eps(); break;
+            default :
+                HLR_ERROR( "unsupported norm mode" );
+        }// switch
+    }// if
+    else if ( acc.rel_eps() != 0 )
+    {
+        switch ( acc.norm_mode() )
+        {
+            case  Hpro::spectral_norm  : tol = acc.rel_eps() * blas::norm_2( M ); break;
+            case  Hpro::frobenius_norm : tol = acc.rel_eps() * blas::norm_F( M ); break;
+            default :
+                HLR_ERROR( "unsupported norm mode" );
+        }// switch
+    }// if
+    else
+        HLR_ERROR( "zero error" );
+
+    #else
+    
+    //
+    // assuming relative error within compressor
+    //
+    
     if ( acc.abs_eps() != 0 )
     {
         switch ( acc.norm_mode() )
@@ -761,6 +796,8 @@ get_config ( const accuracy &                 acc,
     else
         HLR_ERROR( "zero error" );
 
+    #endif
+    
     return get_config( tol );
 }
 

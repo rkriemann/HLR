@@ -59,8 +59,8 @@ inline config  fixed_precision  ( const uint    prec ) { return config{ zfp_mode
 inline config  fixed_accuracy   ( const double  tol  ) { return config{ zfp_mode_fixed_accuracy, tol, 0, 0 }; }     // absolute error
 
 // inline config  get_config       ( const double  acc  ) { return fixed_rate( eps_to_rate( acc ) ); }
-inline config  get_config       ( const double  tol  ) { return fixed_precision( eps_to_rate( 0.1 * tol ) ); }
-// inline config  get_config       ( const double  tol  ) { return fixed_accuracy( tol ); }
+// inline config  get_config       ( const double  tol  ) { return fixed_precision( eps_to_rate( 0.1 * tol ) ); }
+inline config  get_config       ( const double  tol  ) { return fixed_accuracy( 0.1 * tol ); }
 
 // holds compressed data
 using  byte_t = unsigned char;
