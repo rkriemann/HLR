@@ -354,7 +354,80 @@ zarray
 compress_lr< float > ( const hlr::blas::matrix< float > &  U,
                        const hlr::blas::vector< float > &  S )
 {
-    HLR_ERROR( "not supported" );
+    //
+    // determine corresponding parts for FP32, FP16
+    //
+
+    const size_t    n    = U.nrows();
+    const uint32_t  rank = U.ncols();
+    int             i    = rank-1;
+
+    auto  test_prec = [&i,&S] ( double  u )
+    {
+        uint32_t  nprec = 0;
+            
+        while ( i >= 0 )
+        {
+            // test u ≤ tol / σ_i = S_i
+            if ( u <= S(i) ) nprec++; 
+            else             break;
+            --i;
+        }// while
+
+        return nprec;
+    };
+
+    const uint32_t  n_fp16 = test_prec( fp16_prec );
+    const uint32_t  n_fp32 = i+1;                   // remaining singular values
+    size_t          s     = 0;
+
+    // std::cout << n_fp16 << " / " << n_fp32 << " / " << n_fp64 << std::endl;
+    
+    HLR_ASSERT( n_fp32 >= 0 );
+    HLR_ASSERT( n_fp16 + n_fp32 == rank );
+
+    //
+    // copy into storage
+    //
+
+    const size_t  zsize = ( 2 * sizeof(uint32_t) +
+                            sizeof(fp32_t) * n * n_fp32 +
+                            sizeof(fp16_t) * n * n_fp16 );
+    zarray        zdata( zsize );
+
+    reinterpret_cast< uint32_t * >( zdata.data() )[0] = n_fp32;
+    reinterpret_cast< uint32_t * >( zdata.data() )[1] = n_fp16;
+
+    uint32_t  k   = 0;
+    size_t    pos = 2 * sizeof(uint32_t);
+        
+    {
+        auto    zptr = reinterpret_cast< fp32_t * >( zdata.data() + pos );
+        size_t  zpos = 0;
+
+        for ( uint32_t  l = 0; l < n_fp32; ++l, ++k )
+        {
+            for ( size_t  i = 0; i < n; ++i, ++zpos )
+                zptr[zpos] = fp32_t( U(i,k) );
+        }// for
+        pos += n_fp32 * n * sizeof(fp32_t);
+    }
+
+    {
+        auto    zptr = reinterpret_cast< fp16_t * >( zdata.data() + pos );
+        size_t  zpos = 0;
+
+        for ( uint32_t  l = 0; l < n_fp16; ++l, ++k )
+        {
+            for ( size_t  i = 0; i < n; ++i, ++zpos )
+                zptr[zpos] = fp16_t( U(i,k) );
+        }// for
+        pos += n_fp16 * n * sizeof(fp16_t);
+    }
+
+    HLR_ASSERT( k == rank );
+
+    return zdata;
 }
 
 template <>
@@ -554,7 +627,40 @@ void
 decompress_lr< float > ( const zarray &                zdata,
                          hlr::blas::matrix< float > &  U )
 {
-    HLR_ERROR( "not supported" );
+    const size_t    nrows = U.nrows();
+    const uint32_t  rank  = U.ncols();
+    const uint32_t  n_fp32 = reinterpret_cast< const uint32_t * >( zdata.data() )[0];
+    const uint32_t  n_fp16 = reinterpret_cast< const uint32_t * >( zdata.data() )[1];
+    size_t          pos   = 2 * sizeof(uint32_t);
+    uint32_t        k     = 0;
+    
+    if ( n_fp32 > 0 )
+    {
+        auto    zptr = reinterpret_cast< const fp32_t * >( zdata.data() + pos );
+        size_t  zpos = 0;
+
+        for ( uint32_t  l = 0; l < n_fp32; ++l, ++k )
+        {
+            for ( size_t  i = 0; i < nrows; ++i, ++zpos )
+                U(i,k) = zptr[zpos];
+        }// for
+        pos += n_fp32 * nrows * sizeof(fp32_t);
+    }// if
+
+    if ( n_fp16 > 0 )
+    {
+        auto    zptr = reinterpret_cast< const fp16_t * >( zdata.data() + pos );
+        size_t  zpos = 0;
+
+        for ( uint32_t  l = 0; l < n_fp16; ++l, ++k )
+        {
+            for ( size_t  i = 0; i < nrows; ++i, ++zpos )
+                U(i,k) = zptr[zpos];
+        }// for
+        pos += n_fp16 * nrows * sizeof(fp16_t);
+    }// if
+
+    HLR_ASSERT( k == rank );
 }
 
 template <>
