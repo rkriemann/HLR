@@ -767,6 +767,9 @@ get_config ( const accuracy &                 acc,
     else
         HLR_ERROR( "zero error" );
 
+    // compensate for dimension growth (why ???)
+    tol /= std::max( M.nrows(), M.ncols() );
+    
     #else
     
     //

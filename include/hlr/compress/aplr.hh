@@ -521,6 +521,12 @@ get_tolerances ( const accuracy &                 acc,
         tol = acc.rel_eps() * norm;
     }// if
 
+    #if HLR_COMPRESSOR == HLR_COMPRESSOR_ZFP
+
+    tol /= sv.length();
+
+    #endif
+    
     //
     // adjust tolerance for additional error due to APLR,
     // e.g., look for ε, such that Σ 1/σ_i ε² + (1+2k)ε = δ
