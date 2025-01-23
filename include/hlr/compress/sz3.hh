@@ -91,7 +91,7 @@ compress ( const config &   config,
             HLR_ERROR( "unsupported compression mode in SZ3" );
     }// switch
     
-    auto    zdata  = std::vector< char >( 2 * nsize * sizeof(value_t) ); // as recommended by SZ3
+    auto    zdata  = std::vector< char >( 3 * nsize * sizeof(value_t) ); // as recommended by SZ3
     auto    zsize  = SZ_compress< value_t >( conf, data, zdata.data(), zdata.size() );
     auto    result = zarray( zsize );
 
