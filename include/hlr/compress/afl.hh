@@ -191,9 +191,9 @@ compress ( const float *   data,
 
             zero[j] = ( aval == float(0) );
             sign[j] = ( aval != val );
-            fbuf[j] = std::max( aval / scale + 1, 2.f ); // prevent rounding issues when converting from fp64
+            fbuf[j] = aval / scale + 1;
 
-            HLR_DBG_ASSERT( fbuf[j] >= float(2) );
+            HLR_DBG_ASSERT( zero[j] || ( fbuf[j] >= float(2) ));
         }// for
 
         // convert to compressed format
@@ -255,7 +255,7 @@ compress ( const float *   data,
         if ( std::abs( val ) != float(0) )
         {
             const bool      zsign = ( val < 0 );
-            const float     sval  = std::max( std::abs(val) / scale + 1, 2.f ); // prevent rounding issues when converting from fp64
+            const float     sval  = std::abs(val) / scale + 1;
             const uint32_t  isval = (*reinterpret_cast< const uint32_t * >( & sval ) );
             const uint32_t  sexp  = ( isval >> FP32::mant_bits ) & ((1u << FP32::exp_bits) - 1);
             const uint32_t  smant = ( isval & ((1u << FP32::mant_bits) - 1) );
@@ -454,7 +454,7 @@ compress ( const double *  data,
     const uint32_t  nbits    = 1 + exp_bits + prec_bits;
     const uint32_t  exp_mask = ( 1 << exp_bits ) - 1;
     const uint32_t  prec_ofs = FP64::mant_bits - prec_bits;
-    const uint32_t  zero_val = FP32::zero_val & (( 1 << nbits) - 1 );
+    const uint32_t  zero_val = FP64::zero_val & (( 1 << nbits) - 1 );
 
     //
     // store header (exponents and precision bits and scaling factor)
@@ -806,6 +806,8 @@ compress ( const config &   config,
     const auto      scale     = vmin;                                                                        // scale all values v_i such that |v_i| >= 1
     auto            zdata     = std::vector< byte_t >( FP_info< real_t >::header_ofs + pad_bs< bs_storage_t >( byte_pad( nsize * nbits ) / 8 ) );
 
+    // std::cout << prec_bits << std::endl;
+    
     HLR_ASSERT( nbits <= sizeof(value_t) * 8 );
     HLR_ASSERT( std::isfinite( scale ) );
     
@@ -962,7 +964,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
 
         s[l] = vmin;
         e[l] = uint32_t( std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ) );
-        m[l] = eps_to_rate_aplr( S(l) );
+        m[l] = std::min< uint32_t >( FP_info< real_t >::mant_bits, eps_to_rate_aplr( S(l) ) );
 
         HLR_ASSERT( std::isfinite( s[l] ) );
         
@@ -1045,7 +1047,7 @@ compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double
 
         s[l] = vmin;
         e[l] = uint32_t( std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ) );
-        m[l] = eps_to_rate_aplr( S(l) );
+        m[l] = std::min< uint32_t >( FP_info< real_t >::mant_bits, eps_to_rate_aplr( S(l) ) );
 
         HLR_ASSERT( std::isfinite( s[l] ) );
 
