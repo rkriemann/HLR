@@ -144,6 +144,18 @@ convert ( const Hpro::TMatrix< src_value_t > &  A )
         
         return RC;
     }// if
+    else if ( matrix::is_lowrank_sv( A ) )
+    {
+        auto  RA = cptrcast( &A, matrix::lrsvmatrix< src_value_t > );
+        auto  U  = blas::convert< dest_value_t >( RA->U() );
+        auto  S  = blas::convert< dest_value_t >( RA->S() );
+        auto  V  = blas::convert< dest_value_t >( RA->V() );
+        auto  RC = std::make_unique< matrix::lrsvmatrix< dest_value_t > >( RA->row_is(), RA->col_is(), std::move( U ), std::move( S ), std::move( V ) );
+
+        copy_struct( *RA, *RC );
+        
+        return RC;
+    }// if
     else if ( matrix::is_dense( A ) )
     {
         auto  DA = cptrcast( &A, matrix::dense_matrix< src_value_t > );
