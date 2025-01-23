@@ -1389,6 +1389,14 @@ copy_compressible ( const Hpro::TMatrix< value_t > &  M )
         
         return N;
     }// if
+    else if ( matrix::is_lowrank_sv( M ) )
+    {
+        auto  N = M.copy();
+        
+        N->set_id( M.id() );
+        
+        return N;
+    }// if
     else if ( Hpro::is_lowrank( M ) )
     {
         auto  R = cptrcast( &M, Hpro::TRkMatrix< value_t > );
