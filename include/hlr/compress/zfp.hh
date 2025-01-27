@@ -58,9 +58,10 @@ inline config  fixed_rate       ( const uint    rate ) { return config{ zfp_mode
 inline config  fixed_precision  ( const uint    prec ) { return config{ zfp_mode_fixed_precision, 0.0, prec, 0 }; } // fixed number of bitplanes
 inline config  fixed_accuracy   ( const double  tol  ) { return config{ zfp_mode_fixed_accuracy, tol, 0, 0 }; }     // absolute error
 
-// inline config  get_config       ( const double  acc  ) { return fixed_rate( eps_to_rate( 0.5 * acc )+1 ); }
-inline config  get_config       ( const double  tol  ) { return fixed_precision( eps_to_rate( 0.1 * tol ) ); }
-inline config  get_config_aplr  ( const double  tol  ) { return get_config( tol ); }
+inline config  get_config       ( const double  tol  ) { return fixed_rate( eps_to_rate( tol )+2 ); }
+inline config  get_config_aplr  ( const double  tol  ) { return fixed_rate( eps_to_rate( tol )+5 ); }
+// inline config  get_config       ( const double  tol  ) { return fixed_precision( eps_to_rate( 0.1 * tol ) ); }
+// inline config  get_config_aplr  ( const double  tol  ) { return get_config( tol ); }
 // inline config  get_config       ( const double  tol  ) { return fixed_accuracy( 2e1 * tol ); }
 // inline config  get_config_aplr  ( const double  tol  ) { return fixed_accuracy( 0.5 * tol ); }
 
