@@ -79,7 +79,13 @@ using hlr::compress::fp16::byte_size;
 
 namespace hlr { namespace compress {
 
-static const char provider[] = "zfp";
+#if HLR_ZFP_MODE == 0
+static const char provider[] = "zfp fr";
+#elif HLR_ZFP_MODE == 1
+static const char provider[] = "zfp fp";
+#elif HLR_ZFP_MODE == 2
+static const char provider[] = "zfp fa";
+#endif
 
 using  zconfig_t = hlr::compress::zfp::config;
 using  zarray    = hlr::compress::zfp::zarray;
@@ -729,6 +735,11 @@ zconfig_t
 get_config ( const accuracy &                 acc,
              const blas::matrix< value_t > &  M )
 {
+    // in case ZFP is not used
+    #if not defined( HLR_ZFP_MODE )
+    #  define HLR_ZFP_MODE 0
+    #endif
+    
     //
     // Assumption: compression with relative error per coefficient, i.e. |a_ij - ã_ij| ≤ ε|a_ij|
     // Then also |M-~M|_F ≤ ε|M|_F holds.
@@ -738,68 +749,68 @@ get_config ( const accuracy &                 acc,
     
     auto  tol = acc.abs_eps();
 
-    // #if HLR_COMPRESSOR == HLR_COMPRESSOR_ZFP
-
-    // //
-    // // ZFP with fixed accuracy uses absolute error
-    // //
-    
-    // if ( acc.abs_eps() != 0 )
-    // {
-    //     switch ( acc.norm_mode() )
-    //     {
-    //         case  Hpro::spectral_norm  : tol = acc.abs_eps(); break;
-    //         case  Hpro::frobenius_norm : tol = acc.abs_eps(); break;
-    //         default :
-    //             HLR_ERROR( "unsupported norm mode" );
-    //     }// switch
-    // }// if
-    // else if ( acc.rel_eps() != 0 )
-    // {
-    //     switch ( acc.norm_mode() )
-    //     {
-    //         case  Hpro::spectral_norm  : tol = acc.rel_eps() * blas::norm_2( M ); break;
-    //         case  Hpro::frobenius_norm : tol = acc.rel_eps() * blas::norm_F( M ); break;
-    //         default :
-    //             HLR_ERROR( "unsupported norm mode" );
-    //     }// switch
-    // }// if
-    // else
-    //     HLR_ERROR( "zero error" );
-
-    // // compensate for dimension growth (why ???)
-    // tol /= std::max( M.nrows(), M.ncols() );
-    
-    // #else
-    
-    //
-    // assuming relative error within compressor
-    //
-    
-    if ( acc.abs_eps() != 0 )
+    if constexpr (( HLR_COMPRESSOR == HLR_COMPRESSOR_ZFP ) && ( HLR_ZFP_MODE == 2 ))
     {
-        switch ( acc.norm_mode() )
+        //
+        // ZFP with fixed accuracy uses absolute error
+        //
+    
+        if ( acc.abs_eps() != 0 )
         {
-            case  Hpro::spectral_norm  : tol = acc.abs_eps() / blas::norm_2( M ); break;
-            case  Hpro::frobenius_norm : tol = acc.abs_eps() / blas::norm_F( M ); break;
-            default :
-                HLR_ERROR( "unsupported norm mode" );
-        }// switch
-    }// if
-    else if ( acc.rel_eps() != 0 )
-    {
-        switch ( acc.norm_mode() )
+            switch ( acc.norm_mode() )
+            {
+                case  Hpro::spectral_norm  : tol = acc.abs_eps(); break;
+                case  Hpro::frobenius_norm : tol = acc.abs_eps(); break;
+                default :
+                    HLR_ERROR( "unsupported norm mode" );
+            }// switch
+        }// if
+        else if ( acc.rel_eps() != 0 )
         {
-            case  Hpro::spectral_norm  : tol = acc.rel_eps(); break;
-            case  Hpro::frobenius_norm : tol = acc.rel_eps(); break;
-            default :
-                HLR_ERROR( "unsupported norm mode" );
-        }// switch
+            switch ( acc.norm_mode() )
+            {
+                case  Hpro::spectral_norm  : tol = acc.rel_eps() * blas::norm_2( M ); break;
+                case  Hpro::frobenius_norm : tol = acc.rel_eps() * blas::norm_F( M ); break;
+                default :
+                    HLR_ERROR( "unsupported norm mode" );
+            }// switch
+        }// if
+        else
+            HLR_ERROR( "zero error" );
+
+        // compensate for dimension growth (why ???)
+        tol /= std::max( M.nrows(), M.ncols() );
+    
     }// if
     else
-        HLR_ERROR( "zero error" );
-
-    // #endif
+    {
+        //
+        // assuming relative error within compressor
+        //
+    
+        if ( acc.abs_eps() != 0 )
+        {
+            switch ( acc.norm_mode() )
+            {
+                case  Hpro::spectral_norm  : tol = acc.abs_eps() / blas::norm_2( M ); break;
+                case  Hpro::frobenius_norm : tol = acc.abs_eps() / blas::norm_F( M ); break;
+                default :
+                    HLR_ERROR( "unsupported norm mode" );
+            }// switch
+        }// if
+        else if ( acc.rel_eps() != 0 )
+        {
+            switch ( acc.norm_mode() )
+            {
+                case  Hpro::spectral_norm  : tol = acc.rel_eps(); break;
+                case  Hpro::frobenius_norm : tol = acc.rel_eps(); break;
+                default :
+                    HLR_ERROR( "unsupported norm mode" );
+            }// switch
+        }// if
+        else
+            HLR_ERROR( "zero error" );
+    }// else
     
     return get_config( tol );
 }

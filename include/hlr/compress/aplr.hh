@@ -107,7 +107,13 @@ using hlr::compress::zfp::decompress_lr;
 using hlr::compress::zfp::byte_size;
 using hlr::compress::zfp::compressed_size;
 
-static const char provider[] = "zfp";
+#if HLR_ZFP_MODE == 0
+static const char provider[] = "zfp fr";
+#elif HLR_ZFP_MODE == 1
+static const char provider[] = "zfp fp";
+#elif HLR_ZFP_MODE == 2
+static const char provider[] = "zfp fa";
+#endif
 
 }}}// namespace hlr::compress::aplr
 
@@ -491,6 +497,11 @@ blas::vector< value_t >
 get_tolerances ( const accuracy &                 acc,
                  const blas::vector< value_t > &  sv )
 {
+    // in case ZFP is not used
+    #if not defined( HLR_ZFP_MODE )
+    #  define HLR_ZFP_MODE 0
+    #endif
+    
     auto  tol = acc.abs_eps();
 
     if ( acc.abs_eps() != 0 )
@@ -521,11 +532,14 @@ get_tolerances ( const accuracy &                 acc,
         tol = acc.rel_eps() * norm;
     }// if
 
-    // #if HLR_COMPRESSOR == HLR_COMPRESSOR_ZFP
+    //
+    // correct for ZFP fixed accuracy mode
+    //
 
-    // tol /= sv.length();
-
-    // #endif
+    if constexpr (( HLR_COMPRESSOR == HLR_COMPRESSOR_ZFP ) && ( HLR_ZFP_MODE == 2 ))
+    {
+        tol /= sv.length();
+    }// if
     
     //
     // adjust tolerance for additional error due to APLR,

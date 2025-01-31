@@ -18,6 +18,9 @@
 
 namespace hlr { namespace compress { namespace zfp {
 
+// set ZFP mode to be used (0: fixed rate, 1: fixed precision, 2: fixed accuracy)
+#define HLR_ZFP_MODE  0
+
 //
 // define compression mode
 //
@@ -58,12 +61,19 @@ inline config  fixed_rate       ( const uint    rate ) { return config{ zfp_mode
 inline config  fixed_precision  ( const uint    prec ) { return config{ zfp_mode_fixed_precision, 0.0, prec, 0 }; } // fixed number of bitplanes
 inline config  fixed_accuracy   ( const double  tol  ) { return config{ zfp_mode_fixed_accuracy, tol, 0, 0 }; }     // absolute error
 
+#if HLR_ZFP_MODE == 0
+// fixed rate mode
 inline config  get_config       ( const double  tol  ) { return fixed_rate( eps_to_rate( tol )+2 ); }
 inline config  get_config_aplr  ( const double  tol  ) { return fixed_rate( eps_to_rate( tol )+5 ); }
-// inline config  get_config       ( const double  tol  ) { return fixed_precision( eps_to_rate( 0.1 * tol ) ); }
-// inline config  get_config_aplr  ( const double  tol  ) { return get_config( tol ); }
-// inline config  get_config       ( const double  tol  ) { return fixed_accuracy( 2e1 * tol ); }
-// inline config  get_config_aplr  ( const double  tol  ) { return fixed_accuracy( 0.5 * tol ); }
+#elif HLR_ZFP_MODE == 1
+// fixed precision mode
+inline config  get_config       ( const double  tol  ) { return fixed_precision( eps_to_rate( 0.1 * tol ) ); }
+inline config  get_config_aplr  ( const double  tol  ) { return get_config( tol ); }
+#elif HLR_ZFP_MODE == 2
+// fixed accuracy mode
+inline config  get_config       ( const double  tol  ) { return fixed_accuracy( 2e1 * tol ); }
+inline config  get_config_aplr  ( const double  tol  ) { return fixed_accuracy( 0.5 * tol ); }
+#endif
 
 // holds compressed data
 using  byte_t = unsigned char;
