@@ -332,17 +332,17 @@ parse ( int argc, char ** argv )
         std::exit( 0 );
     }// if
     
-    if ( sarith == "help" )
-    {
-        std::cout << "Arithmetic to use:" << std::endl
-                  << "  - (dag)std  : standard H-arithmetic (immediate updates)" << std::endl
-                  << "  - (dag)accu : accumulator based H-arithmetic" << std::endl
-                  << "  - (dag)lazy : lazy evaluation in H-arithmetic" << std::endl
-                  << "  - all       : use all types" << std::endl
-                  << "  - default   : use default arithmetic (std)" << std::endl;
+    // if ( sarith == "help" )
+    // {
+    //     std::cout << "Arithmetic to use:" << std::endl
+    //               << "  - (dag)std  : standard H-arithmetic (immediate updates)" << std::endl
+    //               << "  - (dag)accu : accumulator based H-arithmetic" << std::endl
+    //               << "  - (dag)lazy : lazy evaluation in H-arithmetic" << std::endl
+    //               << "  - all       : use all types" << std::endl
+    //               << "  - default   : use default arithmetic (std)" << std::endl;
 
-        std::exit( 0 );
-    }// if
+    //     std::exit( 0 );
+    // }// if
 
     if ( sarith != "" )
     {
