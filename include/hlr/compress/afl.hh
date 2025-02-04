@@ -1321,7 +1321,6 @@ mulvec ( const size_t     nrows,
     const uint8_t      exp_bits  = zA[0];
     const uint8_t      prec_bits = zA[1];
     const uint8_t      nbits     = 1 + exp_bits + prec_bits;
-    const uint8_t      nbyte     = nbits / 8;
     real_t             scale     = * ( reinterpret_cast< const real_t * >( zA.data() + FP_info< real_t >::scale_ofs ) );
     constexpr size_t   data_ofs  = FP_info< real_t >::header_ofs;
     
@@ -1341,9 +1340,9 @@ mulvec_lr ( const size_t     nrows,
     using  real_t       = Hpro::real_type_t< value_t >;
     using  bs_storage_t = typename FP_info< value_t >::bs_storage_t;
 
-    constexpr size_t  scale_ofs = FP_info< real_t >::scale_ofs;
-    constexpr size_t  data_ofs  = FP_info< real_t >::header_ofs;
-    size_t            pos       = 0;
+    constexpr size_t  scale_ofs   = FP_info< real_t >::scale_ofs;
+    constexpr size_t  header_size = FP_info< real_t >::header_ofs;
+    size_t            pos         = 0;
 
     switch ( op_A )
     {
@@ -1353,14 +1352,15 @@ mulvec_lr ( const size_t     nrows,
             {
                 const uint8_t  exp_bits  = zA[pos];
                 const uint8_t  prec_bits = zA[pos+1];
-                const uint8_t  nbyte     = pad_bs< bs_storage_t >( byte_pad( 1 + exp_bits + prec_bits ) / 8 );
+                const uint8_t  nbits     = 1 + exp_bits + prec_bits;
+                const size_t   nbyte     = pad_bs< bs_storage_t >( byte_pad( nrows * nbits ) / 8 );
                 const real_t   scale     = * ( reinterpret_cast< const real_t * >( zA.data() + pos + scale_ofs ) );
         
-                mulvec( nrows, 1, op_A, alpha, scale, zA.data() + pos + data_ofs, x+l, y, exp_bits, prec_bits );
+                mulvec( nrows, 1, op_A, alpha, scale, zA.data() + pos + header_size, x+l, y, exp_bits, prec_bits );
 
-                pos += data_ofs + nbyte * nrows;
+                pos += header_size + nbyte;
 
-                HLR_ASSERT( pos < zA.size() );
+                HLR_ASSERT( pos <= zA.size() );
             }// for
         }// case
         break;
@@ -1375,14 +1375,15 @@ mulvec_lr ( const size_t     nrows,
             {
                 const uint8_t  exp_bits  = zA[pos];
                 const uint8_t  prec_bits = zA[pos+1];
-                const uint8_t  nbyte     = pad_bs< bs_storage_t >( byte_pad( 1 + exp_bits + prec_bits ) / 8 );
+                const uint8_t  nbits     = 1 + exp_bits + prec_bits;
+                const size_t   nbyte     = pad_bs< bs_storage_t >( byte_pad( nrows * nbits ) / 8 );
                 const real_t   scale     = * ( reinterpret_cast< const real_t * >( zA.data() + pos + scale_ofs ) );
         
-                mulvec( nrows, 1, op_A, alpha, scale, zA.data() + pos + data_ofs, x, y+l, exp_bits, prec_bits );
+                mulvec( nrows, 1, op_A, alpha, scale, zA.data() + pos + header_size, x, y+l, exp_bits, prec_bits );
 
-                pos += data_ofs + nbyte * nrows;
+                pos += header_size + nbyte;
 
-                HLR_ASSERT( pos < zA.size() );
+                HLR_ASSERT( pos <= zA.size() );
             }// for
         }// case
         break;
