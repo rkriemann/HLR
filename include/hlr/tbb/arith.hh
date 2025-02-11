@@ -393,7 +393,7 @@ multiply ( const value_t                     alpha,
            const Hpro::matop_t               op_B,
            const Hpro::TMatrix< value_t > &  B,
            Hpro::TMatrix< value_t > &        C,
-           const Hpro::TTruncAcc &           acc,
+           const accuracy &                  acc,
            const approx_t &                  approx )
 {
     if ( hlr::is_blocked_all( A, B, C ) )
@@ -442,7 +442,7 @@ void
 multiply_hadamard ( const value_t                     alpha,
                     Hpro::TMatrix< value_t > &        A,
                     const Hpro::TMatrix< value_t > &  B,
-                    const Hpro::TTruncAcc &           acc,
+                    const accuracy &                  acc,
                     const approx_t &                  approx )
 {
     if ( is_blocked_all( A, B ) )
@@ -486,7 +486,7 @@ solve_lower_tri ( const eval_side_t                 side,
                   const diag_type_t                 diag,
                   const Hpro::TMatrix< value_t > &  L,
                   Hpro::TMatrix< value_t > &        M,
-                  const Hpro::TTruncAcc &           acc,
+                  const accuracy &                  acc,
                   const approx_t &                  approx )
 {
     if ( is_nd( L ) && is_blocked( M ) )
@@ -614,7 +614,7 @@ solve_upper_tri ( const eval_side_t                 side,
                   const diag_type_t                 diag,
                   const Hpro::TMatrix< value_t > &  U,
                   Hpro::TMatrix< value_t > &        M,
-                  const Hpro::TTruncAcc &           acc,
+                  const accuracy &                  acc,
                   const approx_t &                  approx )
 {
     if ( is_nd( U ) && is_blocked( M ) )
@@ -739,7 +739,7 @@ template < typename value_t,
            typename approx_t >
 void
 lu ( Hpro::TMatrix< value_t > &  A,
-     const Hpro::TTruncAcc &     acc,
+     const accuracy &            acc,
      const approx_t &            approx )
 {
     if ( is_blocked( A ) )
@@ -819,7 +819,7 @@ template < typename value_t,
            typename approx_t >
 void
 lu_nd ( Hpro::TMatrix< value_t > &  A,
-        const Hpro::TTruncAcc &     acc,
+        const accuracy &            acc,
         const approx_t &            approx )
 {
     if ( is_nd( A ) )
@@ -880,7 +880,7 @@ template < typename value_t,
 void
 gauss_elim ( Hpro::TMatrix< value_t > &  A,
              Hpro::TMatrix< value_t > &  T,
-             const Hpro::TTruncAcc &     acc,
+             const accuracy &            acc,
              const approx_t &            approx )
 {
     HLR_ASSERT( ! is_null_any( &A, &T ) );
@@ -1044,7 +1044,7 @@ template < typename value_t,
            typename approx_t >
 void
 lu ( Hpro::TMatrix< value_t > &  A,
-     const Hpro::TTruncAcc &     acc,
+     const accuracy &            acc,
      const approx_t &            approx )
 {
     HLR_ASSERT( is_blocked( A ) );
@@ -1092,9 +1092,9 @@ lu ( Hpro::TMatrix< value_t > &  A,
 template < typename value_t,
            typename approx_t >
 void
-ldu ( Hpro::TMatrix< value_t > &          A,
-      const Hpro::TTruncAcc &  acc,
-      const approx_t &         approx )
+ldu ( Hpro::TMatrix< value_t > &  A,
+      const accuracy &            acc,
+      const approx_t &            approx )
 {
     HLR_LOG( 4, Hpro::to_string( "ldu( %d )", A.id() ) );
     
@@ -1212,11 +1212,11 @@ namespace hodlr
 template < typename value_t,
            typename approx_t >
 void
-addlr ( blas::matrix< value_t > &  U,
-        blas::matrix< value_t > &  V,
-        Hpro::TMatrix< value_t > &            A,
-        const Hpro::TTruncAcc &    acc,
-        const approx_t &           approx )
+addlr ( blas::matrix< value_t > &   U,
+        blas::matrix< value_t > &   V,
+        Hpro::TMatrix< value_t > &  A,
+        const accuracy &            acc,
+        const approx_t &            approx )
 {
     HLR_LOG( 5, Hpro::to_string( "addlr( %d )", A.id() ) );
     
@@ -1265,7 +1265,7 @@ template < typename value_t,
            typename approx_t >
 void
 lu ( Hpro::TMatrix< value_t > &  A,
-     const Hpro::TTruncAcc &     acc,
+     const accuracy &            acc,
      const approx_t &            approx )
 {
     HLR_LOG( 4, Hpro::to_string( "lu( %d )", A.id() ) );
@@ -1278,16 +1278,25 @@ lu ( Hpro::TMatrix< value_t > &  A,
         auto  A10 = ptrcast( BA->block( 1, 0 ), matrix::lrmatrix< value_t > );
         auto  A11 = BA->block( 1, 1 );
 
+        HLR_ASSERT( ! ( A01->is_compressed() || A10->is_compressed() ) );
+        
         lu< value_t >( *A00, acc, approx );
 
-        ::tbb::parallel_invoke( [A00,A01] () { seq::hodlr::trsml(  *A00, A01->U_direct() ); },
-                                [A00,A10] () { seq::hodlr::trsmuh( *A00, A10->V_direct() ); } );
+        auto  U01 = A01->U_direct();
+        auto  V01 = A01->V_direct();
+        auto  U10 = A10->U_direct();
+        auto  V10 = A10->V_direct();
+        
+        ::tbb::parallel_invoke(
+            [&A00,&U01] () { seq::hodlr::trsml(  *A00, U01 ); },
+            [&A00,&V10] () { seq::hodlr::trsmuh( *A00, V10 ); }
+        );
 
         // TV = U(A_10) · ( V(A_10)^H · U(A_01) )
-        auto  T  = blas::prod(  value_t(1), blas::adjoint( A10->V_direct() ), A01->U_direct() ); 
-        auto  UT = blas::prod( value_t(-1), A10->U_direct(), T );
+        auto  T  = blas::prod(  value_t(1), blas::adjoint( V10 ), U01 ); 
+        auto  UT = blas::prod( value_t(-1), U10, T );
 
-        addlr< value_t >( UT, A01->V_direct(), *A11, acc, approx );
+        addlr< value_t >( UT, V01, *A11, acc, approx );
         
         lu< value_t >( *A11, acc, approx );
     }// if
@@ -1295,7 +1304,7 @@ lu ( Hpro::TMatrix< value_t > &  A,
     {
         auto  DA = ptrcast( &A, matrix::dense_matrix< value_t > );
         
-        blas::invert( DA->blas_rmat() );
+        blas::invert( DA->mat_direct() );
     }// else
 }
 
@@ -1317,7 +1326,7 @@ template < typename value_t,
            typename approx_t >
 void
 lu ( Hpro::TMatrix< value_t > &  A,
-     const Hpro::TTruncAcc &     acc,
+     const accuracy &            acc,
      const approx_t &            approx )
 {
     HLR_LOG( 4, Hpro::to_string( "lu( %d )", A.id() ) );

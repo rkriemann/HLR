@@ -6,9 +6,11 @@
 // Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
-#include "common.hh"
-#include "common-main.hh"
-#include "hlr/cluster/hodlr.hh"
+#include <common.hh>
+#include <common-main.hh>
+#include <hlr/cluster/hodlr.hh>
+#include <hlr/bem/aca.hh>
+#include <hlr/matrix/luinv_eval.hh>
 
 using namespace hlr;
 
@@ -24,38 +26,31 @@ program_main ()
     auto  tic     = timer::now();
     auto  problem = gen_problem< problem_t >();
     auto  coord   = problem->coordinates();
-    auto  ct      = cluster::hodlr::cluster( *coord, ntile );
-    auto  bct     = cluster::hodlr::blockcluster( *ct, *ct );
+    auto  part    = gen_part_strat();
+    auto  ct      = cluster::hodlr::cluster( *coord, *part, ntile );
+    auto  bc      = cluster::hodlr::blockcluster( *ct, *ct );
     
     if ( hpro::verbose( 3 ) )
-    {
-        hpro::TPSBlockClusterVis   bc_vis;
-        
-        bc_vis.id( true ).print( bct->root(), "bct" );
-    }// if
+        io::eps::print( * bc->root(), "bt" );
     
-    auto  coeff  = problem->coeff_func();
-    auto  pcoeff = std::make_unique< hpro::TPermCoeffFn< value_t > >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
-    auto  lrapx  = std::make_unique< hpro::TACAPlus< value_t > >( pcoeff.get() );
-    auto  acc    = gen_accuracy();
-    auto  A      = impl::matrix::build( bct->root(), *pcoeff, *lrapx, acc );
-    auto  toc    = timer::since( tic );
+    auto  coeff   = problem->coeff_func();
+    auto  pcoeff  = Hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
+    auto  lrapx   = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
+    auto  acc     = gen_accuracy();
+    auto  A       = impl::matrix::build( bc->root(), pcoeff, lrapx, acc );
+    auto  toc     = timer::since( tic );
     
     std::cout << "    done in " << format_time( toc ) << std::endl;
     std::cout << "    mem   = " << format_mem( A->byte_size() ) << std::endl;
     
     if ( hpro::verbose( 3 ) )
-    {
-        hpro::TPSMatrixVis  mvis;
-        
-        mvis.svd( false ).id( true ).print( A.get(), "A" );
-    }// if
+        io::eps::print( *A, "A", "noid" );
     
     {
-        std::cout << term::bullet << term::bold << "LU ( HODLR " << impl_name << " )" << term::reset << std::endl;
+        std::cout << term::bullet << term::bold << "LU ( HODLR )" << term::reset << std::endl;
 
         auto  apx = approx::SVD< value_t >();
-        auto  C   = impl::matrix::copy( *A );
+        auto  LU  = impl::matrix::copy( *A );
 
         std::vector< double >  runtime;
     
@@ -63,7 +58,7 @@ program_main ()
         {
             tic = timer::now();
             
-            impl::hodlr::lu< value_t >( *C, hpro::fixed_rank( k ), apx );
+            impl::hodlr::lu< value_t >( *LU, acc, apx );
             
             toc = timer::since( tic );
 
@@ -72,15 +67,15 @@ program_main ()
             runtime.push_back( toc.seconds() );
 
             if ( i < nbench-1 )
-                impl::matrix::copy_to( *A, *C );
+                impl::matrix::copy_to( *A, *LU );
         }// for
         
         if ( nbench > 1 )
             std::cout << "  runtime = " << format_time( min( runtime ), median( runtime ), max( runtime ) ) << std::endl;
 
-        hpro::TLUInvMatrix  A_inv( C.get(), hpro::block_wise, hpro::store_inverse );
+        auto  A_inv = matrix::luinv_eval( *LU );
         
-        std::cout << "    mem   = " << format_mem( C->byte_size() ) << std::endl;
-        std::cout << "    error = " << format_error( inv_approx_2( A.get(), & A_inv ) ) << std::endl;
+        std::cout << "    mem   = " << format_mem( LU->byte_size() ) << std::endl;
+        std::cout << "    error = " << format_error( norm::inv_error_2( impl::arithmetic, *A, A_inv ) ) << std::endl;
     }
 }
