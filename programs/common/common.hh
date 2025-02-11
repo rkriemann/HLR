@@ -195,8 +195,8 @@ verbose ( const int  lvl )
 //
 // cluser given coordinate set
 //
-std::unique_ptr< Hpro::TClusterTree >
-gen_ct ( Hpro::TCoordinate &  coord )
+std::unique_ptr< Hpro::TBSPPartStrat >
+gen_part_strat ()
 {
     using  hlr::cmdline::cluster;
 
@@ -215,10 +215,19 @@ gen_ct ( Hpro::TCoordinate &  coord )
     else
         HLR_ERROR( "unsupported partitioning strategy: " + hlr::cmdline::part );
 
-    //
-    // actually cluster
-    //
-    
+    return part;
+}
+
+//
+// cluser given coordinate set
+//
+std::unique_ptr< Hpro::TClusterTree >
+gen_ct ( Hpro::TCoordinate &  coord )
+{
+    using  hlr::cmdline::cluster;
+
+    auto  part = gen_part_strat();
+
     if (( cluster == "tlr" ) || ( cluster == "blr" ))
     {
         return hlr::cluster::tlr::cluster( coord, *part, hlr::cmdline::ntile );
