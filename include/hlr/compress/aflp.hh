@@ -641,8 +641,9 @@ compress ( const config &   config,
            const size_t     dim3 = 0 )
 {
     using  real_t = Hpro::real_type_t< value_t >;
-    
-    const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
+
+    constexpr uint8_t  max_mant_bits = FP_info< real_t >::mant_bits;
+    const size_t       nsize         = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
 
     //
     // look for min/max value (> 0!)
@@ -677,16 +678,27 @@ compress ( const config &   config,
     }// if
     
     const auto     scale     = vmin;                                                                         // scale all values v_i such that |v_i| >= 1
-    const uint8_t  exp_bits  = std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) );  // no. of bits needed to represent exponent
-    const uint8_t  nbits     = byte_pad( 1 + exp_bits + config.bitrate );                                    // total no. of bits per value
+    uint8_t        exp_bits  = std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) );  // no. of bits needed to represent exponent
+    uint8_t        prec_bits = std::min< uint32_t >( max_mant_bits, config.bitrate );                        // number of precision bits due to config
+    const uint8_t  nbits     = byte_pad( 1 + exp_bits + prec_bits );                                         // rounded up total no. of bits per value
     const uint8_t  nbyte     = nbits / 8;
-    const uint8_t  prec_bits = nbits - 1 - exp_bits;                                                         // actual number of precision bits
     auto           zdata     = std::vector< byte_t >( FP_info< real_t >::header_ofs + nsize * nbyte );       // array storing compressed data
 
+    // adjust precision (or exponent bits)
+    prec_bits = nbits - 1 - exp_bits;
+
+    if ( prec_bits > max_mant_bits )
+    {
+        const auto  diff = prec_bits - max_mant_bits;
+            
+        exp_bits += prec_bits - max_mant_bits;
+        prec_bits = max_mant_bits;
+    }// if
+            
     HLR_DBG_ASSERT( std::isfinite( scale ) );
     
     HLR_ASSERT( nbits     <= sizeof(real_t) * 8 );
-    HLR_ASSERT( prec_bits <= FP_info< real_t >::mant_bits );
+    HLR_ASSERT( prec_bits <= max_mant_bits );
 
     compress( data, nsize, zdata.data(), scale, exp_bits, prec_bits );
 
