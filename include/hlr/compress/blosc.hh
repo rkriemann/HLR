@@ -53,6 +53,16 @@ inline size_t  byte_size       ( const zarray &  v ) { return sizeof(zarray) + v
 inline size_t  compressed_size ( const zarray &  v ) { return v.size(); }
 
 //
+// floating point data
+//
+template < typename real_t > struct prec_bits_s {};
+
+template <> struct prec_bits_s< float >  { constexpr static byte_t  value = 23; };
+template <> struct prec_bits_s< double > { constexpr static byte_t  value = 52; };
+
+template < typename real_t > inline constexpr byte_t prec_bits_v = prec_bits_s< real_t >::value;
+
+//
 // compression function
 //
 template < typename value_t >
@@ -64,6 +74,8 @@ compress ( const config &   config,
            const size_t     dim2 = 0,
            const size_t     dim3 = 0 )
 {
+    using  real_t = Hpro::real_type_t< value_t >;
+
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
 
     if ( nsize == 0 )
@@ -72,13 +84,18 @@ compress ( const config &   config,
     const auto      lastpos = BLOSC2_MAX_FILTERS - 1;
     blosc2_cparams  cparams = BLOSC2_CPARAMS_DEFAULTS;
     
-    cparams.typesize         = sizeof( value_t );
-    cparams.compcode         = BLOSC_LZ4HC;
-    cparams.clevel           = 9;
-    cparams.filters[0]       = BLOSC_TRUNC_PREC; // truncate precision bits
-    cparams.filters_meta[0]  = config.bitrate;   // number of precision bits
-    cparams.filters[lastpos] = BLOSC_BITSHUFFLE; // use bit shuffling
-    cparams.nthreads         = 1;                // sequential!
+    cparams.typesize = sizeof( value_t );
+    cparams.compcode = BLOSC_LZ4HC;
+    cparams.clevel   = 9;
+
+    if ( config.bitrate < prec_bits_v< real_t > )
+    {
+        cparams.filters[0]      = BLOSC_TRUNC_PREC; // truncate precision bits
+        cparams.filters_meta[0] = config.bitrate;   // number of precision bits
+    }// if
+    
+    cparams.filters[lastpos] = BLOSC_BITSHUFFLE;    // use bit shuffling
+    cparams.nthreads         = 1;                   // sequential!
 
     auto  cctx   = blosc2_create_cctx( cparams );
     auto  buffer = std::vector< byte_t >( nsize * sizeof(value_t) );
@@ -151,10 +168,8 @@ decompress ( const byte_t *  zdata,
 
     blosc2_free_ctx( dctx );
     
-    if ( dsize < 0 )
-    { HLR_ERROR( "internal error in blosc" ); }
-    else if ( dsize < nsize * sizeof(value_t) )
-    { HLR_ERROR( "insufficient decompression" ); }
+    if      ( dsize < 0 )                       { HLR_ERROR( "internal error in blosc" ); }
+    else if ( dsize < nsize * sizeof(value_t) ) { HLR_ERROR( "insufficient decompression" ); }
 }
 
 template < typename value_t >
