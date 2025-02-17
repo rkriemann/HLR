@@ -15,6 +15,7 @@
 #include <hlr/tensor/structured_tensor.hh>
 
 #include <hlr/utils/io.hh>
+#include <hlr/utils/tensor.hh>
 
 namespace hlr { namespace tensor {
 
