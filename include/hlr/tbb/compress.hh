@@ -216,6 +216,98 @@ compress ( const indexset &                 rowis,
     }// else
 }
 
+//
+// compress and uncompress thereby overwriting D by data modified due to compression
+// return memory of compressed representation
+//
+template < typename value_t,
+           typename approx_t >
+size_t
+compress_uncompress ( const indexset &           rowis,
+                      const indexset &           colis,
+                      blas::matrix< value_t > &  M,
+                      const Hpro::TTruncAcc &    acc,
+                      const approx_t &           approx,
+                      const size_t               ntile )
+{
+    using namespace hlr::matrix;
+    
+    if ( std::min( M.nrows(), M.ncols() ) <= ntile )
+    {
+        //
+        // build leaf
+        //
+
+        if ( ! acc.is_exact() )
+        {
+            auto  Mc       = blas::copy( M );  // do not modify M now
+            auto  lacc     = acc( rowis, colis );
+            auto  [ U, V ] = approx( Mc, lacc );
+            
+            if ( U.byte_size() + V.byte_size() < Mc.byte_size() )
+            {
+                auto  R = lrmatrix< value_t >( rowis, colis, std::move( U ), std::move( V ) );
+
+                R.compress( lacc );
+
+                auto  Uc = R.U();
+                auto  Vc = R.V();
+
+                // overwrite M
+                blas::prod( value_t(1), Uc, adjoint(Vc), value_t(0), M );
+
+                return R.data_byte_size();
+            }// if
+            else
+            {
+                auto  D = dense_matrix< value_t >( rowis, colis, std::move( blas::copy( M ) ) );
+
+                D.compress( lacc );
+
+                auto  Dc = D.mat();
+
+                // overwrite M
+                blas::copy( Dc, M );
+
+                return D.data_byte_size();
+            }// else
+        }// if
+    }// if
+    else
+    {
+        //
+        // Recursion
+        //
+
+        const auto  mid_row = ( rowis.first() + rowis.last() + 1 ) / 2;
+        const auto  mid_col = ( colis.first() + colis.last() + 1 ) / 2;
+
+        indexset    sub_rowis[2] = { indexset( rowis.first(), mid_row-1 ), indexset( mid_row, rowis.last() ) };
+        indexset    sub_colis[2] = { indexset( colis.first(), mid_col-1 ), indexset( mid_col, colis.last() ) };
+        auto        mem          = std::atomic< size_t >( 0 );
+
+        ::tbb::parallel_for(
+            ::tbb::blocked_range2d< uint >( 0, 2, 0, 2 ),
+            [&,ntile] ( const auto &  r )
+            {
+                for ( auto  i = r.rows().begin(); i != r.rows().end(); ++i )
+                {
+                    for ( auto  j = r.cols().begin(); j != r.cols().end(); ++j )
+                    {
+                        auto  M_sub = M( sub_rowis[i] - rowis.first(),
+                                         sub_colis[j] - colis.first() );
+                        
+                        mem += compress_uncompress( sub_rowis[i], sub_colis[j], M_sub, acc, approx, ntile );
+                    }// for
+                }// for
+            } );
+
+        return mem.load();
+    }// else
+
+    return 0;
+}
+
 }// namespace detail
 
 template < typename value_t,
@@ -251,7 +343,18 @@ compress ( const indexset &                 rowis,
 
     return M;
 }
-    
+
+template < typename value_t,
+           typename approx_t >
+size_t
+compress_uncompress ( blas::matrix< value_t > &  M,
+                      const Hpro::TTruncAcc &    acc,
+                      const approx_t &           approx,
+                      const size_t               ntile )
+{
+    return detail::compress_uncompress( indexset( 0, M.nrows()-1 ), indexset( 0, M.ncols()-1 ), M, acc, approx, ntile );
+}
+
 //
 // top-down compression approach: if low-rank approximation is possible
 // within given accuracy and maximal rank, stop recursion
