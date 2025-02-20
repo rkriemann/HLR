@@ -314,9 +314,9 @@ compress_tucker ( blas::tensor3< value_t > &  D,
 {
     HLR_ASSERT(( D.size(0) == D.size(1) ) &&
                ( D.size(0) == D.size(2) )); // assuming equal size in all dimensions
-    HLR_ASSERT( ( D.size(0) / ntile ) * ntile == D.size(0) );             // no padding for now
 
     const auto  N    = D.size(0);
+    const auto  Nc   = (N % ntile == 0 ? N / ntile : ( N / ntile ) + 1 );
     auto        apx  = approx::SVD< value_t >();
     auto        zmem = std::atomic< size_t >( 0 );
 
@@ -328,9 +328,9 @@ compress_tucker ( blas::tensor3< value_t > &  D,
     const auto  cacc   = relative_prec( Hpro::frobenius_norm, eps );
     
     ::tbb::parallel_for(
-        ::tbb::blocked_range3d< size_t >( 0, N / ntile,
-                                          0, N / ntile,
-                                          0, N / ntile ),
+        ::tbb::blocked_range3d< size_t >( 0, Nc,
+                                          0, Nc,
+                                          0, Nc ),
         [&,ntile] ( const auto &  r )
         {
             for ( auto  z = r.pages().begin(); z != r.pages().end(); ++z )
@@ -430,7 +430,7 @@ compress_tucker ( blas::tensor3< value_t > &  D,
                             zmem += T_sub->data_byte_size();
                         }// else
 
-                        // O_sub.check_data();
+                        O_sub.check_data();
                     }// for
                 }// for
             }// for

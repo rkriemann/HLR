@@ -10,6 +10,7 @@
 
 #include <hlr/tensor/construct.hh>
 #include <hlr/tensor/convert.hh>
+#include <hlr/tensor/compress.hh>
 
 namespace hlr { namespace seq { namespace tensor {
 
