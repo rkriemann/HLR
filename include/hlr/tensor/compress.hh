@@ -84,6 +84,127 @@ decompress ( base_tensor3< value_t > &  T )
 //
 template < typename value_t >
 size_t
+compress_tucker ( blas::tensor3< value_t > &  D,
+                  const size_t                ntile,
+                  const double &              eps,
+                  const bool                  fpcompress )
+{
+    HLR_ASSERT(( D.size(0) == D.size(1) ) &&
+               ( D.size(0) == D.size(2) )); // assuming equal size in all dimensions
+
+    const auto  N    = D.size(0);
+    const auto  Nc   = (N % ntile == 0 ? N / ntile : ( N / ntile ) + 1 );
+    auto        apx  = approx::SVD< value_t >();
+    size_t      zmem = 0;
+
+    const auto  norm_D = blas::norm_F( D );
+    const auto  tol    = eps * norm_D / std::sqrt( 3 * double(N) / double(ntile) ); // √3 = √d from HOSVD
+    const auto  acc    = absolute_prec( Hpro::frobenius_norm, tol );
+    // const auto  cacc   = absolute_prec( Hpro::frobenius_norm, cmdline::eps );
+    // const auto  acc    = relative_prec( Hpro::frobenius_norm, tol );
+    const auto  cacc   = relative_prec( Hpro::frobenius_norm, eps );
+    
+    for ( size_t  nz = 0; nz < N; nz += ntile )
+    {
+        for ( size_t  ny = 0; ny < N; ny += ntile )
+        {
+            for ( size_t  nx = 0; nx < N; nx += ntile )
+            {
+                const auto  is0 = indexset( nx, std::min( nx + ntile - 1, N-1 ) );
+                const auto  is1 = indexset( ny, std::min( ny + ntile - 1, N-1 ) );
+                const auto  is2 = indexset( nz, std::min( nz + ntile - 1, N-1 ) );
+
+                auto        O_sub      = D( is0, is1, is2 );
+                auto        D_sub      = blas::copy( O_sub );
+                const auto  norm_D_sub = blas::norm_F( D_sub );
+
+                // O_sub.check_data();
+                // D_sub.check_data();
+                        
+                if ( norm_D_sub == value_t(0) )
+                    continue;
+
+                // if ( verbose(4) )
+                //     std::cout << is0 << " × " << is1 << " × " << is2 << " : " << format_norm( norm_D_sub, acc.abs_eps() * norm_D_sub ) << std::endl;
+
+                auto  G  = blas::tensor3< value_t >();
+                auto  X0 = blas::matrix< value_t >();
+                auto  X1 = blas::matrix< value_t >();
+                auto  X2 = blas::matrix< value_t >();
+                        
+                //
+                // HOSVD
+                //
+                
+                // if (( cmdline::tapprox == "hosvd" ) || ( cmdline::tapprox == "default" ))
+                {
+                    std::tie( G, X0, X1, X2 ) = blas::hosvd( D_sub, acc, apx );
+                }// if
+
+                //
+                // decide about format
+                //
+
+                const auto  mem_full   = D_sub.data_byte_size();
+                const auto  mem_tucker = G.data_byte_size() + X0.data_byte_size() + X1.data_byte_size() + X2.data_byte_size();
+                        
+                // if ( mem_tucker < mem_full )
+                // {
+                //     // if ( verbose(4) )
+                //     //     std::cout << is0 << " × " << is1 << " × " << is2 << " : ranks = "
+                //     //               << G.size(0) << " / " << G.size(1) << " / " << G.size(2) << " / " << G.size(3) << std::endl;
+                            
+                //     //
+                //     // replace data by uncompressed version
+                //     //
+
+                //     auto  T_sub = std::make_unique< tensor::tucker_tensor3< value_t > >( is0, is1, is2,
+                //                                                                          std::move( G ),
+                //                                                                          std::move( X0 ),
+                //                                                                          std::move( X1 ),
+                //                                                                          std::move( X2 ) );
+
+                //     if ( fpcompress )
+                //         T_sub->compress( cacc );
+                            
+                //     auto  T0 = blas::tensor_product( T_sub->G(), T_sub->X(0), 0 );
+                //     auto  T1 = blas::tensor_product(         T0, T_sub->X(1), 1 );
+                //     auto  Y  = blas::tensor_product(         T1, T_sub->X(2), 2 );
+
+                //     blas::copy( Y, O_sub );
+
+                //     zmem += T_sub->data_byte_size();
+                // }// if
+                // else
+                {
+                    //
+                    // use original data (nothing to do)
+                    //
+
+                    auto  T_sub = std::make_unique< tensor::dense_tensor3< value_t > >( is0, is1, is2, std::move( D_sub ) );
+                                
+                    if ( fpcompress )
+                        T_sub->compress( cacc );
+
+                    auto  Y = T_sub->tensor();
+
+                    // Y.check_data();
+                            
+                    blas::copy( Y, O_sub );
+
+                    zmem += T_sub->data_byte_size();
+                }// else
+
+                O_sub.check_data();
+            }// for
+        }// for
+    }// for
+
+    return zmem;
+}
+
+template < typename value_t >
+size_t
 compress_tucker ( blas::tensor4< value_t > &  D,
                   const size_t                ntile,
                   const double &              eps,
