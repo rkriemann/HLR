@@ -463,6 +463,28 @@ print ( const tensor3< value_t > &  t,
     }// for
 }
 
+//
+// test data for invalid values, e.g. INF and NAN
+//
+template < typename value_t >
+void
+tensor3< value_t >::check_data  () const
+{
+    for ( idx_t  i2 = 0; i2 < size(2); ++i2 )
+    {
+        for ( idx_t  i1 = 0; i1 < size(1); ++i1 )
+        {
+            for ( idx_t  i0 = 0; i0 < size(0); ++i0 )
+            {
+                const value_t  val = (*this)(i0,i1,i2);
+                
+                if ( std::isinf( val ) ) HLR_ERROR( "Inf found" );
+                if ( std::isnan( val ) ) HLR_ERROR( "NaN found" );
+            }// for
+        }// for
+    }// for
+}
+
 ////////////////////////////////////////////////////////////////
 //
 // BLAS functions
