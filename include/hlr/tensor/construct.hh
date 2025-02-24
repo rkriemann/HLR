@@ -66,15 +66,12 @@ blockwise_tucker ( blas::tensor3< value_t > &  D,
 {
     using  real_t = real_type_t< value_t >;
     
-    const auto    N = D.size(0); // assuming equal size in all dimensions
-
-    HLR_ASSERT( ( N / ntile ) * ntile == N ); // no padding for now
+    const auto  N  = D.size(0); // assuming equal size in all dimensions
+    const auto  Nb = N % ntile == 0 ? N / ntile : N / ntile + 1;
 
     auto  T = std::make_unique< tensor::structured_tensor3< value_t > >( indexset( 0, N-1 ), indexset( 0, N-1 ), indexset( 0, N-1 ) );
 
-    T->set_structure( N / ntile,
-                      N / ntile,
-                      N / ntile );
+    T->set_structure( Nb, Nb, Nb );
     
     for ( size_t  nz = 0, z = 0; nz < N; nz += ntile, ++z )
     {

@@ -321,11 +321,9 @@ compress_tucker ( blas::tensor3< value_t > &  D,
     auto        zmem = std::atomic< size_t >( 0 );
 
     const auto  norm_D = blas::norm_F( D );
-    const auto  tol    = eps * norm_D / std::sqrt( 3 * double(N) / double(ntile) ); // √3 = √d from HOSVD
-    const auto  acc    = absolute_prec( Hpro::frobenius_norm, tol );
-    // const auto  cacc   = absolute_prec( Hpro::frobenius_norm, cmdline::eps );
-    // const auto  acc    = relative_prec( Hpro::frobenius_norm, tol );
-    const auto  cacc   = relative_prec( Hpro::frobenius_norm, eps );
+    const auto  tol    = eps * norm_D / ( double(Nc) * std::sqrt( 3 )); // √3 = √d from HOSVD
+    const auto  tacc   = accuracy( Hpro::frobenius_norm, eps, tol ); // absolute_prec( Hpro::frobenius_norm, tol );
+    const auto  fpacc  = relative_prec( Hpro::frobenius_norm, eps );
     
     ::tbb::parallel_for(
         ::tbb::blocked_range3d< size_t >( 0, Nc,
@@ -373,7 +371,7 @@ compress_tucker ( blas::tensor3< value_t > &  D,
                 
                         // if (( cmdline::tapprox == "hosvd" ) || ( cmdline::tapprox == "default" ))
                         {
-                            std::tie( G, X0, X1, X2 ) = blas::hosvd( D_sub, acc, apx );
+                            std::tie( G, X0, X1, X2 ) = blas::hosvd( D_sub, tacc, apx );
                         }// if
 
                         //
@@ -388,7 +386,7 @@ compress_tucker ( blas::tensor3< value_t > &  D,
                             // if ( verbose(4) )
                             //     std::cout << is0 << " × " << is1 << " × " << is2 << " : ranks = "
                             //               << G.size(0) << " / " << G.size(1) << " / " << G.size(2) << " / " << G.size(3) << std::endl;
-                            
+                         
                             //
                             // replace data by uncompressed version
                             //
@@ -400,8 +398,8 @@ compress_tucker ( blas::tensor3< value_t > &  D,
                                                                                                  std::move( X2 ) );
 
                             if ( fpcompress )
-                                T_sub->compress( cacc );
-                            
+                                T_sub->compress( fpacc );
+                         
                             auto  T0 = blas::tensor_product( T_sub->G(), T_sub->X(0), 0 );
                             auto  T1 = blas::tensor_product(         T0, T_sub->X(1), 1 );
                             auto  Y  = blas::tensor_product(         T1, T_sub->X(2), 2 );
@@ -419,7 +417,7 @@ compress_tucker ( blas::tensor3< value_t > &  D,
                             auto  T_sub = std::make_unique< tensor::dense_tensor3< value_t > >( is0, is1, is2, std::move( D_sub ) );
                                 
                             if ( fpcompress )
-                                T_sub->compress( cacc );
+                                T_sub->compress( fpacc );
 
                             auto  Y = T_sub->tensor();
 
@@ -457,10 +455,10 @@ compress_tucker ( blas::tensor4< value_t > &  D,
 
     const auto  norm_D = blas::norm_F( D );
     const auto  tol    = eps * norm_D / std::sqrt( 4 * double(N) / double(ntile) ); // √4 = √d from HOSVD
-    const auto  acc    = absolute_prec( Hpro::frobenius_norm, tol );
-    // const auto  cacc   = absolute_prec( Hpro::frobenius_norm, cmdline::eps );
+    const auto  tacc   = absolute_prec( Hpro::frobenius_norm, tol );
+    // const auto  fpacc   = absolute_prec( Hpro::frobenius_norm, cmdline::eps );
     // const auto  acc    = relative_prec( Hpro::frobenius_norm, tol );
-    const auto  cacc   = relative_prec( Hpro::frobenius_norm, eps );
+    const auto  fpacc   = relative_prec( Hpro::frobenius_norm, eps );
     
     ::tbb::parallel_for(
         ::tbb::blocked_range3d< size_t >( 0, N / ntile,
@@ -510,7 +508,7 @@ compress_tucker ( blas::tensor4< value_t > &  D,
                 
                         // if (( cmdline::tapprox == "hosvd" ) || ( cmdline::tapprox == "default" ))
                         {
-                            std::tie( G, X0, X1, X2, X3 ) = blas::hosvd( D_sub, acc, apx );
+                            std::tie( G, X0, X1, X2, X3 ) = blas::hosvd( D_sub, tacc, apx );
                         }// if
 
                         //
@@ -538,7 +536,7 @@ compress_tucker ( blas::tensor4< value_t > &  D,
                                                                                                  std::move( X3 ) );
 
                             if ( fpcompress )
-                                T_sub->compress( cacc );
+                                T_sub->compress( fpacc );
                             
                             auto  T0 = blas::tensor_product( T_sub->G(), T_sub->X(0), 0 );
                             auto  T1 = blas::tensor_product(         T0, T_sub->X(1), 1 );
@@ -558,7 +556,7 @@ compress_tucker ( blas::tensor4< value_t > &  D,
                             auto  T_sub = std::make_unique< tensor::dense_tensor4< value_t > >( is0, is1, is2, is3, std::move( D_sub ) );
                                 
                             if ( fpcompress )
-                                T_sub->compress( cacc );
+                                T_sub->compress( fpacc );
 
                             auto  Y = T_sub->tensor();
 
@@ -586,8 +584,8 @@ template < typename                    value_t,
 std::unique_ptr< tensor::structured_tensor3< value_t > >
 blockwise_tucker ( blas::tensor3< value_t > &  D,
                    const size_t                ntile,
-                   const accuracy &            acc,
-                   const accuracy &            cacc,
+                   const accuracy &            tacc,
+                   const accuracy &            fpacc,
                    const approx_t &            apx )
 {
     using  real_t = real_type_t< value_t >;
@@ -653,13 +651,13 @@ blockwise_tucker ( blas::tensor3< value_t > &  D,
                             auto  S1 = blas::vector< real_t >();
                             auto  S2 = blas::vector< real_t >();
                             
-                            std::tie( G, X0, S0, X1, S1, X2, S2 ) = blas::hosvd_sv( D_ijk, acc, apx );
+                            std::tie( G, X0, S0, X1, S1, X2, S2 ) = blas::hosvd_sv( D_ijk, tacc, apx );
                             
                             // if ( verbose(2) && ( std::min( std::min( G.size(0), G.size(1) ), G.size(2) ) ) > 0 )
                                 // std::cout << is0 << " × " << is1 << " × " << is2 << " : "
                                 //           << boost::format( "%.4e" ) % std::max( std::max( S0(0), S1(0) ), S2(0) ) << std::endl;
 
-                            // std::tie( G, X0, X1, X2 ) = blas::hosvd( D_ijk, acc, apx );
+                            // std::tie( G, X0, X1, X2 ) = blas::hosvd( D_ijk, tacc, apx );
                         }// if
 
                         //
@@ -668,7 +666,7 @@ blockwise_tucker ( blas::tensor3< value_t > &  D,
 
                         // if ( tapprox == "sthosvd" )
                         // {
-                        //     std::tie( G, X0, X1, X2 ) = blas::sthosvd( D_ijk, acc, apx );
+                        //     std::tie( G, X0, X1, X2 ) = blas::sthosvd( D_ijk, tacc, apx );
                         // }// if
 
                         //
@@ -678,7 +676,7 @@ blockwise_tucker ( blas::tensor3< value_t > &  D,
                         // if ( tapprox == "ghosvd" )
                         // {
                         //     HLR_ERROR( "TODO" );
-                        //     // std::tie( G, X0, X1, X2 ) = impl::blas::greedy_hosvd( D_ijk, acc, apx );
+                        //     // std::tie( G, X0, X1, X2 ) = impl::blas::greedy_hosvd( D_ijk, tacc, apx );
                         // }// if
 
                         // std::cout << is0 << " × " << is1 << " × " << is2 << " : " << G.size(0) << " × " << G.size(1) << " × " << G.size(2) << std::endl;
@@ -698,8 +696,8 @@ blockwise_tucker ( blas::tensor3< value_t > &  D,
                                                                                                  std::move( X1 ),
                                                                                                  std::move( X2 ) );
 
-                            if ( ! cacc.is_exact() )
-                                T_sub->compress( cacc );
+                            if ( ! fpacc.is_exact() )
+                                T_sub->compress( fpacc );
                     
                             T->set_block( x, y, z, T_sub.release() );
                         }// if
@@ -707,8 +705,8 @@ blockwise_tucker ( blas::tensor3< value_t > &  D,
                         {
                             auto  T_sub = std::make_unique< tensor::dense_tensor3< value_t > >( is0, is1, is2, std::move( D_ijk ) );
                     
-                            if ( ! cacc.is_exact() )
-                                T_sub->compress( cacc );
+                            if ( ! fpacc.is_exact() )
+                                T_sub->compress( fpacc );
                     
                             T->set_block( x, y, z, T_sub.release() );
                         }// else
