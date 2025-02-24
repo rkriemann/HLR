@@ -106,6 +106,24 @@ tensor4< value_t >::unfold ( const uint  mode ) const
     }// switch
 }
 
+template < typename value_t >
+void
+tensor4< value_t >::check_data () const
+{
+    for ( size_t  i3 = 0; i3 < size(3); ++i3 )
+        for ( size_t  i2 = 0; i2 < size(2); ++i2 )
+            for ( size_t  i1 = 0; i1 < size(1); ++i1 )
+                for ( size_t  i0 = 0; i0 < size(0); ++i0 )
+                {
+                    auto  v = this->operator()( i0, i1, i2, i3 );
+
+                    if ( std::isnan( v ) || std::isinf( v ) )
+                    {
+                        HLR_ERROR( "nan/inf detected" );
+                    }// if
+                }// for
+}
+
 ////////////////////////////////////////////////////////////////
 //
 // BLAS functions
