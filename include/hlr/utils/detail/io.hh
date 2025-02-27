@@ -977,7 +977,7 @@ vtk_print_tensor ( const tensor::base_tensor3< value_t > &  t,
     {
         auto  T = behead( tensors );
         
-        if ( tensor::is_structured( *T ) )
+        if ( tensor::is_structured_tensor3( *T ) )
         {
             auto  B = cptrcast( T, tensor::structured_tensor3< value_t > );
 
