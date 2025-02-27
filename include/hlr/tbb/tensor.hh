@@ -46,14 +46,15 @@ build_hierarchical_tucker ( const indexset &                  is0,
                             const indexset &                  is1,
                             const indexset &                  is2,
                             const blas::tensor3< value_t > &  D,
-                            const tensor_accuracy &           acc,
+                            const size_t                      ntile,
+                            const accuracy &                  tacc,
                             const approx_t &                  apx,
-                            const size_t                      ntile )
+                            const accuracy &                  fpacc )
 {
     // choose one to be used below
     // auto  hosvd = blas::hosvd< value_t, approx_t >;
     // auto  hosvd = blas::sthosvd< value_t, approx_t >;
-    auto  hosvd = blas::greedy_hosvd< value_t, approx_t >;
+    // auto  hosvd = blas::greedy_hosvd< value_t, approx_t >;
 
     if ( std::min( D.size(0), std::min( D.size(1), D.size(2) ) ) <= ntile )
     {
@@ -61,14 +62,14 @@ build_hierarchical_tucker ( const indexset &                  is0,
         // build leaf
         //
 
-        const auto  lacc = acc( is0, is1, is2 );
+        // const auto  lacc = acc( is0, is1, is2 );
         
-        if ( ! lacc.is_exact() )
+        if ( ! tacc.is_exact() )
         {
             auto  Dc                = blas::copy( D );  // do not modify D (!)
-            auto  [ G, X0, X1, X2 ] = blas::greedy_hosvd( Dc, lacc, apx );
+            auto  [ G, X0, X1, X2 ] = blas::hosvd( Dc, tacc, apx );
             
-            if ( G.byte_size() + X0.byte_size() + X1.byte_size() + X2.byte_size() < Dc.byte_size() )
+            if ( G.data_byte_size() + X0.data_byte_size() + X1.data_byte_size() + X2.data_byte_size() < Dc.data_byte_size() )
             {
                 return std::make_unique< tucker_tensor3< value_t > >( is0, is1, is2,
                                                                       std::move( G ),
@@ -78,6 +79,7 @@ build_hierarchical_tucker ( const indexset &                  is0,
             }// if
         }// if
 
+        // either exact accuracy or lowrank is less efficient: build dense
         return std::make_unique< dense_tensor3< value_t > >( is0, is1, is2, std::move( blas::copy( D ) ) );
     }// if
     else
@@ -94,6 +96,7 @@ build_hierarchical_tucker ( const indexset &                  is0,
         indexset    sub_is1[2] = { indexset( is1.first(), mid1-1 ), indexset( mid1, is1.last() ) };
         indexset    sub_is2[2] = { indexset( is2.first(), mid2-1 ), indexset( mid2, is2.last() ) };
         auto        sub_D      = hlr::tensor3< std::unique_ptr< base_tensor3< value_t > > >( 2, 2, 2 );
+        auto        sacc       = absolute_prec( Hpro::frobenius_norm, tacc.abs_eps() / 3.0 );
 
         ::tbb::parallel_for(
             ::tbb::blocked_range3d< uint >( 0, 2,
@@ -111,7 +114,7 @@ build_hierarchical_tucker ( const indexset &                  is0,
                                                    sub_is1[j] - is1.first(),
                                                    sub_is2[l] - is2.first() );
                             
-                            sub_D(i,j,l) = build_hierarchical_tucker( sub_is0[i], sub_is1[j], sub_is2[l], D_sub, acc, apx, ntile );
+                            sub_D(i,j,l) = build_hierarchical_tucker( sub_is0[i], sub_is1[j], sub_is2[l], D_sub, ntile, sacc, apx, fpacc );
                             
                             HLR_ASSERT( sub_D(i,j,l).get() != nullptr );
                         }// for
@@ -123,8 +126,9 @@ build_hierarchical_tucker ( const indexset &                  is0,
         // look for type of sub blocks
         //
 
-        bool  all_tucker = true;
-        bool  all_dense  = true;
+        bool    all_tucker = true;
+        bool    all_dense  = true;
+        size_t  mem_sub    = 0;
         
         for ( uint  l = 0; l < 2; ++l )
             for ( uint  j = 0; j < 2; ++j )
@@ -132,6 +136,8 @@ build_hierarchical_tucker ( const indexset &                  is0,
                 {
                     if ( ! is_tucker_tensor3( *sub_D(i,j,l) ) )
                         all_tucker = false;
+                    else
+                        mem_sub += sub_D(i,j,l)->data_byte_size();
 
                     if ( ! is_dense_tensor3( *sub_D(i,j,l) ) )
                         all_dense = false;
@@ -141,17 +147,37 @@ build_hierarchical_tucker ( const indexset &                  is0,
         // if all sub blocks are Tucker tensors, try to merge
         //
 
-        auto  T = std::unique_ptr< base_tensor3< value_t > >();
-        
         if ( all_tucker )
         {
+            auto  T = std::unique_ptr< base_tensor3< value_t > >();
+        
             // T = std::move( merge_all( is0, is1, is2, D, sub_D, acc, apx, hosvd ) );
-            T = std::move( merge_greedy( is0, is1, is2, D, sub_D, acc, apx, hosvd ) );
+            // T = std::move( merge_greedy( is0, is1, is2, D, sub_D, acc, apx, hosvd ) );
             // T = std::move( merge_dim( is0, is1, is2, D, sub_D, acc, apx, hosvd ) );
-        }// if
 
-        if ( ! is_null( T ) )
-            return T;
+            //
+            // construct from dense
+            //
+
+            // std::cout << "trying merge on " << is0.to_string() << " × " << is1.to_string() << " × " << is1.to_string() << std::endl;
+            
+            // const auto  lacc              = acc( is0, is1, is2 );
+            auto        Dc                = blas::copy( D );  // do not modify D (!)
+            auto        [ G, X0, X1, X2 ] = blas::hosvd( Dc, tacc, apx );
+            
+            if ( G.data_byte_size() + X0.data_byte_size() + X1.data_byte_size() + X2.data_byte_size() <= mem_sub )
+            {
+                // std::cout << "merged : " << G.data_byte_size() + X0.data_byte_size() + X1.data_byte_size() + X2.data_byte_size() << " / " << mem_sub << std::endl;
+                
+                return std::make_unique< tucker_tensor3< value_t > >( is0, is1, is2,
+                                                                      std::move( G ),
+                                                                      std::move( X0 ),
+                                                                      std::move( X1 ),
+                                                                      std::move( X2 ) );
+            }// if
+            
+            // std::cout << "not merged : " << G.data_byte_size() + X0.data_byte_size() + X1.data_byte_size() + X2.data_byte_size() << " / " << mem_sub << std::endl;
+        }// if
         
         //
         // also return full tensor if all sub blocks are dense
@@ -159,7 +185,7 @@ build_hierarchical_tucker ( const indexset &                  is0,
 
         if ( all_dense )
             return std::make_unique< dense_tensor3< value_t > >( is0, is1, is2, std::move( blas::copy( D ) ) );
-        
+
         //
         // as merge was not successful, construct structured tensor
         //
@@ -171,7 +197,13 @@ build_hierarchical_tucker ( const indexset &                  is0,
         for ( uint  l = 0; l < 2; ++l )
             for ( uint  i = 0; i < 2; ++i )
                 for ( uint  j = 0; j < 2; ++j )
+                {
+                    // compress FP representation
+                    if ( ! fpacc.is_exact() )
+                        sub_D(i,j,l)->compress( fpacc );
+                    
                     B->set_block( i, j, l, sub_D(i,j,l).release() );
+                }// for
             
         return B;
     }// else
@@ -185,10 +217,11 @@ build_hierarchical_tucker ( const indexset &                  is0,
 template < typename                    value_t,
            approx::approximation_type  approx_t >
 std::unique_ptr< base_tensor3< value_t > >
-build_hierarchical_tucker ( const blas::tensor3< value_t > &  D,
-                            const tensor_accuracy &           acc,
-                            const approx_t &                  apx,
-                            const size_t                      ntile )
+hierarchical_tucker ( const blas::tensor3< value_t > &  D,
+                      const size_t                      ntile,
+                      const accuracy &                  acc,
+                      const approx_t &                  apx,
+                      const accuracy &                  fpacc )
 {
     //
     // handle parallel computation of norm because BLAS should be sequential
@@ -207,7 +240,11 @@ build_hierarchical_tucker ( const blas::tensor3< value_t > &  D,
     M = std::move( detail::build_hierarchical_tucker( indexset( 0, D.size(0)-1 ),
                                                       indexset( 0, D.size(1)-1 ),
                                                       indexset( 0, D.size(2)-1 ),
-                                                      D, acc, apx, ntile ) );
+                                                      D, ntile, acc, apx, fpacc ) );
+
+    // in case of global tucker/dense tensor
+    if ( ! fpacc.is_exact() )
+        M->compress( fpacc );
 
     HLR_ASSERT( M.get() != nullptr );
 
@@ -585,8 +622,8 @@ std::unique_ptr< tensor::structured_tensor3< value_t > >
 blockwise_tucker ( blas::tensor3< value_t > &  D,
                    const size_t                ntile,
                    const accuracy &            tacc,
-                   const accuracy &            fpacc,
-                   const approx_t &            apx )
+                   const approx_t &            apx,
+                   const accuracy &            fpacc )
 {
     using  real_t = real_type_t< value_t >;
     
