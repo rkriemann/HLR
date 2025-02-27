@@ -147,7 +147,7 @@ build_hierarchical_tucker ( const indexset &                  is0,
         // if all sub blocks are Tucker tensors, try to merge
         //
 
-        if ( all_tucker )
+        if ( all_tucker && ( std::min( std::min( is0.size(), is1.size() ), is2.size() ) <= 128 ) )
         {
             auto  T = std::unique_ptr< base_tensor3< value_t > >();
         
