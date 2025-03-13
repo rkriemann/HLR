@@ -16,6 +16,7 @@
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/operator_wrapper.hh>
 #include <hlr/approx/tools.hh>
+#include <hlr/utils/math.hh>
 
 namespace hlr { namespace approx {
 
@@ -83,7 +84,7 @@ struct aca_pivot_next
         const auto  max_val   = column( pivot_row );
 
         // stop and signal no pivot found if remainder is "zero"
-        if ( Hpro::Math::abs( max_val ) <= zero_val )
+        if ( math::abs( max_val ) <= zero_val )
             return { -1, -1, blas::vector< value_t >(), blas::vector< value_t >() };
 
         // scale <col> by inverse of maximal element in u
@@ -165,7 +166,7 @@ struct aca_pivot_max
         const auto  max_val   = column( pivot_row );
 
         // stop and signal no pivot found if remainder is "zero"
-        if ( Hpro::Math::abs( max_val ) <= zero_val )
+        if ( math::abs( max_val ) <= zero_val )
             return { -1, -1, blas::vector< value_t >(), blas::vector< value_t >() };
 
         // scale <col> by inverse of maximal element in u
@@ -266,7 +267,7 @@ struct aca_pivot_full
         }// for
         
         // stop and signal no pivot found if remainder is "zero"
-        if ( Hpro::Math::abs( max_val ) <= zero_val )
+        if ( math::abs( max_val ) <= zero_val )
             return { -1, -1, blas::vector< value_t >(), blas::vector< value_t >() };
 
         auto  column = get_column( M, pivot_col );
