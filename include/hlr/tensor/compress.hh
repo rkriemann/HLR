@@ -148,34 +148,34 @@ compress_tucker ( blas::tensor3< value_t > &  D,
                 const auto  mem_full   = D_sub.data_byte_size();
                 const auto  mem_tucker = G.data_byte_size() + X0.data_byte_size() + X1.data_byte_size() + X2.data_byte_size();
                         
-                // if ( mem_tucker < mem_full )
-                // {
-                //     // if ( verbose(4) )
-                //     //     std::cout << is0 << " × " << is1 << " × " << is2 << " : ranks = "
-                //     //               << G.size(0) << " / " << G.size(1) << " / " << G.size(2) << " / " << G.size(3) << std::endl;
+                if ( mem_tucker < mem_full )
+                {
+                    // if ( verbose(4) )
+                    //     std::cout << is0 << " × " << is1 << " × " << is2 << " : ranks = "
+                    //               << G.size(0) << " / " << G.size(1) << " / " << G.size(2) << " / " << G.size(3) << std::endl;
                             
-                //     //
-                //     // replace data by uncompressed version
-                //     //
+                    //
+                    // replace data by uncompressed version
+                    //
 
-                //     auto  T_sub = std::make_unique< tensor::tucker_tensor3< value_t > >( is0, is1, is2,
-                //                                                                          std::move( G ),
-                //                                                                          std::move( X0 ),
-                //                                                                          std::move( X1 ),
-                //                                                                          std::move( X2 ) );
+                    auto  T_sub = std::make_unique< tensor::tucker_tensor3< value_t > >( is0, is1, is2,
+                                                                                         std::move( G ),
+                                                                                         std::move( X0 ),
+                                                                                         std::move( X1 ),
+                                                                                         std::move( X2 ) );
 
-                //     if ( fpcompress )
-                //         T_sub->compress( cacc );
+                    if ( fpcompress )
+                        T_sub->compress( cacc );
                             
-                //     auto  T0 = blas::tensor_product( T_sub->G(), T_sub->X(0), 0 );
-                //     auto  T1 = blas::tensor_product(         T0, T_sub->X(1), 1 );
-                //     auto  Y  = blas::tensor_product(         T1, T_sub->X(2), 2 );
+                    auto  T0 = blas::tensor_product( T_sub->G(), T_sub->X(0), 0 );
+                    auto  T1 = blas::tensor_product(         T0, T_sub->X(1), 1 );
+                    auto  Y  = blas::tensor_product(         T1, T_sub->X(2), 2 );
 
-                //     blas::copy( Y, O_sub );
+                    blas::copy( Y, O_sub );
 
-                //     zmem += T_sub->data_byte_size();
-                // }// if
-                // else
+                    zmem += T_sub->data_byte_size();
+                }// if
+                else
                 {
                     //
                     // use original data (nothing to do)

@@ -271,7 +271,7 @@ public:
 // type tests
 //
 bool
-is_structured ( const has_value_type auto &  t )
+is_structured_tensor3 ( const has_value_type auto &  t )
 {
     using type_t  = std::remove_cv_t< std::remove_reference_t< decltype( t ) > >;
     using value_t = typename type_t::value_t;
