@@ -1079,7 +1079,7 @@ compress ( tensor::base_tensor3< value_t > &  A,
 {
     using namespace hlr::tensor;
 
-    if ( is_structured( A ) )
+    if ( is_structured_tensor3( A ) )
     {
         auto  BA = ptrcast( &A, structured_tensor3< value_t > );
         

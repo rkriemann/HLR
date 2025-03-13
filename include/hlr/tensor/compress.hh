@@ -24,7 +24,7 @@ void
 compress ( base_tensor3< value_t > &  T,
            const accuracy &           acc )
 {
-    if ( is_structured( T ) )
+    if ( is_structured_tensor3( T ) )
     {
         auto  B = ptrcast( &T, structured_tensor3< value_t > );
 

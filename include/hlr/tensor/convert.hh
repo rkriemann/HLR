@@ -25,7 +25,7 @@ void
 to_dense ( const base_tensor3< value_t > &  X,
            blas::tensor3< value_t > &       D )
 {
-    if ( is_structured( X ) )
+    if ( is_structured_tensor3( X ) )
     {
         auto  BX    = cptrcast( &X, structured_tensor3< value_t > );
 
