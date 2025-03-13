@@ -22,7 +22,7 @@ using namespace hlr;
 // determine number of blocks with face/edge/vertex/strong admissibility
 //
 size_t
-nadmblocks ( const uint              acodim,
+nadmblocks ( const uint              anooverlap,
              const cluster::block &  bc )
 {
     if ( bc.is_adm() )
@@ -33,8 +33,8 @@ nadmblocks ( const uint              acodim,
         if ( rowcl == colcl )
             return 0;
 
-        const uint  dim   = rowcl->bbox().min().dim();
-        uint        codim = 0;
+        const uint  dim       = rowcl->bbox().min().dim();
+        uint        ndisjoint = 0;
     
         const auto  rbbox = rowcl->bbox();
         const auto  cbbox = colcl->bbox();
@@ -43,14 +43,14 @@ nadmblocks ( const uint              acodim,
         {
             if (( rbbox.max()[i] <= cbbox.min()[i] ) ||   // ├── τ ──┼── σ ──┤
                 ( cbbox.max()[i] <= rbbox.min()[i] ))     // ├── σ ──┼── τ ──┤
-                codim++;
+                ndisjoint++;
         }// for
 
-        if ( acodim > 0 )
+        if ( anooverlap <= dim )
         {
             if ( std::min( rbbox.diameter(), cbbox.diameter() ) <= ( 2.0 * rbbox.distance( cbbox ) ) )
                 return 0;
-            else if ( codim == acodim )
+            else if ( ndisjoint == anooverlap )
                 return 1;
             else
                 return 0;
@@ -68,7 +68,7 @@ nadmblocks ( const uint              acodim,
         size_t  n = 0;
         
         for ( uint  i = 0; i < bc.nsons(); ++i )
-            n += nadmblocks( acodim, * bc.son(i) );
+            n += nadmblocks( anooverlap, * bc.son(i) );
 
         return n;
     }// else
@@ -106,10 +106,12 @@ program_main ()
     auto  part         = Hpro::TGeomBSPPartStrat( Hpro::adaptive_split_axis );
     auto  [ ct, pe2i ] = cluster::build_cluster_tree( coord, part, cmdline::ntile );
 
-    auto  adm1    = cluster::weak_adm_cond( 1 ); // face admissibility
-    auto  adm2    = cluster::weak_adm_cond( 2 ); // edge admissibility
-    auto  adm3    = cluster::weak_adm_cond( 3 ); // vertex admissibility
-    auto  strong  = cluster::strong_adm_cond();
+    auto  adm0    = cluster::weak_adm( 0 ); // off-diagonal admissibility
+    auto  adm1    = cluster::weak_adm( 1 ); // face admissibility
+    auto  adm2    = cluster::weak_adm( 2 ); // edge admissibility
+    auto  adm3    = cluster::weak_adm( 3 ); // vertex admissibility
+    auto  strong  = cluster::strong_adm();
+    auto  bct0    = cluster::build_block_tree( *ct, *ct, adm0 );
     auto  bct1    = cluster::build_block_tree( *ct, *ct, adm1 );
     auto  bct2    = cluster::build_block_tree( *ct, *ct, adm2 );
     auto  bct3    = cluster::build_block_tree( *ct, *ct, adm3 );
@@ -118,30 +120,35 @@ program_main ()
     if ( hpro::verbose( 3 ) )
     {
         io::vtk::print( coord, "coord" );
+        io::eps::print( *bct0, "bct0" );
         io::eps::print( *bct1, "bct1" );
         io::eps::print( *bct2, "bct2" );
         io::eps::print( *bct3, "bct3" );
         io::eps::print( *bcts, "bcts" );
     }// if
 
-    std::cout << term::bold << "  c_sp:" << term::reset << std::endl
-              << "    adm1 : " << Hpro::compute_c_sp( *bct1, true, true ) << std::endl
-              << "    adm2 : " << Hpro::compute_c_sp( *bct2, true, true ) << std::endl
-              << "    adm3 : " << Hpro::compute_c_sp( *bct3, true, true ) << std::endl
-              << "    std  : " << Hpro::compute_c_sp( *bcts, true, true ) << std::endl;
+    // std::cout << term::bold << "  c_sp:" << term::reset << std::endl
+    //           << "    adm0 : " << Hpro::compute_c_sp( *bct0, true, true ) << std::endl
+    //           << "    adm1 : " << Hpro::compute_c_sp( *bct1, true, true ) << std::endl
+    //           << "    adm2 : " << Hpro::compute_c_sp( *bct2, true, true ) << std::endl
+    //           << "    adm3 : " << Hpro::compute_c_sp( *bct3, true, true ) << std::endl
+    //           << "    std  : " << Hpro::compute_c_sp( *bcts, true, true ) << std::endl;
 
     nadmblocks( 1, *bct2 );
     
     std::cout << term::bold << "  adm. blocks:" << term::reset << std::endl
-              << "              face /   edge  /   vtx   /   std" << std::endl
-              << "    adm1 : "
-              << boost::format( "%7d / %7d / %7d / %7d" ) % nadmblocks( 1, *bct1 ) % nadmblocks( 2, *bct1 ) % nadmblocks( 3, *bct1 ) % nadmblocks( 0, *bct1 ) << std::endl
-              << "    adm2 : "
-              << boost::format( "%7d / %7d / %7d / %7d" ) % nadmblocks( 1, *bct2 ) % nadmblocks( 2, *bct2 ) % nadmblocks( 3, *bct2 ) % nadmblocks( 0, *bct2 ) << std::endl
-              << "    adm3 : "
-              << boost::format( "%7d / %7d / %7d / %7d" ) % nadmblocks( 1, *bct3 ) % nadmblocks( 2, *bct3 ) % nadmblocks( 3, *bct3 ) % nadmblocks( 0, *bct3 ) << std::endl
-              << "    std  : "
-              << boost::format( "%7d / %7d / %7d / %7d" ) % nadmblocks( 1, *bcts ) % nadmblocks( 2, *bcts ) % nadmblocks( 3, *bcts ) % nadmblocks( 0, *bcts ) << std::endl;
+              << "         │    face │   edge  │   vtx   │   std   │ c_sp " << std::endl
+              << "   ──────┼─────────┼─────────┼─────────┼─────────┼──────" << std::endl
+              << "    adm0 │ "
+              << boost::format( "%7d │ %7d │ %7d │ %7d │ %3d" ) % nadmblocks( 1, *bct0 ) % nadmblocks( 2, *bct0 ) % nadmblocks( 3, *bct0 ) % nadmblocks( 4, *bct0 ) % Hpro::compute_c_sp( *bct0, true, true ) << std::endl
+              << "    adm1 │ "
+              << boost::format( "%7d │ %7d │ %7d │ %7d │ %3d" ) % nadmblocks( 1, *bct1 ) % nadmblocks( 2, *bct1 ) % nadmblocks( 3, *bct1 ) % nadmblocks( 4, *bct1 ) % Hpro::compute_c_sp( *bct1, true, true ) << std::endl
+              << "    adm2 │ "
+              << boost::format( "%7d │ %7d │ %7d │ %7d │ %3d" ) % nadmblocks( 1, *bct2 ) % nadmblocks( 2, *bct2 ) % nadmblocks( 3, *bct2 ) % nadmblocks( 4, *bct2 ) % Hpro::compute_c_sp( *bct2, true, true )<< std::endl
+              << "    adm3 │ "
+              << boost::format( "%7d │ %7d │ %7d │ %7d │ %3d" ) % nadmblocks( 1, *bct3 ) % nadmblocks( 2, *bct3 ) % nadmblocks( 3, *bct3 ) % nadmblocks( 4, *bct3 ) % Hpro::compute_c_sp( *bct3, true, true )<< std::endl
+              << "    std  │ "
+              << boost::format( "%7d │ %7d │ %7d │ %7d │ %3d" ) % nadmblocks( 1, *bcts ) % nadmblocks( 2, *bcts ) % nadmblocks( 3, *bcts ) % nadmblocks( 4, *bcts ) % Hpro::compute_c_sp( *bcts, true, true ) << std::endl;
     
     // tic = timer::now();
 
