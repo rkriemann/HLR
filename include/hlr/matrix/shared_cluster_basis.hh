@@ -14,7 +14,7 @@
 #include <hlr/approx/accuracy.hh>
 #include <hlr/compress/compressible.hh>
 #include <hlr/compress/direct.hh>
-#include <hlr/compress/aplr.hh>
+#include <hlr/compress/valr.hh>
 #include <hlr/utils/checks.hh>
 
 namespace hlr
@@ -58,7 +58,7 @@ private:
     blas::matrix< value_t >  _V;
 
     // stores compressed data
-    compress::aplr::zarray   _zV;
+    compress::valr::zarray   _zV;
 
     // also singular values assoc. with basis vectors
     // in case of adaptive precision compression
@@ -138,7 +138,7 @@ public:
         {
             auto  V = blas::matrix< value_t >( _is.size(), rank() );
     
-            compress::aplr::decompress_lr< value_t >( _zV, V );
+            compress::valr::decompress_lr< value_t >( _zV, V );
             
             return V;
         }// if
@@ -203,7 +203,7 @@ public:
             const auto  k = this->rank();
             auto        t = blas::vector< value_t >( k );
 
-            compress::aplr::zblas::mulvec( _is.size(), k, apply_adjoint, value_t(1), _zV, v.data(), t.data() );
+            compress::valr::zblas::mulvec( _is.size(), k, apply_adjoint, value_t(1), _zV, v.data(), t.data() );
 
             return t;
         }// if
@@ -238,7 +238,7 @@ public:
             const auto  n = _is.size();
             auto        t = blas::vector< value_t >( n );
 
-            compress::aplr::zblas::mulvec( n, this->rank(), apply_normal, value_t(1), _zV, s.data(), t.data() );
+            compress::valr::zblas::mulvec( n, this->rank(), apply_normal, value_t(1), _zV, s.data(), t.data() );
 
             return t;
         }// if
@@ -260,7 +260,7 @@ public:
         {
             HLR_ASSERT( v.length() == _is.size() );
             
-            compress::aplr::zblas::mulvec( _is.size(), this->rank(), apply_normal, value_t(1), _zV, s.data(), v.data() );
+            compress::valr::zblas::mulvec( _is.size(), this->rank(), apply_normal, value_t(1), _zV, s.data(), v.data() );
         }// if
         else
         #endif
@@ -326,7 +326,7 @@ public:
     {
         size_t  n = ( sizeof(_is) + sizeof(_id) + sizeof(self_t *) * _sons.size() + _V.byte_size() );
 
-        n += compress::aplr::byte_size( _zV );
+        n += compress::valr::byte_size( _zV );
         n += _sv.byte_size();
         
         for ( auto  son : _sons )
@@ -341,7 +341,7 @@ public:
         size_t  n = 0;
 
         if ( is_compressed() )
-            n = hlr::compress::aplr::byte_size( _zV ) + _sv.data_byte_size();
+            n = hlr::compress::valr::byte_size( _zV ) + _sv.data_byte_size();
         else
             n = sizeof( value_t ) * _is.size() * rank();
 
@@ -389,7 +389,7 @@ protected:
     // remove compressed storage (standard storage not restored!)
     virtual void   remove_compressed ()
     {
-        _zV = compress::aplr::zarray();
+        _zV = compress::valr::zarray();
     }
 };
 
@@ -472,8 +472,8 @@ shared_cluster_basis< value_t >::compress ( const accuracy &  acc )
     for ( uint  l = 0; l < S.length(); ++l )
         S(l) = tol / S(l);
 
-    auto  zV   = compress::aplr::compress_lr< value_t >( _V, S );
-    auto  zmem = compress::aplr::compressed_size( zV );
+    auto  zV   = compress::valr::compress_lr< value_t >( _V, S );
+    auto  zmem = compress::valr::compressed_size( zV );
 
     if (( zmem != 0 ) && ( zmem < mem_dense ))
     {

@@ -48,7 +48,7 @@ program_main ()
         if constexpr ( problem_t::supports_hca )
         {
             std::cout << "    using HCA"
-                      << " (" << hlr::compress::provider << " + " << hlr::compress::aplr::provider << ")"
+                      << " (" << hlr::compress::provider << " + " << hlr::compress::valr::provider << ")"
                       << std::endl;
                 
             auto  hcagen = problem->hca_gen_func( *ct );
@@ -64,7 +64,7 @@ program_main ()
     if (( cmdline::capprox == "aca" ) || ( cmdline::capprox == "default" ))
     {
         std::cout << "    using ACA" 
-                  << " (" << hlr::compress::provider << " + " << hlr::compress::aplr::provider << ")"
+                  << " (" << hlr::compress::provider << " + " << hlr::compress::valr::provider << ")"
                   << std::endl;
 
         auto  acalr = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
@@ -75,7 +75,7 @@ program_main ()
     if ( cmdline::capprox == "dense" )
     {
         std::cout << "    using dense"
-                  << " (" << hlr::compress::provider << " + " << hlr::compress::aplr::provider << ")"
+                  << " (" << hlr::compress::provider << " + " << hlr::compress::valr::provider << ")"
                   << std::endl;
 
         auto  dense = bem::dense_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );

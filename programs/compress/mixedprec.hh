@@ -209,7 +209,7 @@ program_main ()
               << "compression ("
               << "δ = " << boost::format( "%.2e" ) % delta
               << ", "
-              << hlr::compress::provider << " + " << hlr::compress::aplr::provider << ")"
+              << hlr::compress::provider << " + " << hlr::compress::valr::provider << ")"
               << term::reset << std::endl;
 
     {
@@ -367,7 +367,7 @@ program_main ()
             y_ref = std::move( y );
         }
 
-        if ( true )
+        if ( false )
         {
             runtime.clear();
             
@@ -413,7 +413,7 @@ program_main ()
             std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
-        if ( true )
+        if ( false )
         {
             runtime.clear();
             
@@ -459,7 +459,7 @@ program_main ()
             std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
-        if ( true )
+        if ( false )
         {
             runtime.clear();
             
@@ -506,7 +506,7 @@ program_main ()
         }
 
 
-        if ( true )
+        if ( false )
         {
             runtime.clear();
             
@@ -605,7 +605,7 @@ program_main ()
             std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
-        if ( true )
+        if ( false )
         {
             runtime.clear();
             
@@ -651,7 +651,7 @@ program_main ()
             std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
-        if ( true )
+        if ( false )
         {
             runtime.clear();
             
@@ -697,7 +697,7 @@ program_main ()
             std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
-        if ( true )
+        if ( false )
         {
             runtime.clear();
             
@@ -743,7 +743,7 @@ program_main ()
             std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
-        if ( true )
+        if ( false )
         {
             runtime.clear();
             

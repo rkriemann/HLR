@@ -19,7 +19,7 @@
 namespace hlr { namespace compress { namespace zfp {
 
 // set ZFP mode to be used (0: fixed rate, 1: fixed precision, 2: fixed accuracy)
-#define HLR_ZFP_MODE  0
+#define HLR_ZFP_MODE  1
 
 //
 // define compression mode
@@ -51,7 +51,7 @@ operator << ( std::ostream &  os, const config &  conf )
 // return bitrate for given accuracy
 //
 inline uint  eps_to_rate      ( const double  eps ) { return std::max< double >( 0, std::ceil( -std::log2( eps ) ) ); }
-inline uint  eps_to_rate_aplr ( const double  eps ) { return std::max< double >( 0, std::ceil( -std::log2( eps ) ) ); }
+inline uint  eps_to_rate_valr ( const double  eps ) { return std::max< double >( 0, std::ceil( -std::log2( eps ) ) ); }
 
 //
 // define various compression modes
@@ -64,15 +64,15 @@ inline config  fixed_accuracy   ( const double  tol  ) { return config{ zfp_mode
 #if HLR_ZFP_MODE == 0
 // fixed rate mode
 inline config  get_config       ( const double  tol  ) { return fixed_rate( eps_to_rate( tol )+2 ); }
-inline config  get_config_aplr  ( const double  tol  ) { return fixed_rate( eps_to_rate( tol )+5 ); }
+inline config  get_config_valr  ( const double  tol  ) { return fixed_rate( eps_to_rate( tol )+5 ); }
 #elif HLR_ZFP_MODE == 1
 // fixed precision mode
 inline config  get_config       ( const double  tol  ) { return fixed_precision( eps_to_rate( 0.1 * tol ) ); }
-inline config  get_config_aplr  ( const double  tol  ) { return get_config( tol ); }
+inline config  get_config_valr  ( const double  tol  ) { return get_config( tol ); }
 #elif HLR_ZFP_MODE == 2
 // fixed accuracy mode
 inline config  get_config       ( const double  tol  ) { return fixed_accuracy( 2e1 * tol ); }
-inline config  get_config_aplr  ( const double  tol  ) { return fixed_accuracy( 0.5 * tol ); }
+inline config  get_config_valr  ( const double  tol  ) { return fixed_accuracy( 0.5 * tol ); }
 #endif
 
 // holds compressed data
@@ -330,7 +330,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
 
     for ( uint  l = 0; l < k; ++l )
     {
-        auto  zconf = get_config_aplr( S(l) ); // fixed_rate( eps_to_rate_aplr( S(l) ) );
+        auto  zconf = get_config_valr( S(l) ); // fixed_rate( eps_to_rate_valr( S(l) ) );
         auto  z_i   = compress( zconf, U.data() + l * n, n );
 
         zsize += z_i.size();

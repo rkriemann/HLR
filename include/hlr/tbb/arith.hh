@@ -213,8 +213,8 @@ realloc ( cluster_blocks_t< value_t > &  cb )
 
                 if ( R->is_compressed() )
                 {
-                    auto  zU = compress::aplr::zarray( R->zU() );
-                    auto  zV = compress::aplr::zarray( R->zV() );
+                    auto  zU = compress::valr::zarray( R->zU() );
+                    auto  zV = compress::valr::zarray( R->zV() );
 
                     R->set_zlrmat( std::move( zU ), std::move( zV ) );
                 }// if

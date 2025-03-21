@@ -38,6 +38,92 @@ struct local_accuracy : public accuracy
 };
 
 //
+// compression tests
+//
+template < typename value_t >
+void
+test_compress ( const std::string &  filename )
+{
+    std::cout << std::endl << filename << std::endl;
+    
+    auto  D = io::matlab::read< value_t >( filename );
+    
+    auto  m1 = D.data_byte_size();
+    auto  n1 = blas::norm_F( D );
+    
+    std::cout << "  mem:  " << m1 << std::endl;
+    std::cout << "  norm: " << n1 << std::endl;
+
+    //
+    // dense compression
+    //
+
+    std::cout << "dense compression" << std::endl;
+    
+    for ( double  eps = 1e-3; eps >= 1e-10; eps = eps / 10.0 )
+    {
+        std::cout << "  eps: " << eps;
+
+        auto  zconf = compress::get_config( relative_prec( eps ), D );
+        auto  zD    = compress::compress( zconf, D );
+        
+        std::cout << " / " << compress::compressed_size( zD );
+
+        auto  T     = blas::copy( D );
+
+        compress::decompress( zD, T );
+
+        blas::add( -1, D, T );
+        
+        std::cout << " / " << blas::norm_F( T ) / n1 << std::endl;
+    }// for
+
+    
+    //
+    // lowrank compress
+    //
+
+    std::cout << "lowrank compression" << std::endl;
+    
+    auto  [ UD, SD, VD ] = blas::svd( D );
+
+    blas::prod_diag( UD, SD, UD.ncols() );
+    
+    for ( double  eps = 1e-3; eps >= 1e-10; eps = eps / 10.0 )
+    {
+        auto  acc = relative_prec( eps );
+        auto  k   = acc.trunc_rank( SD );
+        
+        auto  Uk  = blas::matrix< value_t >( UD, blas::range::all, blas::range( 0, k-1 ) );
+        auto  Vk  = blas::matrix< value_t >( VD, blas::range::all, blas::range( 0, k-1 ) );
+        auto  U   = blas::copy( Uk );
+        auto  V   = blas::copy( Vk );
+        
+        std::cout << "  eps / k / mem / zmem / zerror : " << eps
+                  << " / " << k << " / " << U.data_byte_size() + V.data_byte_size();
+
+        auto  zcfU = compress::get_config( relative_prec( eps ), U );
+        auto  zcfV = compress::get_config( relative_prec( eps ), V );
+        auto  zU   = compress::compress( zcfU, U );
+        auto  zV   = compress::compress( zcfV, V );
+        
+        std::cout << " / " << compress::compressed_size( zU ) + compress::compressed_size( zV );
+
+        auto  TU   = blas::copy( U );
+        auto  TV   = blas::copy( V );
+
+        compress::decompress( zU, TU );
+        compress::decompress( zV, TV );
+
+        auto  T    = blas::prod( TU, blas::adjoint( TV ) );
+        
+        blas::add( -1, D, T );
+        
+        std::cout << " / " << blas::norm_F( T ) / n1 << std::endl;
+    }// for
+}
+
+//
 // main function
 //
 template < typename problem_t >
@@ -46,6 +132,18 @@ program_main ()
 {
     using value_t = typename problem_t::value_t;
 
+    // {
+    //     // test_compress< value_t >( "D64.mat" );
+    //     test_compress< value_t >( "D128.mat" );
+    //     // test_compress< value_t >( "D256.mat" );
+    //     // test_compress< value_t >( "D512.mat" );
+    //     // test_compress< value_t >( "D1024.mat" );
+    //     test_compress< value_t >( "D2048.mat" );
+    //     // test_compress< value_t >( "D4096.mat" );
+    //     // test_compress< value_t >( "D8192.mat" );
+    //     return;
+    // }
+    
     auto  tic     = timer::now();
     auto  toc     = timer::since( tic );
     auto  runtime = std::vector< double >();
@@ -64,6 +162,52 @@ program_main ()
         auto  coeff   = problem->coeff_func();
         auto  pcoeff  = Hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
 
+        // {
+        //     //
+        //     // test matrices from --config ../laplace.conf --grid sphere-7
+        //     //
+            
+        //     {
+        //         auto  D = pcoeff.build( is(99968,100031), is(105472,105727) );
+        //         io::matlab::write( ptrcast( D.get(), Hpro::TDenseMatrix< value_t > )->blas_mat(), "D64" );
+        //     }// if
+
+        //     {
+        //         auto D = pcoeff.build( is(11904,12031), is(74112,74239) );
+        //         io::matlab::write( ptrcast( D.get(), Hpro::TDenseMatrix< value_t > )->blas_mat(), "D128" );
+        //     }// if
+
+        //     {
+        //         auto D = pcoeff.build( is(104960,105215), is(105472,105727) );
+        //         io::matlab::write( ptrcast( D.get(), Hpro::TDenseMatrix< value_t > )->blas_mat(), "D256" );
+        //     }// if
+
+        //     {
+        //         auto D = pcoeff.build( is(112128,112639), is(59392,59903) );
+        //         io::matlab::write( ptrcast( D.get(), Hpro::TDenseMatrix< value_t > )->blas_mat(), "D512" );
+        //     }// if
+
+        //     {
+        //         auto D = pcoeff.build( is(106496,107519), is(59392,59903) );
+        //         io::matlab::write( ptrcast( D.get(), Hpro::TDenseMatrix< value_t > )->blas_mat(), "D1024" );
+        //     }// if
+
+        //     {
+        //         auto D = pcoeff.build( is(34816,36863), is(45056,47103) );
+        //         io::matlab::write( ptrcast( D.get(), Hpro::TDenseMatrix< value_t > )->blas_mat(), "D2048" );
+        //     }// if
+
+        //     {
+        //         auto D = pcoeff.build( is(90112,94207), is(28672,32767) );
+        //         io::matlab::write( ptrcast( D.get(), Hpro::TDenseMatrix< value_t > )->blas_mat(), "D4096" );
+        //     }// if
+
+        //     {
+        //         auto D = pcoeff.build( is(0,8191), is(106496,114687) );
+        //         io::matlab::write( ptrcast( D.get(), Hpro::TDenseMatrix< value_t > )->blas_mat(), "D8192" );
+        //     }// if
+        // }
+        
         tic = timer::now();
 
         if ( cmdline::capprox == "hca" )
@@ -219,7 +363,8 @@ program_main ()
         {
             tic = timer::now();
     
-            impl::matrix::compress( *zA, lacc );
+            seq::matrix::compress( *zA, lacc );
+            // impl::matrix::compress( *zA, lacc );
 
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
@@ -272,7 +417,8 @@ program_main ()
         {
             tic = timer::now();
     
-            impl::matrix::decompress( *zB );
+            // impl::matrix::decompress( *zB );
+            seq::matrix::decompress( *zB );
             
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );

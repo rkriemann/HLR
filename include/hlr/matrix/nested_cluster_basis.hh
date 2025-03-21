@@ -73,7 +73,7 @@ private:
     std::vector< blas::matrix< value_t > >  _E;
 
     // compressed data
-    compress::aplr::zarray                  _zV;
+    compress::valr::zarray                  _zV;
     std::vector< compress::zarray >         _zE;
     
     // mutex for synchronised changes
@@ -188,7 +188,7 @@ public:
         {
             auto  V = blas::matrix< value_t >( _is.size(), rank() );
     
-            compress::aplr::decompress_lr< value_t >( _zV, V );
+            compress::valr::decompress_lr< value_t >( _zV, V );
             
             return V;
         }// if
@@ -400,7 +400,7 @@ public:
             {
                 auto  s = blas::vector< value_t >( k );
 
-                compress::aplr::zblas::mulvec( _is.size(), k, apply_adjoint, value_t(1), _zV, v.data(), s.data() );
+                compress::valr::zblas::mulvec( _is.size(), k, apply_adjoint, value_t(1), _zV, v.data(), s.data() );
 
                 return s;
             }// if
@@ -501,7 +501,7 @@ public:
                 const auto  n = _is.size();
                 auto        v = blas::vector< value_t >( n );
 
-                compress::aplr::zblas::mulvec( n, this->rank(), apply_normal, value_t(1), _zV, s.data(), v.data() );
+                compress::valr::zblas::mulvec( n, this->rank(), apply_normal, value_t(1), _zV, s.data(), v.data() );
 
                 return v;
             }// if
@@ -602,7 +602,7 @@ public:
         {
             if ( nsons() == 0 )
             {
-                compress::aplr::zblas::mulvec( _is.size(), this->rank(), apply_normal, value_t(1), _zV, s.data(), v.data() );
+                compress::valr::zblas::mulvec( _is.size(), this->rank(), apply_normal, value_t(1), _zV, s.data(), v.data() );
             }// if
             else
             {
@@ -722,7 +722,7 @@ public:
         for ( uint  i = 0; i < nsons(); ++i )
             n += _E[i].byte_size();
         
-        n += compress::aplr::byte_size( _zV );
+        n += compress::valr::byte_size( _zV );
         n += _sv.byte_size();
         n += sizeof(_zE);
         
@@ -743,7 +743,7 @@ public:
         if ( is_compressed() )
         {
             if ( nsons() == 0 )
-                n += hlr::compress::aplr::byte_size( _zV ) + _sv.data_byte_size();
+                n += hlr::compress::valr::byte_size( _zV ) + _sv.data_byte_size();
             else
             {
                 for ( uint  i = 0; i < nsons(); ++i )
@@ -808,7 +808,7 @@ protected:
     // remove compressed storage (standard storage not restored!)
     virtual void   remove_compressed ()
     {
-        _zV = compress::aplr::zarray();
+        _zV = compress::valr::zarray();
         _zE.resize( 0 );
     }
 };
@@ -890,13 +890,13 @@ nested_cluster_basis< value_t >::compress ( const accuracy &  acc )
         for ( uint  l = 0; l < S.length(); ++l )
             S(l) = tol / S(l);
         
-        auto  zV   = compress::aplr::compress_lr< value_t >( _V, S );
-        auto  zmem = compress::aplr::compressed_size( zV );
+        auto  zV   = compress::valr::compress_lr< value_t >( _V, S );
+        auto  zmem = compress::valr::compressed_size( zV );
             
         // {
         //     auto  T = blas::copy( _V );
 
-        //     compress::aplr::decompress_lr< value_t >( zV, T );
+        //     compress::valr::decompress_lr< value_t >( zV, T );
 
         //     blas::add( value_t(-1), _V, T );
         //     std::cout << blas::norm_F( T ) << " / " << blas::norm_F( T ) / blas::norm_F( _V ) << std::endl;
