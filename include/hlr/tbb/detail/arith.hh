@@ -723,9 +723,9 @@ mul_vec_cl ( const value_t                        alpha,
                     
                     #if defined(HLR_HAS_ZBLAS_APLR)
                     if ( op_M == apply_normal )
-                        compress::aplr::zblas::mulvec( R->ncols(), k_i, apply_adjoint, value_t(1), R->zV(), x_i.data(), t_i.data() );
+                        compress::valr::zblas::mulvec( R->ncols(), k_i, apply_adjoint, value_t(1), R->zV(), x_i.data(), t_i.data() );
                     else
-                        compress::aplr::zblas::mulvec( R->nrows(), k_i, apply_adjoint, value_t(1), R->zU(), x_i.data(), t_i.data() );
+                        compress::valr::zblas::mulvec( R->nrows(), k_i, apply_adjoint, value_t(1), R->zU(), x_i.data(), t_i.data() );
                     #else
                     HLR_ERROR( "TODO" );
                     #endif
@@ -737,7 +737,7 @@ mul_vec_cl ( const value_t                        alpha,
                     t(i) *= cm.S(i);
 
                 #if defined(HLR_HAS_ZBLAS_APLR)
-                compress::aplr::zblas::mulvec( yt.length(), k, apply_normal, value_t(1), cm.zU, t.data(), yt.data() );
+                compress::valr::zblas::mulvec( yt.length(), k, apply_normal, value_t(1), cm.zU, t.data(), yt.data() );
                 #else
                 HLR_ERROR( "TODO" );
                 #endif

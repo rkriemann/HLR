@@ -35,7 +35,7 @@ constexpr uint8_t  dfl_header_ofs = 8;
 //   |d_i - ~d_i| ≤ 2^(-m) ≤ ε with mantissa length m = ⌈-log₂ ε⌉
 //
 inline byte_t eps_to_rate      ( const double  eps ) { return std::max< double >( 0, std::ceil( -std::log2( eps ) ) ); }
-inline byte_t eps_to_rate_aplr ( const double  eps ) { return eps_to_rate( eps ); }
+inline byte_t eps_to_rate_valr ( const double  eps ) { return eps_to_rate( eps ); }
 
 struct config
 {
@@ -341,7 +341,7 @@ compress_lr< double > ( const blas::matrix< double > &  U,
 
     for ( uint32_t  l = 0; l < k; ++l )
     {
-        const auto     nprecbits = eps_to_rate_aplr( S(l) );
+        const auto     nprecbits = eps_to_rate_valr( S(l) );
         const uint8_t  nbits     = byte_pad( 1 + 11 + nprecbits );
         const uint8_t  nbyte     = nbits / 8;
 

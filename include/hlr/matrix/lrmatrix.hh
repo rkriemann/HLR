@@ -856,6 +856,13 @@ lrmatrix< value_t >::compress ( const accuracy &  acc )
     const auto    zmem_U = compress::compressed_size( zU );
     const auto    zmem_V = compress::compressed_size( zV );
 
+    // std::cout << this->block_is().to_string() << " / " << this->nrows() << " / " << this->ncols() << " : " << double(mem_lr) / double(zmem_U + zmem_V) << std::endl;
+
+    // if ( double(mem_lr) / double(zmem_U + zmem_V) < 1.1 )
+    // {
+    //     std::cout << this->block_is().to_string() << " / " << this->nrows() << " / " << this->ncols() << std::endl;
+    // }// if
+    
     if (( zmem_U != 0 ) && ( zmem_V != 0 ) && ( zmem_U + zmem_V < mem_lr ))
     {
         _zU = std::move( zU );

@@ -15,7 +15,7 @@
 #include <hlr/arith/blas.hh>
 #include <hlr/compress/compressible.hh>
 #include <hlr/compress/direct.hh>
-#include <hlr/compress/aplr.hh>
+#include <hlr/compress/valr.hh>
 #include <hlr/utils/checks.hh>
 #include <hlr/utils/log.hh>
 
@@ -55,7 +55,7 @@ private:
     blas::vector< real_t >   _S;
 
     // compressed storage
-    compress::aplr::zarray   _zU, _zV;
+    compress::valr::zarray   _zU, _zV;
 
     // rank for simplified access and for compressed factors
     uint                     _rank;
@@ -329,11 +329,11 @@ public:
     }
 
     // access multiprecision data
-    const compress::aplr::zarray  zU () const { return _zU; }
-    const compress::aplr::zarray  zV () const { return _zV; }
+    const compress::valr::zarray  zU () const { return _zU; }
+    const compress::valr::zarray  zV () const { return _zV; }
     
-    void  set_zlrmat  ( compress::aplr::zarray &&  azU,
-                        compress::aplr::zarray &&  azV )
+    void  set_zlrmat  ( compress::valr::zarray &&  azU,
+                        compress::valr::zarray &&  azV )
     {
         // ASSUMPTION: compatible with S!!!
         _zU = std::move( azU );
@@ -354,8 +354,8 @@ public:
         size += _U.byte_size();
         size += _V.byte_size();
         size += _S.byte_size();
-        size += compress::aplr::byte_size( _zU );
-        size += compress::aplr::byte_size( _zV );
+        size += compress::valr::byte_size( _zU );
+        size += compress::valr::byte_size( _zV );
         
         return size;
     }
@@ -364,7 +364,7 @@ public:
     virtual size_t data_byte_size () const
     {
         if ( is_compressed() )
-            return sizeof(value_t) * _rank + compress::aplr::byte_size( _zU ) + compress::aplr::byte_size( _zV );
+            return sizeof(value_t) * _rank + compress::valr::byte_size( _zU ) + compress::valr::byte_size( _zV );
         else
             return sizeof(value_t) * ( _rank + _rank * ( _row_is.size() + _col_is.size() ) );
     }
@@ -391,8 +391,8 @@ protected:
     // remove compressed storage (standard storage not restored!)
     virtual void   remove_compressed ()
     {
-        _zU = compress::aplr::zarray();
-        _zV = compress::aplr::zarray();
+        _zU = compress::valr::zarray();
+        _zV = compress::valr::zarray();
     }
 };
 
@@ -429,7 +429,7 @@ lrsvmatrix< value_t >::U () const
         auto  dU = blas::matrix< value_t >( this->nrows(), _rank );
         uint  k  = 0;
 
-        compress::aplr::decompress_lr( _zU, dU );
+        compress::valr::decompress_lr( _zU, dU );
 
         // for ( uint  l = 0; l < dU.ncols(); ++l )
         // {
@@ -454,7 +454,7 @@ lrsvmatrix< value_t >::V () const
     {
         auto  dV = blas::matrix< value_t >( this->ncols(), _rank );
 
-        compress::aplr::decompress_lr( _zV, dV );
+        compress::valr::decompress_lr( _zV, dV );
             
         return dV;
     }// if
@@ -708,14 +708,14 @@ lrsvmatrix< value_t >::apply_add ( const value_t                    alpha,
         if ( op == Hpro::apply_normal )
         {
             // t := V^H x
-            compress::aplr::zblas::mulvec( ncols, k, apply_adjoint, value_t(1), _zV, x.data(), t.data() );
+            compress::valr::zblas::mulvec( ncols, k, apply_adjoint, value_t(1), _zV, x.data(), t.data() );
 
             // t := α·t
             for ( uint  i = 0; i < k; ++i )
                 t(i) *= alpha * _S(i);
         
             // y := y + U t
-            compress::aplr::zblas::mulvec( nrows, k, apply_normal, value_t(1), _zU, t.data(), y.data() );
+            compress::valr::zblas::mulvec( nrows, k, apply_normal, value_t(1), _zU, t.data(), y.data() );
         }// if
         else if ( op == Hpro::apply_transposed )
         {
@@ -724,14 +724,14 @@ lrsvmatrix< value_t >::apply_add ( const value_t                    alpha,
         else if ( op == Hpro::apply_adjoint )
         {
             // t := U^H x
-            compress::aplr::zblas::mulvec( nrows, k, apply_adjoint, value_t(1), _zU, x.data(), t.data() );
+            compress::valr::zblas::mulvec( nrows, k, apply_adjoint, value_t(1), _zU, x.data(), t.data() );
 
             // t := α·t
             for ( uint  i = 0; i < k; ++i )
                 t(i) *= alpha * _S(i);
         
             // y := t + V t
-            compress::aplr::zblas::mulvec( ncols, k, apply_normal, value_t(1), _zV, t.data(), y.data() );
+            compress::valr::zblas::mulvec( ncols, k, apply_normal, value_t(1), _zV, t.data(), y.data() );
         }// if
     }// if
     else
@@ -762,8 +762,8 @@ lrsvmatrix< value_t >::copy () const
 
     if ( is_compressed() )
     {
-        R->_zU = compress::aplr::zarray( _zU.size() );
-        R->_zV = compress::aplr::zarray( _zV.size() );
+        R->_zU = compress::valr::zarray( _zU.size() );
+        R->_zV = compress::valr::zarray( _zV.size() );
 
         std::copy( _zU.begin(), _zU.end(), R->_zU.begin() );
         std::copy( _zV.begin(), _zV.end(), R->_zV.begin() );
@@ -796,8 +796,8 @@ lrsvmatrix< value_t >::copy_to ( Hpro::TMatrix< value_t > *  A ) const
             
     if ( is_compressed() )
     {
-        R->_zU = compress::aplr::zarray( _zU.size() );
-        R->_zV = compress::aplr::zarray( _zV.size() );
+        R->_zU = compress::valr::zarray( _zU.size() );
+        R->_zV = compress::valr::zarray( _zV.size() );
             
         std::copy( _zU.begin(), _zU.end(), R->_zU.begin() );
         std::copy( _zV.begin(), _zV.end(), R->_zV.begin() );
@@ -828,9 +828,9 @@ lrsvmatrix< value_t >::compress ( const accuracy &  acc )
     
     auto  oU    = _U;
     auto  oV    = _V;
-    auto  S_tol = compress::aplr::get_tolerances( acc( this->row_is(), this->col_is() ), _S );
-    auto  zU    = compress::aplr::compress_lr( oU, S_tol );
-    auto  zV    = compress::aplr::compress_lr( oV, S_tol );
+    auto  S_tol = compress::valr::get_tolerances( acc( this->row_is(), this->col_is() ), _S );
+    auto  zU    = compress::valr::compress_lr( oU, S_tol );
+    auto  zV    = compress::valr::compress_lr( oV, S_tol );
 
     // std::cout << S_tol << std::endl;
     
@@ -844,8 +844,8 @@ lrsvmatrix< value_t >::compress ( const accuracy &  acc )
     //     auto  dU = blas::matrix< value_t >( oU.nrows(), oU.ncols() );
     //     auto  dV = blas::matrix< value_t >( oV.nrows(), oV.ncols() );
 
-    //     compress::aplr::decompress_lr( zU, dU );
-    //     compress::aplr::decompress_lr( zV, dV );
+    //     compress::valr::decompress_lr( zU, dU );
+    //     compress::valr::decompress_lr( zV, dV );
 
     //     auto  tT2 = blas::prod_diag( dU, _S );
     //     auto  M2  = blas::prod( tT2, blas::adjoint( dV ) );
@@ -880,8 +880,8 @@ lrsvmatrix< value_t >::compress ( const accuracy &  acc )
     //     auto  dU = blas::matrix< value_t >( oU.nrows(), oU.ncols() );
     //     auto  dV = blas::matrix< value_t >( oV.nrows(), oV.ncols() );
 
-    //     compress::aplr::decompress_lr( zU, dU );
-    //     compress::aplr::decompress_lr( zV, dV );
+    //     compress::valr::decompress_lr( zU, dU );
+    //     compress::valr::decompress_lr( zV, dV );
 
     //     for ( uint  l = 0; l < dU.ncols(); ++l )
     //     {
@@ -921,8 +921,8 @@ lrsvmatrix< value_t >::compress ( const accuracy &  acc )
     // }
     
     const size_t  mem_lr = sizeof(value_t) * oU.ncols() * ( oU.nrows() + oV.nrows() );
-    const size_t  mem_zU = compress::aplr::compressed_size( zU );
-    const size_t  mem_zV = compress::aplr::compressed_size( zV );
+    const size_t  mem_zU = compress::valr::compressed_size( zU );
+    const size_t  mem_zV = compress::valr::compressed_size( zV );
 
     if (( mem_zU != 0 ) && ( mem_zV != 0 ) && ( mem_zU + mem_zV < mem_lr ))
     {

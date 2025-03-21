@@ -31,7 +31,7 @@ constexpr uint8_t  ES = 2;
 // return bitrate for given accuracy
 //
 inline byte_t eps_to_rate      ( const double  eps ) { return std::max< double >( 0, std::ceil( -std::log2( eps ) ) ); }
-inline byte_t eps_to_rate_aplr ( const double  eps ) { return eps_to_rate( eps ); }
+inline byte_t eps_to_rate_valr ( const double  eps ) { return eps_to_rate( eps ); }
 
 //
 // compression configuration
@@ -442,7 +442,7 @@ compress_lr ( const blas::matrix< value_t > &                 U,
             vmax = std::max( vmax, std::abs( U(i,l) ) );
 
         s[l] = real_t(1) / vmax;
-        b[l] = 1 + ES + eps_to_rate_aplr( S(l) ); // sign + exponent bits
+        b[l] = 1 + ES + eps_to_rate_valr( S(l) ); // sign + exponent bits
 
         zsize += 1;                          // for nbits
         zsize += sizeof(real_t);             // for scaling factor

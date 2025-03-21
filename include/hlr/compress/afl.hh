@@ -102,7 +102,7 @@ using FP64 = FP_info< double >;
 //   |d_i - ~d_i| ≤ 2^(-m) ≤ ε with mantissa length m = ⌈-log₂ ε⌉
 //
 inline byte_t eps_to_rate      ( const double  eps ) { return std::max< double >( 1, std::ceil( -std::log2( eps ) ) ); }
-inline byte_t eps_to_rate_aplr ( const double  eps ) { return eps_to_rate( eps ); }
+inline byte_t eps_to_rate_valr ( const double  eps ) { return eps_to_rate( eps ); }
 
 struct config
 {
@@ -964,7 +964,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
 
         s[l] = vmin;
         e[l] = uint32_t( std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ) );
-        m[l] = std::min< uint32_t >( FP_info< real_t >::mant_bits, eps_to_rate_aplr( S(l) ) );
+        m[l] = std::min< uint32_t >( FP_info< real_t >::mant_bits, eps_to_rate_valr( S(l) ) );
 
         HLR_ASSERT( std::isfinite( s[l] ) );
         
@@ -1047,7 +1047,7 @@ compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double
 
         s[l] = vmin;
         e[l] = uint32_t( std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ) );
-        m[l] = std::min< uint32_t >( FP_info< real_t >::mant_bits, eps_to_rate_aplr( S(l) ) );
+        m[l] = std::min< uint32_t >( FP_info< real_t >::mant_bits, eps_to_rate_valr( S(l) ) );
 
         HLR_ASSERT( std::isfinite( s[l] ) );
 

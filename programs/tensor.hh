@@ -188,9 +188,9 @@ test_compression ( const blas::tensor3< value_t > &  X,
         std::cout << term::bullet << term::bold << "ε = " << tol << term::reset << std::endl;
 
         #if 1
-        auto  zX0 = compress::aplr::zarray();
-        auto  zX1 = compress::aplr::zarray();
-        auto  zX2 = compress::aplr::zarray();
+        auto  zX0 = compress::valr::zarray();
+        auto  zX1 = compress::valr::zarray();
+        auto  zX2 = compress::valr::zarray();
 
         {
             auto  Gi    = G.unfold( 0 );
@@ -199,8 +199,8 @@ test_compression ( const blas::tensor3< value_t > &  X,
             for ( uint  l = 0; l < S_tol.length(); ++l )
                 S_tol(l) = ( tol ) / S_tol(l);
 
-            zX0   = std::move( compress::aplr::compress_lr( X0, S_tol ) );
-            zmem += compress::aplr::byte_size( zX0 );
+            zX0   = std::move( compress::valr::compress_lr( X0, S_tol ) );
+            zmem += compress::valr::byte_size( zX0 );
         }
         {
             auto  Gi    = G.unfold( 1 );
@@ -209,8 +209,8 @@ test_compression ( const blas::tensor3< value_t > &  X,
             for ( uint  l = 0; l < S_tol.length(); ++l )
                 S_tol(l) = ( tol ) / S_tol(l);
 
-            zX1 = std::move( compress::aplr::compress_lr( X1, S_tol ) );
-            zmem += compress::aplr::byte_size( zX1 );
+            zX1 = std::move( compress::valr::compress_lr( X1, S_tol ) );
+            zmem += compress::valr::byte_size( zX1 );
         }
         {
             auto  Gi    = G.unfold( 2 );
@@ -219,8 +219,8 @@ test_compression ( const blas::tensor3< value_t > &  X,
             for ( uint  l = 0; l < S_tol.length(); ++l )
                 S_tol(l) = ( tol ) / S_tol(l);
 
-            zX2 = std::move( compress::aplr::compress_lr( X2, S_tol ) );
-            zmem += compress::aplr::byte_size( zX2 );
+            zX2 = std::move( compress::valr::compress_lr( X2, S_tol ) );
+            zmem += compress::valr::byte_size( zX2 );
         }
         #else
         auto  zX0 = compress::compress< value_t >( compress::get_config( tol ), X0 );
@@ -244,9 +244,9 @@ test_compression ( const blas::tensor3< value_t > &  X,
 
             compress::decompress( zG, dG );
             #if 1
-            compress::aplr::decompress_lr( zX0, dX0 );
-            compress::aplr::decompress_lr( zX1, dX1 );
-            compress::aplr::decompress_lr( zX2, dX2 );
+            compress::valr::decompress_lr( zX0, dX0 );
+            compress::valr::decompress_lr( zX1, dX1 );
+            compress::valr::decompress_lr( zX2, dX2 );
             #else
             compress::decompress( zX0, dX0 );
             compress::decompress( zX1, dX1 );
@@ -809,7 +809,7 @@ program_main ()
 
         std::cout << "  "
                   << term::bullet << term::bold << "compression via "
-                  << compress::provider << " + " << compress::aplr::provider
+                  << compress::provider << " + " << compress::valr::provider
                   << term::reset << std::endl;
 
         Z.compress( relative_prec( cmdline::eps ) );

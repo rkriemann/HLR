@@ -102,7 +102,7 @@ using FP64 = FP_info< double >;
 //   |d_i - ~d_i| ≤ 2^(-m) ≤ ε with mantissa length m = ⌈-log₂ ε⌉
 //
 inline byte_t eps_to_rate      ( const double  eps ) { return std::max< double >( 1, std::ceil( -std::log2( eps ) ) ); }
-inline byte_t eps_to_rate_aplr ( const double  eps ) { return eps_to_rate( eps ) + 1; }
+inline byte_t eps_to_rate_valr ( const double  eps ) { return eps_to_rate( eps ) + 1; }
 
 struct config
 {
@@ -855,7 +855,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
 
         HLR_ASSERT( std::isfinite( s[l] ) );
 
-        const auto  nprecbits = eps_to_rate_aplr( S(l) );
+        const auto  nprecbits = eps_to_rate_valr( S(l) );
         const auto  nbits     = 1 + e[l] + nprecbits;
 
         // increase mantissa bits such that sum is multiple of 8
@@ -943,7 +943,7 @@ compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double
 
         HLR_DBG_ASSERT( std::isfinite( s[l] ) );
 
-        const auto  nprecbits = eps_to_rate_aplr( S(l) );
+        const auto  nprecbits = eps_to_rate_valr( S(l) );
         const auto  nbits     = 1 + e[l] + nprecbits;
 
         // increase mantissa bits such that sum is multiple of 8
