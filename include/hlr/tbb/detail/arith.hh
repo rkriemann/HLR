@@ -721,7 +721,7 @@ mul_vec_cl ( const value_t                        alpha,
                     auto  x_i = x( M->col_is( op_M ) - x_ofs );
                     auto  t_i = blas::vector< value_t >( t, blas::range( pos, pos + k_i - 1 )  );
                     
-                    #if defined(HLR_HAS_ZBLAS_APLR)
+                    #if defined(HLR_HAS_ZBLAS_VALR)
                     if ( op_M == apply_normal )
                         compress::valr::zblas::mulvec( R->ncols(), k_i, apply_adjoint, value_t(1), R->zV(), x_i.data(), t_i.data() );
                     else
@@ -736,7 +736,7 @@ mul_vec_cl ( const value_t                        alpha,
                 for ( uint  i = 0; i < k; ++i )
                     t(i) *= cm.S(i);
 
-                #if defined(HLR_HAS_ZBLAS_APLR)
+                #if defined(HLR_HAS_ZBLAS_VALR)
                 compress::valr::zblas::mulvec( yt.length(), k, apply_normal, value_t(1), cm.zU, t.data(), yt.data() );
                 #else
                 HLR_ERROR( "TODO" );

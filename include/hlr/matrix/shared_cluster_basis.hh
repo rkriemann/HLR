@@ -197,7 +197,7 @@ public:
     blas::vector< value_t >
     transform_forward  ( const blas::vector< value_t > &  v ) const
     {
-        #if defined(HLR_HAS_ZBLAS_APLR)
+        #if defined(HLR_HAS_ZBLAS_VALR)
         if ( is_compressed() )
         {
             const auto  k = this->rank();
@@ -232,7 +232,7 @@ public:
     blas::vector< value_t >
     transform_backward  ( const blas::vector< value_t > &  s ) const
     {
-        #if defined(HLR_HAS_ZBLAS_APLR)
+        #if defined(HLR_HAS_ZBLAS_VALR)
         if ( is_compressed() )
         {
             const auto  n = _is.size();
@@ -255,7 +255,7 @@ public:
     transform_backward  ( const blas::vector< value_t > &  s,
                           blas::vector< value_t > &        v ) const
     {
-        #if defined(HLR_HAS_ZBLAS_APLR)
+        #if defined(HLR_HAS_ZBLAS_VALR)
         if ( is_compressed() )
         {
             HLR_ASSERT( v.length() == _is.size() );
