@@ -131,6 +131,20 @@ max_abs_val ( const tensor3< value_t > &  t )
     return v;
 }
 
+template < typename value_t >
+tensor3< value_t >
+abs ( const tensor3< value_t > &  t )
+{
+    auto  t2 = copy( t );
+
+    for ( size_t  i2 = 0; i2 < t2.size(2); ++i2 )
+        for ( size_t  i1 = 0; i1 < t2.size(1); ++i1 )
+            for ( size_t  i0 = 0; i0 < t2.size(0); ++i0 )
+                t2(i0,i1,i2) = math::abs( t2(i0,i1,i2) );
+
+    return t2;
+}
+
 //
 // compute B := α A + β B (element wise)
 //

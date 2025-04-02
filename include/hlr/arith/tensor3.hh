@@ -490,26 +490,35 @@ tensor3< value_t >::check_data  () const
 // BLAS functions
 //
 
+// copy <src> to <dest> assuming equal size
 template < typename value_t >
 void
 copy ( const tensor3< value_t > &  src,
        tensor3< value_t > &        dest );
 using Hpro::BLAS::copy;
 
+// compute dot product Σ_ijk t1_ijk * t2_ijk
 template < typename value_t >
 value_t
 dot ( const tensor3< value_t > &  t1,
       const tensor3< value_t > &  t2 );
 using Hpro::BLAS::dot;
 
+// return Frobenius norm of t
 template < typename value_t >
 real_type_t< value_t >
 norm_F ( const tensor3< value_t > &  t );
 using Hpro::BLAS::norm_F;
 
+// return maximal absolute value in t
 template < typename value_t >
 real_type_t< value_t >
 max_abs_val ( const tensor3< value_t > &  t );
+
+// return tensor with absolute values
+template < typename value_t >
+tensor3< value_t >
+abs ( const tensor3< value_t > &  t );
 
 //
 // compute B := α A + β B (element wise)
