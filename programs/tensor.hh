@@ -188,9 +188,9 @@ test_compression ( const blas::tensor3< value_t > &  X,
         std::cout << term::bullet << term::bold << "ε = " << tol << term::reset << std::endl;
 
         #if 1
-        auto  zX0 = compress::aplr::zarray();
-        auto  zX1 = compress::aplr::zarray();
-        auto  zX2 = compress::aplr::zarray();
+        auto  zX0 = compress::valr::zarray();
+        auto  zX1 = compress::valr::zarray();
+        auto  zX2 = compress::valr::zarray();
 
         {
             auto  Gi    = G.unfold( 0 );
@@ -199,8 +199,8 @@ test_compression ( const blas::tensor3< value_t > &  X,
             for ( uint  l = 0; l < S_tol.length(); ++l )
                 S_tol(l) = ( tol ) / S_tol(l);
 
-            zX0   = std::move( compress::aplr::compress_lr( X0, S_tol ) );
-            zmem += compress::aplr::byte_size( zX0 );
+            zX0   = std::move( compress::valr::compress_lr( X0, S_tol ) );
+            zmem += compress::valr::byte_size( zX0 );
         }
         {
             auto  Gi    = G.unfold( 1 );
@@ -209,8 +209,8 @@ test_compression ( const blas::tensor3< value_t > &  X,
             for ( uint  l = 0; l < S_tol.length(); ++l )
                 S_tol(l) = ( tol ) / S_tol(l);
 
-            zX1 = std::move( compress::aplr::compress_lr( X1, S_tol ) );
-            zmem += compress::aplr::byte_size( zX1 );
+            zX1 = std::move( compress::valr::compress_lr( X1, S_tol ) );
+            zmem += compress::valr::byte_size( zX1 );
         }
         {
             auto  Gi    = G.unfold( 2 );
@@ -219,8 +219,8 @@ test_compression ( const blas::tensor3< value_t > &  X,
             for ( uint  l = 0; l < S_tol.length(); ++l )
                 S_tol(l) = ( tol ) / S_tol(l);
 
-            zX2 = std::move( compress::aplr::compress_lr( X2, S_tol ) );
-            zmem += compress::aplr::byte_size( zX2 );
+            zX2 = std::move( compress::valr::compress_lr( X2, S_tol ) );
+            zmem += compress::valr::byte_size( zX2 );
         }
         #else
         auto  zX0 = compress::compress< value_t >( compress::get_config( tol ), X0 );
@@ -244,9 +244,9 @@ test_compression ( const blas::tensor3< value_t > &  X,
 
             compress::decompress( zG, dG );
             #if 1
-            compress::aplr::decompress_lr( zX0, dX0 );
-            compress::aplr::decompress_lr( zX1, dX1 );
-            compress::aplr::decompress_lr( zX2, dX2 );
+            compress::valr::decompress_lr( zX0, dX0 );
+            compress::valr::decompress_lr( zX1, dX1 );
+            compress::valr::decompress_lr( zX2, dX2 );
             #else
             compress::decompress( zX0, dX0 );
             compress::decompress( zX1, dX1 );
@@ -287,235 +287,6 @@ test_compression ( const blas::tensor3< value_t > &  X,
                       << std::endl;
         }
     }// for
-}
-
-//
-// wavelet transform
-//
-template < typename value_t >
-std::array< blas::tensor3< value_t >, 8 >
-dwt ( const blas::tensor3< value_t > &  t )
-{
-    //
-    // axis 0
-    //
-
-    const size_t  n0 = t.size(0) / 2 + t.size(0) % 2;
-    auto          L  = blas::tensor3< value_t >( n0, n, n );
-    auto          H  = blas::tensor3< value_t >( n0, n, n );
-
-    for ( size_t  i2 = 0; i2 < t.size(2); ++i2 )
-    {
-        for ( size_t  i1 = 0; i1 < t.size(1); ++i1 )
-        {
-            for ( size_t  i0 = 0; i0 < n0; ++i0 )
-            {
-                const auto  t0 = t(2*i0,i1,i2);
-                const auto  t1 = t(2*i0+1,i1,i2);
-                
-                L(i0,i1,i2) = t0 + t1;
-                H(i0,i1,i2) = t0 - t1;
-            }// for
-        }// for
-    }// for
-
-    //
-    // axis 1
-    //
-
-    const size_t  n1 = t.size(1) / 2 + t.size(1) % 2;
-    auto          LL = blas::tensor3< value_t >( n0, n1, n );
-    auto          LH = blas::tensor3< value_t >( n0, n1, n );
-    auto          HL = blas::tensor3< value_t >( n0, n1, n );
-    auto          HH = blas::tensor3< value_t >( n0, n1, n );
-
-    for ( size_t  i2 = 0; i2 < t.size(2); ++i2 )
-    {
-        for ( size_t  i1 = 0; i1 < n1; ++i1 )
-        {
-            for ( size_t  i0 = 0; i0 < n0; ++i0 )
-            {
-                const auto  L0 = L(i0,2*i1,i2);
-                const auto  L1 = L(i0,2*i1+1,i2);
-                
-                LL(i0,i1,i2) = L0 + L1;
-                LH(i0,i1,i2) = L0 - L1;
-
-                const auto  H0 = H(i0,2*i1,i2);
-                const auto  H1 = H(i0,2*i1+1,i2);
-
-                HL(i0,i1,i2) = H0 + H1;
-                HH(i0,i1,i2) = H0 - H1;
-            }// for
-        }// for
-    }// for
-
-    //
-    // axis 2
-    //
-
-    const size_t  n2 = t.size(1) / 2 + t.size(1) % 2;
-    auto          LLL = blas::tensor3< value_t >( n0, n1, n2 );
-    auto          LLH = blas::tensor3< value_t >( n0, n1, n2 );
-    auto          LHL = blas::tensor3< value_t >( n0, n1, n2 );
-    auto          LHH = blas::tensor3< value_t >( n0, n1, n2 );
-    auto          HLL = blas::tensor3< value_t >( n0, n1, n2 );
-    auto          HLH = blas::tensor3< value_t >( n0, n1, n2 );
-    auto          HHL = blas::tensor3< value_t >( n0, n1, n2 );
-    auto          HHH = blas::tensor3< value_t >( n0, n1, n2 );
-
-    for ( size_t  i2 = 0; i2 < n2; ++i2 )
-    {
-        for ( size_t  i1 = 0; i1 < n1; ++i1 )
-        {
-            for ( size_t  i0 = 0; i0 < n0; ++i0 )
-            {
-                const auto  LL0 = LL(i0,i1,2*i2);
-                const auto  LL1 = LL(i0,i1,2*i2+1);
-                
-                LLL(i0,i1,i2) = LL0 + LL1;
-                LLH(i0,i1,i2) = LL0 - LL1;
-
-                const auto  LH0 = LH(i0,i1,2*i2);
-                const auto  LH1 = LH(i0,i1,2*i2+1);
-                
-                LHL(i0,i1,i2) = LH0 + LH1;
-                LHH(i0,i1,i2) = LH0 - LH1;
-
-                const auto  HL0 = HL(i0,i1,2*i2);
-                const auto  HL1 = HL(i0,i1,2*i2+1);
-                
-                HLL(i0,i1,i2) = HL0 + HL1;
-                HLH(i0,i1,i2) = HL0 - HL1;
-
-                const auto  HH0 = HH(i0,i1,2*i2);
-                const auto  HH1 = HH(i0,i1,2*i2+1);
-                
-                HHL(i0,i1,i2) = HH0 + HH1;
-                HHH(i0,i1,i2) = HH0 - HH1;
-            }// for
-        }// for
-    }// for
-
-    return { std::move( LLL ),
-             std::move( LLH ),
-             std::move( LHL ),
-             std::move( LHH ),
-             std::move( HLL ),
-             std::move( HLH ),
-             std::move( HHL ),
-             std::move( HHH ) };
-}
-
-template < typename value_t >
-blas::tensor3< value_t >
-idwt ( const std::array< blas::tensor3< value_t >, 8 > &  coeffs )
-{
-    auto          LLL = coeffs[0];
-    auto          LLH = coeffs[1];
-    auto          LHL = coeffs[2];
-    auto          LHH = coeffs[3];
-    auto          HLL = coeffs[4];
-    auto          HLH = coeffs[5];
-    auto          HHL = coeffs[6];
-    auto          HHH = coeffs[7];
-    const size_t  n0  = LLL.size(0);
-    const size_t  n1  = LLL.size(1);
-    const size_t  n2  = LLL.size(2);
-    const size_t  n   = 2*n0;
-
-    //
-    // axis 2
-    //
-
-    auto  LL = blas::tensor3< value_t >( n0, n1, n );
-    auto  LH = blas::tensor3< value_t >( n0, n1, n );
-    auto  HL = blas::tensor3< value_t >( n0, n1, n );
-    auto  HH = blas::tensor3< value_t >( n0, n1, n );
-    
-    for ( size_t  i2 = 0; i2 < n2; ++i2 )
-    {
-        for ( size_t  i1 = 0; i1 < n1; ++i1 )
-        {
-            for ( size_t  i0 = 0; i0 < n0; ++i0 )
-            {
-                const auto  lll = LLL(i0,i1,i2);
-                const auto  llh = LLH(i0,i1,i2);
-                
-                LL(i0,i1,2*i2)   = (lll + llh) / 2.0;
-                LL(i0,i1,2*i2+1) = (lll - llh) / 2.0;
-
-                const auto  lhl = LHL(i0,i1,i2);
-                const auto  lhh = LHH(i0,i1,i2);
-
-                LH(i0,i1,2*i2)   = (lhl + lhh) / 2.0;
-                LH(i0,i1,2*i2+1) = (lhl - lhh) / 2.0;
-
-                const auto  hll = HLL(i0,i1,i2);
-                const auto  hlh = HLH(i0,i1,i2);
-
-                HL(i0,i1,2*i2)   = (hll + hlh) / 2.0;
-                HL(i0,i1,2*i2+1) = (hll - hlh) / 2.0;
-
-                const auto  hhl = HHL(i0,i1,i2);
-                const auto  hhh = HHH(i0,i1,i2);
-
-                HH(i0,i1,2*i2)   = (hhl + hhh) / 2.0;
-                HH(i0,i1,2*i2+1) = (hhl - hhh) / 2.0;
-            }// for
-        }// for
-    }// for
-
-    //
-    // axis 1
-    //
-
-    auto  L = blas::tensor3< value_t >( n0, n, n );
-    auto  H = blas::tensor3< value_t >( n0, n, n );
-
-    for ( size_t  i2 = 0; i2 < n; ++i2 )
-    {
-        for ( size_t  i1 = 0; i1 < n1; ++i1 )
-        {
-            for ( size_t  i0 = 0; i0 < n0; ++i0 )
-            {
-                const auto  ll = LL(i0,i1,i2);
-                const auto  lh = LH(i0,i1,i2);
-                
-                L(i0,2*i1,i2)   = (ll + lh) / 2.0;
-                L(i0,2*i1+1,i2) = (ll - lh) / 2.0;
-
-                const auto  hl = HL(i0,i1,i2);
-                const auto  hh = HH(i0,i1,i2);
-                
-                H(i0,2*i1,i2)   = (hl + hh) / 2.0;
-                H(i0,2*i1+1,i2) = (hl - hh) / 2.0;
-            }// for
-        }// for
-    }// for
-
-    //
-    // axis 0
-    //
-
-    auto  M = blas::tensor3< value_t >( n, n, n );
-
-    for ( size_t  i2 = 0; i2 < n; ++i2 )
-    {
-        for ( size_t  i1 = 0; i1 < n; ++i1 )
-        {
-            for ( size_t  i0 = 0; i0 < n0; ++i0 )
-            {
-                const auto  l = L(i0,i1,i2);
-                const auto  h = H(i0,i1,i2);
-                
-                M(2*i0,i1,i2)   = (l + h) / 2.0;
-                M(2*i0+1,i1,i2) = (l - h) / 2.0;
-            }// for
-        }// for
-    }// for
-
-    return M;
 }
 
 //
@@ -596,7 +367,7 @@ program_main ()
     {
         tic = timer::now();
         
-        auto  coeffs = dwt( X );
+        auto  coeffs = blas::dwt( X );
 
         toc = timer::since( tic );
         std::cout << "    dwt done in  " << format_time( toc ) << std::endl;
@@ -621,7 +392,7 @@ program_main ()
 
         tic = timer::now();
 
-        auto  T = idwt( coeffs );
+        auto  T = blas::idwt( coeffs );
 
         toc = timer::since( tic );
         std::cout << "    idwt done in " << format_time( toc ) << std::endl;
@@ -809,7 +580,7 @@ program_main ()
 
         std::cout << "  "
                   << term::bullet << term::bold << "compression via "
-                  << compress::provider << " + " << compress::aplr::provider
+                  << compress::provider << " + " << compress::valr::provider
                   << term::reset << std::endl;
 
         Z.compress( relative_prec( cmdline::eps ) );

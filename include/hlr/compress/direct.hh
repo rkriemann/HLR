@@ -415,24 +415,24 @@ namespace zblas { using hlr::compress::aflp::mulvec; }
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#elif HLR_COMPRESSOR == HLR_COMPRESSOR_BFL
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_SFL
 
-#include <hlr/compress/bfl.hh>
+#include <hlr/compress/sfl.hh>
 
 namespace hlr { namespace compress {
 
-static const char provider[] = "bfl";
+static const char provider[] = "sfl";
 
-using  zconfig_t = hlr::compress::bfl::config;
-using  zarray    = hlr::compress::bfl::zarray;
+using  zconfig_t = hlr::compress::sfl::config;
+using  zarray    = hlr::compress::sfl::zarray;
 
-using hlr::compress::bfl::compress;
-using hlr::compress::bfl::decompress;
-using hlr::compress::bfl::get_config;
-using hlr::compress::bfl::byte_size;
-using hlr::compress::bfl::compressed_size;
+using hlr::compress::sfl::compress;
+using hlr::compress::sfl::decompress;
+using hlr::compress::sfl::get_config;
+using hlr::compress::sfl::byte_size;
+using hlr::compress::sfl::compressed_size;
 
-namespace zblas { using hlr::compress::bfl::mulvec; }
+namespace zblas { using hlr::compress::sfl::mulvec; }
 
 }} // namespace hlr::compress
 

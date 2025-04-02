@@ -106,7 +106,7 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
-    const auto  compstr = std::string( hlr::compress::provider ) + " + " + hlr::compress::aplr::provider;
+    const auto  compstr = std::string( hlr::compress::provider ) + " + " + hlr::compress::valr::provider;
     auto        zA      = impl::matrix::copy_mixedprec( *A );
 
     std::cout << "  "

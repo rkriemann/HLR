@@ -197,6 +197,89 @@ program_main ()
     
     //////////////////////////////////////////////////////////////////////
     //
+    // try single precision
+    //
+    //////////////////////////////////////////////////////////////////////
+
+    if ( true )
+    {
+        using  single_t = math::decrease_precision_t< value_t >;
+            
+        auto        sA      = impl::matrix::convert< single_t, value_t >( *A );
+        auto        zsA     = impl::matrix::copy_compressible( *sA );
+        const auto  delta   = cmdline::eps; // norm_A * cmdline::eps / std::sqrt( double(A->nrows()) * double(A->ncols()) );
+    
+        const auto  mem_sA    = matrix::data_byte_size( *sA );
+        const auto  mem_sA_d  = matrix::data_byte_size_dense( *sA );
+        const auto  mem_sA_lr = matrix::data_byte_size_lowrank( *sA );
+        auto        norm_sA   = impl::norm::frobenius( *sA );
+        
+        std::cout << "  "
+                  << term::bullet << term::bold
+                  << "single precision compression ("
+                  << "δ = " << boost::format( "%.2e" ) % delta
+                  << ", "
+                  << hlr::compress::provider << ')'
+                  << term::reset << std::endl;
+
+        std::cout << "    mem   = " << format_mem( mem_sA, mem_sA_d, mem_sA_lr ) << std::endl;
+        std::cout << "      idx = " << format_mem( mem_sA / sA->nrows() ) << std::endl;
+        std::cout << "    |A|   = " << format_norm( norm_sA ) << std::endl;
+        
+        {
+            // auto  lacc = local_accuracy( delta );
+            auto  lacc  = relative_prec( Hpro::frobenius_norm, delta );
+            auto  niter = std::max( nbench, 1u );
+        
+            runtime.clear();
+        
+            for ( uint  i = 0; i < niter; ++i )
+            {
+                tic = timer::now();
+    
+                impl::matrix::compress( *zsA, lacc );
+
+                toc = timer::since( tic );
+                runtime.push_back( toc.seconds() );
+                std::cout << "      compressed in   " << format_time( toc ) << std::endl;
+
+                if ( i < niter-1 )
+                {
+                    zsA.reset( nullptr );
+                    zsA = std::move( impl::matrix::copy_compressible( *sA ) );
+                }// if
+            }// for
+
+            if ( nbench > 1 )
+                std::cout << "    runtime  = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
+                          << std::endl;
+        }
+
+        const auto  mem_zsA    = matrix::data_byte_size( *zsA );
+        const auto  mem_zsA_d  = matrix::data_byte_size_dense( *zsA );
+        const auto  mem_zsA_lr = matrix::data_byte_size_lowrank( *zsA );
+    
+        std::cout << "    mem     = " << format_mem( mem_zsA, mem_zsA_d, mem_zsA_lr ) << std::endl;
+        std::cout << "        vs H  "
+                  << boost::format( "%.3f" ) % ( double(mem_zsA) / double(mem_sA) ) << " / "
+                  << boost::format( "%.3f" ) % ( double(mem_zsA_d) / double(mem_sA_d) ) << " / "
+                  << boost::format( "%.3f" ) % ( double(mem_zsA_lr) / double(mem_sA_lr) ) << std::endl;
+
+        if ( verbose( 3 ) )
+            matrix::print_eps( *zsA, "zsA", "noid,norank,nosize" );
+
+        {
+            auto  error = impl::norm::frobenius( 1, *sA, -1, *zsA );
+
+            std::cout << "    error = " << format_error( error, error / norm_sA ) << std::endl;
+        }
+
+        return;
+    }// if
+
+    //////////////////////////////////////////////////////////////////////
+    //
     // convert to mixed precision format
     //
     //////////////////////////////////////////////////////////////////////
@@ -209,7 +292,7 @@ program_main ()
               << "compression ("
               << "δ = " << boost::format( "%.2e" ) % delta
               << ", "
-              << hlr::compress::provider << " + " << hlr::compress::aplr::provider << ")"
+              << hlr::compress::provider << " + " << hlr::compress::valr::provider << ")"
               << term::reset << std::endl;
 
     {
@@ -367,7 +450,7 @@ program_main ()
             y_ref = std::move( y );
         }
 
-        if ( true )
+        if ( false )
         {
             runtime.clear();
             
@@ -413,7 +496,7 @@ program_main ()
             std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
-        if ( true )
+        if ( false )
         {
             runtime.clear();
             
@@ -459,7 +542,7 @@ program_main ()
             std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
-        if ( true )
+        if ( false )
         {
             runtime.clear();
             
@@ -506,7 +589,7 @@ program_main ()
         }
 
 
-        if ( true )
+        if ( false )
         {
             runtime.clear();
             
@@ -605,7 +688,7 @@ program_main ()
             std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
-        if ( true )
+        if ( false )
         {
             runtime.clear();
             
@@ -651,7 +734,7 @@ program_main ()
             std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
-        if ( true )
+        if ( false )
         {
             runtime.clear();
             
@@ -697,7 +780,7 @@ program_main ()
             std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
-        if ( true )
+        if ( false )
         {
             runtime.clear();
             
@@ -743,7 +826,7 @@ program_main ()
             std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
-        if ( true )
+        if ( false )
         {
             runtime.clear();
             

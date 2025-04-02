@@ -57,7 +57,7 @@ using FP64 = fp_info< double >;
 //   |d_i - ~d_i| ≤ 2^(-m) ≤ ε with mantissa length m = ⌈-log₂ ε⌉
 //
 inline byte_t eps_to_rate      ( const double  eps ) { return std::max< double >( 1, std::ceil( -std::log2( eps ) ) ); }
-inline byte_t eps_to_rate_aplr ( const double  eps ) { return eps_to_rate( eps ); }
+inline byte_t eps_to_rate_valr ( const double  eps ) { return eps_to_rate( eps ); }
 
 struct config
 {
@@ -638,7 +638,7 @@ compress_lr ( const blas::matrix< value_t > &                       U,
 
     for ( uint32_t  l = 0; l < k; ++l )
     {
-        m[l] = eps_to_rate_aplr( S(l) );
+        m[l] = eps_to_rate_valr( S(l) );
 
         const size_t  nbits = 1 + exp_bits + m[l]; // number of bits per value
         
@@ -701,7 +701,7 @@ compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double
 
     for ( uint32_t  l = 0; l < k; ++l )
     {
-        m[l] = eps_to_rate_aplr( S(l) );
+        m[l] = eps_to_rate_valr( S(l) );
 
         const size_t  nbits = 1 + exp_bits + m[l]; // number of bits per value
         

@@ -17,7 +17,7 @@
 #define HLR_COMPRESSOR_NONE     0
 #define HLR_COMPRESSOR_AFL      1
 #define HLR_COMPRESSOR_AFLP     2
-#define HLR_COMPRESSOR_BFL      3
+#define HLR_COMPRESSOR_SFL      3
 #define HLR_COMPRESSOR_DFL      4
 #define HLR_COMPRESSOR_ZFP      5
 #define HLR_COMPRESSOR_SZ       6

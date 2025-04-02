@@ -561,6 +561,17 @@ tensor3< value_t >
 hadamard_product ( const tensor3< value_t > &  X1,
                    tensor3< value_t > &        X2 );
 
+//
+// (inverse) discrete wavelet transform using Haar wavelet
+//
+template < typename value_t >
+std::array< blas::tensor3< value_t >, 8 >
+dwt ( const blas::tensor3< value_t > &  t );
+
+template < typename value_t >
+blas::tensor3< value_t >
+idwt ( const std::array< blas::tensor3< value_t >, 8 > &  coeffs );
+
 }}// namespace hlr::blas
 
 #include <hlr/arith/detail/tensor3.hh>
