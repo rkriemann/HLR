@@ -213,6 +213,10 @@ public:
     const blas::matrix< value_t > &  U_direct  ( const Hpro::matop_t  op ) const { return ( op == apply_normal ? U_direct() : V_direct() ); }
     const blas::matrix< value_t > &  V_direct  ( const Hpro::matop_t  op ) const { return ( op == apply_normal ? V_direct() : U_direct() ); }
 
+    // access compressed data
+    const compress::zarray &  zU () const { return _zU; }
+    const compress::zarray &  zV () const { return _zV; }
+    
     //
     // directly set low-rank factors
     //
@@ -352,6 +356,14 @@ public:
         }// else
     }
 
+    // directly set compressed data assuming correct dimensions(!)
+    void  set_zlrmat  ( compress::zarray &&  azU,
+                        compress::zarray &&  azV )
+    {
+        _zU = std::move( azU );
+        _zV = std::move( azV );
+    }
+    
     //
     // algebra routines
     //
