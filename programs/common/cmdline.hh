@@ -30,6 +30,7 @@ using  vstring = std::vector< std::string >;
 size_t  n          = 1024;         // problem size
 size_t  ntile      = 128;          // tile size (nmin)
 size_t  nseq       = 0;            // use sequential arithmetic below
+size_t  ndim       = 3;            // problem dimensionality
 size_t  nlvl       = 0;            // number of level, e.g., for Tile-H or MBLR
 size_t  k          = 16;           // constant rank
 double  eps        = 1e-4;         // build precision
@@ -88,6 +89,7 @@ read_config ( const std::string &  filename )
     appl       = cfg.get( "app.appl",    appl );
     kernel     = cfg.get( "app.kernel",  kernel );
     n          = cfg.get( "app.n",       n );
+    ndim       = cfg.get( "app.ndim",    ndim );
     adm        = cfg.get( "app.adm",     adm );
     eta        = cfg.get( "app.eta",     eta );
     cluster    = cfg.get( "app.cluster", cluster );
@@ -155,6 +157,7 @@ parse ( int argc, char ** argv )
         ( "kernel",      value<string>(), ": kernel to use (newton,log,exp,...)" )
         ( "matrix",      value<string>(), ": matrix file to use" )
         ( "nprob,n",     value<int>(),    ": set problem size" )
+        ( "ndim,d",      value<int>(),    ": set problem dimension" )
         ( "part",        value<string>(), ": partitioning strategy (bsp-/pca-card,bsp-/pca-vol)" )
         ( "sepcoup",                      ": use separate row/column couplings for Uni-H and H²" )
         ( "sigma",       value<double>(), ": parameter σ for Matérn and Gaussian" )
@@ -239,6 +242,7 @@ parse ( int argc, char ** argv )
     if ( vm.count( "nprob"      ) ) n          = vm["nprob"].as<int>();
     if ( vm.count( "ntile"      ) ) ntile      = vm["ntile"].as<int>();
     if ( vm.count( "nseq"       ) ) nseq       = vm["nseq"].as<int>();
+    if ( vm.count( "ndim"       ) ) ndim       = vm["ndim"].as<int>();
     if ( vm.count( "nlvl"       ) ) nlvl       = vm["nlvl"].as<int>();
     if ( vm.count( "rank"       ) ) k          = vm["rank"].as<uint>();
     if ( vm.count( "eps"        ) ) eps        = vm["eps"].as<double>();
