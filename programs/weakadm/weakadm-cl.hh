@@ -18,6 +18,47 @@
 
 using namespace hlr;
 
+std::vector< Hpro::TPoint >
+make_vertices_nd ( const uint    dim,
+                   const size_t  nsize )
+{
+    auto          vertices = std::vector< Hpro::TPoint >();
+    const double  h        = 1.0 / double(nsize-1);
+    
+    if ( dim == 3 )
+    {
+        vertices.reserve( nsize * nsize * nsize );
+            
+        for ( size_t  i2 = 0; i2 < nsize; ++i2 )
+            for ( size_t  i1 = 0; i1 < nsize; ++i1 )
+                for ( size_t  i0 = 0; i0 < nsize; ++i0 )
+                    vertices.push_back( point_t( i0*h, i1*h, i2*  ) );
+    }// if
+    else if ( dim == 4 )
+    {
+        vertices.reserve( nsize * nsize * nsize * nsize );
+            
+        for ( size_t  i3 = 0; i3 < nsize; ++i3 )
+            for ( size_t  i2 = 0; i2 < nsize; ++i2 )
+                for ( size_t  i1 = 0; i1 < nsize; ++i1 )
+                    for ( size_t  i0 = 0; i0 < nsize; ++i0 )
+                        vertices.push_back( point_t( i0*h, i1*h, i2*h, i3*h ) );
+    }// if
+    else if ( dim == 5 )
+    {
+        vertices.reserve( nsize * nsize * nsize * nsize * nsize );
+            
+        for ( size_t  i4 = 0; i4 < nsize; ++i4 )
+            for ( size_t  i3 = 0; i3 < nsize; ++i3 )
+                for ( size_t  i2 = 0; i2 < nsize; ++i2 )
+                    for ( size_t  i1 = 0; i1 < nsize; ++i1 )
+                        for ( size_t  i0 = 0; i0 < nsize; ++i0 )
+                            vertices.push_back( point_t( i0*h, i1*h, i2*h, i3*h, i4*h ) );
+    }// if
+    else
+        HLR_ERROR( "unsupported dimension" );
+}
+
 //
 // determine number of blocks with face/edge/vertex/strong admissibility
 //
@@ -106,10 +147,10 @@ program_main ()
     auto  part         = Hpro::TGeomBSPPartStrat( Hpro::adaptive_split_axis );
     auto  [ ct, pe2i ] = cluster::build_cluster_tree( coord, part, cmdline::ntile );
 
-    auto  adm0    = cluster::weak_adm( 0 ); // off-diagonal admissibility
-    auto  adm1    = cluster::weak_adm( 1 ); // face admissibility
-    auto  adm2    = cluster::weak_adm( 2 ); // edge admissibility
-    auto  adm3    = cluster::weak_adm( 3 ); // vertex admissibility
+    auto  vadm    = cluster::weak_adm( 0 ); // vertex admissibility
+    auto  eadm    = cluster::weak_adm( 1 ); // edge admissibility
+    auto  fadm    = cluster::weak_adm( 2 ); // face admissibility
+    auto  weak    = cluster::weak_adm( 3 ); // off-diagonal admissibility
     auto  strong  = cluster::strong_adm();
     auto  bct0    = cluster::build_block_tree( *ct, *ct, adm0 );
     auto  bct1    = cluster::build_block_tree( *ct, *ct, adm1 );
