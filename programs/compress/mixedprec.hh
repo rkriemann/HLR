@@ -201,7 +201,7 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
-    if ( true )
+    if ( false )
     {
         using  single_t = math::decrease_precision_t< value_t >;
             
