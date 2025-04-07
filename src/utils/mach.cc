@@ -6,12 +6,19 @@
 // Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
+#include <boost/format.hpp>
+
 #if !defined(_GNU_SOURCE)
 #  define _GNU_SOURCE
 #endif
 
 #if defined(__linux)
 #  include <sched.h>
+#endif
+
+#if defined(__APPLE__)
+#  include <sys/types.h>
+#  include <sys/sysctl.h>
 #endif
 
 #include <unistd.h>
@@ -91,6 +98,17 @@ cpuset ()
                 
     return out.str();
 
+    #elif defined(__APPLE__)
+
+    // return total number of cores
+    int     ncores = 0;
+    size_t  len    = sizeof( ncores );
+    
+    if ( sysctlbyname( "machdep.cpu.core_count", &ncores, &len, NULL, 0 ) != 0 )
+        return " (unknown)";
+    
+    return (boost::format( "#%d" ) % ncores ).str();
+    
     #else
 
     return "unknown";
@@ -157,6 +175,16 @@ cpu ()
     
     return cpu;
 
+    #elif defined(__APPLE__)
+
+    char    cpu_brand[128];
+    size_t  len = sizeof( cpu_brand );
+    
+    if ( sysctlbyname( "machdep.cpu.brand_string", cpu_brand, &len, NULL, 0 ); != 0 )
+        return " (unknown)";
+
+    return cpu_brand;
+    
     #else
 
     return "unknown";
