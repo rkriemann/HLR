@@ -23,7 +23,7 @@
 // signal availability of compressed BLAS
 //
 #define HLR_HAS_ZBLAS_DIRECT
-#define HLR_HAS_ZBLAS_APLR
+#define HLR_HAS_ZBLAS_VALR
 
 ////////////////////////////////////////////////////////////
 //
