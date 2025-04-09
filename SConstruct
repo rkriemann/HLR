@@ -163,10 +163,6 @@ COMPRESSORS   = [ 'help',       # print help
                   'dfl2',       # 22
                   'mp3',        # 18
                   'fp32',       # 13
-                  # 'fp16',
-                  # 'bf16',
-                  # 'tf32',
-                  # 'bf24',
                   'zfp',        # 5
                   'posits',     # 12
                   'cfloat',     # 20
@@ -174,6 +170,10 @@ COMPRESSORS   = [ 'help',       # print help
                   'sz3',        # 7
                   'mgard',      # 8
                   'blosc',      # 21
+                  # 'fp16',
+                  # 'bf16',
+                  # 'tf32',
+                  # 'bf24',
                   # 'lz4',
                   # 'zlib',
                   # 'zstd'
@@ -200,41 +200,41 @@ COMPRESSORS_HELP = { 'none'   : 'no compression used',
                      # 'zstd'   : 'use Zstd    (see also {0}zstd_dir{1})',
                     }
 
-# supported and active VALR compressor
-VALR_COMPRESSORS = [ 'help',      # print help
-                     'none',
-                     'default',
-                     'zfp',
-                     'sz',
-                     'sz3',
-                     'mgard',
-                     'afl',
-                     'aflp',
-                     'sfl',
-                     'dfl',
-                     'mp2',
-                     'mp3',
-                     'posits',
-                     'cfloat',
-                     'blosc' ]
-valr = 'default'
+# # supported and active VALR compressor
+# VALR_COMPRESSORS = [ # 'help',      # print help
+#                      # 'none',
+#                      # 'default',
+#                      'afl',
+#                      'aflp',
+#                      'sfl',
+#                      'dfl',
+#                      'mp3',
+#                      'zfp',
+#                      'posits',
+#                      'cfloat',
+#                      'sz',
+#                      'sz3',
+#                      'mgard',
+#                      'blosc',
+#                      # 'mp2' ]
+# valr = 'default'
 
-VALR_HELP =        { 'none'    : 'no VALR compression used',
-                     'default' : 'use VALR from {0}compressor{1} setting',
-                     'zfp'     : 'use ZFP    (see also {0}zfp_dir{1})',
-                     'posits'  : 'use Posits (see also {0}universal_dir{1})',
-                     'cfloat'  : 'use CFloat (see also {0}universal_dir{1})',
-                     'sz'      : 'use SZ     (see also {0}sz_dir{1})',
-                     'sz3'     : 'use SZ3    (see also {0}sz3_dir{1})',
-                     'mgard'   : 'use MGARD  (see also {0}mgard_dir{1})',
-                     'blosc'   : 'use Blosc  (see also {0}blosc_dir{1})',
-                     'afl'     : 'use AFL',
-                     'aflp'    : 'use AFLP',
-                     'sfl'     : 'use SFL',
-                     'dfl'     : 'use DFL',
-                     'mp2'     : 'use mixed precision with FP64/FP32',
-                     'mp3'     : 'use mixed precision with FP64/FP32/BF16',
-                    }
+# VALR_HELP =        { 'none'    : 'no VALR compression used',
+#                      'default' : 'use VALR from {0}compressor{1} setting',
+#                      'zfp'     : 'use ZFP    (see also {0}zfp_dir{1})',
+#                      'posits'  : 'use Posits (see also {0}universal_dir{1})',
+#                      'cfloat'  : 'use CFloat (see also {0}universal_dir{1})',
+#                      'sz'      : 'use SZ     (see also {0}sz_dir{1})',
+#                      'sz3'     : 'use SZ3    (see also {0}sz3_dir{1})',
+#                      'mgard'   : 'use MGARD  (see also {0}mgard_dir{1})',
+#                      'blosc'   : 'use Blosc  (see also {0}blosc_dir{1})',
+#                      'afl'     : 'use AFL',
+#                      'aflp'    : 'use AFLP',
+#                      'sfl'     : 'use SFL',
+#                      'dfl'     : 'use DFL',
+#                      'mp2'     : 'use mixed precision with FP64/FP32',
+#                      'mp3'     : 'use mixed precision with FP64/FP32/BF16',
+#                     }
 
 
 ######################################################################
@@ -417,7 +417,7 @@ opts.Add( BoolVariable( 'atc',           'use ATC compression library',        a
 opts.Add( PathVariable( 'atc_dir',       'ATC installation directory',         ATC_DIR, PathVariable.PathIsDir ) )
 
 opts.Add( EnumVariable( 'compressor',    'defined compressor',                  'none', allowed_values = COMPRESSORS,      ignorecase = 2 ) )
-opts.Add( EnumVariable( 'valr',          'defined VALR compressor',             'none', allowed_values = VALR_COMPRESSORS, ignorecase = 2 ) )
+# opts.Add( EnumVariable( 'valr',          'defined VALR compressor',             'none', allowed_values = VALR_COMPRESSORS, ignorecase = 2 ) )
 opts.Add( BoolVariable( 'zblas',         'activate/deactivate compressed BLAS', zblas ) )
 
 opts.Add( BoolVariable( 'fullmsg',   'enable full command line output',           fullmsg ) )
@@ -504,7 +504,7 @@ atc           = opt_env['atc']
 ATC_DIR       = opt_env['atc_dir']
 
 compressor    = opt_env['compressor']
-valr          = opt_env['valr']
+# valr          = opt_env['valr']
 zblas         = opt_env['zblas']
 
 buildtype     = opt_env['buildtype']
@@ -547,12 +547,12 @@ if compressor == 'help' :
             print( '  {0}{1:<11s}{2} : '.format( colors['bold'], opt, colors['reset'] ) + COMPRESSORS_HELP[opt].format( colors['italic'], colors['reset'] ) )
     sys.exit( 1 )
 
-if valr == 'help' :
-    print( 'supported {0}valr{1} options: '.format( colors['bold'], colors['reset'] ) )
-    for opt in VALR_COMPRESSORS :
-        if opt != 'help' :
-            print( '  {0}{1:<11s}{2} : '.format( colors['bold'], opt, colors['reset'] ) + VALR_HELP[opt].format( colors['italic'], colors['reset'] ) )
-    sys.exit( 1 )
+# if valr == 'help' :
+#     print( 'supported {0}valr{1} options: '.format( colors['bold'], colors['reset'] ) )
+#     for opt in VALR_COMPRESSORS :
+#         if opt != 'help' :
+#             print( '  {0}{1:<11s}{2} : '.format( colors['bold'], opt, colors['reset'] ) + VALR_HELP[opt].format( colors['italic'], colors['reset'] ) )
+#     sys.exit( 1 )
 
 opts.Save( opts_file, opt_env )
 
@@ -721,42 +721,69 @@ if zfp :
     
 if   compressor == 'none' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=0' )
+    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=0' )
 elif   compressor == 'afl' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=1' )
+    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=1' )
 elif compressor == 'aflp' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=2' )
+    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=2' )
 elif compressor == 'sfl' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=3' )
+    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=3' )
 elif compressor == 'dfl' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=4' )
+    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=4' )
 elif compressor == 'dfl2' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=22' )
+    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=22' )
 elif compressor == 'mp3' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=18' )
+    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=18' )
 elif compressor == 'zfp' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=5' )
-    # env.Append( CPPDEFINES = 'HLR_HAS_ZFP' )
-    # env.Append( CPPPATH    = os.path.join( ZFP_DIR, 'include' ) )
-    # env.Append( LIBPATH    = os.path.join( ZFP_DIR, 'lib' ) )
-    # env.Append( LIBS       = [ 'zfp' ] )
+    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=5' )
 elif compressor == 'sz'   :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=6' )
+    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=6' )
     env.Append( CPPDEFINES = 'HLR_HAS_SZ' )
     env.Append( CPPPATH    = os.path.join( SZ_DIR, 'include' ) )
     env.Append( LIBPATH    = os.path.join( SZ_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'SZ' ] )
 elif compressor == 'sz3'  :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=7' )
+    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=7' )
     env.Append( CPPDEFINES = 'HLR_HAS_SZ3' )
     env.Append( CPPPATH    = os.path.join( SZ3_DIR, 'include' ) )
     env.Append( LIBPATH    = os.path.join( SZ3_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'zstd' ] )
 elif compressor == 'mgard' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=8' )
+    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=8' )
     env.Append( CPPDEFINES = 'HLR_HAS_MGARD' )
     env.Append( CPPPATH    = os.path.join( MGARD_DIR, 'include' ) )
     env.Append( LIBPATH    = os.path.join( MGARD_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'mgard' ] )
+elif compressor == 'posits' :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=12' )
+    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=12' )
+    env.Append( CPPDEFINES = 'HLR_HAS_UNIVERSAL' )
+    env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
+elif compressor == 'cfloat' :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=20' )
+    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=20' )
+    env.Append( CPPDEFINES = 'HLR_HAS_UNIVERSAL' )
+    env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
+elif compressor == 'blosc' :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=21' )
+    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=21' )
+    env.Append( CPPDEFINES = 'HLR_HAS_BLOSC' )
+    env.Append( CPPPATH    = os.path.join( BLOSC_DIR, 'include' ) )
+    env.Append( LIBPATH    = os.path.join( BLOSC_DIR, 'lib' ) )
+    env.Append( LIBS       = [ 'blosc2' ] )
+elif compressor == 'fp32' :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=13' )
+    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=0' )
 # elif compressor == 'lz4' :
 #     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=9' )
 #     env.Append( CPPDEFINES = 'HLR_HAS_LZ4' )
@@ -775,22 +802,6 @@ elif compressor == 'mgard' :
 #     env.Append( CPPPATH    = os.path.join( ZSTD_DIR, 'include' ) )
 #     env.Append( LIBPATH    = os.path.join( ZSTD_DIR, 'lib' ) )
 #     env.Append( LIBS       = [ 'zstd' ] )
-elif compressor == 'posits' :
-    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=12' )
-    env.Append( CPPDEFINES = 'HLR_HAS_UNIVERSAL' )
-    env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
-elif compressor == 'cfloat' :
-    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=20' )
-    env.Append( CPPDEFINES = 'HLR_HAS_UNIVERSAL' )
-    env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
-elif compressor == 'blosc' :
-    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=21' )
-    env.Append( CPPDEFINES = 'HLR_HAS_BLOSC' )
-    env.Append( CPPPATH    = os.path.join( BLOSC_DIR, 'include' ) )
-    env.Append( LIBPATH    = os.path.join( BLOSC_DIR, 'lib' ) )
-    env.Append( LIBS       = [ 'blosc2' ] )
-elif compressor == 'fp32' :
-    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=13' )
 # elif compressor == 'fp16' :
 #     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=14' )
 # elif compressor == 'bf16' :
@@ -800,77 +811,77 @@ elif compressor == 'fp32' :
 # elif compressor == 'bf24' :
 #     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=17' )
 
-if valr == 'default'  :
-    if   compressor == 'none'   : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=0' )
-    elif compressor == 'afl'    : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=1' )
-    elif compressor == 'aflp'   : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=2' )
-    elif compressor == 'sfl'    : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=3' )
-    elif compressor == 'dfl'    : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=4' )
-    elif compressor == 'dfl2'   : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=22' )
-    elif compressor == 'mp3'    : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=18' )
-    elif compressor == 'zfp'    : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=5' )
-    elif compressor == 'sz'     : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=6' )
-    elif compressor == 'sz3'    : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=7' )
-    elif compressor == 'mgard'  : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=8' )
-    elif compressor == 'posits' : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=12' )
-    elif compressor == 'cfloat' : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=20' )
-    elif compressor == 'blosc'  : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=21' )
-    else :
-        env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=0' )
-elif valr == 'none'  :
-    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=0' )
-elif valr == 'afl'  :
-    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=1' )
-elif valr == 'aflp' :
-    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=2' )
-elif valr == 'sfl'  :
-    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=3' )
-elif valr == 'dfl'  :
-    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=4' )
-elif valr == 'dfl2'  :
-    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=22' )
-elif valr == 'zfp'  :
-    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=5' )
-    env.Append( CPPDEFINES = 'HLR_HAS_ZFP' )
-    env.Append( CPPPATH    = os.path.join( ZFP_DIR, 'include' ) )
-    env.Append( LIBPATH    = os.path.join( ZFP_DIR, 'lib' ) )
-    env.Append( LIBS       = [ 'zfp' ] )
-elif valr == 'sz'      :
-    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=6' )
-    env.Append( CPPDEFINES = 'HLR_HAS_SZ' )
-    env.Append( CPPPATH    = os.path.join( SZ_DIR, 'include' ) )
-    env.Append( LIBPATH    = os.path.join( SZ_DIR, 'lib' ) )
-    env.Append( LIBS       = [ 'SZ' ] )
-elif valr == 'sz3'     :
-    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=7' )
-    env.Append( CPPDEFINES = 'HLR_HAS_SZ3' )
-    env.Append( CPPPATH    = os.path.join( SZ3_DIR, 'include' ) )
-    env.Append( LIBPATH    = os.path.join( SZ3_DIR, 'lib' ) )
-    env.Append( LIBS       = [ 'zstd' ] )
-elif valr == 'mgard'   :
-    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=8' )
-    env.Append( CPPDEFINES = 'HLR_HAS_MGARD' )
-    env.Append( CPPPATH    = os.path.join( MGARD_DIR, 'include' ) )
-    env.Append( LIBPATH    = os.path.join( MGARD_DIR, 'lib' ) )
-    env.Append( LIBS       = [ 'mgard' ] )
-elif valr == 'posits'   :
-    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=12' )
-    env.Append( CPPDEFINES = 'HLR_HAS_UNIVERSAL' )
-    env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
-elif valr == 'cfloat'   :
-    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=20' )
-    env.Append( CPPDEFINES = 'HLR_HAS_UNIVERSAL' )
-    env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
-elif valr == 'mp3'  :
-    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=18' )
-# elif valr == 'mp2'  :
-#     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=19' )
-elif valr == 'blosc'   :
-    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=20' )
-    env.Append( CPPDEFINES = 'HLR_HAS_BLOSC' )
-    env.Append( CPPPATH    = os.path.join( BLOSC_DIR, 'include' ) )
-    env.Append( LIBPATH    = os.path.join( BLOSC_DIR, 'lib' ) )
-    env.Append( LIBS       = [ 'blosc2' ] )
+# if valr == 'default'  :
+#     if   compressor == 'none'   : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=0' )
+#     elif compressor == 'afl'    : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=1' )
+#     elif compressor == 'aflp'   : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=2' )
+#     elif compressor == 'sfl'    : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=3' )
+#     elif compressor == 'dfl'    : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=4' )
+#     elif compressor == 'dfl2'   : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=22' )
+#     elif compressor == 'mp3'    : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=18' )
+#     elif compressor == 'zfp'    : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=5' )
+#     elif compressor == 'sz'     : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=6' )
+#     elif compressor == 'sz3'    : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=7' )
+#     elif compressor == 'mgard'  : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=8' )
+#     elif compressor == 'posits' : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=12' )
+#     elif compressor == 'cfloat' : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=20' )
+#     elif compressor == 'blosc'  : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=21' )
+#     else :
+#         env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=0' )
+# elif valr == 'none'  :
+#     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=0' )
+# elif valr == 'afl'  :
+#     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=1' )
+# elif valr == 'aflp' :
+#     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=2' )
+# elif valr == 'sfl'  :
+#     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=3' )
+# elif valr == 'dfl'  :
+#     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=4' )
+# elif valr == 'dfl2'  :
+#     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=22' )
+# elif valr == 'zfp'  :
+#     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=5' )
+#     env.Append( CPPDEFINES = 'HLR_HAS_ZFP' )
+#     env.Append( CPPPATH    = os.path.join( ZFP_DIR, 'include' ) )
+#     env.Append( LIBPATH    = os.path.join( ZFP_DIR, 'lib' ) )
+#     env.Append( LIBS       = [ 'zfp' ] )
+# elif valr == 'sz'      :
+#     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=6' )
+#     env.Append( CPPDEFINES = 'HLR_HAS_SZ' )
+#     env.Append( CPPPATH    = os.path.join( SZ_DIR, 'include' ) )
+#     env.Append( LIBPATH    = os.path.join( SZ_DIR, 'lib' ) )
+#     env.Append( LIBS       = [ 'SZ' ] )
+# elif valr == 'sz3'     :
+#     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=7' )
+#     env.Append( CPPDEFINES = 'HLR_HAS_SZ3' )
+#     env.Append( CPPPATH    = os.path.join( SZ3_DIR, 'include' ) )
+#     env.Append( LIBPATH    = os.path.join( SZ3_DIR, 'lib' ) )
+#     env.Append( LIBS       = [ 'zstd' ] )
+# elif valr == 'mgard'   :
+#     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=8' )
+#     env.Append( CPPDEFINES = 'HLR_HAS_MGARD' )
+#     env.Append( CPPPATH    = os.path.join( MGARD_DIR, 'include' ) )
+#     env.Append( LIBPATH    = os.path.join( MGARD_DIR, 'lib' ) )
+#     env.Append( LIBS       = [ 'mgard' ] )
+# elif valr == 'posits'   :
+#     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=12' )
+#     env.Append( CPPDEFINES = 'HLR_HAS_UNIVERSAL' )
+#     env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
+# elif valr == 'cfloat'   :
+#     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=20' )
+#     env.Append( CPPDEFINES = 'HLR_HAS_UNIVERSAL' )
+#     env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
+# elif valr == 'mp3'  :
+#     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=18' )
+# # elif valr == 'mp2'  :
+# #     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=19' )
+# elif valr == 'blosc'   :
+#     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=20' )
+#     env.Append( CPPDEFINES = 'HLR_HAS_BLOSC' )
+#     env.Append( CPPPATH    = os.path.join( BLOSC_DIR, 'include' ) )
+#     env.Append( LIBPATH    = os.path.join( BLOSC_DIR, 'lib' ) )
+#     env.Append( LIBS       = [ 'blosc2' ] )
 
 if zblas :
     env.Append( CPPDEFINES = 'HLR_USE_ZBLAS=1' )
@@ -959,7 +970,7 @@ def show_help ( target, source, env ):
     print( '  {0}tcmalloc_dir{1} │ path to tcmalloc              │'.format( colors['bold'], colors['reset'] ) )
     print( ' ──────────────┼───────────────────────────────┼──────────' )
     print( '  {0}compressor{1}   │ compression method to use     │ {2}'.format( colors['bold'], colors['reset'], ', '.join( COMPRESSORS ) ) )
-    print( '  {0}valr{1}         │ AP compression method to use  │ {2}'.format( colors['bold'], colors['reset'], ', '.join( VALR_COMPRESSORS ) ) )
+    # print( '  {0}valr{1}         │ AP compression method to use  │ {2}'.format( colors['bold'], colors['reset'], ', '.join( VALR_COMPRESSORS ) ) )
     print( '  {0}zblas{1}        │ use compressed BLAS           │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( ' ──────────────┼───────────────────────────────┼──────────' )
     print( '  {0}zfp{1}          │ use ZFP library               │'.format( colors['bold'], colors['reset'] ), '0/1' )
@@ -1048,7 +1059,7 @@ def show_options ( target, source, env ):
     print( '  {0}likwid{1}       │ use LikWid library            │ {2}'.format( colors['bold'], colors['reset'], bool_str[ likwid ] ),     pathstr( LIKWID_DIR    if likwid    else '' ) )
     print( ' ──────────────┼───────────────────────────────┼──────────' )
     print( '  {0}compressor{1}   │ compression method to use     │ {2}'.format( colors['bold'], colors['reset'], compressor ) )
-    print( '  {0}valr{1}         │ AP compression method to use  │ {2}'.format( colors['bold'], colors['reset'], valr ) )
+    # print( '  {0}valr{1}         │ AP compression method to use  │ {2}'.format( colors['bold'], colors['reset'], valr ) )
     print( '  {0}zblas{1}        │ use compressed BLAS           │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zblas ] ) )
     print( ' ──────────────┼───────────────────────────────┼──────────' )
     print( '  {0}zfp{1}          │ use ZFP compression library   │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zfp ] ),        pathstr( ZFP_DIR       if zfp       else '' ) )
