@@ -1253,6 +1253,49 @@ prod_diag ( const vector_t &  D,
 
 using Hpro::BLAS::prod_diag;
 
+//
+// compute Khatri-Rao product C ≔ A⊙B
+//
+template < matrix_type matrixA_t,
+           matrix_type matrixB_t >
+requires ( std::convertible_to< value_type_t< matrixA_t >, value_type_t< matrixB_t > > )
+blas::matrix< value_type_t< matrixA_t > >
+khatri_rao ( const matrixA_t &  A,
+             const matrixB_t &  B )
+{
+    HLR_DBG_ASSERT( A.ncols() == B.ncols() );
+    
+    using  value_t = value_type_t< matrixA_t >;
+
+    const auto  nrows_A = A.nrows();
+    const auto  nrows_B = B.nrows();
+    const auto  ncols   = A.ncols();
+
+    const auto  nrows_C = nrows_A * nrows_B;
+
+    auto  C = blas::matrix< value_t >( nrows_C, ncols );
+    
+    for ( Hpro::idx_t  j = 0; j < ncols; ++j )
+    {
+        auto  a_j = A.column( j );
+        auto  b_j = B.column( j );
+        auto  c_j = C.column( j );
+
+        Hpro::idx_t  idx_c = 0;
+        
+        for ( Hpro::idx_t  i = 0; i < nrows_A; ++i, idx_c += nrows_B )
+        {
+            auto  a_ij = a_j(i);
+            auto  c_ij = c_j( blas::range( idx_c, idx_c + nrows_B - 1 ) );
+
+            blas::copy(   b_j, c_ij );
+            blas::scale( a_ij, c_ij );
+        }// for
+    }// for
+
+    return C;
+}
+
 //////////////////////////////////////////////////////////////////////
 //
 // functions related to QR factorization
