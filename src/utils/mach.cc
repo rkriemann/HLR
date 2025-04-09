@@ -180,7 +180,7 @@ cpu ()
     char    cpu_brand[128];
     size_t  len = sizeof( cpu_brand );
     
-    if ( sysctlbyname( "machdep.cpu.brand_string", cpu_brand, &len, NULL, 0 ); != 0 )
+    if ( sysctlbyname( "machdep.cpu.brand_string", cpu_brand, &len, NULL, 0 ) != 0 )
         return " (unknown)";
 
     return cpu_brand;
