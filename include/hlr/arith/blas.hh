@@ -1253,6 +1253,23 @@ prod_diag ( const vector_t &  D,
 
 using Hpro::BLAS::prod_diag;
 
+template < matrix_type matrixA_t,
+           matrix_type matrixB_t >
+requires ( std::convertible_to< value_type_t< matrixA_t >, value_type_t< matrixB_t > > )
+blas::matrix< value_type_t< matrixA_t > >
+hadamard ( const matrixA_t &  A,
+           const matrixB_t &  B )
+{ 
+    HLR_ASSERT( A.nrows() == B.nrows() );
+    HLR_ASSERT( A.ncols() == B.ncols() );
+          
+    auto  C = blas::copy( B );
+
+    hadamard_prod( A, C );
+
+    return C;
+}   
+
 //
 // compute Khatri-Rao product C ≔ A⊙B
 //
