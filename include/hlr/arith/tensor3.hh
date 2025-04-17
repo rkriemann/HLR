@@ -435,6 +435,37 @@ copy ( const tensor3< value_t > &  t )
 }
 
 //
+// fill tensor with sequentially increasing values starting with 1
+// order is lexicographic i0 < i1 < i2
+//
+template < typename value_t >
+void
+fill ( const value_t         f,
+       tensor3< value_t > &  t )
+{
+    for ( size_t  i2 = 0; i2 < t.size(2); ++i2 )
+        for ( size_t  i1 = 0; i1 < t.size(1); ++i1 )
+            for ( size_t  i0 = 0; i0 < t.size(0); ++i0 )
+                t(i0,i1,i2) = f;
+}
+
+//
+// fill tensor with sequentially increasing values starting with 1
+// order is lexicographic i0 < i1 < i2
+//
+template < typename value_t >
+void
+fill_iota ( tensor3< value_t > &  t )
+{
+    auto  val = value_t(1);
+    
+    for ( size_t  i2 = 0; i2 < t.size(2); ++i2 )
+        for ( size_t  i1 = 0; i1 < t.size(1); ++i1 )
+            for ( size_t  i0 = 0; i0 < t.size(0); ++i0 )
+                t(i0,i1,i2) = val++;
+}
+
+//
 // print tensor to (standard) output
 //
 template < typename value_t >
