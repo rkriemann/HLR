@@ -717,6 +717,8 @@ HLR_BLAS_NORMI( std::complex< float >,  clange_ )
 HLR_BLAS_NORMI( std::complex< double >, zlange_ )
 #undef HLR_BLAS_NORMI
 
+using Hpro::BLAS::norm_inf;
+
 #define  HLR_BLAS_NORMM( type, func )                                   \
     inline                                                              \
     typename Hpro::real_type_t< type >                                  \
