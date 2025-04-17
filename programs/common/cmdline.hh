@@ -330,6 +330,7 @@ parse ( int argc, char ** argv )
                   << "  - sthosvd : sequentially truncated HOSVD" << std::endl
                   << "  - ghosvd  : greedy HOSVD" << std::endl
                   << "  - hhosvd  : hierarchical HOSVD" << std::endl
+                  << "  - hooi    : higher order orthogonal iteration (Tucker-ALS)" << std::endl
                   << "  - tcafull : full tensor cross approximation" << std::endl
                   << "  - default : use default approximation (HHOSVD)" << std::endl;
 
@@ -440,8 +441,14 @@ parse ( int argc, char ** argv )
         HLR_ERROR( "unknown arithmetic LR approximation : " + aapprox );
 
     for ( auto &  entry : split( cmdline::tapprox, "," ) )
-        if ( ! ( ( entry == "hosvd"  ) || ( entry == "sthosvd" ) || ( entry == "ghosvd" ) ||
-                 ( entry == "hhosvd" ) || ( entry == "tcafull" ) || ( entry == "default" ) ) )
+        if ( ! ( ( entry == "hosvd"   ) ||
+                 ( entry == "sthosvd" ) ||
+                 ( entry == "ghosvd"  ) ||
+                 ( entry == "hhosvd"  ) ||
+                 ( entry == "hooi"    ) ||
+                 ( entry == "tcafull" ) ||
+                 ( entry == "als"     ) ||
+                 ( entry == "default" ) ) )
             HLR_ERROR( "unknown tensor approximation : " + entry );
 
     // for ( auto &  a : arith )
