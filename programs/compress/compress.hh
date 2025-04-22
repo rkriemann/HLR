@@ -361,8 +361,7 @@ program_main ()
         {
             tic = timer::now();
     
-            seq::matrix::compress( *zA, lacc );
-            // impl::matrix::compress( *zA, lacc );
+            impl::matrix::compress( *zA, lacc );
 
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
@@ -415,8 +414,7 @@ program_main ()
         {
             tic = timer::now();
     
-            // impl::matrix::decompress( *zB );
-            seq::matrix::decompress( *zB );
+            impl::matrix::decompress( *zB );
             
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
@@ -445,7 +443,7 @@ program_main ()
     //
     //////////////////////////////////////////////////////////////////////
 
-    if ( true )
+    if ( false )
     {
         using  single_t = math::decrease_precision_t< value_t >;
             

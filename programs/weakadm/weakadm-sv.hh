@@ -29,9 +29,9 @@ struct radial_kernel
     double operator () ( const double *  x,
                          const double *  y ) const
     {
-        const auto  r = math::sqrt( math::abs2(x[0] - y[0]) +
-                                    math::abs2(x[1] - y[1]) +
-                                    math::abs2(x[2] - y[2]) );
+        const auto  r = math::sqrt( math::square(x[0] - y[0]) +
+                                    math::square(x[1] - y[1]) +
+                                    math::square(x[2] - y[2]) );
 
         return  (*radialfn)( r );
     }
@@ -164,19 +164,23 @@ program_main ()
                 C0(0,pos) = X(i);
                 C0(1,pos) = X(j);
                 C0(2,pos) = X(k);
-                     
+
+                // shared face
                 C1(0,pos) = X(i) + 1.0;
                 C1(1,pos) = X(j);
                 C1(2,pos) = X(k);
-                     
+
+                // shared edge
                 C2(0,pos) = X(i) + 1.0;
                 C2(1,pos) = X(j) + 1.0;
                 C2(2,pos) = X(k);
-                     
+
+                // shared vertex
                 C3(0,pos) = X(i) + 1.0;
                 C3(1,pos) = X(j) + 1.0;
                 C3(2,pos) = X(k) + 1.0;
-                     
+
+                // dist = diam (strong adm.)
                 C4(0,pos) = X(i) + 2.0;
                 C4(1,pos) = X(j);
                 C4(2,pos) = X(k);
@@ -198,16 +202,6 @@ program_main ()
     
     tic = timer::now();
 
-    auto  logr      = matrix::log_function< value_t >();
-    auto  newton    = matrix::newton_function< value_t >();
-    auto  exp       = matrix::exponential_function< value_t >( value_t(1) );
-    auto  gaussian  = matrix::gaussian_function< value_t >( value_t(1) );
-    auto  mquadric  = matrix::multiquadric_function< value_t >( value_t(1) );
-    auto  imquadric = matrix::inverse_multiquadric_function< value_t >( value_t(1) );
-    auto  tps       = matrix::thin_plate_spline_function< value_t >( value_t(1) );
-    auto  ratquad   = matrix::rational_quadratic_function< value_t >( value_t(1), value_t(1) );
-    auto  matcov    = matrix::matern_covariance_function< value_t >( value_t(1), value_t(1.0/3.0), value_t(1) );
-
     auto  M0 = blas::matrix< value_t >();
     auto  M1 = blas::matrix< value_t >();
     auto  M2 = blas::matrix< value_t >();
@@ -216,55 +210,64 @@ program_main ()
 
     if ( cmdline::kernel == "log" )
     {
-        auto  kernel = radial_kernel( logr );
+        auto  fn     = matrix::log_function< value_t >();
+        auto  kernel = radial_kernel( fn );
         
         std::tie( M0, M1, M2, M3, M4 ) = build_blocks( kernel, n3, C0, C1, C2, C3, C4 );
     }// if
     else if ( cmdline::kernel == "newton" )
     {
-        auto  kernel = radial_kernel( newton );
+        auto  fn     = matrix::newton_function< value_t >();
+        auto  kernel = radial_kernel( fn );
         
         std::tie( M0, M1, M2, M3, M4 ) = build_blocks( kernel, n3, C0, C1, C2, C3, C4 );
     }// if
     else if ( cmdline::kernel == "exp" )
     {
-        auto  kernel = radial_kernel( exp );
+        auto  fn     = matrix::exponential_function< value_t >( value_t(1) );
+        auto  kernel = radial_kernel( fn );
         
         std::tie( M0, M1, M2, M3, M4 ) = build_blocks( kernel, n3, C0, C1, C2, C3, C4 );
     }// if
     else if ( cmdline::kernel == "gaussian" )
     {
-        auto  kernel = radial_kernel( gaussian );
+        auto  fn     = matrix::gaussian_function< value_t >( value_t(1) );
+        auto  kernel = radial_kernel( fn );
         
         std::tie( M0, M1, M2, M3, M4 ) = build_blocks( kernel, n3, C0, C1, C2, C3, C4 );
     }// if
     else if ( cmdline::kernel == "mquadric" )
     {
-        auto  kernel = radial_kernel( mquadric );
+        auto  fn     = matrix::multiquadric_function< value_t >( value_t(1) );
+        auto  kernel = radial_kernel( fn );
         
         std::tie( M0, M1, M2, M3, M4 ) = build_blocks( kernel, n3, C0, C1, C2, C3, C4 );
     }// if
     else if ( cmdline::kernel == "imquadric" )
     {
-        auto  kernel = radial_kernel( imquadric );
+        auto  fn     = matrix::inverse_multiquadric_function< value_t >( value_t(1) );
+        auto  kernel = radial_kernel( fn );
         
         std::tie( M0, M1, M2, M3, M4 ) = build_blocks( kernel, n3, C0, C1, C2, C3, C4 );
     }// if
     else if ( cmdline::kernel == "tps" )
     {
-        auto  kernel = radial_kernel( tps );
+        auto  fn     = matrix::thin_plate_spline_function< value_t >( value_t(1) );
+        auto  kernel = radial_kernel( fn );
         
         std::tie( M0, M1, M2, M3, M4 ) = build_blocks( kernel, n3, C0, C1, C2, C3, C4 );
     }// if
     else if ( cmdline::kernel == "ratquad" )
     {
-        auto  kernel = radial_kernel( ratquad );
+        auto  fn     = matrix::rational_quadratic_function< value_t >( value_t(1), value_t(1) );
+        auto  kernel = radial_kernel( fn );
         
         std::tie( M0, M1, M2, M3, M4 ) = build_blocks( kernel, n3, C0, C1, C2, C3, C4 );
     }// if
     else if ( cmdline::kernel == "matcov" )
     {
-        auto  kernel = radial_kernel( matcov );
+        auto  fn     = matrix::matern_covariance_function< value_t >( value_t(1), value_t(1.0/3.0), value_t(1) );
+        auto  kernel = radial_kernel( fn );
         
         std::tie( M0, M1, M2, M3, M4 ) = build_blocks( kernel, n3, C0, C1, C2, C3, C4 );
     }// if

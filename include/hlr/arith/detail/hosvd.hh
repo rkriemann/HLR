@@ -708,6 +708,79 @@ tca_full ( const blas::tensor3< value_t > &  O,
     return { std::move( H ), std::move( Y0 ), std::move( Y1 ), std::move( Y2 ) };
 }
 
+//
+// higher order orthogonal iteration (ALS for Tucker)
+//
+template < typename                    value_t,
+           approx::approximation_type  approx_t >
+std::tuple< tensor3< value_t >,
+            matrix< value_t >,
+            matrix< value_t >,
+            matrix< value_t > >
+hooi ( const tensor3< value_t > &  X,
+       const accuracy &            acc,
+       const approx_t &            apx )
+{
+    auto  [ G, U0, U1, U2 ] = sthosvd( X, acc, apx );
+
+    auto  norm_X = norm_F( X );
+    auto  norm_G = norm_F( G );
+    auto  tol    = acc.rel_eps() * norm_X;
+
+    std::cout << "start: " << norm_X << " / " << norm_G << " / " << (norm_X - norm_G ) / norm_X << std::endl;
+    
+    do
+    {
+        //
+        // update mode bases
+        //
+
+        auto  Y = tensor3< value_t >();
+        
+        {
+            auto  T = tensor_product( X,  adjoint( U1 ), 1 );
+
+            Y = tensor_product( T, adjoint( U2 ), 2 );
+            
+            auto  Y0 = Y.unfold( 0 );
+
+            U0 = apx.column_basis( Y0, acc );
+        }
+                             
+        {
+            auto  T = tensor_product( X,  adjoint( U0 ), 0 );
+            
+            Y = tensor_product( T, adjoint( U2 ), 2 );
+            
+            auto  Y1 = Y.unfold( 1 );
+
+            U1 = apx.column_basis( Y1, acc );
+        }
+                             
+        {
+            auto  T = tensor_product( X,  adjoint( U0 ), 0 );
+
+            Y = tensor_product( T, adjoint( U1 ), 1 );
+            
+            auto  Y2 = Y.unfold( 2 );
+
+            U2 = apx.column_basis( Y2, acc );
+        }
+
+        //
+        // update core tensor
+        // (use Y from last mode basis computation)
+        //
+
+        G      = tensor_product( Y, adjoint( U2 ), 2 );
+        norm_G = blas::norm_F( G );
+
+        std::cout << "it: " << norm_X << " / " << norm_G << " / " << (norm_X - norm_G ) / norm_X << std::endl;
+    } while ( norm_G <= tol );
+
+    return  { std::move( G ), std::move( U0 ), std::move( U1 ), std::move( U2 ) };
+}
+
 }}// namespace hlr::blas
 
 #endif // __HLR_BLAS_DETAIL_HOSVD_HH
