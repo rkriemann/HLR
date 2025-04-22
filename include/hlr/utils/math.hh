@@ -78,9 +78,9 @@ using decrease_precision_t = typename decrease_precision< value_t >::type_t;
 //
 
 auto square ( const auto  val ) { return val*val; }
-auto abs2   ( const auto  val ) { return square( abs( val ) ); }
+auto sqabs  ( const auto  val ) { return square( abs( val ) ); }
 
-auto isqrt3 ( const auto  val ) {
+auto icbrt ( const auto  val ) {
     auto  v = 1;
 
     while ( v*v*v < val )

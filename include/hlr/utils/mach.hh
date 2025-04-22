@@ -16,7 +16,7 @@ namespace hlr { namespace mach
 //
 // return info about associated CPU cores 
 //
-std::string  cpuset   ();
+std::string  cpuset ();
 
 //
 // return CPU name

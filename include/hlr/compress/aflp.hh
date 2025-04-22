@@ -18,7 +18,7 @@
 // signal availability of compressed BLAS
 //
 #define HLR_HAS_ZBLAS_DIRECT
-#define HLR_HAS_ZBLAS_APLR
+#define HLR_HAS_ZBLAS_VALR
 
 ////////////////////////////////////////////////////////////
 //
@@ -133,7 +133,7 @@ void
 compress ( const float *  data,
            const size_t   nsize,
            byte_t *       zdata,
-           const float    scale,
+           float          scale,
            const uint8_t  exp_bits,
            const uint8_t  prec_bits )
 {
@@ -153,6 +153,8 @@ compress ( const float *  data,
     zdata[1] = prec_bits;
     memcpy( zdata + FP32::scale_ofs, & scale, sizeof(scale) );
 
+    scale = 1.f / scale;
+    
     //
     // compress data in "vectorized" form
     //
@@ -182,7 +184,7 @@ compress ( const float *  data,
 
             zero[j] = ( aval == float(0) );
             sign[j] = ( aval != val );
-            fbuf[j] = aval / scale + 1.f;
+            fbuf[j] = aval * scale + 1.f;
 
             HLR_DBG_ASSERT( fbuf[j] >= float(2) );
         }// for
@@ -226,7 +228,7 @@ compress ( const float *  data,
         if ( std::abs( val ) != float(0) )
         {
             const bool      zsign = ( val < 0 );
-            const float     sval  = std::abs(val) / scale + 1.f;
+            const float     sval  = std::abs(val) * scale + 1.f;
             
             HLR_DBG_ASSERT( sval >= float(2) );
             
@@ -369,7 +371,7 @@ void
 compress ( const double *  data,  // points to actual start of buffer
            const size_t    nsize,
            byte_t *        zdata,
-           const double    scale,
+           double          scale,
            const uint8_t   exp_bits,
            const uint8_t   prec_bits )
 {
@@ -387,6 +389,8 @@ compress ( const double *  data,  // points to actual start of buffer
     zdata[1] = prec_bits;
     memcpy( zdata + FP64::scale_ofs, & scale, sizeof(scale) );
 
+    scale = 1.0 / scale;
+    
     //
     // in case of 8 byte, just copy data
     //
@@ -426,7 +430,7 @@ compress ( const double *  data,  // points to actual start of buffer
 
             zero[j] = ( aval == double(0) );
             sign[j] = ( aval != val );
-            fbuf[j] = aval / scale + 1.0;
+            fbuf[j] = aval * scale + 1.0;
 
             HLR_DBG_ASSERT( zero[j] || ( fbuf[j] >= double(2) ));
         }// for
@@ -474,7 +478,7 @@ compress ( const double *  data,  // points to actual start of buffer
         if ( std::abs( val ) != double(0) )
         {
             const bool      zsign = ( val < 0 );
-            const double    sval  = std::abs(val) / scale + 1.0;
+            const double    sval  = std::abs(val) * scale + 1.0;
             const uint64_t  isval = (*reinterpret_cast< const uint64_t * >( & sval ) );
             const uint64_t  sexp  = ( isval >> FP64::mant_bits ) & FP64::exp_mask;
             const uint64_t  smant = ( isval & FP64::mant_mask );
@@ -1250,7 +1254,6 @@ mulvec ( const size_t                        nrows,
             for ( size_t  j = 0; j < ncols; ++j )
             {
                 const auto  x_j = scale * x[j];
-                fp64int_t   fival;
                 
                 // size_t      i   = 0;
 
@@ -1282,18 +1285,16 @@ mulvec ( const size_t                        nrows,
 
                     if ( z_ij != zero_val )
                     {
-                        const uint64_t  mant = z_ij & prec_mask;
-                        const uint64_t  exp  = (z_ij >> prec_bits) & exp_mask;
-                        const uint64_t  sign = (z_ij >> sign_shift) << FP64::sign_bit;
-
-                        fival.u  = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs);
+                        const uint64_t  mant  = z_ij & prec_mask;
+                        const uint64_t  exp   = (z_ij >> prec_bits) & exp_mask;
+                        const uint64_t  sign  = (z_ij >> sign_shift) << FP64::sign_bit;
+                        fp64int_t       fival = { ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
+                        
                         fival.f  = ( fival.f - 1.0 );
                         fival.u |= sign;
+
+                        y[i] += fival.f * x_j;
                     }// if
-                    else
-                        fival.f = double(0);
-                    
-                    y[i] += fival.f * x_j;
                 }// for
             }// for
         }// case
@@ -1306,7 +1307,6 @@ mulvec ( const size_t                        nrows,
             for ( size_t  j = 0; j < ncols; ++j )
             {
                 value_t    y_j = value_t(0);
-                fp64int_t  fival;
                 // size_t   i   = 0;
 
                 // for ( ; i < nrows_buf; i += nbuf, pos += nbuf )
@@ -1339,15 +1339,13 @@ mulvec ( const size_t                        nrows,
                         const uint64_t  mant = z_ij & prec_mask;
                         const uint64_t  exp  = (z_ij >> prec_bits) & exp_mask;
                         const uint64_t  sign = (z_ij >> sign_shift) << FP64::sign_bit;
-                        
-                        fival.u  = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs);
+                        fp64int_t       fival = { ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
+
                         fival.f  = ( fival.f - 1.0 );
                         fival.u |= sign;
+
+                        y_j += fival.f * x[i];
                     }// if
-                    else
-                        fival.f = double(0);
-                    
-                    y_j += fival.f * x[i];
                 }// for
 
                 y[j] += scale * y_j;

@@ -649,58 +649,127 @@ mul_vec_cl ( const value_t                             alpha,
 
         if ( ! cm.R.empty() )
         {
+            //
+            // look for what lr format is used
+            //
+                
+            bool  has_lr   = false;
+            bool  has_lrsv = false;
+        
+            for ( auto  M : cm.R )
+            {
+                if      ( matrix::is_lowrank(    M ) ) has_lr   = true;
+                else if ( matrix::is_lowrank_sv( M ) ) has_lrsv = true;
+            }// for
+
+            if ( has_lr && has_lrsv )
+                HLR_ERROR( "only either lrmatrix or lrsvmatrix supported" );
+
             if ( cm.compressed )
             {
                 const auto  k   = cm.S.length();
                 auto        t   = blas::vector< value_t >( k );
                 uint        pos = 0;
-            
-                for ( auto  M : cm.R )
+
+                //
+                // apply V
+                //
+
+                if ( has_lr )
                 {
-                    auto  R   = cptrcast( M, matrix::lrsvmatrix< value_t > );
-                    auto  k_i = R->rank();
-                    auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
-                    auto  t_i = blas::vector< value_t >( t, blas::range( pos, pos + k_i - 1 )  );
+                    for ( auto  M : cm.R )
+                    {
+                        auto  R   = cptrcast( M, matrix::lrmatrix< value_t > );
+                        auto  k_i = R->rank();
+                        auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
+                        auto  t_i = blas::vector< value_t >( t, blas::range( pos, pos + k_i - 1 )  );
                     
-                    #if defined(HLR_HAS_ZBLAS_VALR)
-                    if ( op_M == apply_normal )
-                        compress::valr::zblas::mulvec( R->ncols(), k_i, apply_adjoint, value_t(1), R->zV(), x_i.data(), t_i.data() );
-                    else
-                        compress::valr::zblas::mulvec( R->nrows(), k_i, apply_adjoint, value_t(1), R->zU(), x_i.data(), t_i.data() );
+                        #if defined(HLR_HAS_ZBLAS_DIRECT)
+                        if ( op_M == apply_normal )
+                            compress::zblas::mulvec( R->ncols(), k_i, apply_adjoint, value_t(1), R->zV(), x_i.data(), t_i.data() );
+                        else
+                            compress::zblas::mulvec( R->nrows(), k_i, apply_adjoint, value_t(1), R->zU(), x_i.data(), t_i.data() );
+                        #else
+                        HLR_ERROR( "TODO" );
+                        #endif
+
+                        pos += k_i;
+                    }// for
+
+                    #if defined(HLR_HAS_ZBLAS_DIRECT)
+                    compress::zblas::mulvec( yt.length(), k, apply_normal, value_t(1), cm.zU, t.data(), yt.data() );
                     #else
                     HLR_ERROR( "TODO" );
                     #endif
+                }// if
+                else if ( has_lrsv )
+                {
+                    for ( auto  M : cm.R )
+                    {
+                        auto  R   = cptrcast( M, matrix::lrsvmatrix< value_t > );
+                        auto  k_i = R->rank();
+                        auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
+                        auto  t_i = blas::vector< value_t >( t, blas::range( pos, pos + k_i - 1 )  );
+                    
+                        #if defined(HLR_HAS_ZBLAS_VALR)
+                        if ( op_M == apply_normal )
+                            compress::valr::zblas::mulvec( R->ncols(), k_i, apply_adjoint, value_t(1), R->zV(), x_i.data(), t_i.data() );
+                        else
+                            compress::valr::zblas::mulvec( R->nrows(), k_i, apply_adjoint, value_t(1), R->zU(), x_i.data(), t_i.data() );
+                        #else
+                        HLR_ERROR( "TODO" );
+                        #endif
 
-                    pos += k_i;
-                }// for
+                        pos += k_i;
+                    }// for
 
-                for ( uint  i = 0; i < k; ++i )
-                    t(i) *= cm.S(i);
+                    for ( uint  i = 0; i < k; ++i )
+                        t(i) *= cm.S(i);
 
-                #if defined(HLR_HAS_ZBLAS_VALR)
-                compress::valr::zblas::mulvec( yt.length(), k, apply_normal, value_t(1), cm.zU, t.data(), yt.data() );
-                #else
-                HLR_ERROR( "TODO" );
-                #endif
+                    #if defined(HLR_HAS_ZBLAS_VALR)
+                    compress::valr::zblas::mulvec( yt.length(), k, apply_normal, value_t(1), cm.zU, t.data(), yt.data() );
+                    #else
+                    HLR_ERROR( "TODO" );
+                    #endif
+                }// if
+                else
+                    HLR_ERROR( "no lr found" );
             }// if
             else
             {
                 auto  t   = blas::vector< value_t >( cm.U.ncols() );
                 uint  pos = 0;
             
-                for ( auto  M : cm.R )
+                if ( has_lr )
                 {
-                    HLR_ASSERT( matrix::is_lowrank_sv( M ) );
-                    
-                    auto  R   = cptrcast( M, matrix::lrsvmatrix< value_t > );
-                    auto  VR  = R->V( op_M );
-                    auto  k_i = R->rank();
-                    auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
-                    auto  t_i = blas::vector< value_t >( t, blas::range( pos, pos + k_i - 1 )  );
+                    for ( auto  M : cm.R )
+                    {
+                        auto  R   = cptrcast( M, matrix::lrmatrix< value_t > );
+                        auto  VR  = R->V( op_M );
+                        auto  k_i = R->rank();
+                        auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
+                        auto  t_i = blas::vector< value_t >( t, blas::range( pos, pos + k_i - 1 )  );
 
-                    blas::mulvec( blas::adjoint( VR ), x_i, t_i );
-                    pos += k_i;
-                }// for
+                        blas::mulvec( blas::adjoint( VR ), x_i, t_i );
+                        pos += k_i;
+                    }// for
+                }// if
+                else if ( has_lrsv )
+                {
+                    for ( auto  M : cm.R )
+                    {
+                        auto  R   = cptrcast( M, matrix::lrsvmatrix< value_t > );
+                        auto  VR  = R->V( op_M );
+                        auto  k_i = R->rank();
+                        auto  x_i = blas::vector< value_t >( blas::vec( x ), M->col_is( op_M ) - x.ofs() );
+                        auto  t_i = blas::vector< value_t >( t, blas::range( pos, pos + k_i - 1 )  );
+
+                        blas::mulvec( blas::adjoint( VR ), x_i, t_i );
+                        pos += k_i;
+                    }// for
+                }// if
+                else
+                    HLR_ERROR( "no lr found" );
 
                 blas::mulvec( value_t(1), cm.U, t, value_t(1), yt );
             }// else

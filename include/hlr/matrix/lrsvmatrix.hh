@@ -328,9 +328,9 @@ public:
         return _zU.size() > 0;
     }
 
-    // access multiprecision data
-    const compress::valr::zarray  zU () const { return _zU; }
-    const compress::valr::zarray  zV () const { return _zV; }
+    // access compressed data
+    const compress::valr::zarray &  zU () const { return _zU; }
+    const compress::valr::zarray &  zV () const { return _zV; }
     
     void  set_zlrmat  ( compress::valr::zarray &&  azU,
                         compress::valr::zarray &&  azV )

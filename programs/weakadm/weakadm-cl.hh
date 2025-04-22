@@ -18,11 +18,71 @@
 
 using namespace hlr;
 
+std::vector< Hpro::TPoint >
+make_vertices_nd ( const uint    dim,
+                   const size_t  nsize )
+{
+    using  point_t = Hpro::TPoint;
+    
+    auto          vertices = std::vector< Hpro::TPoint >();
+    const double  h        = 1.0 / double(nsize-1);
+    
+    if ( dim == 1 )
+    {
+        vertices.reserve( nsize );
+            
+        for ( size_t  i0 = 0; i0 < nsize; ++i0 )
+            vertices.push_back( Hpro::TPoint( i0*h ) );
+    }// if
+    else if ( dim == 2 )
+    {
+        vertices.reserve( nsize * nsize );
+            
+        for ( size_t  i1 = 0; i1 < nsize; ++i1 )
+            for ( size_t  i0 = 0; i0 < nsize; ++i0 )
+                vertices.push_back( Hpro::TPoint( i0*h, i1*h ) );
+    }// if
+    else if ( dim == 3 )
+    {
+        vertices.reserve( nsize * nsize * nsize );
+            
+        for ( size_t  i2 = 0; i2 < nsize; ++i2 )
+            for ( size_t  i1 = 0; i1 < nsize; ++i1 )
+                for ( size_t  i0 = 0; i0 < nsize; ++i0 )
+                    vertices.push_back( Hpro::TPoint( i0*h, i1*h, i2*h ) );
+    }// if
+    else if ( dim == 4 )
+    {
+        vertices.reserve( nsize * nsize * nsize * nsize );
+            
+        for ( size_t  i3 = 0; i3 < nsize; ++i3 )
+            for ( size_t  i2 = 0; i2 < nsize; ++i2 )
+                for ( size_t  i1 = 0; i1 < nsize; ++i1 )
+                    for ( size_t  i0 = 0; i0 < nsize; ++i0 )
+                        vertices.push_back( point_t( i0*h, i1*h, i2*h, i3*h ) );
+    }// if
+    else if ( dim == 5 )
+    {
+        vertices.reserve( nsize * nsize * nsize * nsize * nsize );
+            
+        for ( size_t  i4 = 0; i4 < nsize; ++i4 )
+            for ( size_t  i3 = 0; i3 < nsize; ++i3 )
+                for ( size_t  i2 = 0; i2 < nsize; ++i2 )
+                    for ( size_t  i1 = 0; i1 < nsize; ++i1 )
+                        for ( size_t  i0 = 0; i0 < nsize; ++i0 )
+                            vertices.push_back( point_t( i0*h, i1*h, i2*h, i3*h, i4*h ) );
+    }// if
+    else
+        HLR_ERROR( "unsupported dimension" );
+
+    return vertices;
+}
+
 //
 // determine number of blocks with face/edge/vertex/strong admissibility
 //
 size_t
-nadmblocks ( const uint              anooverlap,
+nadmblocks ( const uint              anoverlap,
              const cluster::block &  bc )
 {
     if ( bc.is_adm() )
@@ -33,42 +93,48 @@ nadmblocks ( const uint              anooverlap,
         if ( rowcl == colcl )
             return 0;
 
-        const uint  dim       = rowcl->bbox().min().dim();
-        uint        ndisjoint = 0;
+        const uint  dim      = rowcl->bbox().min().dim();
+        uint        noverlap = 0;
     
         const auto  rbbox = rowcl->bbox();
         const auto  cbbox = colcl->bbox();
         
         for ( uint  i = 0; i < dim; ++i )
         {
-            if (( rbbox.max()[i] <= cbbox.min()[i] ) ||   // ├── τ ──┼── σ ──┤
-                ( cbbox.max()[i] <= rbbox.min()[i] ))     // ├── σ ──┼── τ ──┤
-                ndisjoint++;
+            const auto  rmin   = rbbox.min()[i];
+            const auto  rmax   = rbbox.max()[i];
+            
+            const auto  cmin   = cbbox.min()[i];
+            const auto  cmax   = cbbox.max()[i];
+            
+            if (( rmax <= cmin ) ||   // ├── τ ──┤├── σ ──┤
+                ( cmax <= rmin ))     // ├── σ ──┤├── τ ──┤
+            {
+                // no overlap
+            }// if
+            else
+                noverlap++;
         }// for
 
-        if ( anooverlap <= dim )
+        // filter out strong adm.
+        if ( std::min( rbbox.diameter(), cbbox.diameter() ) <= ( 2.0 * rbbox.distance( cbbox ) ) )
         {
-            if ( std::min( rbbox.diameter(), cbbox.diameter() ) <= ( 2.0 * rbbox.distance( cbbox ) ) )
-                return 0;
-            else if ( ndisjoint == anooverlap )
+            if ( anoverlap == dim )// signals strong adm. is requested
                 return 1;
             else
                 return 0;
-        }// if
+        }//
+        else if ( noverlap == anoverlap ) // weak admissibility
+            return 1;
         else
-        {
-            if ( std::min( rbbox.diameter(), cbbox.diameter() ) <= ( 2.0 * rbbox.distance( cbbox ) ) )
-                return 1;
-            else
-                return 0;
-        }// else
+            return 0;
     }// if
     else
     {
         size_t  n = 0;
         
         for ( uint  i = 0; i < bc.nsons(); ++i )
-            n += nadmblocks( anooverlap, * bc.son(i) );
+            n += nadmblocks( anoverlap, * bc.son(i) );
 
         return n;
     }// else
@@ -89,12 +155,14 @@ program_main ()
     auto  toc     = timer::since( tic );
 
     //
-    // 3D coordinates
+    // ND coordinates
     //
 
-    auto  gridname = "tensorcube-" + Hpro::to_string( cmdline::n );
-    auto  vertices = apps::make_vertices( gridname );
+    auto  vertices = make_vertices_nd( cmdline::ndim, cmdline::n );
     auto  coord    = cluster::coordinates( vertices );
+    
+    if ( hpro::verbose( 4 ) )
+        io::vtk::print( coord, "coord" );
     
     std::cout << term::bullet << term::bold << "Problem Setup" << term::reset << std::endl
               << "    " << kernel
@@ -106,50 +174,42 @@ program_main ()
     auto  part         = Hpro::TGeomBSPPartStrat( Hpro::adaptive_split_axis );
     auto  [ ct, pe2i ] = cluster::build_cluster_tree( coord, part, cmdline::ntile );
 
-    auto  adm0    = cluster::weak_adm( 0 ); // off-diagonal admissibility
-    auto  adm1    = cluster::weak_adm( 1 ); // face admissibility
-    auto  adm2    = cluster::weak_adm( 2 ); // edge admissibility
-    auto  adm3    = cluster::weak_adm( 3 ); // vertex admissibility
     auto  strong  = cluster::strong_adm();
-    auto  bct0    = cluster::build_block_tree( *ct, *ct, adm0 );
-    auto  bct1    = cluster::build_block_tree( *ct, *ct, adm1 );
-    auto  bct2    = cluster::build_block_tree( *ct, *ct, adm2 );
-    auto  bct3    = cluster::build_block_tree( *ct, *ct, adm3 );
     auto  bcts    = cluster::build_block_tree( *ct, *ct, strong );
 
     if ( hpro::verbose( 3 ) )
-    {
-        io::vtk::print( coord, "coord" );
-        io::eps::print( *bct0, "bct0" );
-        io::eps::print( *bct1, "bct1" );
-        io::eps::print( *bct2, "bct2" );
-        io::eps::print( *bct3, "bct3" );
         io::eps::print( *bcts, "bcts" );
+        
+    std::cout << term::bold << "  adm. blocks:" << term::reset << std::endl
+              << "    adm  │ ";
+    for ( uint  a = 0; a < cmdline::ndim; ++a )
+        std::cout << Hpro::to_string( "   adm%d │", a );
+    std::cout << "   std  │ c_sp " << std::endl;
+    
+    std::cout << "   ──────┼─";
+    for ( uint  a = 0; a <= cmdline::ndim; ++a )
+        std::cout << "────────┼";
+    std::cout << "──────" << std::endl;
+    
+    std::cout << "    std  │ ";
+    for ( uint  a = 0; a <= cmdline::ndim; ++a )
+        std::cout << boost::format( "%7d │" ) % nadmblocks( a, *bcts );
+    std::cout << boost::format( " %3d" ) % Hpro::compute_c_sp( *bcts, true, true ) << std::endl;
+    
+    for ( uint  a = 0; a < cmdline::ndim; ++a )
+    {
+        auto  adm = cluster::weak_adm( a );
+        auto  bct = cluster::build_block_tree( *ct, *ct, adm );
+
+        if ( hpro::verbose( 3 ) )
+            io::eps::print( *bct, Hpro::to_string( "bct%d", a ) );
+
+        std::cout << boost::format( "    adm%d │ " ) % a;
+        for ( uint  a = 0; a <= cmdline::ndim; ++a )
+            std::cout << boost::format( "%7d │" ) % nadmblocks( a, *bct );
+        std::cout << boost::format( " %3d" ) % Hpro::compute_c_sp( *bct, true, true ) << std::endl;
     }// if
 
-    // std::cout << term::bold << "  c_sp:" << term::reset << std::endl
-    //           << "    adm0 : " << Hpro::compute_c_sp( *bct0, true, true ) << std::endl
-    //           << "    adm1 : " << Hpro::compute_c_sp( *bct1, true, true ) << std::endl
-    //           << "    adm2 : " << Hpro::compute_c_sp( *bct2, true, true ) << std::endl
-    //           << "    adm3 : " << Hpro::compute_c_sp( *bct3, true, true ) << std::endl
-    //           << "    std  : " << Hpro::compute_c_sp( *bcts, true, true ) << std::endl;
-
-    nadmblocks( 1, *bct2 );
-    
-    std::cout << term::bold << "  adm. blocks:" << term::reset << std::endl
-              << "         │    face │   edge  │   vtx   │   std   │ c_sp " << std::endl
-              << "   ──────┼─────────┼─────────┼─────────┼─────────┼──────" << std::endl
-              << "    adm0 │ "
-              << boost::format( "%7d │ %7d │ %7d │ %7d │ %3d" ) % nadmblocks( 1, *bct0 ) % nadmblocks( 2, *bct0 ) % nadmblocks( 3, *bct0 ) % nadmblocks( 4, *bct0 ) % Hpro::compute_c_sp( *bct0, true, true ) << std::endl
-              << "    adm1 │ "
-              << boost::format( "%7d │ %7d │ %7d │ %7d │ %3d" ) % nadmblocks( 1, *bct1 ) % nadmblocks( 2, *bct1 ) % nadmblocks( 3, *bct1 ) % nadmblocks( 4, *bct1 ) % Hpro::compute_c_sp( *bct1, true, true ) << std::endl
-              << "    adm2 │ "
-              << boost::format( "%7d │ %7d │ %7d │ %7d │ %3d" ) % nadmblocks( 1, *bct2 ) % nadmblocks( 2, *bct2 ) % nadmblocks( 3, *bct2 ) % nadmblocks( 4, *bct2 ) % Hpro::compute_c_sp( *bct2, true, true )<< std::endl
-              << "    adm3 │ "
-              << boost::format( "%7d │ %7d │ %7d │ %7d │ %3d" ) % nadmblocks( 1, *bct3 ) % nadmblocks( 2, *bct3 ) % nadmblocks( 3, *bct3 ) % nadmblocks( 4, *bct3 ) % Hpro::compute_c_sp( *bct3, true, true )<< std::endl
-              << "    std  │ "
-              << boost::format( "%7d │ %7d │ %7d │ %7d │ %3d" ) % nadmblocks( 1, *bcts ) % nadmblocks( 2, *bcts ) % nadmblocks( 3, *bcts ) % nadmblocks( 4, *bcts ) % Hpro::compute_c_sp( *bcts, true, true ) << std::endl;
-    
     // tic = timer::now();
 
     // auto  logr      = matrix::log_function< value_t >();
