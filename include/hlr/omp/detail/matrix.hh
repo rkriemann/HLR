@@ -197,7 +197,8 @@ build_compressed ( const Hpro::TBlockCluster *  bct,
     }// if
     else if ( std::min( rowis.size(), colis.size() ) <= nseq )
     {
-        M = hlr::seq::matrix::build_compressed( bct, coeff, lrapx, acc, nseq );
+        HLR_ERROR( "TODO" );
+        // M = hlr::seq::matrix::build_compressed( bct, coeff, lrapx, acc, nseq );
     }// if
     else
     {
@@ -344,7 +345,8 @@ build_mixedprec ( const Hpro::TBlockCluster *  bct,
     }// if
     else if ( std::min( rowis.size(), colis.size() ) <= nseq )
     {
-        M = hlr::seq::matrix::build_mixedprec( bct, coeff, lrapx, acc, nseq );
+        HLR_ERROR( "TODO" );
+        // M = hlr::seq::matrix::build_mixedprec( bct, coeff, lrapx, acc, nseq );
     }// if
     else
     {
