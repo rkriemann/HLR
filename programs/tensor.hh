@@ -8,6 +8,7 @@
 
 #include <cmath>
 #include <numbers>
+#include <ranges>
 
 #include <common.hh>
 #include <common-main.hh>
@@ -152,6 +153,264 @@ test_tensor ( const size_t  n )
                 X( i, j, l ) = v++;
 
     return X;
+}
+
+//
+// ALS iteration for canonical tensor approximation
+//
+template < typename value_t >
+void
+als ( const blas::tensor3< value_t > &  T,
+      const accuracy &                  acc )
+{
+    auto  X      = blas::copy( T );
+    auto  norm_X = blas::norm_F( X );
+
+    uint  it = 0;
+    uint  k  = 2; // start rank
+
+    const auto  n0 = X.size(0);
+    const auto  n1 = X.size(1);
+    const auto  n2 = X.size(2);
+    
+    auto  X0 = blas::random< value_t >( X.size(0), k );
+    auto  X1 = blas::random< value_t >( X.size(1), k );
+    auto  X2 = blas::random< value_t >( X.size(2), k );
+    
+    do
+    {
+        //
+        // optimize for each dimension
+        //
+
+        {
+            //
+            // X₀ = T₀ (X₂ ⊙ X₁)(X₂'·X₂ ⊛ X₁'·X₁)⁻¹
+            //
+            
+            auto  G2 = blas::prod( blas::adjoint( X2 ), X2 );
+            auto  G1 = blas::prod( blas::adjoint( X1 ), X1 );
+            auto  H  = blas::hadamard( G2, G1 );
+
+            blas::pseudo_invert( H );
+
+            auto  X21 = blas::khatri_rao( X2, X1 );
+            auto  XH  = blas::prod( X21, H );
+            auto  T0  = T.unfold( 0 );
+
+            blas::prod( T0, XH, value_t(0), X0 );
+        }
+        
+        {
+            //
+            // X₁ = T₁ (X₂ ⊙ X₀)(X₂'·X₂ ⊛ X₀'·X₀)⁻¹
+            //
+            
+            auto  G2 = blas::prod( blas::adjoint( X2 ), X2 );
+            auto  G0 = blas::prod( blas::adjoint( X0 ), X0 );
+            auto  H  = blas::hadamard( G2, G0 );
+
+            blas::pseudo_invert( H );
+
+            auto  X20 = blas::khatri_rao( X2, X0 );
+            auto  XH  = blas::prod( X20, H );
+            auto  T1  = T.unfold( 1 );
+
+            blas::prod( T1, XH, value_t(0), X1 );
+        }
+        
+        {
+            //
+            // X₂ = T₂ (X₁ ⊙ X₀)(X₁'·X₁ ⊛ X₀'·X₀)⁻¹
+            //
+            
+            auto  G1 = blas::prod( blas::adjoint( X1 ), X1 );
+            auto  G0 = blas::prod( blas::adjoint( X0 ), X0 );
+            auto  H  = blas::hadamard( G1, G0 );
+
+            blas::pseudo_invert( H );
+
+            auto  X10 = blas::khatri_rao( X1, X0 );
+            auto  XH  = blas::prod( X10, H );
+            auto  T2  = T.unfold( 2 );
+
+            blas::prod( T2, XH, value_t(0), X2 );
+        }
+
+        //
+        // subtract from X
+        //
+
+        auto  X = blas::copy( T );
+        
+        for ( size_t  i2 = 0; i2 < n2; ++i2 )
+            for ( size_t  i1 = 0; i1 < n1; ++i1 )
+                for ( size_t  i0 = 0; i0 < n0; ++i0 )
+                    for ( size_t  l = 0; l < k; ++l )
+                        X(i0,i1,i2) -= X0(i0,l) * X1(i1,l) * X2(i2,l);
+
+        auto  norm_R = blas::norm_F( X );
+
+        std::cout << format_norm( norm_X, norm_R, norm_R / norm_X ) << std::endl;
+
+        ++it;
+    } while ( it < 100 );
+}
+
+//
+// return product of i-mode unfolding of T with Khatri-Rao product of all matrices in M, except i'th
+//
+template < typename value_t >
+blas::matrix< value_t >
+mttkrp ( const std::array< blas::matrix< value_t >, 3 > &  Ti,
+         const std::array< blas::matrix< value_t >, 3 > &  M,
+         const uint                                        i )
+{
+    auto  Zi = blas::matrix< value_t >();
+    
+    switch ( i )
+    {
+        case 0 : Zi = blas::khatri_rao( M[2], M[1] ); break;
+        case 1 : Zi = blas::khatri_rao( M[2], M[0] ); break;
+        case 2 : Zi = blas::khatri_rao( M[1], M[0] ); break;
+    }// switch
+    
+    return blas::prod( Ti[i], Zi );
+}
+
+template < typename value_t >
+void
+als2 ( const blas::tensor3< value_t > &  T,
+       const accuracy &                  acc,
+       const uint                        maxit )
+{
+    using  real_t = Hpro::real_type_t< value_t >;
+    using  std::ranges::views::iota;
+
+    constexpr uint  dim = 3;
+    
+    auto  Tc     = blas::copy( T );
+    auto  norm_T = blas::norm_F( T );
+    auto  tol    = acc.rel_eps() * norm_T;
+    auto  ni     = std::array< size_t, dim >{ T.size(0), T.size(1), T.size(2) };
+
+    std::cout << "tol : " << format_norm( tol / norm_T ) << std::endl;
+    
+    uint  it = 0;
+    uint  k  = cmdline::k; // start rank
+
+    //
+    // unfolded tensor matrices
+    //
+    
+    auto  Ti = std::array< blas::matrix< value_t >, dim >();
+
+    for ( uint  i : iota( 0u, dim ) )
+        Ti[i] = T.unfold( i );
+
+    ////////////////////////////////////////////////////////////////////////////
+    //
+    // set up initial guess
+    //
+
+    auto  Xi = std::array< blas::matrix< value_t >, dim >();
+    
+    //
+    // random initial guess
+    //
+
+    if ( true )
+    {
+        for ( uint  i : iota( 0u, dim ) )
+            Xi[i] = blas::random< value_t >( ni[i], k );
+    }
+
+    //
+    // use first k eigenvectors of T_i · T_i'
+    //
+
+    if ( false )
+    {
+        for ( uint  i : iota( 0u, dim ) )
+        {
+            auto  TTi        = blas::prod( Ti[i], blas::adjoint( Ti[i] ) );
+            auto  [ Vi, Ei ] = blas::eigen_herm( TTi );
+            auto  Vik        = Vi( blas::range::all, blas::range( k ) );
+            auto  Eik        = Ei( blas::range( k ) );
+
+            // blas::prod_diag( Eik, Vik, k );
+            
+            Xi[i] = blas::copy( Vik );
+        }// for
+    }
+    
+    //
+    // prepare Gram matrices
+    //
+    
+    auto  Gi = std::array< blas::matrix< value_t >, dim >();
+
+    for ( uint  i : iota( 0u, dim ) )
+        Gi[i] = blas::prod( blas::adjoint( Xi[i] ), Xi[i] );
+    
+    auto  lambda   = blas::vector< value_t >( k );
+    auto  norm_rem = std::vector< double >( maxit );
+    
+    do
+    {
+        //
+        // optimize for each dimension
+        //
+
+        for ( uint  i = 0; i < 3; ++i )
+        {
+            // update mode vectors
+            auto  Mi = mttkrp( Ti, Xi, i );
+            auto  Si = blas::matrix< value_t >();
+
+            switch ( i )
+            {
+                case 0 : Si = blas::hadamard( Gi[2], Gi[1] ); break;
+                case 1 : Si = blas::hadamard( Gi[2], Gi[0] ); break;
+                case 2 : Si = blas::hadamard( Gi[1], Gi[0] ); break;
+            }// switch
+            
+            blas::pseudo_invert( Si );
+            blas::prod( Mi, Si, value_t(0), Xi[i] );
+
+            // normalize columns
+            for ( size_t  l = 0; l < k; ++l )
+            {
+                auto  Xi_l = Xi[i].column( l );
+
+                if ( it == 0 ) lambda(l) = blas::norm_2( Xi_l );
+                else           lambda(l) = blas::norm_inf( Xi_l );
+
+                blas::scale( 1.0 / lambda(l), Xi_l );
+            }// for
+
+            // update Gram matrix
+            blas::prod( blas::adjoint( Xi[i] ), Xi[i], value_t(0), Gi[i] );
+        }// for
+        
+        //
+        // subtract from X
+        //
+
+        blas::copy( T, Tc );
+        
+        for ( size_t  l = 0; l < k; ++l )
+            for ( size_t  i2 = 0; i2 < ni[2]; ++i2 )
+                for ( size_t  i1 = 0; i1 < ni[1]; ++i1 )
+                    for ( size_t  i0 = 0; i0 < ni[0]; ++i0 )
+                        Tc(i0,i1,i2) -= lambda(l) * Xi[0](i0,l) * Xi[1](i1,l) * Xi[2](i2,l);
+
+        norm_rem[it] = blas::norm_F( Tc );
+
+        std::cout << it << " : " << format_norm( norm_rem[it] / norm_T ) << std::endl;
+
+        ++it;
+    } while (( it < maxit ) && ( norm_rem[it-1] > tol ));
 }
 
 //
@@ -327,7 +586,7 @@ program_main ()
     {
         tic = timer::now();
 
-        switch ( 0 )
+        switch ( 2 )
         {
             case 0:
                 std::cout << "  " << term::bullet << term::bold << "building Coulomb cost tensor" << term::reset << std::endl;
@@ -363,63 +622,6 @@ program_main ()
     const auto  norm_X = impl::blas::norm_F( X );
     
     std::cout << "    |X|_F  = " << format_norm( norm_X ) << std::endl;
-
-    {
-        tic = timer::now();
-        
-        auto  coeffs = blas::dwt( X );
-
-        toc = timer::since( tic );
-        std::cout << "    dwt done in  " << format_time( toc ) << std::endl;
-
-        auto  norm_c = blas::norm_F( coeffs[0] );
-        
-        for ( auto &  t : coeffs )
-        {
-            auto  n = blas::norm_F( t );
-            
-            std::cout << format_norm( n ) << " / " << boost::format( "%.2e" ) % ( n / norm_c ) << std::endl;
-        }// for
-        
-        // io::vtk::print( coeffs[0], "LLL" );
-        // io::vtk::print( coeffs[1], "LLH" );
-        // io::vtk::print( coeffs[2], "LHL" );
-        // io::vtk::print( coeffs[3], "LHH" );
-        // io::vtk::print( coeffs[4], "HLL" );
-        // io::vtk::print( coeffs[5], "HLH" );
-        // io::vtk::print( coeffs[6], "HHL" );
-        // io::vtk::print( coeffs[7], "HHH" );
-
-        tic = timer::now();
-
-        auto  T = blas::idwt( coeffs );
-
-        toc = timer::since( tic );
-        std::cout << "    idwt done in " << format_time( toc ) << std::endl;
-        
-        blas::add( value_t(-1), X, T );
-
-        auto  norm_T = blas::norm_F( T );
-        
-        std::cout << "wt error = " << format_error( norm_T, norm_T / norm_X ) << std::endl;
-    }
-    
-    // {
-    //     //
-    //     // copy some part
-    //     //
-
-    //     auto  Y = blas::tensor3< value_t >( 256, 256, 256 );
-
-    //     for ( uint l = 0; l < 256; l++ )
-    //         for ( uint j = 0; j < 256; j++ )
-    //             for ( uint i = 0; i < 256; i++ )
-    //                 Y(i,j,l) = X(i + 1024,j,l);
-
-    //     io::vtk::print( Y, "Y.vtk" );
-    //     io::hdf5::write( Y, "Y" );
-    //     return;
-    // }
 
     if ( verbose(3) ) io::vtk::print( X, "X.vtk" );
     if ( verbose(2) ) io::hdf5::write( X, "X" );
@@ -499,6 +701,7 @@ program_main ()
             
         std::cout << "    mem    = " << format_mem( Z.byte_size() ) << std::endl;
         std::cout << "      rate = " << format_rate( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
+        std::cout << "    error  = " << format_error( error, error / norm_X ) << std::endl;
             
         std::cout << "  " << term::bullet << term::bold << "compression via " << compress::provider << term::reset << std::endl;
 
@@ -687,6 +890,114 @@ program_main ()
         std::cout << "      rate = " << format_rate( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
         std::cout << "    error  = " << format_error( error, error / norm_X ) << std::endl;
     }// if
+
+    //
+    // HOOI
+    //
+    
+    if ( contains( tapprox, "hooi" ) )
+    {
+        std::cout << term::bullet << term::bold << "HOOI" << " ( ε = " << cmdline::eps << " )" << term::reset << std::endl;
+
+        auto  acc = relative_prec( Hpro::frobenius_norm, cmdline::eps );
+        
+        tic = timer::now();
+
+        auto  [ G, X0, X1, X2 ] = blas::hooi( X, acc, apx );
+            
+        toc = timer::since( tic );
+            
+        std::cout << "    done in  " << format_time( toc ) << std::endl;
+        std::cout << "    ranks  = " << term::bold << G.size(0) << " × " << G.size(1) << " × " << G.size(2) << term::reset << std::endl;
+            
+        auto  Z     = tensor::tucker_tensor3< value_t >( is( 0, X.size(0)-1 ), is( 0, X.size(1)-1 ), is( 0, X.size(2)-1 ),
+                                                         std::move( G ),
+                                                         std::move( X0 ),
+                                                         std::move( X1 ),
+                                                         std::move( X2 ) );
+        auto  error = blas::tucker_error( X, Z.G(), Z.X(0), Z.X(1), Z.X(2) );
+            
+        std::cout << "    mem    = " << format_mem( Z.byte_size() ) << std::endl;
+        std::cout << "      rate = " << format_rate( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
+        std::cout << "    error  = " << format_error( error, error / norm_X ) << std::endl;
+            
+        std::cout << "  " << term::bullet << term::bold << "compression via " << compress::provider << term::reset << std::endl;
+
+        Z.compress( Hpro::fixed_prec( cmdline::eps ) );
+
+        error = blas::tucker_error( X, Z.G(), Z.X(0), Z.X(1), Z.X(2) );
+
+        std::cout << "    mem    = " << format_mem( Z.byte_size() ) << std::endl;
+        std::cout << "      rate = " << format_rate( double(X.byte_size()) / double(Z.byte_size()) ) << std::endl;
+        std::cout << "    error  = " << format_error( error, error / norm_X ) << std::endl;
+    }
+
+    //
+    // ALS
+    //
+    
+    if ( contains( tapprox, "als" ) )
+    {
+        als2( X, relative_prec( cmdline::eps ), 20 );
+    }// if
+    
+    // {
+    //     tic = timer::now();
+        
+    //     auto  coeffs = blas::dwt( X );
+
+    //     toc = timer::since( tic );
+    //     std::cout << "    dwt done in  " << format_time( toc ) << std::endl;
+
+    //     auto  norm_c = blas::norm_F( coeffs[0] );
+        
+    //     for ( auto &  t : coeffs )
+    //     {
+    //         auto  n = blas::norm_F( t );
+            
+    //         std::cout << format_norm( n ) << " / " << boost::format( "%.2e" ) % ( n / norm_c ) << std::endl;
+    //     }// for
+        
+    //     // io::vtk::print( coeffs[0], "LLL" );
+    //     // io::vtk::print( coeffs[1], "LLH" );
+    //     // io::vtk::print( coeffs[2], "LHL" );
+    //     // io::vtk::print( coeffs[3], "LHH" );
+    //     // io::vtk::print( coeffs[4], "HLL" );
+    //     // io::vtk::print( coeffs[5], "HLH" );
+    //     // io::vtk::print( coeffs[6], "HHL" );
+    //     // io::vtk::print( coeffs[7], "HHH" );
+
+    //     tic = timer::now();
+
+    //     auto  T = blas::idwt( coeffs );
+
+    //     toc = timer::since( tic );
+    //     std::cout << "    idwt done in " << format_time( toc ) << std::endl;
+        
+    //     blas::add( value_t(-1), X, T );
+
+    //     auto  norm_T = blas::norm_F( T );
+        
+    //     std::cout << "wt error = " << format_error( norm_T, norm_T / norm_X ) << std::endl;
+    // }
+    
+    // {
+    //     //
+    //     // copy some part
+    //     //
+
+    //     auto  Y = blas::tensor3< value_t >( 256, 256, 256 );
+
+    //     for ( uint l = 0; l < 256; l++ )
+    //         for ( uint j = 0; j < 256; j++ )
+    //             for ( uint i = 0; i < 256; i++ )
+    //                 Y(i,j,l) = X(i + 1024,j,l);
+
+    //     io::vtk::print( Y, "Y.vtk" );
+    //     io::hdf5::write( Y, "Y" );
+    //     return;
+    // }
+
 }
 
 template < typename value_t >
@@ -694,12 +1005,10 @@ void
 test_tensors ()
 {
     {
-        int   n = 8;
-        auto  X = blas::tensor4< value_t >( n, n, n, n );
-        uint  val = 1;
-        
-        for ( size_t  i = 0; i < n*n*n*n; ++i )
-            X.data()[i] = val++;
+        int   n = 4;
+        auto  X = blas::tensor3< value_t >( 4, 3, 2 );
+
+        blas::fill_iota( X );
 
         std::cout << X << std::endl;
 
@@ -716,22 +1025,26 @@ test_tensors ()
         //     std::cout << v_231 << std::endl;
         // }// if
 
-        // auto  M0 = X.unfold( 0 );
-        // auto  M1 = X.unfold( 1 );
-        // auto  M2 = X.unfold( 2 );
+        auto  M0 = X.unfold( 0 );
+        auto  M1 = X.unfold( 1 );
+        auto  M2 = X.unfold( 2 );
         // auto  M3 = X.unfold( 3 );
 
-        // std::cout << M0 << std::endl;
-        // std::cout << M1 << std::endl;
-        // std::cout << M2 << std::endl;
+        std::cout << M0 << std::endl;
+        std::cout << M1 << std::endl;
+        std::cout << M2 << std::endl;
         // std::cout << M3 << std::endl;
 
-        auto  T                     = blas::copy( X );
-        auto  apx                   = approx::SVD< value_t >();
-        auto  [ G, U0, U1, U2, U3 ] = blas::hosvd( X, relative_prec( 1e-4 ), apx );
+        // auto  T                     = blas::copy( X );
+        // auto  apx                   = approx::SVD< value_t >();
+        // auto  [ G, U0, U1, U2, U3 ] = blas::hosvd( X, relative_prec( 1e-4 ), apx );
 
-        std::cout << G.size(0) << " x " << G.size(1) << " x " << G.size(2) << " x " << G.size(3) << std::endl;
-        std::cout << "error : " << format_error( blas::tucker_error( T, G, U0, U1, U2, U3 ), blas::tucker_error( T, G, U0, U1, U2, U3 ) / blas::norm_F( T ) ) << std::endl;
+        // std::cout << G.size(0) << " x " << G.size(1) << " x " << G.size(2) << " x " << G.size(3) << std::endl;
+        // std::cout << "error : " << format_error( blas::tucker_error( T, G, U0, U1, U2, U3 ), blas::tucker_error( T, G, U0, U1, U2, U3 ) / blas::norm_F( T ) ) << std::endl;
+
+        als2( X, relative_prec( 1e-4 ), 20 );
+
+        return;
     }
     
     //
