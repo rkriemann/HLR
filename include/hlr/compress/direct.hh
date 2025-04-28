@@ -456,7 +456,7 @@ using hlr::compress::sfl2::get_config;
 using hlr::compress::sfl2::byte_size;
 using hlr::compress::sfl2::compressed_size;
 
-namespace zblas { using hlr::compress::sfl2::mulvec; }
+// namespace zblas { using hlr::compress::sfl2::mulvec; }
 
 }} // namespace hlr::compress
 

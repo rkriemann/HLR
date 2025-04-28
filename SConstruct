@@ -159,6 +159,7 @@ COMPRESSORS   = [ 'help',       # print help
                   'afl',        # 1
                   'aflp',       # 2
                   'sfl',        # 3
+                  'sfl2',       # 23
                   'dfl',        # 4
                   'dfl2',       # 22
                   'mp3',        # 18
@@ -184,6 +185,7 @@ COMPRESSORS_HELP = { 'none'   : 'no compression used',
                      'afl'    : 'use AFL',
                      'aflp'   : 'use AFLP',
                      'sfl'    : 'use SFL',
+                     'sfl2'   : 'use SFL2',
                      'dfl'    : 'use DFL',
                      'dfl2'   : 'use DFL2',
                      'mp3'    : 'use mixed precision storage with FP64/FP32/BF16',
@@ -731,6 +733,9 @@ elif compressor == 'aflp' :
 elif compressor == 'sfl' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=3' )
     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=3' )
+elif compressor == 'sfl2' :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=23' )
+    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=23' )
 elif compressor == 'dfl' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=4' )
     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=4' )
