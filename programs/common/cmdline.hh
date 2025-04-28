@@ -120,7 +120,7 @@ parse ( int argc, char ** argv )
     // read from config file
     //
 
-    if ( std::filesystem::exists( ".config" ) )
+    if ( std::filesystem::exists( ".config" ) && std::filesystem::is_regular_file( ".config" ) )
         read_config( ".config" );
     
     //
