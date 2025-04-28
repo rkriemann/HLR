@@ -439,6 +439,30 @@ namespace zblas { using hlr::compress::sfl::mulvec; }
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_SFL2
+
+#include <hlr/compress/sfl2.hh>
+
+namespace hlr { namespace compress {
+
+static const char provider[] = "sfl2";
+
+using  zconfig_t = hlr::compress::sfl2::config;
+using  zarray    = hlr::compress::sfl2::zarray;
+
+using hlr::compress::sfl2::compress;
+using hlr::compress::sfl2::decompress;
+using hlr::compress::sfl2::get_config;
+using hlr::compress::sfl2::byte_size;
+using hlr::compress::sfl2::compressed_size;
+
+namespace zblas { using hlr::compress::sfl2::mulvec; }
+
+}} // namespace hlr::compress
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
 #elif HLR_COMPRESSOR == HLR_COMPRESSOR_DFL
 
 #include <hlr/compress/dfl.hh>
