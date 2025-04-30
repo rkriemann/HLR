@@ -194,6 +194,43 @@ mulvec ( const size_t     nrows,
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
+#elif HLR_VALR_COMPRESSOR == HLR_COMPRESSOR_SFL2
+
+#include <hlr/compress/sfl2.hh>
+
+namespace hlr { namespace compress { namespace valr {
+
+using zarray = hlr::compress::sfl2::zarray;
+using hlr::compress::sfl2::compress_lr;
+using hlr::compress::sfl2::decompress_lr;
+using hlr::compress::sfl2::byte_size;
+using hlr::compress::sfl2::compressed_size;
+
+static const char provider[] = "sfl2";
+
+// namespace zblas
+// {
+
+// template < typename value_t >
+// void
+// mulvec ( const size_t     nrows,
+//          const size_t     ncols,
+//          const matop_t    op_A,
+//          const value_t    alpha,
+//          const zarray &   zA,
+//          const value_t *  x,
+//          value_t *        y )
+// {
+//     hlr::compress::sfl2::mulvec_lr( nrows, ncols, op_A, alpha, zA, x, y );
+// }
+
+// }// namespace zblas
+
+}}}// namespace hlr::compress::valr
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
 #elif HLR_VALR_COMPRESSOR == HLR_COMPRESSOR_DFL
 
 #include <hlr/compress/dfl.hh>
