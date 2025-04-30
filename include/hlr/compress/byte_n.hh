@@ -33,6 +33,11 @@ using byte2_t = uint16_t;
 struct byte3_t
 {
     byte_t  data[3];
+
+    byte3_t ( const uint32_t  n )
+    {
+        *this = n;
+    }
     
     void operator = ( const uint32_t  n )
     {
@@ -57,6 +62,11 @@ struct byte5_t
 {
     byte_t  data[5];
     
+    byte5_t ( const uint64_t  n )
+    {
+        *this = n;
+    }
+    
     void operator = ( const uint64_t  n )
     {
         *reinterpret_cast< uint32_t * >( data ) = uint32_t(n & 0xffffffff);
@@ -69,6 +79,11 @@ struct byte5_t
 struct byte6_t
 {
     byte_t  data[6];
+    
+    byte6_t ( const uint64_t  n )
+    {
+        *this = n;
+    }
     
     void operator = ( const uint64_t  n )
     {
@@ -83,6 +98,11 @@ struct byte6_t
 struct byte7_t
 {
     byte_t  data[7];
+    
+    byte7_t ( const uint64_t  n )
+    {
+        *this = n;
+    }
     
     void operator = ( const uint64_t  n )
     {
