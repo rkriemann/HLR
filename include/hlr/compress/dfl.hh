@@ -8,7 +8,7 @@
 // Copyright   : Max Planck Institute MIS 2004-2024. All Rights Reserved.
 //
 
-#include <hlr/compress/bfl.hh>
+#include <hlr/compress/sfl.hh>
 #include <hlr/compress/byte_n.hh>
 
 //
@@ -142,7 +142,7 @@ compress< float > ( const config &   config,
                     const size_t     dim2,
                     const size_t     dim3 )
 {
-    return bfl::compress( bfl::config{ config.bitrate }, data, dim0, dim1, dim2, dim3 );
+    return sfl::compress( sfl::config{ config.bitrate }, data, dim0, dim1, dim2, dim3 );
 }
 
 template <>
@@ -233,7 +233,7 @@ decompress< float > ( const zarray &  zdata,
                       const size_t    dim2,
                       const size_t    dim3 )
 {
-    bfl::decompress( zdata, dest, dim0, dim1, dim2, dim3 );
+    sfl::decompress( zdata, dest, dim0, dim1, dim2, dim3 );
 }
 
 template <>
@@ -321,7 +321,7 @@ zarray
 compress_lr< float > ( const blas::matrix< float > &  U,
                        const blas::vector< float > &  S )
 {
-    return bfl::compress_lr( U, S );
+    return sfl::compress_lr( U, S );
 }
 
 template <>
@@ -386,7 +386,7 @@ void
 decompress_lr< float > ( const zarray &           zdata,
                          blas::matrix< float > &  U )
 {
-    bfl::decompress_lr( zdata, U );
+    sfl::decompress_lr( zdata, U );
 }
 
 template <>
