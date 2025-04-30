@@ -40,6 +40,8 @@ struct fp_info< float >
 {
     constexpr static uint32_t  exp_bits  = 8;
     constexpr static uint32_t  mant_bits = 23;
+
+    using  bs_storage_t = uint32_t;
 };
     
 template <>
@@ -51,10 +53,18 @@ struct fp_info< double >
     constexpr static uint64_t  sign_mask = (1ul << sign_bit);
     constexpr static uint64_t  mant_mask = 0x000fffffffffffff;
     constexpr static uint64_t  exp_mask  = 0x7ff0000000000000;
+
+    using  bs_storage_t = uint64_t;
 };
 
 using FP32 = fp_info< float >;
 using FP64 = fp_info< double >;
+
+// shift from FP64 exponent to FP32 exponent (FP64 bias - FP32 bias + 1)
+constexpr uint  fp64_fp32_exp_shift = ( 1023 - 127 + 1 );
+
+// shift from FP64 exponent to FP32 exponent (FP64 bias - FP32 bias + 1)
+constexpr uint  sfl_header_ofs = 1;
 
 //
 // return bitrate for given accuracy
@@ -190,17 +200,15 @@ compress ( const double *  data,
     
     for ( size_t  i = 0; i < nsize; ++i )
     {
-        const double    val  = data[i];
-        const uint64_t  ival = (*reinterpret_cast< const uint64_t * >( & val ) );
-        const uint32_t  exp  = (ival & FP64::exp_mask ) >> FP64::mant_bits;
+        const fp64int_t val{ .f = data[i] };
+        const uint64_t  ival = val.u;
+        const int32_t   exp  = (ival & FP64::exp_mask ) >> FP64::mant_bits;
+        const int32_t   sexp = exp - fp64_fp32_exp_shift;
         const uint64_t  mant = (ival & FP64::mant_mask) >> sfl_mant_shift;
         const uint64_t  sign = (ival & FP64::sign_mask) >> sfl_sign_shift;
         uint64_t        zval = 0;
 
-        HLR_DBG_ASSERT( exp - 0x381ul >= 0 );
-        
-        if ( exp == 0 ) zval = sign | mant;
-        else            zval = sign | (uint64_t(exp - 0x381ul) << sfl_mant_bits) | mant;
+        if ( sexp >= 0 ) zval = sign | (uint64_t(sexp) << sfl_mant_bits) | mant;
 
         bs.write_bits( zval, nbits );
     }// for
@@ -235,12 +243,10 @@ decompress ( double *        data,
         const uint64_t  zval = bs.read_bits( nbits );
         const uint64_t  sign = (zval & sfl_sign_mask) << sfl_sign_shift;
         const uint64_t  exp  = (zval & sfl_exp_mask ) >> sfl_mant_bits;
+        const uint64_t  sexp = ( exp == 0 ) ? 0 : exp + fp64_fp32_exp_shift;
         const uint64_t  mant = (zval & sfl_mant_mask) << sfl_mant_shift;
-        fp64int_t       val{ 0 };
-        
-        if ( exp == 0 ) val.u = sign | mant;
-        else            val.u = sign | ((exp + 0x381ul) << FP64::mant_bits) | mant;
-        
+        const fp64int_t val{ .u = sign | (sexp << FP64::mant_bits) | mant };
+
         data[i] = val.f;
     }// for
 }
@@ -390,7 +396,8 @@ zarray
 compress_lr ( const blas::matrix< value_t > &                       U,
               const blas::vector< Hpro::real_type_t< value_t > > &  S )
 {
-    using  real_t = Hpro::real_type_t< value_t >;
+    using  real_t       = Hpro::real_type_t< value_t >;
+    using  bs_storage_t = fp_info< real_t >::bs_storage_t;
     
     constexpr auto  exp_bits   = fp_info< real_t >::exp_bits;
     
@@ -409,12 +416,8 @@ compress_lr ( const blas::matrix< value_t > &                       U,
 
         const size_t  nbits = 1 + exp_bits + m[l]; // number of bits per value
         
-        zsize += 1 + 1 + pad_bs< uint32_t >( byte_pad( n * nbits ) / 8 );
+        zsize += 1 + pad_bs< bs_storage_t >( byte_pad( n * nbits ) / 8 );
     }// for
-
-    // for ( uint32_t  l = 0; l < k; ++l )
-    //     std::cout << e[l] << '/' << m[l] << std::endl;
-    // std::cout << std::endl;
 
     //
     // convert each column to compressed form
@@ -422,16 +425,16 @@ compress_lr ( const blas::matrix< value_t > &                       U,
 
     auto              zdata       = std::vector< byte_t >( zsize );
     size_t            pos         = 0;
-    constexpr size_t  header_size = 2;
+    constexpr size_t  header_size = 1;
     const real_t *    U_ptr       = reinterpret_cast< const real_t * >( U.data() );
         
     for ( uint32_t  l = 0; l < k; ++l )
     {
         const uint32_t  prec_bits = m[l];
-        const size_t    nbits     = 1 + exp_bits + prec_bits; // number of bits per value
+        const size_t    nbits     = 1 + FP32::exp_bits + prec_bits; // number of bits per value
 
-        compress( U.data() + l*n, n, zdata.data() + pos, exp_bits, prec_bits );
-        pos += header_size + pad_bs< uint32_t >( byte_pad( n * nbits ) / 8 );
+        compress( U.data() + l*n, n, zdata.data() + pos, prec_bits );
+        pos += header_size + pad_bs< bs_storage_t >( byte_pad( n * nbits ) / 8 );
     }// for
 
     return zdata;
@@ -452,9 +455,8 @@ zarray
 compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double > > &  U,
                                         const blas::vector< double > &                  S )
 {
-    using  real_t = double;
-    
-    constexpr auto  exp_bits   = fp_info< real_t >::exp_bits;
+    using  real_t       = double;
+    using  bs_storage_t = fp_info< real_t >::bs_storage_t;
     
     //
     // first, determine exponent bits and mantissa bits for all columns
@@ -470,9 +472,9 @@ compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double
     {
         m[l] = eps_to_rate_valr( S(l) );
 
-        const size_t  nbits = 1 + exp_bits + m[l]; // number of bits per value
+        const size_t  nbits = 1 + FP32::exp_bits + m[l]; // number of bits per value
         
-        zsize += 1 + pad_bs< uint32_t >( byte_pad( n2 * nbits ) / 8 ); // twice because real+imag
+        zsize += 1 + pad_bs< bs_storage_t >( byte_pad( n2 * nbits ) / 8 ); // twice because real+imag
     }// for
 
     //
@@ -487,10 +489,10 @@ compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double
     for ( uint32_t  l = 0; l < k; ++l )
     {
         const uint32_t  prec_bits = m[l];
-        const size_t    nbits     = 1 + exp_bits + prec_bits; // number of bits per value
+        const size_t    nbits     = 1 + FP32::exp_bits + prec_bits; // number of bits per value
 
         compress( U_ptr + l * n2, n2, zdata.data() + pos, prec_bits );
-        pos += header_size + pad_bs< uint32_t >( byte_pad( n2 * nbits ) / 8 );
+        pos += header_size + pad_bs< bs_storage_t >( byte_pad( n2 * nbits ) / 8 );
     }// for
 
     return zdata;
@@ -501,7 +503,8 @@ void
 decompress_lr ( const zarray &             zdata,
                 blas::matrix< value_t > &  U )
 {
-    using  real_t = Hpro::real_type_t< value_t >;
+    using  real_t       = Hpro::real_type_t< value_t >;
+    using  bs_storage_t = fp_info< real_t >::bs_storage_t;
     
     const size_t      n           = U.nrows();
     const uint32_t    k           = U.ncols();
@@ -519,7 +522,7 @@ decompress_lr ( const zarray &             zdata,
         const uint32_t  nbits     = 1 + FP32::exp_bits + prec_bits;
 
         decompress( U.data() + l * n, n, zdata.data() + pos, prec_bits );
-        pos += header_size + pad_bs< uint32_t >( byte_pad( nbits * n ) / 8 );
+        pos += header_size + pad_bs< bs_storage_t >( byte_pad( nbits * n ) / 8 );
     }// for
 }
 
@@ -562,6 +565,162 @@ decompress_lr< std::complex< double > > ( const zarray &                        
         decompress( U_ptr + l * n2, n2, zdata.data() + pos, prec_bits );
         pos += header_size + pad_bs< uint32_t >( byte_pad( nbits * n2 ) / 8 );
     }// for
+}
+
+//
+// compressed blas
+//
+
+namespace
+{
+
+template < typename value_t >
+void
+mulvec ( const uint32_t   prec_bits,
+         const size_t     nrows,
+         const size_t     ncols,
+         const matop_t    op_A,
+         const value_t    alpha,
+         const byte_t *   zA,
+         const value_t *  x,
+         value_t *        y )
+{
+    using  real_t       = Hpro::real_type_t< value_t >;
+    using  bs_storage_t = typename fp_info< real_t >::bs_storage_t;
+
+    const uint32_t  nbits          = 1 + FP32::exp_bits + prec_bits;
+    const uint8_t   sfl_mant_bits  = prec_bits;
+    const uint8_t   sfl_sign_bit   = sfl_mant_bits + 8;
+    const uint8_t   sfl_mant_shift = FP64::mant_bits - sfl_mant_bits;
+    const uint8_t   sfl_sign_shift = FP64::sign_bit  - sfl_sign_bit;
+    const uint64_t  sfl_sign_mask  = (1ul    << sfl_sign_bit);
+    const uint64_t  sfl_exp_mask   = (0xfful << sfl_mant_bits);
+    const uint64_t  sfl_mant_mask  = (1ul    << sfl_mant_bits) - 1;
+
+    const size_t    bssize = pad_bs< bs_storage_t >( byte_pad( nrows * ncols * nbits ) / 8 );
+    auto            bs     = bitstream< bs_storage_t >( const_cast< byte_t * >( zA ), bssize );
+    
+    switch ( op_A )
+    {
+        case  apply_normal :
+        {
+            for ( size_t  j = 0; j < ncols; ++j )
+            {
+                const auto  x_j = alpha * x[j];
+
+                for ( size_t  i = 0; i < nrows; ++i )
+                {
+                    const uint64_t  zval = bs.read_bits( nbits );
+                    const uint64_t  sign = (zval & sfl_sign_mask) << sfl_sign_shift;
+                    const uint64_t  exp  = (zval & sfl_exp_mask ) >> sfl_mant_bits;
+                    const uint64_t  sexp = ( exp == 0 ) ? 0 : exp + fp64_fp32_exp_shift;
+                    const uint64_t  mant = (zval & sfl_mant_mask) << sfl_mant_shift;
+                    const fp64int_t val{ .u = sign | (sexp << FP64::mant_bits) | mant };
+                    
+                    y[i] += val.f * x_j;
+                }// for
+            }// for
+        }// case
+        break;
+        
+        case  apply_adjoint :
+        {
+            for ( size_t  j = 0; j < ncols; ++j )
+            {
+                value_t  y_j = value_t(0);
+                
+                for ( size_t  i = 0; i < nrows; ++i )
+                {
+                    const uint64_t  zval = bs.read_bits( nbits );
+                    const uint64_t  sign = (zval & sfl_sign_mask) << sfl_sign_shift;
+                    const uint64_t  exp  = (zval & sfl_exp_mask ) >> sfl_mant_bits;
+                    const uint64_t  sexp = ( exp == 0 ) ? 0 : exp + fp64_fp32_exp_shift;
+                    const uint64_t  mant = (zval & sfl_mant_mask) << sfl_mant_shift;
+                    const fp64int_t val{ .u = sign | (sexp << FP64::mant_bits) | mant };
+
+                    y_j += val.f * x[i];
+                }// for
+
+                y[j] += alpha * y_j;
+            }// for
+        }// case
+        break;
+
+        default:
+            HLR_ERROR( "TODO" );
+    }// switch
+}
+
+}// namespace anonymous
+
+template < typename value_t >
+void
+mulvec ( const size_t     nrows,
+         const size_t     ncols,
+         const matop_t    op_A,
+         const value_t    alpha,
+         const zarray &   zA,
+         const value_t *  x,
+         value_t *        y )
+{
+    using  real_t = Hpro::real_type_t< value_t >;
+
+    const uint8_t  prec_bits = zA[0];
+    
+    mulvec( prec_bits, nrows, ncols, op_A, alpha, zA.data() + sfl_header_ofs, x, y );
+}
+
+template < typename value_t >
+void
+mulvec_lr ( const size_t     nrows,
+            const size_t     ncols,
+            const matop_t    op_A,
+            const value_t    alpha,
+            const zarray &   zA,
+            const value_t *  x,
+            value_t *        y )
+{
+    using  real_t       = Hpro::real_type_t< value_t >;
+    using  bs_storage_t = typename fp_info< real_t >::bs_storage_t;
+
+    size_t  pos = 0;
+
+    switch ( op_A )
+    {
+        case  apply_normal :
+        {
+            for ( uint  l = 0; l < ncols; ++l )
+            {
+                const uint8_t  prec_bits = zA[0];
+                const uint8_t  nbits     = 1 + FP32::exp_bits + prec_bits;
+                const size_t   nbyte     = pad_bs< bs_storage_t >( byte_pad( nrows * nbits ) / 8 );
+        
+                mulvec( prec_bits, nrows, 1, op_A, alpha, zA.data() + pos + sfl_header_ofs, x+l, y );
+
+                pos += sfl_header_ofs + nbyte * nrows;
+            }// for
+        }// case
+        break;
+
+        case  apply_conjugate  : HLR_ERROR( "TODO" );
+            
+        case  apply_transposed : HLR_ERROR( "TODO" );
+
+        case  apply_adjoint :
+        {
+            for ( uint  l = 0; l < ncols; ++l )
+            {
+                const uint8_t  prec_bits = zA[0];
+                const uint8_t  nbits     = 1 + FP32::exp_bits + prec_bits;
+                const size_t   nbyte     = pad_bs< bs_storage_t >( byte_pad( nrows * nbits ) / 8 );
+
+                mulvec( prec_bits, nrows, 1, op_A, alpha, zA.data() + pos + sfl_header_ofs, x, y+l );
+
+                pos += sfl_header_ofs + nbyte * nrows;
+            }// for
+        }// case
+        break;
+    }// switch
 }
 
 }}}// namespace hlr::compress::sfl2
