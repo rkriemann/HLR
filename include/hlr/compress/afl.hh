@@ -14,6 +14,7 @@
 
 #include <hlr/arith/blas.hh>
 #include <hlr/compress/byte_n.hh>
+#include <hlr/compress/ztypes.hh>
 
 // activate/deactivate bitstreams
 #define HLR_USE_BITSTREAM
@@ -36,21 +37,6 @@
 ////////////////////////////////////////////////////////////
 
 namespace hlr { namespace compress { namespace afl {
-
-//
-// shared float/int types
-//
-union fp32int_t
-{
-    uint32_t u;
-    float    f;
-};
-
-union fp64int_t
-{
-    uint64_t  u;
-    double    f;
-};
 
 //
 // floating point data
