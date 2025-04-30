@@ -11,6 +11,7 @@
 #include <cstdint>
 
 #include <hlr/compress/byte_n.hh>
+#include <hlr/compress/ztypes.hh>
 
 //
 // signal availability of compressed BLAS
@@ -38,6 +39,9 @@ constexpr uint64_t  fp64_mant_mask = 0x000fffffffffffff;
 constexpr uint64_t  fp64_exp_mask  = 0x7ff0000000000000;
 
 constexpr uint8_t   sfl_header_ofs = 4;
+
+// shift from FP64 exponent to FP32 exponent (FP64 bias - FP32 bias + 1)
+constexpr uint  fp64_fp32_exp_shift = ( 1023 - 127 + 1 );
 
 //
 // return bitrate for given accuracy
@@ -160,12 +164,13 @@ struct sfl64
         {
             const double    fval  = data[i];
             const uint64_t  ival = (*reinterpret_cast< const uint64_t * >( & fval ) );
-            const uint32_t  exp  = (ival & fp64_exp_mask ) >> fp64_mant_bits;
+            const int32_t   exp  = (ival & fp64_exp_mask ) >> fp64_mant_bits;
+            const int32_t   sexp = exp - fp64_fp32_exp_shift;
             const uint64_t  mant = (ival & fp64_mant_mask) >> sfl_mant_shift;
             const uint64_t  sign = (ival & fp64_sign_mask) >> sfl_sign_shift;
 
-            if ( exp == 0 ) zptr[i] = sign | mant;
-            else            zptr[i] = sign | (uint64_t(exp - 0x381ul) << sfl_mant_bits) | mant;
+            if ( sexp >= 0 ) zptr[i] = sign | (uint64_t(sexp) << sfl_mant_bits) | mant;
+            else             zptr[i] = storage_t(0);
         }// for
     }
 
@@ -183,22 +188,11 @@ struct sfl64
             const uint64_t  zval = zptr[i];
             const uint64_t  sign = (zval & sfl_sign_mask) << sfl_sign_shift;
             const uint64_t  exp  = (zval & sfl_exp_mask ) >> sfl_mant_bits;
+            const uint64_t  sexp = ( exp == 0 ) ? 0 : exp + fp64_fp32_exp_shift;
             const uint64_t  mant = (zval & sfl_mant_mask) << sfl_mant_shift;
+            const fp64int_t val{ .u = sign | (sexp << fp64_mant_bits) | mant };
 
-            if ( exp == 0 )
-            {
-                const uint64_t  ival = sign | mant;
-                const double    fval = * reinterpret_cast< const double * >( & ival );
-
-                data[i] = fval;
-            }// if
-            else
-            {
-                const uint64_t  ival = sign | ((exp + 0x381ul) << fp64_mant_bits) | mant;
-                const double    fval = * reinterpret_cast< const double * >( & ival );
-
-                data[i] = fval;
-            }// else
+            data[i] = val.f;
         }// for
     }
 };
@@ -329,18 +323,18 @@ compress< float > ( const config &   config,
             default : sfl< float, byte4_t >::decompress( tmp.data(), nsize, zdata.data() + sfl_header_ofs ); break;
         }// switch
 
-        double  err = 0;
-        double  nrm = 0;
+        // double  err = 0;
+        // double  nrm = 0;
 
-        for ( size_t  i = 0; i < nsize; ++i )
-        {
-            const auto  d_i = data[i] - tmp[i];
+        // for ( size_t  i = 0; i < nsize; ++i )
+        // {
+        //     const auto  d_i = data[i] - tmp[i];
             
-            err += d_i * d_i;
-            nrm += data[i] * data[i];
-        }// for
+        //     err += d_i * d_i;
+        //     nrm += data[i] * data[i];
+        // }// for
 
-        std::cout << std::sqrt( err ) << " / " << std::sqrt( err ) / std::sqrt( nrm ) << std::endl;
+        // std::cout << std::sqrt( err ) << " / " << std::sqrt( err ) / std::sqrt( nrm ) << std::endl;
     }
     // DEBUG
     
@@ -396,18 +390,18 @@ compress< double > ( const config &   config,
             default : sfl< double, byte8_t >::decompress( tmp.data(), nsize, zdata.data() + sfl_header_ofs ); break;
         }// switch
 
-        double  err = 0;
-        double  nrm = 0;
+        // double  err = 0;
+        // double  nrm = 0;
 
-        for ( size_t  i = 0; i < nsize; ++i )
-        {
-            const auto  d_i = data[i] - tmp[i];
+        // for ( size_t  i = 0; i < nsize; ++i )
+        // {
+        //     const auto  d_i = data[i] - tmp[i];
             
-            err += d_i * d_i;
-            nrm += data[i] * data[i];
-        }// for
+        //     err += d_i * d_i;
+        //     nrm += data[i] * data[i];
+        // }// for
 
-        std::cout << std::sqrt( err ) << " / " << std::sqrt( err ) / std::sqrt( nrm ) << std::endl;
+        // std::cout << std::sqrt( err ) << " / " << std::sqrt( err ) / std::sqrt( nrm ) << std::endl;
     }
     // DEBUG
     
@@ -746,11 +740,11 @@ mulvec ( const size_t       nrows,
                     const uint64_t  zval = zA[pos];
                     const uint64_t  sign = (zval & sfl_sign_mask) << sfl_sign_shift;
                     const uint64_t  exp  = (zval & sfl_exp_mask ) >> sfl_mant_bits;
+                    const uint64_t  sexp = ( exp == 0 ) ? 0 : exp + fp64_fp32_exp_shift;
                     const uint64_t  mant = (zval & sfl_mant_mask) << sfl_mant_shift;
-                    const uint64_t  ival = sign | ((exp + 0x381ul) << fp64_mant_bits) | mant;
-                    const double    fval = * reinterpret_cast< const double * >( & ival );
+                    const fp64int_t val{ .u = sign | (sexp << fp64_mant_bits) | mant };
                     
-                    y[i] += fval * x_j;
+                    y[i] += val.f * x_j;
                 }// for
             }// for
         }// case
@@ -769,11 +763,11 @@ mulvec ( const size_t       nrows,
                     const uint64_t  zval = zA[pos];
                     const uint64_t  sign = (zval & sfl_sign_mask) << sfl_sign_shift;
                     const uint64_t  exp  = (zval & sfl_exp_mask ) >> sfl_mant_bits;
+                    const uint64_t  sexp = ( exp == 0 ) ? 0 : exp + fp64_fp32_exp_shift;
                     const uint64_t  mant = (zval & sfl_mant_mask) << sfl_mant_shift;
-                    const uint64_t  ival = sign | ((exp + 0x381ul) << fp64_mant_bits) | mant;
-                    const double    fval = * reinterpret_cast< const double * >( & ival );
+                    const fp64int_t val{ .u = sign | (sexp << fp64_mant_bits) | mant };
 
-                    y_j += fval * x[i];
+                    y_j += val.f * x[i];
                 }// for
 
                 y[j] += alpha * y_j;
