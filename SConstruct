@@ -162,7 +162,7 @@ COMPRESSORS   = [ 'help',       # print help
                   'sfl2',       # 23
                   'dfl',        # 4
                   'dfl2',       # 22
-                  'mp3',        # 18
+                  'mp',         # 18
                   'fp32',       # 13
                   'zfp',        # 5
                   'posits',     # 12
@@ -188,7 +188,7 @@ COMPRESSORS_HELP = { 'none'   : 'no compression used',
                      'sfl2'   : 'use SFL2',
                      'dfl'    : 'use DFL',
                      'dfl2'   : 'use DFL2',
-                     'mp3'    : 'use mixed precision storage with FP64/FP32/BF16',
+                     'mp'     : 'use mixed precision storage with FP64/FP32/BF16',
                      'fp32'   : 'use FP32 for storage',
                      'zfp'    : 'use ZFP     (see also {0}zfp_dir{1})',
                      'posits' : 'use Posits  (see also {0}universal_dir{1})',
@@ -210,7 +210,7 @@ COMPRESSORS_HELP = { 'none'   : 'no compression used',
 #                      'aflp',
 #                      'sfl',
 #                      'dfl',
-#                      'mp3',
+#                      'mp',
 #                      'zfp',
 #                      'posits',
 #                      'cfloat',
@@ -235,7 +235,7 @@ COMPRESSORS_HELP = { 'none'   : 'no compression used',
 #                      'sfl'     : 'use SFL',
 #                      'dfl'     : 'use DFL',
 #                      'mp2'     : 'use mixed precision with FP64/FP32',
-#                      'mp3'     : 'use mixed precision with FP64/FP32/BF16',
+#                      'mp'      : 'use mixed precision with FP64/FP32/BF16',
 #                     }
 
 
@@ -742,7 +742,7 @@ elif compressor == 'dfl' :
 elif compressor == 'dfl2' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=22' )
     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=22' )
-elif compressor == 'mp3' :
+elif compressor == 'mp' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=18' )
     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=18' )
 elif compressor == 'zfp' :
@@ -823,7 +823,7 @@ elif compressor == 'fp32' :
 #     elif compressor == 'sfl'    : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=3' )
 #     elif compressor == 'dfl'    : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=4' )
 #     elif compressor == 'dfl2'   : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=22' )
-#     elif compressor == 'mp3'    : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=18' )
+#     elif compressor == 'mp'     : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=18' )
 #     elif compressor == 'zfp'    : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=5' )
 #     elif compressor == 'sz'     : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=6' )
 #     elif compressor == 'sz3'    : env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=7' )
@@ -877,7 +877,7 @@ elif compressor == 'fp32' :
 #     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=20' )
 #     env.Append( CPPDEFINES = 'HLR_HAS_UNIVERSAL' )
 #     env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
-# elif valr == 'mp3'  :
+# elif valr == 'mp'  :
 #     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=18' )
 # # elif valr == 'mp2'  :
 # #     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=19' )
