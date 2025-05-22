@@ -16,6 +16,7 @@
 //
 // signal availability of compressed BLAS
 //
+#define HLR_HAS_ZBLAS_DIRECT
 #define HLR_HAS_ZBLAS_VALR
 
 ////////////////////////////////////////////////////////////
@@ -780,13 +781,13 @@ namespace
 template < typename value_t,
            typename storage_t >
 void
-mulvec ( const size_t       nrows,
-         const size_t       ncols,
-         const matop_t      op_A,
-         const value_t      alpha,
-         const storage_t *  zA,
-         const value_t *    x,
-         value_t *          y )
+internal_mulvec ( const size_t       nrows,
+                  const size_t       ncols,
+                  const matop_t      op_A,
+                  const value_t      alpha,
+                  const storage_t *  zA,
+                  const value_t *    x,
+                  value_t *          y )
 {
     switch ( op_A )
     {
@@ -796,7 +797,7 @@ mulvec ( const size_t       nrows,
             
             for ( size_t  j = 0; j < ncols; ++j )
             {
-                const auto  x_j = x[j];
+                const auto  x_j = alpha * x[j];
                 
                 for ( size_t  i = 0; i < nrows; ++i, pos++ )
                     y[i] += value_t(zA[pos]) * x_j;
@@ -815,7 +816,7 @@ mulvec ( const size_t       nrows,
                 for ( size_t  i = 0; i < nrows; ++i, pos++ )
                     y_j += value_t(zA[pos]) * x[i];
 
-                y[j] += y_j;
+                y[j] += alpha * y_j;
             }// for
         }// case
         break;
@@ -826,6 +827,119 @@ mulvec ( const size_t       nrows,
 }
 
 }// namespace anonymous
+
+template < typename value_t >
+void
+mulvec ( const size_t     nrows,
+         const size_t     ncols,
+         const matop_t    op_A,
+         const value_t    alpha,
+         const zarray &   zA,
+         const value_t *  x,
+         value_t *        y );
+
+template <>
+inline
+void
+mulvec< float > ( const size_t     nrows,
+                  const size_t     ncols,
+                  const matop_t    op_A,
+                  const float      alpha,
+                  const zarray &   zA,
+                  const float *    x,
+                  float *          y )
+{
+    HLR_ERROR( "TODO" );
+
+    const uint8_t  ftype = zA[0];
+    
+    switch ( ftype )
+    {
+        case  1 :
+        {
+            //
+            // fp16_t
+            //
+
+            auto  zptr = reinterpret_cast< const fp16_t * >( zA.data() + 1 );
+            
+            internal_mulvec< float, fp16_t >( nrows, ncols, op_A, alpha, zptr, x, y );
+        }
+        break;
+            
+        case  2 :
+        {
+            //
+            // fp32_t
+            //
+
+            auto  zptr = reinterpret_cast< const fp32_t * >( zA.data() + 1 );
+
+            internal_mulvec< float, fp32_t >( nrows, ncols, op_A, alpha, zptr, x, y );
+        }
+        break;
+
+        default :
+            HLR_ERROR( "invalid FP type in compressed data" );
+    }// switch
+}
+
+template <>
+inline
+void
+mulvec< double > ( const size_t     nrows,
+                   const size_t     ncols,
+                   const matop_t    op_A,
+                   const double     alpha,
+                   const zarray &   zA,
+                   const double *   x,
+                   double *         y )
+{
+    const uint8_t  ftype = zA[0];
+    
+    switch ( ftype )
+    {
+        case  1 :
+        {
+            //
+            // fp16_t
+            //
+
+            auto  zptr = reinterpret_cast< const fp16_t * >( zA.data() + 2 );
+            
+            internal_mulvec< double, fp16_t >( nrows, ncols, op_A, alpha, zptr, x, y );
+        }
+        break;
+            
+        case  2 :
+        {
+            //
+            // fp32_t
+            //
+
+            auto  zptr = reinterpret_cast< const fp32_t * >( zA.data() + 4 );
+
+            internal_mulvec< double, fp32_t >( nrows, ncols, op_A, alpha, zptr, x, y );
+        }
+        break;
+
+        case  3 :
+        {
+            //
+            // fp64_t
+            //
+
+            auto  zptr = reinterpret_cast< const fp64_t * >( zA.data() + 8 );
+
+            internal_mulvec< double, fp64_t >( nrows, ncols, op_A, alpha, zptr, x, y );
+            // blas::gemv( 'N', nrows, ncols, alpha, zptr, nrows, x, 1, fp64_t(1), y, 1 );
+        }
+        break;
+
+        default :
+            HLR_ERROR( "invalid FP type in compressed data" );
+    }// switch
+}
 
 template < typename value_t >
 void
@@ -877,7 +991,7 @@ mulvec_lr< float > ( const size_t     nrows,
                         blas::gemv( 'N', nrows, n_fp32, alpha, zptr, nrows, x + dpos, 1, fp32_t(1), y, 1 );
                     }// if
                     // {
-                    //     mulvec< value_t, fp32_t >( nrows, n_fp32, op_A, alpha, zptr, x + dpos, y );
+                    //     internal_mulvec< value_t, fp32_t >( nrows, n_fp32, op_A, alpha, zptr, x + dpos, y );
                     // }// else
                 
                     zpos += n_fp32 * nrows * sizeof(fp32_t);
@@ -888,7 +1002,7 @@ mulvec_lr< float > ( const size_t     nrows,
                 {
                     auto  zptr = reinterpret_cast< const fp16_t * >( zA.data() + zpos );
                 
-                    mulvec< value_t, fp16_t >( nrows, n_fp16, op_A, alpha, zptr, x + dpos, y );
+                    internal_mulvec< value_t, fp16_t >( nrows, n_fp16, op_A, alpha, zptr, x + dpos, y );
                     zpos += n_fp16 * nrows * sizeof(fp16_t);
                     dpos += n_fp16;
                 }// if
@@ -905,7 +1019,7 @@ mulvec_lr< float > ( const size_t     nrows,
                 {
                     auto  zptr = reinterpret_cast< const fp32_t * >( zA.data() + zpos );
                 
-                    mulvec< value_t, fp32_t >( nrows, n_fp32, op_A, alpha, zptr, x, y + dpos );
+                    internal_mulvec< value_t, fp32_t >( nrows, n_fp32, op_A, alpha, zptr, x, y + dpos );
                     zpos += n_fp32 * nrows * sizeof(fp32_t);
                     dpos += n_fp32;
                 }// if
@@ -914,7 +1028,7 @@ mulvec_lr< float > ( const size_t     nrows,
                 {
                     auto  zptr = reinterpret_cast< const fp16_t * >( zA.data() + zpos );
                 
-                    mulvec< value_t, fp16_t >( nrows, n_fp16, op_A, alpha, zptr, x, y + dpos );
+                    internal_mulvec< value_t, fp16_t >( nrows, n_fp16, op_A, alpha, zptr, x, y + dpos );
                     zpos += n_fp16 * nrows * sizeof(fp16_t);
                     dpos += n_fp16;
                 }// if
@@ -984,7 +1098,7 @@ mulvec_lr< double > ( const size_t     nrows,
                             y[i] += ty(i);
                     }// if
                     // {
-                    //     mulvec< value_t, fp32_t >( nrows, n_fp32, op_A, alpha, zptr, x + dpos, y );
+                    //     internal_mulvec< value_t, fp32_t >( nrows, n_fp32, op_A, alpha, zptr, x + dpos, y );
                     // }// else
                 
                     zpos += n_fp32 * nrows * sizeof(fp32_t);
@@ -995,7 +1109,7 @@ mulvec_lr< double > ( const size_t     nrows,
                 {
                     auto  zptr = reinterpret_cast< const fp16_t * >( zA.data() + zpos );
                 
-                    mulvec< value_t, fp16_t >( nrows, n_fp16, op_A, alpha, zptr, x + dpos, y );
+                    internal_mulvec< value_t, fp16_t >( nrows, n_fp16, op_A, alpha, zptr, x + dpos, y );
                     zpos += n_fp16 * nrows * sizeof(fp16_t);
                     dpos += n_fp16;
                 }// if
@@ -1012,7 +1126,7 @@ mulvec_lr< double > ( const size_t     nrows,
                 {
                     auto  zptr = reinterpret_cast< const fp64_t * >( zA.data() + zpos );
                 
-                    mulvec< value_t, fp64_t >( nrows, n_fp64, op_A, alpha, zptr, x, y + dpos );
+                    internal_mulvec< value_t, fp64_t >( nrows, n_fp64, op_A, alpha, zptr, x, y + dpos );
                     zpos += n_fp64 * nrows * sizeof(fp64_t);
                     dpos += n_fp64;
                 }// if
@@ -1021,7 +1135,7 @@ mulvec_lr< double > ( const size_t     nrows,
                 {
                     auto  zptr = reinterpret_cast< const fp32_t * >( zA.data() + zpos );
                 
-                    mulvec< value_t, fp32_t >( nrows, n_fp32, op_A, alpha, zptr, x, y + dpos );
+                    internal_mulvec< value_t, fp32_t >( nrows, n_fp32, op_A, alpha, zptr, x, y + dpos );
                     zpos += n_fp32 * nrows * sizeof(fp32_t);
                     dpos += n_fp32;
                 }// if
@@ -1030,7 +1144,7 @@ mulvec_lr< double > ( const size_t     nrows,
                 {
                     auto  zptr = reinterpret_cast< const fp16_t * >( zA.data() + zpos );
                 
-                    mulvec< value_t, fp16_t >( nrows, n_fp16, op_A, alpha, zptr, x, y + dpos );
+                    internal_mulvec< value_t, fp16_t >( nrows, n_fp16, op_A, alpha, zptr, x, y + dpos );
                     zpos += n_fp16 * nrows * sizeof(fp16_t);
                     dpos += n_fp16;
                 }// if

@@ -548,6 +548,8 @@ using hlr::compress::mixedprec::get_config;
 using hlr::compress::mixedprec::byte_size;
 using hlr::compress::mixedprec::compressed_size;
 
+namespace zblas { using hlr::compress::mixedprec::mulvec; }
+
 }} // namespace hlr::compress
 
 //////////////////////////////////////////////////////////////////////
