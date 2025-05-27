@@ -45,6 +45,18 @@ program_main ()
 
     auto  problem = gen_problem< problem_t >();
     auto  coord   = problem->coordinates();
+
+    // adjust ntile to √n
+    if (( cmdline::cluster == "tlr" ) && ( cmdline::ntile == 0 ))
+    {
+        auto  lg2 = std::log2( std::sqrt( double(coord->ncoord()) ) );
+        auto  up  = 1 << uint( std::ceil( lg2 ) );
+        auto  lo  = 1 << uint( std::floor( lg2 ) );
+
+        ntile = lo;
+        std::cout << "    ntile  = " << ntile << std::endl;
+    }
+    
     auto  ct      = gen_ct( *coord );
     auto  bct     = gen_bct( *ct, *ct );
 
