@@ -201,6 +201,7 @@ program_main ()
             t_ref = min( runtime );
             
             std::cout << "      flops   = " << format_flops( flops_h, min( runtime ) ) << std::endl;
+            std::cout << "      bandw.  = " << format_bandwidth( double(bytes_h) / min( runtime ) ) << std::endl;
             
             auto  diff = y_ref->copy();
 
@@ -247,6 +248,7 @@ program_main ()
 
             std::cout << "      ratio   = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
             std::cout << "      flops   = " << format_flops( flops_h, min( runtime ) ) << std::endl;
+            std::cout << "      bandw.  = " << format_bandwidth( double(bytes_h) / min( runtime ) ) << std::endl;
 
             auto  diff = y_ref->copy();
 
@@ -293,6 +295,7 @@ program_main ()
 
             std::cout << "      ratio   = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
             std::cout << "      flops   = " << format_flops( flops_h, min( runtime ) ) << std::endl;
+            std::cout << "      bandw.  = " << format_bandwidth( double(bytes_h) / min( runtime ) ) << std::endl;
 
             auto  diff = y_ref->copy();
 
@@ -339,6 +342,7 @@ program_main ()
 
             std::cout << "      ratio   = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
             std::cout << "      flops   = " << format_flops( flops_h, min( runtime ) ) << std::endl;
+            std::cout << "      bandw.  = " << format_bandwidth( double(bytes_h) / min( runtime ) ) << std::endl;
 
             auto  diff = y_ref->copy();
 
@@ -383,6 +387,7 @@ program_main ()
 
             std::cout << "      ratio   = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
             std::cout << "      flops   = " << format_flops( flops_h, min( runtime ) ) << std::endl;
+            std::cout << "      bandw.  = " << format_bandwidth( double(bytes_h) / min( runtime ) ) << std::endl;
             
             auto  diff = y_ref->copy();
 
@@ -427,6 +432,7 @@ program_main ()
 
             std::cout << "      ratio   = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
             std::cout << "      flops   = " << format_flops( flops_h, min( runtime ) ) << std::endl;
+            std::cout << "      bandw.  = " << format_bandwidth( double(bytes_h) / min( runtime ) ) << std::endl;
             
             auto  diff = y_ref->copy();
 

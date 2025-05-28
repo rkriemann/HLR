@@ -145,6 +145,13 @@ format_flops ( const double  f,
 
 inline
 std::string
+format_bandwidth ( const double  f )
+{
+    return str( boost::format( "%.2f GB/s" ) % ( f / 1e9 ) );
+}
+
+inline
+std::string
 format_rate ( const double  r )
 {
     return hlr::term::italic( str( boost::format( "%.02fx" ) % r ) );
