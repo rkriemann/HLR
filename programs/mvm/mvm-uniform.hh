@@ -249,6 +249,7 @@ program_main ()
             std::cout << std::endl;
 
             std::cout << "      flops   = " << format_flops( flops_uh, min( runtime ) ) << std::endl;
+            std::cout << "      bandw.  = " << format_bandwidth( double(bytes_uh) / min( runtime ) ) << std::endl;
             
             t_ref = min( runtime );
             
@@ -261,7 +262,7 @@ program_main ()
             std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
-        if ( false )
+        if ( true )
         {
             runtime.clear();
             
@@ -294,6 +295,7 @@ program_main ()
             std::cout << std::endl;
 
             std::cout << "      flops   = " << format_flops( flops_uh, min( runtime ) ) << std::endl;
+            std::cout << "      bandw.  = " << format_bandwidth( double(bytes_uh) / min( runtime ) ) << std::endl;
             
             t_ref = min( runtime );
             
@@ -341,6 +343,7 @@ program_main ()
             std::cout << std::endl;
 
             std::cout << "      flops   = " << format_flops( flops_uh, min( runtime ) ) << std::endl;
+            std::cout << "      bandw.  = " << format_bandwidth( double(bytes_uh) / min( runtime ) ) << std::endl;
             
             t_ref = min( runtime );
             
@@ -390,6 +393,7 @@ program_main ()
         
             std::cout << "      ratio   = " << boost::format( "%.02f" ) % ( min( runtime ) / t_ref ) << std::endl;
             std::cout << "      flops   = " << format_flops( flops_uh, min( runtime ) ) << std::endl;
+            std::cout << "      bandw.  = " << format_bandwidth( double(bytes_uh) / min( runtime ) ) << std::endl;
 
             auto  diff = y_ref->copy();
 
