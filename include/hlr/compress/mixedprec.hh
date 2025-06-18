@@ -826,6 +826,81 @@ internal_mulvec ( const size_t       nrows,
     }// switch
 }
 
+//
+// specializations using BLAS
+//
+template <>
+void
+internal_mulvec ( const size_t    nrows,
+                  const size_t    ncols,
+                  const matop_t   op_A,
+                  const double    alpha,
+                  const fp32_t *  zA,
+                  const double *  x,
+                  double *        y )
+{
+    switch ( op_A )
+    {
+        case apply_normal    :
+        case apply_conjugate :
+        {
+            auto  tx = blas::vector< fp32_t >( ncols );
+            auto  ty = blas::vector< fp32_t >( nrows );
+            
+            for ( size_t  i = 0; i < ncols; ++i )
+                tx(i) = *(x + i);
+                    
+            blas::gemv( op_A, nrows, ncols, alpha, zA, nrows, tx.data(), 1, fp32_t(0), ty.data(), 1 );
+            
+            for ( size_t  i = 0; i < nrows; ++i )
+                y[i] += ty(i);
+        }
+        break;
+
+        case apply_transposed :
+        case apply_adjoint    :
+        {
+            auto  tx = blas::vector< fp32_t >( nrows );
+            auto  ty = blas::vector< fp32_t >( ncols );
+            
+            for ( size_t  i = 0; i < nrows; ++i )
+                tx(i) = *(x + i);
+                    
+            blas::gemv( op_A, nrows, ncols, alpha, zA, nrows, tx.data(), 1, fp32_t(0), ty.data(), 1 );
+            
+            for ( size_t  i = 0; i < ncols; ++i )
+                y[i] += ty(i);
+        }
+        break;
+    }// switch
+}
+
+template <>
+void
+internal_mulvec ( const size_t    nrows,
+                  const size_t    ncols,
+                  const matop_t   op_A,
+                  const float     alpha,
+                  const fp32_t *  zA,
+                  const float *   x,
+                  float *         y )
+{
+    blas::gemv( op_A, nrows, ncols, alpha, zA, nrows, x, 1, fp32_t(1), y, 1 );
+}
+
+template <>
+void
+internal_mulvec ( const size_t    nrows,
+                  const size_t    ncols,
+                  const matop_t   op_A,
+                  const double    alpha,
+                  const fp64_t *  zA,
+                  const double *  x,
+                  double *        y )
+{
+    blas::gemv( op_A, nrows, ncols, alpha, zA, nrows, x, 1, fp64_t(1), y, 1 );
+}
+
 }// namespace anonymous
 
 template < typename value_t >
@@ -932,7 +1007,6 @@ mulvec< double > ( const size_t     nrows,
             auto  zptr = reinterpret_cast< const fp64_t * >( zA.data() + 8 );
 
             internal_mulvec< double, fp64_t >( nrows, ncols, op_A, alpha, zptr, x, y );
-            // blas::gemv( 'N', nrows, ncols, alpha, zptr, nrows, x, 1, fp64_t(1), y, 1 );
         }
         break;
 
@@ -987,13 +1061,7 @@ mulvec_lr< float > ( const size_t     nrows,
                 {
                     auto  zptr = reinterpret_cast< const fp32_t * >( zA.data() + zpos );
                 
-                    {
-                        blas::gemv( 'N', nrows, n_fp32, alpha, zptr, nrows, x + dpos, 1, fp32_t(1), y, 1 );
-                    }// if
-                    // {
-                    //     internal_mulvec< value_t, fp32_t >( nrows, n_fp32, op_A, alpha, zptr, x + dpos, y );
-                    // }// else
-                
+                    internal_mulvec< value_t, fp32_t >( nrows, n_fp32, op_A, alpha, zptr, x + dpos, y );
                     zpos += n_fp32 * nrows * sizeof(fp32_t);
                     dpos += n_fp32;
                 }// if
@@ -1075,8 +1143,7 @@ mulvec_lr< double > ( const size_t     nrows,
                 {
                     auto  zptr = reinterpret_cast< const fp64_t * >( zA.data() + zpos );
                 
-                    blas::gemv( 'N', nrows, n_fp64, alpha, zptr, nrows, x + dpos, 1, fp64_t(1), y, 1 );
-                
+                    internal_mulvec< value_t, fp64_t >( nrows, n_fp64, op_A, alpha, zptr, x + dpos, y );
                     zpos += n_fp64 * nrows * sizeof(fp64_t);
                     dpos += n_fp64;
                 }// if
@@ -1085,22 +1152,7 @@ mulvec_lr< double > ( const size_t     nrows,
                 {
                     auto  zptr = reinterpret_cast< const fp32_t * >( zA.data() + zpos );
                 
-                    {
-                        auto  tx = blas::vector< fp32_t >( n_fp32 );
-                        auto  ty = blas::vector< fp32_t >( nrows );
-
-                        for ( size_t  i = 0; i < n_fp32; ++i )
-                            tx(i) = *(x + dpos + i);
-                    
-                        blas::gemv( 'N', nrows, n_fp32, alpha, zptr, nrows, tx.data(), 1, fp32_t(0), ty.data(), 1 );
-
-                        for ( size_t  i = 0; i < nrows; ++i )
-                            y[i] += ty(i);
-                    }// if
-                    // {
-                    //     internal_mulvec< value_t, fp32_t >( nrows, n_fp32, op_A, alpha, zptr, x + dpos, y );
-                    // }// else
-                
+                    internal_mulvec< value_t, fp32_t >( nrows, n_fp32, op_A, alpha, zptr, x + dpos, y );
                     zpos += n_fp32 * nrows * sizeof(fp32_t);
                     dpos += n_fp32;
                 }// if
