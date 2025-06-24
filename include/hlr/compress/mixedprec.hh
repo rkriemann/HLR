@@ -130,11 +130,11 @@ constexpr byte_t  fp32_prec_bits = 24;
 // coarsest precision
 #if HLR_HAS_FLOAT16
 using             fp16_t         = _Float16;
-constexpr double  fp16_prec      = 4.9e-4;
+constexpr double  fp16_prec      = 4.8828125e-04;
 constexpr byte_t  fp16_prec_bits = 11;
 #else
 using             fp16_t         = bf16;
-constexpr double  fp16_prec      = 3.9e-3;
+constexpr double  fp16_prec      = 3.90625e-03;
 constexpr byte_t  fp16_prec_bits = 8;
 #endif
 
