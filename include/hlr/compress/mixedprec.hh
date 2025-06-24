@@ -18,6 +18,7 @@
 //
 #define HLR_HAS_ZBLAS_DIRECT
 #define HLR_HAS_ZBLAS_VALR
+#define HLR_MP_BLAS_MVM  // activate for BLAS based specializations in MVM
 
 ////////////////////////////////////////////////////////////
 //
@@ -826,6 +827,8 @@ internal_mulvec ( const size_t       nrows,
     }// switch
 }
 
+#if defined(HLR_MP_BLAS_MVM)
+
 //
 // specializations using BLAS
 //
@@ -900,6 +903,8 @@ internal_mulvec ( const size_t    nrows,
 {
     blas::gemv( op_A, nrows, ncols, alpha, zA, nrows, x, 1, fp64_t(1), y, 1 );
 }
+
+#endif
 
 }// namespace anonymous
 
