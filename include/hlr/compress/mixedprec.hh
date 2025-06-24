@@ -18,7 +18,7 @@
 //
 #define HLR_HAS_ZBLAS_DIRECT
 #define HLR_HAS_ZBLAS_VALR
-#define HLR_MP_BLAS_MVM  // activate for BLAS based specializations in MVM
+// #define HLR_MP_BLAS_MVM  // activate for BLAS based specializations in MVM
 
 ////////////////////////////////////////////////////////////
 //
