@@ -66,7 +66,7 @@ inline config  get_config      ( const double    eps ) { return config{ eps_to_r
 // check some of the default defines for this
 //
 #if defined(__FLT16_EPSILON__)
-#  define HLR_HAS_FLOAT16  0 // prefer BF16 anyway because much faster
+#  define HLR_HAS_FLOAT16  1 // prefer BF16 anyway because much faster
 #else
 #  define HLR_HAS_FLOAT16  0
 #endif
@@ -173,7 +173,7 @@ compress ( const config &   config,
     
     const size_t  nsize     = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
     const auto    prec_bits = std::min< byte_t >( prec_bits_v< real_t >, config.bitrate );
-    
+
     if ( prec_bits <= fp16_prec_bits )
     {
         const auto  nbytes = 2 + nsize * 2;
@@ -183,8 +183,39 @@ compress ( const config &   config,
 
         auto  ptr = reinterpret_cast< fp16_t * >( zdata.data() + 2 );
 
-        for ( size_t  i = 0; i < nsize; ++i )
-            *(ptr++) = fp16_t( data[i] );
+        #if HLR_HAS_FLOAT16 == 1
+        if constexpr ( std::same_as< value_t, double > )
+        {
+            const size_t  nsize8 = ( nsize / 8 ) * 8; // size for SIMD
+            size_t        i      = 0;
+    
+            #pragma GCC ivdep
+            for ( ; i < nsize8; i += 8, ptr += 8 )
+            {
+                __m256  f1{ float(data[i]),
+                            float(data[i+1]),
+                            float(data[i+2]),
+                            float(data[i+3]),
+                            float(data[i+4]),
+                            float(data[i+5]),
+                            float(data[i+6]),
+                            float(data[i+7]) };
+                auto    f2 = _mm256_cvtps_ph( f1, _MM_ROUND_NEAREST );
+
+                std::memcpy( ptr, &f2, sizeof(fp16_t) * 8 );
+            }// for
+
+            #pragma GCC ivdep
+            for ( ; i < nsize; ++i )
+                *(ptr++) = fp16_t( data[i] );
+        }// if
+        else
+        #endif
+        {
+            #pragma GCC ivdep
+            for ( size_t  i = 0; i < nsize; ++i )
+                *(ptr++) = fp16_t( data[i] );
+        }// else
 
         return zdata;
     }// if
@@ -197,6 +228,7 @@ compress ( const config &   config,
 
         auto  ptr = reinterpret_cast< fp32_t * >( zdata.data() + 4 );
 
+        #pragma GCC ivdep
         for ( size_t  i = 0; i < nsize; ++i )
             *(ptr++) = fp32_t( data[i] );
 
@@ -211,6 +243,7 @@ compress ( const config &   config,
 
         auto  ptr = reinterpret_cast< fp64_t * >( zdata.data() + 8 );
 
+        #pragma GCC ivdep
         for ( size_t  i = 0; i < nsize; ++i )
             *(ptr++) = fp64_t( data[i] );
 
@@ -267,7 +300,7 @@ decompress ( const zarray &  zdata,
 {
     using  real_t = Hpro::real_type_t< value_t >;
     
-    const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
+    const size_t  nsize  = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
 
     //
     // convert back based on given FP type
@@ -279,8 +312,36 @@ decompress ( const zarray &  zdata,
         {
             auto  ptr = reinterpret_cast< const fp16_t * >( zdata.data() + 2 );
 
-            for ( size_t  i = 0; i < nsize; ++i )
-                dest[i] = value_t( *(ptr++) );
+            #if HLR_HAS_FLOAT16 == 1
+            if constexpr ( std::same_as< value_t, double > )
+            {
+                float         val[8]  __attribute__((aligned(64)));
+                const size_t  nsize8 = ( nsize / 8 ) * 8; // size for SIMD
+                size_t        i      = 0;
+                
+                #pragma GCC ivdep
+                for ( ; i < nsize8; i += 8, ptr += 8 )
+                {
+                    __m128i  f;
+
+                    std::memcpy( &f, ptr, sizeof(fp16_t) * 8 );
+                    _mm256_store_ps( val, _mm256_cvtph_ps( f ) );
+
+                    for ( size_t  j = 0; j < 8; ++j )
+                        dest[i+j] = val[j];
+                }// for
+
+                #pragma GCC ivdep
+                for ( ; i < nsize; ++i )
+                    dest[i] = value_t( *(ptr++) );
+            }// if
+            else
+            #endif
+            {
+                #pragma GCC ivdep
+                for ( size_t  i = 0; i < nsize; ++i )
+                    dest[i] = value_t( *(ptr++) );
+            }// else
         }
         break;
         
@@ -288,6 +349,7 @@ decompress ( const zarray &  zdata,
         {
             auto  ptr = reinterpret_cast< const fp32_t * >( zdata.data() + 4 );
 
+            #pragma GCC ivdep
             for ( size_t  i = 0; i < nsize; ++i )
                 dest[i] = value_t( *(ptr++) );
         }
@@ -297,6 +359,7 @@ decompress ( const zarray &  zdata,
         {
             auto  ptr = reinterpret_cast< const fp64_t * >( zdata.data() + 8 );
 
+            #pragma GCC ivdep
             for ( size_t  i = 0; i < nsize; ++i )
                 dest[i] = value_t( *(ptr++) );
         }
@@ -409,6 +472,7 @@ compress_lr< float > ( const hlr::blas::matrix< float > &  U,
 
         for ( uint32_t  l = 0; l < n_fp32; ++l, ++k )
         {
+            #pragma GCC ivdep
             for ( size_t  i = 0; i < n; ++i, ++zpos )
                 zptr[zpos] = fp32_t( U(i,k) );
         }// for
@@ -421,6 +485,7 @@ compress_lr< float > ( const hlr::blas::matrix< float > &  U,
 
         for ( uint32_t  l = 0; l < n_fp16; ++l, ++k )
         {
+            #pragma GCC ivdep
             for ( size_t  i = 0; i < n; ++i, ++zpos )
                 zptr[zpos] = fp16_t( U(i,k) );
         }// for
@@ -494,6 +559,7 @@ compress_lr< double > ( const hlr::blas::matrix< double > &  U,
 
         for ( uint32_t  l = 0; l < n_fp64; ++l, ++k )
         {
+            #pragma GCC ivdep
             for ( size_t  i = 0; i < n; ++i, ++zpos )
                 zptr[zpos] = fp64_t( U(i,k) );
         }// for
@@ -506,6 +572,7 @@ compress_lr< double > ( const hlr::blas::matrix< double > &  U,
 
         for ( uint32_t  l = 0; l < n_fp32; ++l, ++k )
         {
+            #pragma GCC ivdep
             for ( size_t  i = 0; i < n; ++i, ++zpos )
                 zptr[zpos] = fp32_t( U(i,k) );
         }// for
@@ -518,8 +585,38 @@ compress_lr< double > ( const hlr::blas::matrix< double > &  U,
 
         for ( uint32_t  l = 0; l < n_fp16; ++l, ++k )
         {
+            #if HLR_HAS_FLOAT16 == 1
+
+            const size_t  n8 = ( n / 8 ) * 8; // size for SIMD
+            size_t        i  = 0;
+
+            #pragma GCC ivdep
+            for ( ; i < n8; i += 8, zpos += 8 )
+            {
+                __m256  f1{ float(U(i  ,k)),
+                            float(U(i+1,k)),
+                            float(U(i+2,k)),
+                            float(U(i+3,k)),
+                            float(U(i+4,k)),
+                            float(U(i+5,k)),
+                            float(U(i+6,k)),
+                            float(U(i+7,k)) };
+                auto    f2 = _mm256_cvtps_ph( f1, _MM_ROUND_NEAREST );
+
+                std::memcpy( zptr + zpos, &f2, sizeof(fp16_t) * 8 );
+            }// for
+            
+            #pragma GCC ivdep
+            for ( ; i < n; ++i, ++zpos )
+                zptr[zpos] = fp16_t( U(i,k) );
+            
+            #else
+            
+            #pragma GCC ivdep
             for ( size_t  i = 0; i < n; ++i, ++zpos )
                 zptr[zpos] = fp16_t( U(i,k) );
+
+            #endif
         }// for
         pos += n_fp16 * n * sizeof(fp16_t);
     }
@@ -643,6 +740,7 @@ decompress_lr< float > ( const zarray &                zdata,
 
         for ( uint32_t  l = 0; l < n_fp32; ++l, ++k )
         {
+            #pragma GCC ivdep
             for ( size_t  i = 0; i < nrows; ++i, ++zpos )
                 U(i,k) = zptr[zpos];
         }// for
@@ -656,6 +754,7 @@ decompress_lr< float > ( const zarray &                zdata,
 
         for ( uint32_t  l = 0; l < n_fp16; ++l, ++k )
         {
+            #pragma GCC ivdep
             for ( size_t  i = 0; i < nrows; ++i, ++zpos )
                 U(i,k) = zptr[zpos];
         }// for
@@ -686,6 +785,7 @@ decompress_lr< double > ( const zarray &                 zdata,
 
         for ( uint32_t  l = 0; l < n_fp64; ++l, ++k )
         {
+            #pragma GCC ivdep
             for ( size_t  i = 0; i < nrows; ++i, ++zpos )
                 U(i,k) = zptr[zpos];
         }// for
@@ -699,6 +799,7 @@ decompress_lr< double > ( const zarray &                 zdata,
 
         for ( uint32_t  l = 0; l < n_fp32; ++l, ++k )
         {
+            #pragma GCC ivdep
             for ( size_t  i = 0; i < nrows; ++i, ++zpos )
                 U(i,k) = zptr[zpos];
         }// for
@@ -710,10 +811,40 @@ decompress_lr< double > ( const zarray &                 zdata,
         auto    zptr = reinterpret_cast< const fp16_t * >( zdata.data() + pos );
         size_t  zpos = 0;
 
+        #if HLR_HAS_FLOAT16 == 1
+        float         val[8]  __attribute__((aligned(32)));
+        const size_t  nrows8 = ( nrows / 8 ) * 8; // size for SIMD
+        #endif
+
         for ( uint32_t  l = 0; l < n_fp16; ++l, ++k )
         {
+            #if HLR_HAS_FLOAT16 == 1
+
+            size_t  i = 0;
+            
+            #pragma GCC ivdep
+            for ( ; i < nrows8; i += 8, zpos += 8 )
+            {
+                __m128i  f2;
+                
+                std::memcpy( &f2, zptr + zpos, sizeof(fp16_t) * 8 );
+                _mm256_store_ps( val, _mm256_cvtph_ps( f2 ) );
+                
+                for ( size_t  j = 0; j < 8; ++j )
+                    U(i+j,k) = val[j];
+            }// for
+
+            #pragma GCC ivdep
+            for ( ; i < nrows; ++i, ++zpos )
+                U(i,k) = zptr[zpos];
+            
+            #else
+            
+            #pragma GCC ivdep
             for ( size_t  i = 0; i < nrows; ++i, ++zpos )
                 U(i,k) = zptr[zpos];
+                
+            #endif
         }// for
         pos += n_fp16 * nrows * sizeof(fp16_t);
     }// if
@@ -800,6 +931,7 @@ internal_mulvec ( const size_t       nrows,
             {
                 const auto  x_j = alpha * x[j];
                 
+                #pragma GCC ivdep
                 for ( size_t  i = 0; i < nrows; ++i, pos++ )
                     y[i] += value_t(zA[pos]) * x_j;
             }// for
@@ -814,6 +946,7 @@ internal_mulvec ( const size_t       nrows,
             {
                 value_t  y_j = value_t(0);
                 
+                #pragma GCC ivdep
                 for ( size_t  i = 0; i < nrows; ++i, pos++ )
                     y_j += value_t(zA[pos]) * x[i];
 
@@ -826,6 +959,89 @@ internal_mulvec ( const size_t       nrows,
             HLR_ERROR( "TODO" );
     }// switch
 }
+
+#if HLR_HAS_FLOAT16 == 1
+//
+// special version for real FP16 and double
+//
+template <>
+void
+internal_mulvec ( const size_t    nrows,
+                  const size_t    ncols,
+                  const matop_t   op_A,
+                  const double    alpha,
+                  const fp16_t *  zA,
+                  const double *  x,
+                  double *        y )
+{
+    float         val[8]  __attribute__((aligned(32)));
+    const size_t  nrows8 = ( nrows / 8 ) * 8; // size for SIMD
+    
+    switch ( op_A )
+    {
+        case  apply_normal :
+        {
+            size_t  pos = 0;
+            
+            for ( size_t  j = 0; j < ncols; ++j )
+            {
+                const auto  x_j = alpha * x[j];
+                size_t      i   = 0;
+                
+                #pragma GCC ivdep
+                for ( ; i < nrows8; i += 8, pos += 8 )
+                {
+                    __m128i  f;
+                
+                    std::memcpy( &f, zA + pos, sizeof(fp16_t) * 8 );
+                    _mm256_store_ps( val, _mm256_cvtph_ps( f ) );
+                
+                    for ( size_t  j = 0; j < 8; ++j )
+                        y[i+j] += double(val[j]) * x_j;
+                }// for
+
+                #pragma GCC ivdep
+                for ( ; i < nrows; ++i, pos++ )
+                    y[i] += double(zA[pos]) * x_j;
+            }// for
+        }// case
+        break;
+        
+        case  apply_adjoint :
+        {
+            size_t  pos = 0;
+            
+            for ( size_t  j = 0; j < ncols; ++j )
+            {
+                double  y_j = 0;
+                size_t  i   = 0;
+                
+                #pragma GCC ivdep
+                for ( ; i < nrows8; i += 8, pos += 8 )
+                {
+                    __m128i  f;
+                
+                    std::memcpy( &f, zA + pos, sizeof(fp16_t) * 8 );
+                    _mm256_store_ps( val, _mm256_cvtph_ps( f ) );
+                
+                    for ( size_t  j = 0; j < 8; ++j )
+                        y_j += double(val[j]) * x[i+j];
+                }// for
+
+                #pragma GCC ivdep
+                for ( ; i < nrows; ++i, pos++ )
+                    y_j += double(zA[pos]) * x[i];
+                
+                y[j] += alpha * y_j;
+            }// for
+        }// case
+        break;
+
+        default:
+            HLR_ERROR( "TODO" );
+    }// switch
+}
+#endif
 
 #if defined(HLR_MP_BLAS_MVM)
 
@@ -850,11 +1066,13 @@ internal_mulvec ( const size_t    nrows,
             auto  tx = blas::vector< fp32_t >( ncols );
             auto  ty = blas::vector< fp32_t >( nrows );
             
+            #pragma GCC ivdep
             for ( size_t  i = 0; i < ncols; ++i )
                 tx(i) = *(x + i);
                     
             blas::gemv( op_A, nrows, ncols, alpha, zA, nrows, tx.data(), 1, fp32_t(0), ty.data(), 1 );
             
+            #pragma GCC ivdep
             for ( size_t  i = 0; i < nrows; ++i )
                 y[i] += ty(i);
         }
@@ -866,11 +1084,13 @@ internal_mulvec ( const size_t    nrows,
             auto  tx = blas::vector< fp32_t >( nrows );
             auto  ty = blas::vector< fp32_t >( ncols );
             
+            #pragma GCC ivdep
             for ( size_t  i = 0; i < nrows; ++i )
                 tx(i) = *(x + i);
                     
             blas::gemv( op_A, nrows, ncols, alpha, zA, nrows, tx.data(), 1, fp32_t(0), ty.data(), 1 );
             
+            #pragma GCC ivdep
             for ( size_t  i = 0; i < ncols; ++i )
                 y[i] += ty(i);
         }
