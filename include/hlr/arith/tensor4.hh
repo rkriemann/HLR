@@ -553,4 +553,4 @@ hadamard_product ( const tensor4< value_t > &  t1,
 
 #include <hlr/arith/detail/tensor4.hh>
 
-#endif  // __HPRO_BLAS_TENSOR_HH
+#endif  // __HLR_BLAS_TENSOR_HH
