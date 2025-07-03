@@ -24,9 +24,10 @@ CXX          = 'g++'
 CXXFLAGS     = '-std=c++20'
 CPUFLAGS     = 'cpuflags'
 
+MACHFLAGS    = '-march=native'
 DBGFLAGS     = '-g -frounding-math'
-RELDBGFLAGS  = '-g -O2 -march=native'
-RELFLAGS     = '-O3 -fomit-frame-pointer -ffast-math -funroll-loops -march=native'
+RELDBGFLAGS  = '-g -O2'
+RELFLAGS     = '-O3 -fomit-frame-pointer -ffast-math -funroll-loops'
 OPTFLAGS     = RELFLAGS
 WARNFLAGS    = '' # '-Wall'
 LINKFLAGS    = '-g'
@@ -609,7 +610,7 @@ if warn :
 env = Environment( options    = opts, # TODO: <- check without
                    ENV        = os.environ,
                    CXX        = CXX,
-                   CXXFLAGS   = Split( CXXFLAGS + ' ' + OPTFLAGS + ' ' + WARNFLAGS ),
+                   CXXFLAGS   = Split( CXXFLAGS + ' ' + MACHFLAGS + ' ' + OPTFLAGS + ' ' + WARNFLAGS ),
                    LINKFLAGS  = Split( LINKFLAGS ),
                    CPPDEFINES = Split( DEFINES ) )
 
