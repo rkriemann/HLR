@@ -365,7 +365,7 @@ program_main ()
 
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
-            std::cout << "      compressed in   " << format_time( toc ) << std::endl;
+            std::cout << term::rollback << term::clearline << "      compressed in   " << format_time( toc ) << term::flush;
 
             if ( i < niter-1 )
             {
@@ -375,9 +375,9 @@ program_main ()
         }// for
 
         if ( nbench > 1 )
-            std::cout << "    runtime  = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                      << std::endl;
+            std::cout << term::rollback << term::clearline << "    runtime = "
+                      << format_time( min( runtime ), median( runtime ), max( runtime ) );
+        std::cout << std::endl;
     }
 
     const auto  mem_zA    = matrix::data_byte_size( *zA );
@@ -418,7 +418,7 @@ program_main ()
             
             toc = timer::since( tic );
             runtime.push_back( toc.seconds() );
-            std::cout << "      decompressed in   " << format_time( toc ) << std::endl;
+            std::cout << term::rollback << term::clearline << "      decompressed in   " << format_time( toc ) << term::flush;
 
             if ( i < niter-1 )
             {
@@ -428,9 +428,9 @@ program_main ()
         }// for
         
         if ( nbench > 1 )
-            std::cout << "    runtime  = "
-                      << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                      << std::endl;
+            std::cout << term::rollback << term::clearline << "    runtime = "
+                      << format_time( min( runtime ), median( runtime ), max( runtime ) );
+        std::cout << std::endl;
 
         auto  error = impl::norm::frobenius( 1, *A, -1, *zB );
         
@@ -570,16 +570,16 @@ program_main ()
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
         
-                std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+                std::cout << term::rollback << term::clearline << "      mvm in   " << format_time( toc ) << term::flush;
 
                 if ( i < nbench-1 )
                     y->fill( 1 );
             }// for
         
             if ( nbench > 1 )
-                std::cout << "  runtime  = "
-                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                          << std::endl;
+                std::cout << term::rollback << term::clearline << "      runtime = "
+                          << format_time( min( runtime ), median( runtime ), max( runtime ) );
+            std::cout << std::endl;
 
             t_orig = min( runtime );
             
@@ -617,21 +617,20 @@ program_main ()
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
         
-                std::cout << "    mvm in   " << format_time( toc ) << std::endl;
+                std::cout << term::rollback << term::clearline << "      mvm in   " << format_time( toc ) << term::flush;
 
                 if ( i < nbench-1 )
                     y->fill( 1 );
             }// for
         
             if ( nbench > 1 )
-                std::cout << "  runtime  = "
-                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime )
-                          << std::endl;
+                std::cout << term::rollback << term::clearline << "      runtime = "
+                          << format_time( min( runtime ), median( runtime ), max( runtime ) );
+            std::cout << std::endl;
         
             t_compressed = min( runtime );
 
             std::cout << "    ratio  = " << boost::format( "%.02f" ) % ( t_compressed / t_orig ) << std::endl;
-
             std::cout << "    flops  = " << format_flops( flops_h, min( runtime ) ) << std::endl;
             
             auto  diff = y_ref->copy();
