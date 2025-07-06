@@ -66,7 +66,11 @@ inline config  get_config      ( const double    eps ) { return config{ eps_to_r
 // check some of the default defines for this
 //
 #if defined(__FLT16_EPSILON__)
-#  define HLR_HAS_FLOAT16  1 // prefer BF16 anyway because much faster
+#  if defined(__AVX__)
+#    define HLR_HAS_FLOAT16  1
+#  else
+#    define HLR_HAS_FLOAT16  0 // FP16 is too slow without AVX???
+#  endif
 #else
 #  define HLR_HAS_FLOAT16  0
 #endif
@@ -192,17 +196,23 @@ compress ( const config &   config,
             #pragma GCC ivdep
             for ( ; i < nsize8; i += 8, ptr += 8 )
             {
-                __m256  f1{ float(data[i]),
-                            float(data[i+1]),
-                            float(data[i+2]),
-                            float(data[i+3]),
-                            float(data[i+4]),
-                            float(data[i+5]),
-                            float(data[i+6]),
-                            float(data[i+7]) };
-                auto    f2 = _mm256_cvtps_ph( f1, _MM_ROUND_NEAREST );
+                // __m256  f07{ float(data[i]),
+                //              float(data[i+1]),
+                //              float(data[i+2]),
+                //              float(data[i+3]),
+                //              float(data[i+4]),
+                //              float(data[i+5]),
+                //              float(data[i+6]),
+                //              float(data[i+7]) };
 
-                std::memcpy( ptr, &f2, sizeof(fp16_t) * 8 );
+                auto  d03 = _mm256_loadu_pd( data + i );
+                auto  d47 = _mm256_loadu_pd( data + i + 4 );
+                auto  f07 = _mm256_insertf128_ps( _mm256_castps128_ps256( _mm256_cvtpd_ps( d03 ) ),
+                                                  _mm256_cvtpd_ps( d47 ),
+                                                  1 );
+                auto  h07 = _mm256_cvtps_ph( f07, _MM_ROUND_NEAREST );
+
+                std::memcpy( ptr, &h07, sizeof(fp16_t) * 8 );
             }// for
 
             #pragma GCC ivdep
@@ -974,63 +984,88 @@ internal_mulvec ( const size_t    nrows,
                   const double *  x,
                   double *        y )
 {
-    float         val[8]  __attribute__((aligned(32)));
+    // float         val[8]  __attribute__((aligned(32)));
+    double        val[8]  __attribute__((aligned(32)));
     const size_t  nrows8 = ( nrows / 8 ) * 8; // size for SIMD
     
     switch ( op_A )
     {
         case  apply_normal :
         {
-            size_t  pos = 0;
-            
             for ( size_t  j = 0; j < ncols; ++j )
             {
                 const auto  x_j = alpha * x[j];
                 size_t      i   = 0;
+
+                // auto        vx  = _mm256_set1_pd( x_j );
+                // auto        vy0 = _mm256_loadu_pd( y + j );
+                // auto        vy1 = _mm256_loadu_pd( y + j + 4 );
                 
                 #pragma GCC ivdep
-                for ( ; i < nrows8; i += 8, pos += 8 )
+                for ( ; i < nrows8; i += 8, zA += 8 )
                 {
-                    __m128i  f;
+                    // __m128i  h07;
+                    // std::memcpy( &h07, zA + pos, sizeof(fp16_t) * 8 );
+                    // _mm256_store_ps( val, _mm256_cvtph_ps( h07 ) );
                 
-                    std::memcpy( &f, zA + pos, sizeof(fp16_t) * 8 );
-                    _mm256_store_ps( val, _mm256_cvtph_ps( f ) );
-                
-                    for ( size_t  j = 0; j < 8; ++j )
-                        y[i+j] += double(val[j]) * x_j;
+                    // for ( size_t  j = 0; j < 8; ++j )
+                    //     y[i+j] += double(val[j]) * x_j;
+
+                    auto  f07 = _mm256_cvtph_ps( _mm_loadu_si128( (__m128i *) zA ) );
+                    auto  d03 = _mm256_cvtps_pd( _mm256_extractf128_ps( f07, 0 ) );
+                    auto  d47 = _mm256_cvtps_pd( _mm256_extractf128_ps( f07, 1 ) );
+
+                    _mm256_store_pd( val + 0, d03 );
+                    _mm256_store_pd( val + 4, d47 );
+
+                    #pragma GCC ivdep
+                    for ( size_t  l = 0; l < 8; ++l )
+                        y[i+l] += val[l] * x_j;
+
+
+                    
+                    // auto  vy0 = _mm256_loadu_pd( y + j + i );
+                    // auto  vy1 = _mm256_loadu_pd( y + j + i + 4 );
+                    
+                    // vy0 = _mm256_add_pd( vy0, _mm256_mul_pd( d03, vx ) );
+                    // vy1 = _mm256_add_pd( vy1, _mm256_mul_pd( d47, vx ) );
+
+                    // _mm256_storeu_pd( y + j + i,     vy0 );
+                    // _mm256_storeu_pd( y + j + i + 4, vy1 );
                 }// for
 
                 #pragma GCC ivdep
-                for ( ; i < nrows; ++i, pos++ )
-                    y[i] += double(zA[pos]) * x_j;
+                for ( ; i < nrows; ++i )
+                    y[i] += double(*zA++) * x_j;
             }// for
         }// case
         break;
         
         case  apply_adjoint :
         {
-            size_t  pos = 0;
-            
             for ( size_t  j = 0; j < ncols; ++j )
             {
                 double  y_j = 0;
                 size_t  i   = 0;
                 
                 #pragma GCC ivdep
-                for ( ; i < nrows8; i += 8, pos += 8 )
+                for ( ; i < nrows8; i += 8, zA += 8 )
                 {
-                    __m128i  f;
+                    auto  f07 = _mm256_cvtph_ps( _mm_loadu_si128( (__m128i *) zA ) );
+                    auto  d03 = _mm256_cvtps_pd( _mm256_extractf128_ps( f07, 0 ) );
+                    auto  d47 = _mm256_cvtps_pd( _mm256_extractf128_ps( f07, 1 ) );
+
+                    _mm256_store_pd( val + 0, d03 );
+                    _mm256_store_pd( val + 4, d47 );
                 
-                    std::memcpy( &f, zA + pos, sizeof(fp16_t) * 8 );
-                    _mm256_store_ps( val, _mm256_cvtph_ps( f ) );
-                
-                    for ( size_t  j = 0; j < 8; ++j )
-                        y_j += double(val[j]) * x[i+j];
+                    #pragma GCC ivdep
+                    for ( size_t  l = 0; l < 8; ++l )
+                        y_j += val[l] * x[i+l];
                 }// for
 
                 #pragma GCC ivdep
-                for ( ; i < nrows; ++i, pos++ )
-                    y_j += double(zA[pos]) * x[i];
+                for ( ; i < nrows; ++i )
+                    y_j += double(*zA++) * x[i];
                 
                 y[j] += alpha * y_j;
             }// for
