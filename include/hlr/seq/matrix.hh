@@ -955,6 +955,53 @@ build_uniform_sep ( const Hpro::TMatrix< value_t > &                A,
     return detail::build_uniform_sep( A, rowcb, colcb );
 }
 
+template < approx::approximation_type basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< hlr::matrix::shared_cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
+build_uniform_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &    A,
+                    const basisapx_t &                                       basisapx,
+                    const Hpro::TTruncAcc &                                  acc,
+                    const bool                                               compress,
+                    const size_t                                             /* nseq */ = 0 ) // ignored
+{
+    using value_t       = typename basisapx_t::value_t;
+    using cluster_basis = hlr::matrix::shared_cluster_basis< value_t >;
+
+    //
+    // mapping of index sets to lowrank matrices 
+    //
+
+    auto  rowcb  = std::make_unique< cluster_basis >( A.row_is() );
+    auto  colcb  = std::make_unique< cluster_basis >( A.col_is() );
+
+    if ( is_blocked( A ) )
+    {
+        rowcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix< value_t > )->nblock_rows() );
+        colcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix< value_t > )->nblock_cols() );
+    }// if
+
+    auto  row_map = detail::lr_coupling_map_t< value_t >();
+    auto  col_map = detail::lr_coupling_map_t< value_t >();
+
+    detail::build_mat_map( A, *rowcb, *colcb, row_map, col_map );
+
+    //
+    // build cluster bases
+    //
+
+    detail::build_cluster_basis( *rowcb, basisapx, acc, row_map, false );
+    detail::build_cluster_basis( *colcb, basisapx, acc, col_map, true );
+
+    //
+    // construct uniform lowrank matrices with given cluster bases
+    //
+
+    auto  M = detail::build_uniform( A, *rowcb, *colcb );
+
+    return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
+}
+
 namespace tlr
 {
 
@@ -1004,6 +1051,63 @@ build_uniform ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
 }
 
 }// namespace blr
+
+//
+// build H² matrix out of given H-matrix
+//
+template < typename basisapx_t >
+std::tuple< std::unique_ptr< hlr::matrix::nested_cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< hlr::matrix::nested_cluster_basis< typename basisapx_t::value_t > >,
+            std::unique_ptr< Hpro::TMatrix< typename basisapx_t::value_t > > >
+build_h2_rec ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
+               const basisapx_t &                                     basisapx,
+               const accuracy &                                       acc,
+               const bool                                             compress,
+               const size_t                                           /* nseq */ = 0 ) // ignored
+{
+    using value_t       = typename basisapx_t::value_t;
+    using cluster_basis = hlr::matrix::nested_cluster_basis< value_t >;
+
+    //
+    // mapping of index sets to lowrank matrices 
+    //
+
+    auto  rowcb  = std::make_unique< cluster_basis >( A.row_is() );
+    auto  colcb  = std::make_unique< cluster_basis >( A.col_is() );
+
+    if ( is_blocked( A ) )
+    {
+        rowcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix< value_t > )->nblock_rows() );
+        colcb->set_nsons( cptrcast( &A, hpro::TBlockMatrix< value_t > )->nblock_cols() );
+    }// if
+
+    auto  row_map      = detail::lr_mat_map_t< value_t >();
+    auto  row_coupling = detail::coupling_map_t< value_t >();
+    auto  col_map      = detail::lr_mat_map_t< value_t >();
+    auto  col_coupling = detail::coupling_map_t< value_t >();
+
+    detail::build_mat_map( A, *rowcb, *colcb, row_map, row_coupling, col_map, col_coupling );
+
+    //
+    // build cluster bases
+    //
+
+    auto  empty_list = detail::lr_mat_list_t< value_t >();
+
+    detail::build_nested_cluster_basis( *rowcb, basisapx, acc, row_map, row_coupling, empty_list, false, compress );
+    detail::build_nested_cluster_basis( *colcb, basisapx, acc, col_map, col_coupling, empty_list, true,  compress );
+
+    { int  id = 0;  detail::set_ids( *rowcb, id ); }
+    { int  id = 0;  detail::set_ids( *colcb, id ); }
+
+    //
+    // construct uniform lowrank matrices with given cluster bases
+    //
+
+    auto  M = detail::build_h2( A, *rowcb, *colcb, acc, compress );
+
+    return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
+}
 
 //
 // build H² matrix out of given uniform H-matrix and given shared cluster bases 

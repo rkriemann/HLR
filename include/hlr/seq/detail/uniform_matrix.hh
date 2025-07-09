@@ -1890,183 +1890,183 @@ build_blr2_red ( const Hpro::TMatrix< typename basisapx_t::value_t > &  A,
 //     if ( colcb.id() == -1 ) colcb.set_id( col_id++ );
 // }
 
-// //
-// // Build mapping from index set to set of lowrank matrices in block row/column
-// // together with computing QR factorization of each.
-// // Also set up structure of cluster bases.
-// // 
-// template < typename value_t >
-// using  lr_coupling_map_t  = std::unordered_map< indexset, std::list< std::pair< const lrmatrix< value_t > *, blas::matrix< value_t > > >, indexset_hash >;
+//
+// Build mapping from index set to set of lowrank matrices in block row/column
+// together with computing QR factorization of each.
+// Also set up structure of cluster bases.
+// 
+template < typename value_t >
+using  lr_coupling_map_t  = std::unordered_map< indexset, std::list< std::pair< const lrmatrix< value_t > *, blas::matrix< value_t > > >, indexset_hash >;
 
-// template < typename value_t >
-// void
-// build_mat_map ( const Hpro::TMatrix< value_t > &   A,
-//                 shared_cluster_basis< value_t > &  rowcb,
-//                 shared_cluster_basis< value_t > &  colcb,
-//                 lr_coupling_map_t< value_t > &     row_map,
-//                 lr_coupling_map_t< value_t > &     col_map )
-// {
-//     using namespace hlr::matrix;
+template < typename value_t >
+void
+build_mat_map ( const Hpro::TMatrix< value_t > &   A,
+                shared_cluster_basis< value_t > &  rowcb,
+                shared_cluster_basis< value_t > &  colcb,
+                lr_coupling_map_t< value_t > &     row_map,
+                lr_coupling_map_t< value_t > &     col_map )
+{
+    using namespace hlr::matrix;
     
-//     //
-//     // decide upon cluster type, how to construct matrix
-//     //
+    //
+    // decide upon cluster type, how to construct matrix
+    //
     
-//     auto  M = std::unique_ptr< Hpro::TMatrix< value_t > >();
+    auto  M = std::unique_ptr< Hpro::TMatrix< value_t > >();
     
-//     if ( hlr::matrix::is_lowrank( A ) )
-//     {
-//         //
-//         // compute semi-coupling, e.g. QR factorization of U/V
-//         // (see "build_cluster_basis" for more details)
-//         //
+    if ( hlr::matrix::is_lowrank( A ) )
+    {
+        //
+        // compute semi-coupling, e.g. QR factorization of U/V
+        // (see "build_cluster_basis" for more details)
+        //
         
-//         auto  R  = cptrcast( &A, lrmatrix< value_t > );
-//         auto  W  = blas::copy( R->U() );
-//         auto  X  = blas::copy( R->V() );
-//         auto  Cw = blas::matrix< value_t >();
-//         auto  Cx = blas::matrix< value_t >();
+        auto  R  = cptrcast( &A, lrmatrix< value_t > );
+        auto  W  = blas::copy( R->U() );
+        auto  X  = blas::copy( R->V() );
+        auto  Cw = blas::matrix< value_t >();
+        auto  Cx = blas::matrix< value_t >();
         
-//         blas::qr( W, Cw, false ); // only need R, not Q
-//         blas::qr( X, Cx, false );
+        blas::qr( W, Cw, false ); // only need R, not Q
+        blas::qr( X, Cx, false );
         
-//         HLR_ASSERT( Cw.ncols() != 0 );
-//         HLR_ASSERT( Cx.ncols() != 0 );
+        HLR_ASSERT( Cw.ncols() != 0 );
+        HLR_ASSERT( Cx.ncols() != 0 );
 
-//         // add matrix to block row/column together with other(!) semi-coupling
-//         row_map[ A.row_is() ].push_back( { R, std::move( Cx ) } );
-//         col_map[ A.col_is() ].push_back( { R, std::move( Cw ) } );
-//     }// if
-//     else if ( is_blocked( A ) )
-//     {
-//         auto  B = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
+        // add matrix to block row/column together with other(!) semi-coupling
+        row_map[ A.row_is() ].push_back( { R, std::move( Cx ) } );
+        col_map[ A.col_is() ].push_back( { R, std::move( Cw ) } );
+    }// if
+    else if ( is_blocked( A ) )
+    {
+        auto  B = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
 
-//         for ( uint  i = 0; i < B->nblock_rows(); ++i )
-//         {
-//             auto  rowcb_i = rowcb.son( i );
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            auto  rowcb_i = rowcb.son( i );
             
-//             for ( uint  j = 0; j < B->nblock_cols(); ++j )
-//             {
-//                 auto  colcb_j = colcb.son( j );
-//                 auto  M_ij    = B->block( i, j );
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                auto  colcb_j = colcb.son( j );
+                auto  M_ij    = B->block( i, j );
                 
-//                 if ( ! is_null( M_ij ) )
-//                 {
-//                     if ( is_null( rowcb_i ) )
-//                     {
-//                         rowcb_i = new shared_cluster_basis< value_t >( M_ij->row_is() );
-//                         rowcb.set_son( i, rowcb_i );
-//                     }// if
+                if ( ! is_null( M_ij ) )
+                {
+                    if ( is_null( rowcb_i ) )
+                    {
+                        rowcb_i = new shared_cluster_basis< value_t >( M_ij->row_is() );
+                        rowcb.set_son( i, rowcb_i );
+                    }// if
             
-//                     if ( is_blocked( M_ij ) && ( rowcb_i->nsons() == 0 ))
-//                         rowcb_i->set_nsons( cptrcast( M_ij, Hpro::TBlockMatrix< value_t > )->nblock_rows() );
+                    if ( is_blocked( M_ij ) && ( rowcb_i->nsons() == 0 ))
+                        rowcb_i->set_nsons( cptrcast( M_ij, Hpro::TBlockMatrix< value_t > )->nblock_rows() );
                         
-//                     if ( is_null( colcb_j ) )
-//                     {
-//                         colcb_j = new shared_cluster_basis< value_t >( M_ij->col_is() );
-//                         colcb.set_son( j, colcb_j );
-//                     }// if
+                    if ( is_null( colcb_j ) )
+                    {
+                        colcb_j = new shared_cluster_basis< value_t >( M_ij->col_is() );
+                        colcb.set_son( j, colcb_j );
+                    }// if
             
-//                     if ( is_blocked( M_ij ) && ( colcb_j->nsons() == 0 ))
-//                         colcb_j->set_nsons( cptrcast( M_ij, Hpro::TBlockMatrix< value_t > )->nblock_cols() );
-//                 }// if
-//             }// for
-//         }// for
+                    if ( is_blocked( M_ij ) && ( colcb_j->nsons() == 0 ))
+                        colcb_j->set_nsons( cptrcast( M_ij, Hpro::TBlockMatrix< value_t > )->nblock_cols() );
+                }// if
+            }// for
+        }// for
 
-//         //
-//         // recurse
-//         //
+        //
+        // recurse
+        //
         
-//         for ( uint  i = 0; i < B->nblock_rows(); ++i )
-//         {
-//             auto  rowcb_i = rowcb.son( i );
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            auto  rowcb_i = rowcb.son( i );
             
-//             for ( uint  j = 0; j < B->nblock_cols(); ++j )
-//             {
-//                 auto  colcb_j = colcb.son( j );
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                auto  colcb_j = colcb.son( j );
                 
-//                 if ( ! is_null( B->block( i, j ) ) )
-//                     build_mat_map( *B->block( i, j ), *rowcb_i, *colcb_j, row_map, col_map );
-//             }// for
-//         }// for
-//     }// if
-// }
+                if ( ! is_null( B->block( i, j ) ) )
+                    build_mat_map( *B->block( i, j ), *rowcb_i, *colcb_j, row_map, col_map );
+            }// for
+        }// for
+    }// if
+}
 
-// //
-// // build cluster basis using precomputed QR decomposition of lowrank matrices
-// // in block row/columns
-// //
-// template < typename value_t,
-//            typename basisapx_t >
-// void
-// build_cluster_basis ( shared_cluster_basis< value_t > &     cb,
-//                       const basisapx_t &                    basisapx,
-//                       const accuracy &                      acc,
-//                       const lr_coupling_map_t< value_t > &  mat_map,
-//                       const bool                            transposed )
-// {
-//     using  real_t  = Hpro::real_type_t< value_t >;
+//
+// build cluster basis using precomputed QR decomposition of lowrank matrices
+// in block row/columns
+//
+template < typename value_t,
+           typename basisapx_t >
+void
+build_cluster_basis ( shared_cluster_basis< value_t > &     cb,
+                      const basisapx_t &                    basisapx,
+                      const accuracy &                      acc,
+                      const lr_coupling_map_t< value_t > &  mat_map,
+                      const bool                            transposed )
+{
+    using  real_t  = Hpro::real_type_t< value_t >;
 
-//     const matop_t  op = ( transposed ? apply_transposed : apply_normal );
+    const matop_t  op = ( transposed ? apply_transposed : apply_normal );
 
-//     //
-//     // construct cluster basis for all precollected blocks
-//     //
+    //
+    // construct cluster basis for all precollected blocks
+    //
 
-//     if ( mat_map.find( cb.is() ) != mat_map.end() )
-//     {
-//         //
-//         // compute column basis for block row
-//         //
-//         //  ( U₀·V₀'  U₁·V₁'  U₂·V₂'  … )
-//         //
-//         // as 
-//         //
-//         //   ( U₀·C₀'·Q₀'  U₁·C₁'·Q₁'  U₂'·C₂'·Q₂' … )
-//         //
-//         // with QR decomposition V_i = Q_i C_i
-//         // (precomputed in "build_mat_map" above)
-//         //
-//         // As Q_i is orthogonal, it can be neglected in column basis computation!
-//         //
+    if ( mat_map.find( cb.is() ) != mat_map.end() )
+    {
+        //
+        // compute column basis for block row
+        //
+        //  ( U₀·V₀'  U₁·V₁'  U₂·V₂'  … )
+        //
+        // as 
+        //
+        //   ( U₀·C₀'·Q₀'  U₁·C₁'·Q₁'  U₂'·C₂'·Q₂' … )
+        //
+        // with QR decomposition V_i = Q_i C_i
+        // (precomputed in "build_mat_map" above)
+        //
+        // As Q_i is orthogonal, it can be neglected in column basis computation!
+        //
 
-//         const uint  nrows = cb.is().size();
-//         uint        ncols = 0;
+        const uint  nrows = cb.is().size();
+        uint        ncols = 0;
 
-//         // determine total number of columns
-//         for ( const auto  [ M_i, C_i ] : mat_map.at( cb.is() ) )
-//             ncols += C_i.nrows();
+        // determine total number of columns
+        for ( const auto  [ M_i, C_i ] : mat_map.at( cb.is() ) )
+            ncols += C_i.nrows();
 
-//         // build ( U_0·C_0'  U_1·C_1'  U_2'·C_2' … )
-//         auto  X   = blas::matrix< value_t >( nrows, ncols );
-//         uint  pos = 0;
+        // build ( U_0·C_0'  U_1·C_1'  U_2'·C_2' … )
+        auto  X   = blas::matrix< value_t >( nrows, ncols );
+        uint  pos = 0;
 
-//         for ( const auto  [ R_i, C_i ] : mat_map.at( cb.is() ) )
-//         {
-//             auto  X_i   = blas::prod( R_i->U( op ), blas::adjoint( C_i ) );
-//             auto  X_sub = blas::matrix< value_t >( X, blas::range::all, blas::range( pos, pos + C_i.nrows() - 1 ) );
+        for ( const auto  [ R_i, C_i ] : mat_map.at( cb.is() ) )
+        {
+            auto  X_i   = blas::prod( R_i->U( op ), blas::adjoint( C_i ) );
+            auto  X_sub = blas::matrix< value_t >( X, blas::range::all, blas::range( pos, pos + C_i.nrows() - 1 ) );
 
-//             blas::copy( X_i, X_sub );
-//             pos += C_i.nrows();
-//         }// for
+            blas::copy( X_i, X_sub );
+            pos += C_i.nrows();
+        }// for
 
-//         // actually build cluster basis
-//         auto  Ws = blas::vector< real_t >(); // singular values corresponding to basis vectors
-//         auto  W  = basisapx.column_basis( X, acc, & Ws );
+        // actually build cluster basis
+        auto  Ws = blas::vector< real_t >(); // singular values corresponding to basis vectors
+        auto  W  = basisapx.column_basis( X, acc, & Ws );
 
-//         cb.set_basis( std::move( W ), std::move( Ws ) );
-//     }// if
+        cb.set_basis( std::move( W ), std::move( Ws ) );
+    }// if
 
-//     //
-//     // recurse
-//     //
+    //
+    // recurse
+    //
     
-//     for ( uint  i = 0; i < cb.nsons(); ++i )
-//     {
-//         if ( ! is_null( cb.son( i ) ) )
-//             build_cluster_basis( *cb.son( i ), basisapx, acc, mat_map, transposed );
-//     }// for
-// }
+    for ( uint  i = 0; i < cb.nsons(); ++i )
+    {
+        if ( ! is_null( cb.son( i ) ) )
+            build_cluster_basis( *cb.son( i ), basisapx, acc, mat_map, transposed );
+    }// for
+}
 
 //
 // build uniform-H representation of A by converting all lowrank matrices
