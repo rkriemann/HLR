@@ -9,6 +9,7 @@
 //
 
 #include <cstdint>
+#include <cstring>
 
 #include <hlr/arith/blas.hh>
 #include <hlr/compress/byte_n.hh>
