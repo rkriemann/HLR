@@ -14,5 +14,5 @@
 namespace          impl      = hlr::tbb;
 const std::string  impl_name = "tbb";
 
-#include "mvm-uniform.hh"
+#include "mvm-uni.hh"
 #include "tbb.hh"

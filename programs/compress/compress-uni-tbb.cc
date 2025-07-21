@@ -14,5 +14,5 @@
 namespace          impl      = hlr::tbb;
 const std::string  impl_name = "tbb";
 
-#include "compress-uniform.hh"
+#include "compress-uni.hh"
 #include "tbb.hh"

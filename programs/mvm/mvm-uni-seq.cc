@@ -5,14 +5,14 @@
 //
 
 #include "hlr/seq/matrix.hh"
-#include "hlr/seq/compress.hh"
 #include "hlr/seq/arith.hh"
 #include "hlr/seq/arith_uniform.hh"
-#include "hlr/seq/norm.hh"
 #include "hlr/seq/convert.hh"
+#include "hlr/seq/compress.hh"
+#include "hlr/seq/norm.hh"
 
 namespace          impl      = hlr::seq;
 const std::string  impl_name = "seq";
 
-#include "compress-uniform.hh"
+#include "mvm-uni.hh"
 #include "seq.hh"
