@@ -11,6 +11,8 @@
 #include <cstdint>
 #include <cstring>
 
+#include <hpro/base/packed.hh>
+
 #include <hlr/arith/blas.hh>
 #include <hlr/compress/byte_n.hh>
 
@@ -67,7 +69,7 @@ inline config  get_config      ( const double    eps ) { return config{ eps_to_r
 // check some of the default defines for this
 //
 #if defined(__FLT16_EPSILON__)
-#  if defined(__AVX__)
+#  if defined(__AVX__) && defined(__F16C__)
 #    define HLR_HAS_FLOAT16  1
 #  else
 #    define HLR_HAS_FLOAT16  0 // FP16 is too slow without AVX???
@@ -189,32 +191,60 @@ compress ( const config &   config,
         auto  ptr = reinterpret_cast< fp16_t * >( zdata.data() + 2 );
 
         #if HLR_HAS_FLOAT16 == 1
+
         if constexpr ( std::same_as< value_t, double > )
         {
-            const size_t  nsize8 = ( nsize / 8 ) * 8; // size for SIMD
+            #if defined(__AVX512FP16__)
+
+            constexpr auto  nvec = 32;
+        
+            const size_t  nvsize = ( nsize / nvec ) * nvec; // size for SIMD
             size_t        i      = 0;
     
             #pragma GCC ivdep
-            for ( ; i < nsize8; i += 8, ptr += 8 )
+            for ( ; i < nvsize; i += nvec, ptr += nvec )
             {
-                // __m256  f07{ float(data[i]),
-                //              float(data[i+1]),
-                //              float(data[i+2]),
-                //              float(data[i+3]),
-                //              float(data[i+4]),
-                //              float(data[i+5]),
-                //              float(data[i+6]),
-                //              float(data[i+7]) };
+                auto  h_0 = _mm512_castpd_ph( _mm512_loadu_pd( data + i      ) );
+                auto  h_1 = _mm512_castpd_ph( _mm512_loadu_pd( data + i + 8  ) );
+                auto  h_2 = _mm512_castpd_ph( _mm512_loadu_pd( data + i + 16 ) );
+                auto  h_3 = _mm512_castpd_ph( _mm512_loadu_pd( data + i + 24 ) );
+                
+                auto  h    = _mm256_cvtps_ph( f07, _MM_ROUND_NEAREST );
 
-                auto  d03 = _mm256_loadu_pd( data + i );
-                auto  d47 = _mm256_loadu_pd( data + i + 4 );
-                auto  f07 = _mm256_insertf128_ps( _mm256_castps128_ps256( _mm256_cvtpd_ps( d03 ) ),
-                                                  _mm256_cvtpd_ps( d47 ),
-                                                  1 );
-                auto  h07 = _mm256_cvtps_ph( f07, _MM_ROUND_NEAREST );
+                
+                auto  f    = _mm256_insertf128_ps( _mm512_castps256_ps512( _mm512_cvtpd_ps( d_lo ) ),
+                                                   _mm512_cvtpd_ps( d_hi ),
+                                                   1 );
+                auto  h    = _mm256_cvtps_ph( f07, _MM_ROUND_NEAREST );
 
-                std::memcpy( ptr, &h07, sizeof(fp16_t) * 8 );
+                _mm512_store_ph( ptr, h );
+                // std::memcpy( ptr, &h, sizeof(fp16_t) * 8 );
             }// for
+
+            #elif defined(__AVX__) && defined(__F16C__)
+            
+            constexpr auto  nvdbl = 4;
+            constexpr auto  nvflt = 8;
+        
+            const size_t  nvsize = ( nsize / nvflt ) * nvflt; // size for SIMD
+            size_t        i      = 0;
+    
+            #pragma GCC ivdep
+            for ( ; i < nvsize; i += nvflt, ptr += nvflt )
+            {
+                auto  d_03 = _mm256_loadu_pd( data + i );
+                auto  d_47 = _mm256_loadu_pd( data + i + nvdbl );
+                auto  f_07 = _mm256_insertf128_ps( _mm256_castps128_ps256( _mm256_cvtpd_ps( d_03 ) ),
+                                                   _mm256_cvtpd_ps( d_47 ),
+                                                   1 );
+                auto  h_07 = _mm256_cvtps_ph( f_07, _MM_ROUND_NEAREST );
+
+                // std::memcpy( ptr, &h_07, sizeof(fp16_t) * 8 );
+                _mm_store_si128( reinterpret_cast< __m128i * >( ptr ), h_07 );
+            }// for
+
+            #endif
+
 
             #pragma GCC ivdep
             for ( ; i < nsize; ++i )
@@ -333,9 +363,9 @@ decompress ( const zarray &  zdata,
                 #pragma GCC ivdep
                 for ( ; i < nsize8; i += 8, ptr += 8 )
                 {
-                    __m128i  f;
+                    __m128i  f = _mm_load_si128( reinterpret_cast< const __m128i * >( ptr ) );
 
-                    std::memcpy( &f, ptr, sizeof(fp16_t) * 8 );
+                    // std::memcpy( &f, ptr, sizeof(fp16_t) * 8 );
                     _mm256_store_ps( val, _mm256_cvtph_ps( f ) );
 
                     for ( size_t  j = 0; j < 8; ++j )
@@ -591,8 +621,7 @@ compress_lr< double > ( const hlr::blas::matrix< double > &  U,
     }
 
     {
-        auto    zptr = reinterpret_cast< fp16_t * >( zdata.data() + pos );
-        size_t  zpos = 0;
+        auto  zptr = reinterpret_cast< fp16_t * >( zdata.data() + pos );
 
         for ( uint32_t  l = 0; l < n_fp16; ++l, ++k )
         {
@@ -602,30 +631,28 @@ compress_lr< double > ( const hlr::blas::matrix< double > &  U,
             size_t        i  = 0;
 
             #pragma GCC ivdep
-            for ( ; i < n8; i += 8, zpos += 8 )
+            for ( ; i < n8; i += 8, zptr += 8 )
             {
-                __m256  f1{ float(U(i  ,k)),
-                            float(U(i+1,k)),
-                            float(U(i+2,k)),
-                            float(U(i+3,k)),
-                            float(U(i+4,k)),
-                            float(U(i+5,k)),
-                            float(U(i+6,k)),
-                            float(U(i+7,k)) };
-                auto    f2 = _mm256_cvtps_ph( f1, _MM_ROUND_NEAREST );
+                auto  d_03 = _mm256_setr_pd( U(i  ,k), U(i+1,k), U(i+2,k), U(i+3,k) );
+                auto  d_47 = _mm256_setr_pd( U(i+4,k), U(i+5,k), U(i+6,k), U(i+7,k) );
+                auto  f_07 = _mm256_insertf128_ps( _mm256_castps128_ps256( _mm256_cvtpd_ps( d_03 ) ),
+                                                   _mm256_cvtpd_ps( d_47 ),
+                                                   1 );
+                auto  h_07 = _mm256_cvtps_ph( f_07, _MM_ROUND_NEAREST );
 
-                std::memcpy( zptr + zpos, &f2, sizeof(fp16_t) * 8 );
+                _mm_store_si128( reinterpret_cast< __m128i * >( zptr ), h_07 );
+                // std::memcpy( zptr, &f2, sizeof(fp16_t) * 8 );
             }// for
             
             #pragma GCC ivdep
-            for ( ; i < n; ++i, ++zpos )
-                zptr[zpos] = fp16_t( U(i,k) );
+            for ( ; i < n; ++i, ++zptr )
+                *zptr = fp16_t( U(i,k) );
             
             #else
             
             #pragma GCC ivdep
-            for ( size_t  i = 0; i < n; ++i, ++zpos )
-                zptr[zpos] = fp16_t( U(i,k) );
+            for ( size_t  i = 0; i < n; ++i, ++zptr )
+                *zptr = fp16_t( U(i,k) );
 
             #endif
         }// for
@@ -819,8 +846,7 @@ decompress_lr< double > ( const zarray &                 zdata,
 
     if ( n_fp16 > 0 )
     {
-        auto    zptr = reinterpret_cast< const fp16_t * >( zdata.data() + pos );
-        size_t  zpos = 0;
+        auto  zptr = reinterpret_cast< const fp16_t * >( zdata.data() + pos );
 
         #if HLR_HAS_FLOAT16 == 1
         float         val[8]  __attribute__((aligned(32)));
@@ -834,26 +860,25 @@ decompress_lr< double > ( const zarray &                 zdata,
             size_t  i = 0;
             
             #pragma GCC ivdep
-            for ( ; i < nrows8; i += 8, zpos += 8 )
+            for ( ; i < nrows8; i += 8, zptr += 8 )
             {
-                __m128i  f2;
+                __m128i  h_07 = _mm_load_si128( reinterpret_cast< const __m128i * >( zptr ) );
                 
-                std::memcpy( &f2, zptr + zpos, sizeof(fp16_t) * 8 );
-                _mm256_store_ps( val, _mm256_cvtph_ps( f2 ) );
+                _mm256_store_ps( val, _mm256_cvtph_ps( h_07 ) );
                 
                 for ( size_t  j = 0; j < 8; ++j )
                     U(i+j,k) = val[j];
             }// for
 
             #pragma GCC ivdep
-            for ( ; i < nrows; ++i, ++zpos )
-                U(i,k) = zptr[zpos];
+            for ( ; i < nrows; ++i, ++zptr )
+                U(i,k) = *zptr;
             
             #else
             
             #pragma GCC ivdep
-            for ( size_t  i = 0; i < nrows; ++i, ++zpos )
-                U(i,k) = zptr[zpos];
+            for ( size_t  i = 0; i < nrows; ++i, ++zptr )
+                U(i,k) = *zptr;
                 
             #endif
         }// for
@@ -985,7 +1010,6 @@ internal_mulvec ( const size_t    nrows,
                   const double *  x,
                   double *        y )
 {
-    // float         val[8]  __attribute__((aligned(32)));
     double        val[8]  __attribute__((aligned(32)));
     const size_t  nrows8 = ( nrows / 8 ) * 8; // size for SIMD
     
@@ -997,42 +1021,20 @@ internal_mulvec ( const size_t    nrows,
             {
                 const auto  x_j = alpha * x[j];
                 size_t      i   = 0;
-
-                // auto        vx  = _mm256_set1_pd( x_j );
-                // auto        vy0 = _mm256_loadu_pd( y + j );
-                // auto        vy1 = _mm256_loadu_pd( y + j + 4 );
                 
                 #pragma GCC ivdep
                 for ( ; i < nrows8; i += 8, zA += 8 )
                 {
-                    // __m128i  h07;
-                    // std::memcpy( &h07, zA + pos, sizeof(fp16_t) * 8 );
-                    // _mm256_store_ps( val, _mm256_cvtph_ps( h07 ) );
-                
-                    // for ( size_t  j = 0; j < 8; ++j )
-                    //     y[i+j] += double(val[j]) * x_j;
+                    auto  f_07 = _mm256_cvtph_ps( _mm_loadu_si128( (__m128i *) zA ) );
+                    auto  d_03 = _mm256_cvtps_pd( _mm256_extractf128_ps( f_07, 0 ) );
+                    auto  d_47 = _mm256_cvtps_pd( _mm256_extractf128_ps( f_07, 1 ) );
 
-                    auto  f07 = _mm256_cvtph_ps( _mm_loadu_si128( (__m128i *) zA ) );
-                    auto  d03 = _mm256_cvtps_pd( _mm256_extractf128_ps( f07, 0 ) );
-                    auto  d47 = _mm256_cvtps_pd( _mm256_extractf128_ps( f07, 1 ) );
-
-                    _mm256_store_pd( val + 0, d03 );
-                    _mm256_store_pd( val + 4, d47 );
+                    _mm256_store_pd( val + 0, d_03 );
+                    _mm256_store_pd( val + 4, d_47 );
 
                     #pragma GCC ivdep
                     for ( size_t  l = 0; l < 8; ++l )
                         y[i+l] += val[l] * x_j;
-
-
-                    
-                    // auto  vy0 = _mm256_loadu_pd( y + j + i );
-                    // auto  vy1 = _mm256_loadu_pd( y + j + i + 4 );
-                    
-                    // vy0 = _mm256_add_pd( vy0, _mm256_mul_pd( d03, vx ) );
-                    // vy1 = _mm256_add_pd( vy1, _mm256_mul_pd( d47, vx ) );
-
-                    // _mm256_storeu_pd( y + j + i,     vy0 );
-                    // _mm256_storeu_pd( y + j + i + 4, vy1 );
                 }// for
 
                 #pragma GCC ivdep
@@ -1052,12 +1054,12 @@ internal_mulvec ( const size_t    nrows,
                 #pragma GCC ivdep
                 for ( ; i < nrows8; i += 8, zA += 8 )
                 {
-                    auto  f07 = _mm256_cvtph_ps( _mm_loadu_si128( (__m128i *) zA ) );
-                    auto  d03 = _mm256_cvtps_pd( _mm256_extractf128_ps( f07, 0 ) );
-                    auto  d47 = _mm256_cvtps_pd( _mm256_extractf128_ps( f07, 1 ) );
+                    auto  f_07 = _mm256_cvtph_ps( _mm_loadu_si128( (__m128i *) zA ) );
+                    auto  d_03 = _mm256_cvtps_pd( _mm256_extractf128_ps( f_07, 0 ) );
+                    auto  d_47 = _mm256_cvtps_pd( _mm256_extractf128_ps( f_07, 1 ) );
 
-                    _mm256_store_pd( val + 0, d03 );
-                    _mm256_store_pd( val + 4, d47 );
+                    _mm256_store_pd( val + 0, d_03 );
+                    _mm256_store_pd( val + 4, d_47 );
                 
                     #pragma GCC ivdep
                     for ( size_t  l = 0; l < 8; ++l )
