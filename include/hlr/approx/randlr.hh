@@ -359,7 +359,7 @@ rand_column_basis ( const operator_t &  M,
             norm_M = std::sqrt( math::square( norm_M ) + math::square( norm_Qi ) );
 
             //
-            // power iteration
+            // power iteration: Q_i = (M·M')^i · Q_i 
             //
             
             blas::qr( Q_i, R );
