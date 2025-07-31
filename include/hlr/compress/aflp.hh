@@ -108,6 +108,100 @@ inline config  get_config ( const double    eps ) { return config{ eps_to_rate( 
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+// helper functions
+//
+////////////////////////////////////////////////////////////////////////////////
+
+//
+// compute min/max non-zero(!) values of given data
+//
+template < typename value_t >
+std::pair< Hpro::real_type_t< value_t >,   // min
+           Hpro::real_type_t< value_t > >  // max
+nzmin_max ( const value_t *  data,
+            const size_t     nsize )
+{
+    using  real_t = Hpro::real_type_t< value_t >;
+
+    auto  vmin = FP_info< real_t >::maximum;
+    auto  vmax = real_t(0);
+
+    for ( size_t  i = 0; i < nsize; ++i )
+    {
+        const auto  d_i = std::abs( data[i] );
+        const auto  val = ( d_i == real_t(0) ? FP_info< real_t >::maximum : d_i );
+
+        vmin = std::min( vmin, val );
+        vmax = std::max( vmax, d_i );
+    }// for
+
+    HLR_ASSERT( vmin > real_t(0) );
+
+    return { vmin, vmax };
+}
+
+//
+// SIMD specializations
+//
+
+#if defined(__AVX512F__)
+
+template <>
+std::pair< float, float >
+nzmin_max ( const float *  data,
+            const size_t   nsize )
+{
+    constexpr size_t  simd_size = 16;
+
+    // TODO: handle non-multiple sizes
+    HLR_DBG_ASSERT( nsize % simd_size == 0 );
+    
+    const auto  vzero = _mm512_setzero_ps();
+    auto        vMIN  = _mm512_set1_ps( FP_info< float >::maximum );
+    auto        vMAX  = _mm512_setzero_ps();
+        
+    for ( myint_t  i = 0; i < nsize; i += simd_size )
+    {
+        __m512     vd   = _mm512_abs_ps( _mm512_load_ps( vptr + i ) );
+        __mmask16  mask = _mm512_cmp_ps_mask( vd, vzero, _CMP_NEQ_OQ );
+
+        vMAX = _mm512_max_ps( vMAX, vd );
+        vMIN = _mm512_mask_min_ps( vMIN, mask, vMIN, vd );
+    }// for
+
+    return { _mm512_reduce_min_ps( vMIN ), _mm512_reduce_max_ps( vMAX ) };
+}
+
+template <>
+std::pair< double, double >
+nzmin_max ( const double *  data,
+            const size_t    nsize )
+{
+    constexpr size_t  simd_size = 8;
+
+    // TODO: handle non-multiple sizes
+    HLR_DBG_ASSERT( nsize % simd_size == 0 );
+    
+    const auto  vzero = _mm512_setzero_pd();
+    auto        vMIN  = _mm512_set1_pd( FP_info< double >::maximum );
+    auto        vMAX  = _mm512_setzero_pd();
+        
+    for ( myint_t  i = 0; i < nsize; i += simd_size )
+    {
+        const auto  vd   = _mm512_abs_pd( _mm512_load_pd( vptr + i ) );
+        const auto  mask = _mm512_cmp_pd_mask( vd, vzero, _CMP_NEQ_OQ );
+
+        vMAX = _mm512_max_pd( vMAX, vd );
+        vMIN = _mm512_mask_min_pd( vMIN, mask, vMIN, vd );
+    }// for
+
+    return { _mm512_reduce_min_pd( vMIN ), _mm512_reduce_max_pd( vMAX ) };
+}
+
+#endif
+
+////////////////////////////////////////////////////////////////////////////////
+//
 // low-level compression functions
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -636,25 +730,10 @@ compress ( const config &   config,
     constexpr uint8_t  max_mant_bits = FP_info< real_t >::mant_bits;
     const size_t       nsize         = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
 
-    //
-    // look for min/max value (> 0!)
-    //
+    // determine min/max value (> 0!)
+    const auto  [ vmin, vmax ] = nzmin_max( data, nsize );
     
-    auto  vmin = FP_info< real_t >::maximum;
-    auto  vmax = real_t(0);
-
-    for ( size_t  i = 0; i < nsize; ++i )
-    {
-        const auto  d_i = std::abs( data[i] );
-        const auto  val = ( d_i == real_t(0) ? FP_info< real_t >::maximum : d_i );
-
-        vmin = std::min( vmin, val );
-        vmax = std::max( vmax, d_i );
-    }// for
-
-    HLR_ASSERT( vmin > real_t(0) );
-    
-    if ( vmin == FP_info< real_t >::maximum )
+    if ( vmax == real_t(0) )
     {
         //
         // in case of zero data, return special data
@@ -829,17 +908,21 @@ compress_lr ( const blas::matrix< value_t > &                       U,
 
     for ( uint32_t  l = 0; l < k; ++l )
     {
-        auto  vmin = fp_maximum;
-        auto  vmax = real_t(0);
+        // auto  vmin = fp_maximum;
+        // auto  vmax = real_t(0);
 
-        for ( size_t  i = 0; i < n; ++i )
-        {
-            const auto  u_il = std::abs( U(i,l) );
-            const auto  val  = ( u_il == real_t(0) ? fp_maximum : u_il );
+        // for ( size_t  i = 0; i < n; ++i )
+        // {
+        //     const auto  u_il = std::abs( U(i,l) );
+        //     const auto  val  = ( u_il == real_t(0) ? fp_maximum : u_il );
             
-            vmin = std::min( vmin, val );
-            vmax = std::max( vmax, u_il );
-        }// for
+        //     vmin = std::min( vmin, val );
+        //     vmax = std::max( vmax, u_il );
+        // }// for
+
+        HLR_DBG_ASSERT( U.row_stride() == 1 );
+
+        const auto  [ vmin, vmax ] = nzmin_max( U.ptr(0,l), n );
 
         s[l] = vmin;
         e[l] = uint8_t( std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ) );
