@@ -163,6 +163,7 @@ COMPRESSORS   = [ 'help',       # print help
                   'sfl2',       # 23
                   'dfl',        # 4
                   'dfl2',       # 22
+                  'efl',        # 24
                   'mp',         # 18
                   'fp32',       # 13
                   'zfp',        # 5
@@ -189,6 +190,7 @@ COMPRESSORS_HELP = { 'none'   : 'no compression used',
                      'sfl2'   : 'use SFL2',
                      'dfl'    : 'use DFL',
                      'dfl2'   : 'use DFL2',
+                     'efl'    : 'use extended float',
                      'mp'     : 'use mixed precision storage with FP64/FP32/BF16',
                      'fp32'   : 'use FP32 for storage',
                      'zfp'    : 'use ZFP     (see also {0}zfp_dir{1})',
@@ -202,41 +204,6 @@ COMPRESSORS_HELP = { 'none'   : 'no compression used',
                      # 'zlib'   : 'use Zlib    (see also {0}zlib_dir{1})',
                      # 'zstd'   : 'use Zstd    (see also {0}zstd_dir{1})',
                     }
-
-# # supported and active VALR compressor
-# VALR_COMPRESSORS = [ # 'help',      # print help
-#                      # 'none',
-#                      # 'default',
-#                      'afl',
-#                      'aflp',
-#                      'sfl',
-#                      'dfl',
-#                      'mp',
-#                      'zfp',
-#                      'posits',
-#                      'cfloat',
-#                      'sz',
-#                      'sz3',
-#                      'mgard',
-#                      'blosc' ]
-# valr = 'default'
-
-# VALR_HELP =        { 'none'    : 'no VALR compression used',
-#                      'default' : 'use VALR from {0}compressor{1} setting',
-#                      'zfp'     : 'use ZFP    (see also {0}zfp_dir{1})',
-#                      'posits'  : 'use Posits (see also {0}universal_dir{1})',
-#                      'cfloat'  : 'use CFloat (see also {0}universal_dir{1})',
-#                      'sz'      : 'use SZ     (see also {0}sz_dir{1})',
-#                      'sz3'     : 'use SZ3    (see also {0}sz3_dir{1})',
-#                      'mgard'   : 'use MGARD  (see also {0}mgard_dir{1})',
-#                      'blosc'   : 'use Blosc  (see also {0}blosc_dir{1})',
-#                      'afl'     : 'use AFL',
-#                      'aflp'    : 'use AFLP',
-#                      'sfl'     : 'use SFL',
-#                      'dfl'     : 'use DFL',
-#                      'mp'      : 'use mixed precision with FP64/FP32/FP16',
-#                     }
-
 
 ######################################################################
 #
@@ -741,6 +708,9 @@ elif compressor == 'dfl' :
 elif compressor == 'dfl2' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=22' )
     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=22' )
+elif compressor == 'efl' :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=24' )
+    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=24' )
 elif compressor == 'mp' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=18' )
     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=18' )

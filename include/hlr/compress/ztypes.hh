@@ -40,27 +40,6 @@
 #define HLR_COMPRESSOR_BLOSC    21
 #define HLR_COMPRESSOR_DFL2     22
 #define HLR_COMPRESSOR_SFL2     23
-
-//
-// union of integer and float types
-//
-namespace hlr { namespace compress {
-
-//
-// shared float/int types
-//
-union fp32int_t
-{
-    uint32_t u;
-    float    f;
-};
-
-union fp64int_t
-{
-    uint64_t  u;
-    double    f;
-};
-
-}}// namespace hlr::compress
+#define HLR_COMPRESSOR_EFL      24
 
 #endif // __HLR_COMPRESS_ZTYPES_HH

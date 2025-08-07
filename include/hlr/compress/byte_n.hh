@@ -23,6 +23,24 @@ constexpr size_t byte_pad ( const size_t  n )
 
 ////////////////////////////////////////////////////////////
 //
+// shared float/int union
+//
+////////////////////////////////////////////////////////////
+
+union fp32int_t
+{
+    float     f;
+    uint32_t  u;
+};
+    
+union fp64int_t
+{
+    double    f;
+    uint64_t  u;
+};
+    
+////////////////////////////////////////////////////////////
+//
 // datatypes to store multiple bytes
 //
 ////////////////////////////////////////////////////////////
@@ -32,7 +50,8 @@ using byte2_t = uint16_t;
 
 struct byte3_t
 {
-    byte_t  data[3];
+    uint16_t  data01;
+    uint8_t   data2;
 
     byte3_t ( const uint32_t  n )
     {
@@ -41,19 +60,17 @@ struct byte3_t
     
     void operator = ( const uint32_t  n )
     {
-        data[0] = (n & 0x0000ff);
-        data[1] = (n & 0x00ff00) >> 8;
-        data[2] = (n & 0xff0000) >> 16;
+        data01 = (n & 0x00ffff);
+        data2  = (n & 0xff0000) >> 16;
     }
 
     void operator = ( const uint64_t  n )
     {
-        data[0] = (n & 0x0000ff);
-        data[1] = (n & 0x00ff00) >> 8;
-        data[2] = (n & 0xff0000) >> 16;
+        data01 = (n & 0x00ffff) >> 8;
+        data2  = (n & 0xff0000) >> 16;
     }
 
-    operator uint32_t () const { return ( data[2] << 16 ) | ( data[1] << 8 ) | data[0]; }
+    operator uint32_t () const { return ( data2 << 16 ) | ( data01 ); }
 };
 
 using byte4_t = uint32_t;
