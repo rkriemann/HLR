@@ -13,8 +13,8 @@
 //
 // signal availability of compressed BLAS
 //
-// #define HLR_HAS_ZBLAS_DIRECT
-// #define HLR_HAS_ZBLAS_VALR
+#define HLR_HAS_ZBLAS_DIRECT
+#define HLR_HAS_ZBLAS_VALR
 
 ////////////////////////////////////////////////////////////
 //
@@ -56,7 +56,28 @@ inline config  get_config      ( const double    eps ) { return config{ eps_to_r
 #if defined (__AVX512VBMI__) && defined (__EVEX512__)
 
 //
-// convert 8 FP64 to/from FP24 (1-8-15) via FP32
+// convert 8 FP64 <-> FP32 <-> FP16 (1-8-7)
+//
+
+static const __mmask32  fp64_to_fp16_mask = 0b00000000000000001111111111111111;  // upper 16 bytes will be zero
+static const int8_t     fp64_to_fp16[32]  = { // use upper 2 bytes for FP16
+    2,  3,    6,  7,    10, 11,   14, 15,
+    18, 19,   22, 23,   26, 27,   30, 31,
+
+    -1, -1, -1, -1,   -1, -1, -1, -1,   -1, -1, -1, -1,   -1, -1, -1, -1
+};
+static const auto       fp64_to_fp16_idxs = _mm256_loadu_si256( reinterpret_cast< const __m256i * >( fp64_to_fp16 ) );
+
+static const __mmask32  from_fp16_mask = 0b11001100110011001100110011001100;  // first two bytes are zet to zero
+static const int8_t     from_fp16[32]  = {  
+    -1, -1, 0, 1,   -1, -1,  2,  3,   -1, -1,  4,  5,   -1, -1,  6,  7,
+    -1, -1, 8, 9,   -1, -1, 10, 11,   -1, -1, 12, 13,   -1, -1, 14, 15
+};
+static const auto       fp64_from_fp16_idxs = _mm256_loadu_si256( reinterpret_cast< const __m256i * >( fp64_from_fp16 ) );
+
+
+//
+// convert 8 FP64 <-> FP32 <-> FP24 (1-8-15)
 //
 
 static const __mmask32  fp64_to_fp24_mask = 0b00000000111111111111111111111111;  // upper 8 bytes will be zero
@@ -77,7 +98,7 @@ static const auto       fp64_from_fp24_idxs = _mm256_loadu_si256( reinterpret_ca
 
 
 //
-// convert 16 FP32 to/from FP24 (1-8-15)
+// convert 16 FP32 <-> FP24 (1-8-15)
 //
 static const __mmask64  fp32_to_fp24_mask = 0b0000000000000000111111111111111111111111111111111111111111111111;  // upper 16 bytes will be zero
 static const int8_t     fp32_to_fp24[64]  = {   // use upper 3 bytes for FP24
@@ -134,17 +155,27 @@ compress_fp16 ( const double *  data,
 {
     #if defined (__AVX512F__)
 
-    HLR_ERROR( "TODO" );
+    auto  zptr = zdata;
     
+    for ( size_t  i = 0; i < nsize; i += 8, zptr += 16 )
+    {
+        const auto  vd = _mm512_loadu_pd( data + i );
+        const auto  vf = _mm512_cvtpd_ps( vd );
+        const auto  vb = _mm256_maskz_permutexvar_epi8( fp64_to_fp16_mask, fp64_to_fp16_idxs, reinterpret_cast< __m256i >( vf ) );
+
+        _mm256_storeu_ps( reinterpret_cast< __m256i * >( zptr ), vb );
+    }// for
+
     #else
 
     auto  zptr = reinterpret_cast< byte2_t * >( zdata );
-    
+
+    #pragma GCC ivdep
     for ( size_t  i = 0; i < nsize; ++i )
     {
-        const fp32int_t  f{ .f = float(data[i]) };
+        const fp32int_t  v{ .f = float(data[i]) };
         
-        zptr[i] = f.u >> 16;
+        zptr[i] = v.u >> 16;
     }// for
     
     #endif
@@ -158,17 +189,29 @@ decompress_fp16 ( double *        data,
 {
     #if defined (__AVX512F__)
 
-    HLR_ERROR( "TODO" );
+    auto  zptr = reinterpret_cast< uint8_t * >( zdata );
+    
+    for ( size_t  i = 0; i < nsize; i += 8, zptr += 16 )
+    {
+        const auto  vb = _mm256_loadu_ps( zptr + i );
+        const auto  vf = _mm256_maskz_permutexvar_epi8( fp64_from_fp16_mask, fp64_from_fp16_idxs, reinterpret_cast< __m256i >( vf ) );
+        const auto  vd = _mm512_cvtps_pd( vf );
+
+        _mm512_storeu_pd( zptr + i, vd );
+    }// for
     
     #else
 
-    auto  zptr = reinterpret_cast< const byte3_t * >( zdata );
+    auto  zptr = reinterpret_cast< const byte2_t * >( zdata );
     
+    #pragma GCC ivdep
     for ( size_t  i = 0; i < nsize; ++i )
     {
         const fp32int_t  v{ .u = uint32_t(zptr[i]) << 16 };
         
         data[i] = double(v.f);
+
+        HLR_DBG_ASSERT( std::isfinite( data[i] ) );
     }// for
 
     #endif
@@ -185,7 +228,7 @@ compress_fp24 ( const double *  data,
 {
     #if defined (__AVX512F__)
     
-    auto  zptr = reinterpret_cast< uint8_t * >( zdata );
+    auto  zptr = zdata;
     
     for ( size_t  i = 0; i < nsize; i += 8, zptr += 24 )
     {
@@ -200,6 +243,7 @@ compress_fp24 ( const double *  data,
 
     auto  zptr = reinterpret_cast< byte3_t * >( zdata );
     
+    #pragma GCC ivdep
     for ( size_t  i = 0; i < nsize; ++i )
     {
         const fp32int_t  v{ .f = float(data[i]) };
@@ -220,7 +264,7 @@ decompress_fp24 ( double *        data,
     
     auto  zptr = reinterpret_cast< uint8_t * >( zdata );
     
-    for ( size_t  i = 0; i < nsize; i += 8 )
+    for ( size_t  i = 0; i < nsize; i += 8, zptr += 24 )
     {
         const auto  vb = _mm256_loadu_ps( zptr + i );
         const auto  vf = _mm256_maskz_permutexvar_epi8( fp64_from_fp24_mask, fp64_from_fp24_idxs, reinterpret_cast< __m256i >( vf ) );
@@ -233,11 +277,14 @@ decompress_fp24 ( double *        data,
 
     auto  zptr = reinterpret_cast< const byte3_t * >( zdata );
     
+    #pragma GCC ivdep
     for ( size_t  i = 0; i < nsize; ++i )
     {
-        const fp32int_t  v{ .u = uint32_t(zptr[i]) << 8 };
+        const fp32int_t  v{ .u = uint32_t( zptr[i] ) << 8 };
         
         data[i] = double(v.f);
+
+        HLR_DBG_ASSERT( std::isfinite( data[i] ) );
     }// for
 
     #endif
@@ -329,6 +376,23 @@ compress_fp40 ( const double *  data,
                 const size_t    nsize,
                 byte_t *        zdata )
 {
+    #if defined (__AVX512F__)
+    
+    HLR_ERROR( "TODO" );
+
+    #else
+
+    auto  zptr = reinterpret_cast< byte5_t * >( zdata );
+    
+    #pragma GCC ivdep
+    for ( size_t  i = 0; i < nsize; ++i )
+    {
+        const fp64int_t  v{ .f = data[i] };
+        
+        zptr[i] = v.u >> 24;
+    }// for
+
+    #endif
 }
 
 static
@@ -337,6 +401,25 @@ decompress_fp40 ( double *        data,
                   const size_t    nsize,
                   const byte_t *  zdata )
 {
+    #if defined (__AVX512F__)
+    
+    HLR_ERROR( "TODO" );
+
+    #else
+
+    auto  zptr = reinterpret_cast< const byte5_t * >( zdata );
+    
+    #pragma GCC ivdep
+    for ( size_t  i = 0; i < nsize; ++i )
+    {
+        const fp64int_t  v{ .u = uint64_t( zptr[i] ) << 24 };
+        
+        data[i] = v.f;
+
+        HLR_DBG_ASSERT( std::isfinite( data[i] ) );
+    }// for
+
+    #endif
 }
 
 //
@@ -348,6 +431,23 @@ compress_fp48 ( const double *  data,
                 const size_t    nsize,
                 byte_t *        zdata )
 {
+    #if defined (__AVX512F__)
+    
+    HLR_ERROR( "TODO" );
+
+    #else
+
+    auto  zptr = reinterpret_cast< byte6_t * >( zdata );
+    
+    #pragma GCC ivdep
+    for ( size_t  i = 0; i < nsize; ++i )
+    {
+        const fp64int_t  v{ .f = data[i] };
+        
+        zptr[i] = v.u >> 16;
+    }// for
+
+    #endif
 }
 
 static
@@ -356,6 +456,25 @@ decompress_fp48 ( double *        data,
                   const size_t    nsize,
                   const byte_t *  zdata )
 {
+    #if defined (__AVX512F__)
+    
+    HLR_ERROR( "TODO" );
+
+    #else
+
+    auto  zptr = reinterpret_cast< const byte6_t * >( zdata );
+    
+    #pragma GCC ivdep
+    for ( size_t  i = 0; i < nsize; ++i )
+    {
+        const fp64int_t  v{ .u = uint64_t( zptr[i] ) << 16 };
+        
+        data[i] = v.f;
+
+        HLR_DBG_ASSERT( std::isfinite( data[i] ) );
+    }// for
+
+    #endif
 }
 
 //
@@ -367,6 +486,23 @@ compress_fp56 ( const double *  data,
                 const size_t    nsize,
                 byte_t *        zdata )
 {
+    #if defined (__AVX512F__)
+    
+    HLR_ERROR( "TODO" );
+
+    #else
+
+    auto  zptr = reinterpret_cast< byte7_t * >( zdata );
+    
+    #pragma GCC ivdep
+    for ( size_t  i = 0; i < nsize; ++i )
+    {
+        const fp64int_t  v{ .f = data[i] };
+        
+        zptr[i] = v.u >> 8;
+    }// for
+
+    #endif
 }
 
 static
@@ -375,6 +511,25 @@ decompress_fp56 ( double *        data,
                   const size_t    nsize,
                   const byte_t *  zdata )
 {
+    #if defined (__AVX512F__)
+    
+    HLR_ERROR( "TODO" );
+
+    #else
+
+    auto  zptr = reinterpret_cast< const byte7_t * >( zdata );
+    
+    #pragma GCC ivdep
+    for ( size_t  i = 0; i < nsize; ++i )
+    {
+        const fp64int_t  v{ .u = uint64_t( zptr[i] ) << 8 };
+        
+        data[i] = v.f;
+
+        HLR_DBG_ASSERT( std::isfinite( data[i] ) );
+    }// for
+
+    #endif
 }
 
 //
@@ -386,6 +541,7 @@ compress_fp64 ( const double *  data,
                 const size_t    nsize,
                 byte_t *        zdata )
 {
+    std::memcpy( zdata, data, sizeof(double) * nsize );
 }
 
 static
@@ -394,6 +550,7 @@ decompress_fp64 ( double *        data,
                   const size_t    nsize,
                   const byte_t *  zdata )
 {
+    std::memcpy( data, zdata, sizeof(double) * nsize );
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -449,8 +606,8 @@ compress< double > ( const config &   config,
         case  5 : compress_fp40( data, nsize, zdata.data() + efl_header_ofs ); break;
         case  6 : compress_fp48( data, nsize, zdata.data() + efl_header_ofs ); break;
         case  7 : compress_fp56( data, nsize, zdata.data() + efl_header_ofs ); break;
-        case  8 :
-        default : compress_fp64( data, nsize, zdata.data() + efl_header_ofs ); break;
+        case  8 : compress_fp64( data, nsize, zdata.data() + efl_header_ofs ); break;
+        default : HLR_ERROR( "invalid byte size" );
     }// switch
     
     return zdata;
@@ -538,6 +695,7 @@ decompress< double > ( const zarray &  zdata,
         case  6 : decompress_fp48( dest, nsize, zdata.data() + efl_header_ofs ); break;
         case  7 : decompress_fp56( dest, nsize, zdata.data() + efl_header_ofs ); break;
         case  8 : decompress_fp64( dest, nsize, zdata.data() + efl_header_ofs ); break;
+        default : HLR_ERROR( "invalid byte size" );
     }// switch
 }
 
@@ -649,8 +807,8 @@ compress_lr< double > ( const blas::matrix< double > &  U,
             case  5 : compress_fp40( U.data() + l*n, n, zdata.data() + pos ); break;
             case  6 : compress_fp48( U.data() + l*n, n, zdata.data() + pos ); break;
             case  7 : compress_fp56( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  8 :
-            default : compress_fp64( U.data() + l*n, n, zdata.data() + pos ); break;
+            case  8 : compress_fp64( U.data() + l*n, n, zdata.data() + pos ); break;
+            default : HLR_ERROR( "invalid byte size" );
         }// switch
         
         pos += n*nbyte;
@@ -692,8 +850,8 @@ decompress_lr< double > ( const zarray &            zdata,
             case  5 : decompress_fp40( U.data() + l*n, n, zdata.data() + pos ); break;
             case  6 : decompress_fp48( U.data() + l*n, n, zdata.data() + pos ); break;
             case  7 : decompress_fp56( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  8 :
-            default : decompress_fp64( U.data() + l*n, n, zdata.data() + pos ); break;
+            case  8 : decompress_fp64( U.data() + l*n, n, zdata.data() + pos ); break;
+            default : HLR_ERROR( "invalid byte size" );
         }// switch
         
         pos += nbyte * n;
@@ -704,169 +862,176 @@ decompress_lr< double > ( const zarray &            zdata,
 // compressed blas
 //
 
-// namespace
-// {
+namespace
+{
 
-// template < typename value_t,
-//            typename storage_t >
-// void
-// mulvec ( const size_t       nrows,
-//          const size_t       ncols,
-//          const matop_t      op_A,
-//          const value_t      alpha,
-//          const storage_t *  zA,
-//          const value_t *    x,
-//          value_t *          y )
-// {
-//     static constexpr uint64_t  efl_mant_bits  = 8 * sizeof(storage_t) - 1 - 11;  // 1 sign bit, 11 exponent bits
-//     static constexpr uint64_t  efl_mant_shift = fp64_mant_bits - efl_mant_bits;
+inline
+void
+mulvec ( const uint8_t   nbyte,
+         const size_t    nrows,
+         const size_t    ncols,
+         const matop_t   op_A,
+         const float     alpha,
+         const byte_t *  zA,
+         const float *   x,
+         float *         y )
+{
+    HLR_ERROR( "TODO" );
+}
 
-//     switch ( op_A )
-//     {
-//         case  apply_normal :
-//         {
-//             size_t  pos = 0;
-            
-//             for ( size_t  j = 0; j < ncols; ++j )
-//             {
-//                 const auto  x_j = alpha * x[j];
-                
-//                 for ( size_t  i = 0; i < nrows; ++i, pos++ )
-//                 {
-//                     const uint64_t  zval = uint64_t( zA[pos] ) << efl_mant_shift;
-//                     const double    fval = * reinterpret_cast< const double * >( & zval );
-                    
-//                     y[i] += fval * x_j;
-//                 }// for
-//             }// for
-//         }// case
-//         break;
-        
-//         case  apply_adjoint :
-//         {
-//             size_t  pos = 0;
-            
-//             for ( size_t  j = 0; j < ncols; ++j )
-//             {
-//                 value_t  y_j = value_t(0);
-                
-//                 for ( size_t  i = 0; i < nrows; ++i, pos++ )
-//                 {
-//                     const uint64_t  zval = uint64_t( zA[pos] ) << efl_mant_shift;
-//                     const double    fval = * reinterpret_cast< const double * >( & zval );
-
-//                     y_j += fval * x[i];
-//                 }// for
-
-//                 y[j] += alpha * y_j;
-//             }// for
-//         }// case
-//         break;
-
-//         default:
-//             HLR_ERROR( "TODO" );
-//     }// switch
-// }
-
-// }// namespace anonymous
-
-// template < typename value_t >
-// void
-// mulvec ( const size_t     nrows,
-//          const size_t     ncols,
-//          const matop_t    op_A,
-//          const value_t    alpha,
-//          const zarray &   zA,
-//          const value_t *  x,
-//          value_t *        y )
-// {
-//     using  real_t = Hpro::real_type_t< value_t >;
-
-//     const uint8_t  nbyte = zA[0];
+inline
+void
+mulvec ( const uint8_t   nbyte,
+         const size_t    nrows,
+         const size_t    ncols,
+         const matop_t   op_A,
+         const double    alpha,
+         const byte_t *  zA,
+         const double *  x,
+         double *        y )
+{
+    using  value_t = double;
     
-//     switch ( nbyte )
-//     {
-//         case  2 : mulvec( nrows, ncols, op_A, alpha, reinterpret_cast< const byte2_t * >( zA.data() + efl_header_ofs ), x, y ); break;
-//         case  3 : mulvec( nrows, ncols, op_A, alpha, reinterpret_cast< const byte3_t * >( zA.data() + efl_header_ofs ), x, y ); break;
-//         case  4 : mulvec( nrows, ncols, op_A, alpha, reinterpret_cast< const byte4_t * >( zA.data() + efl_header_ofs ), x, y ); break;
-//         case  5 : mulvec( nrows, ncols, op_A, alpha, reinterpret_cast< const byte5_t * >( zA.data() + efl_header_ofs ), x, y ); break;
-//         case  6 : mulvec( nrows, ncols, op_A, alpha, reinterpret_cast< const byte6_t * >( zA.data() + efl_header_ofs ), x, y ); break;
-//         case  7 : mulvec( nrows, ncols, op_A, alpha, reinterpret_cast< const byte7_t * >( zA.data() + efl_header_ofs ), x, y ); break;
-//         case  8 : mulvec( nrows, ncols, op_A, alpha, reinterpret_cast< const byte8_t * >( zA.data() + efl_header_ofs ), x, y ); break;
-//         default :
-//             HLR_ERROR( "unsupported byte size" );
-//     }// switch
-// }
+    constexpr size_t  NB  = 64;
+    value_t           row[ NB ];
 
-// template < typename value_t >
-// void
-// mulvec_lr ( const size_t     nrows,
-//             const size_t     ncols,
-//             const matop_t    op_A,
-//             const value_t    alpha,
-//             const zarray &   zA,
-//             const value_t *  x,
-//             value_t *        y )
-// {
-//     using  real_t = Hpro::real_type_t< value_t >;
-
-//     size_t  pos = 0;
-
-//     switch ( op_A )
-//     {
-//         case  apply_normal :
-//         {
-//             for ( uint  l = 0; l < ncols; ++l )
-//             {
-//                 const uint8_t  nbyte = zA[pos];
-        
-//                 switch ( nbyte )
-//                 {
-//                     case  2 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte2_t * >( zA.data() + pos + efl_header_ofs ), x+l, y ); break;
-//                     case  3 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte3_t * >( zA.data() + pos + efl_header_ofs ), x+l, y ); break;
-//                     case  4 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte4_t * >( zA.data() + pos + efl_header_ofs ), x+l, y ); break;
-//                     case  5 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte5_t * >( zA.data() + pos + efl_header_ofs ), x+l, y ); break;
-//                     case  6 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte6_t * >( zA.data() + pos + efl_header_ofs ), x+l, y ); break;
-//                     case  7 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte7_t * >( zA.data() + pos + efl_header_ofs ), x+l, y ); break;
-//                     case  8 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte8_t * >( zA.data() + pos + efl_header_ofs ), x+l, y ); break;
-//                     default :
-//                         HLR_ERROR( "unsupported byte size" );
-//                 }// switch
-
-//                 pos += efl_header_ofs + nbyte * nrows;
-//             }// for
-//         }// case
-//         break;
-        
-//         case  apply_conjugate  : HLR_ERROR( "TODO" );
+    HLR_DBG_ASSERT( nrows % NB == 0 );
+    
+    switch ( op_A )
+    {
+        case  apply_normal :
+        {
+            size_t  pos = 0;
             
-//         case  apply_transposed : HLR_ERROR( "TODO" );
+            for ( size_t  j = 0; j < ncols; ++j )
+            {
+                const auto  x_j = alpha * x[j];
 
-//         case  apply_adjoint :
-//         {
-//             for ( uint  l = 0; l < ncols; ++l )
-//             {
-//                 const uint8_t  nbyte = zA[pos];
+                for ( size_t  i = 0; i < nrows; i += NB )
+                {
+                    switch ( nbyte )
+                    {
+                        case  2 : decompress_fp16( row, NB, zA ); break;
+                        case  3 : decompress_fp24( row, NB, zA ); break;
+                        case  4 : decompress_fp32( row, NB, zA ); break;
+                        case  5 : decompress_fp40( row, NB, zA ); break;
+                        case  6 : decompress_fp48( row, NB, zA ); break;
+                        case  7 : decompress_fp56( row, NB, zA ); break;
+                        case  8 : decompress_fp64( row, NB, zA ); break;
+                        default : HLR_ERROR( "invalid byte size" );
+                    }// switch
+
+                    zA += NB * nbyte;
+                    
+                    for ( size_t  k = 0; k < NB; ++k )
+                        y[i+k] += row[k] * x_j;
+                }// for
+            }// for
+        }// case
+        break;
         
-//                 switch ( nbyte )
-//                 {
-//                     case  2 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte2_t * >( zA.data() + pos + efl_header_ofs ), x, y+l ); break;
-//                     case  3 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte3_t * >( zA.data() + pos + efl_header_ofs ), x, y+l ); break;
-//                     case  4 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte4_t * >( zA.data() + pos + efl_header_ofs ), x, y+l ); break;
-//                     case  5 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte5_t * >( zA.data() + pos + efl_header_ofs ), x, y+l ); break;
-//                     case  6 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte6_t * >( zA.data() + pos + efl_header_ofs ), x, y+l ); break;
-//                     case  7 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte7_t * >( zA.data() + pos + efl_header_ofs ), x, y+l ); break;
-//                     case  8 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte8_t * >( zA.data() + pos + efl_header_ofs ), x, y+l ); break;
-//                     default :
-//                         HLR_ERROR( "unsupported byte size" );
-//                 }// switch
+        case  apply_adjoint :
+        {
+            size_t  pos = 0;
+            
+            for ( size_t  j = 0; j < ncols; ++j )
+            {
+                value_t  y_j = value_t(0);
+                
+                for ( size_t  i = 0; i < nrows; i += NB )
+                {
+                    switch ( nbyte )
+                    {
+                        case  2 : decompress_fp16( row, NB, zA ); break;
+                        case  3 : decompress_fp24( row, NB, zA ); break;
+                        case  4 : decompress_fp32( row, NB, zA ); break;
+                        case  5 : decompress_fp40( row, NB, zA ); break;
+                        case  6 : decompress_fp48( row, NB, zA ); break;
+                        case  7 : decompress_fp56( row, NB, zA ); break;
+                        case  8 : decompress_fp64( row, NB, zA ); break;
+                        default : HLR_ERROR( "invalid byte size" );
+                    }// switch
 
-//                 pos += efl_header_ofs + nbyte * nrows;
-//             }// for
-//         }// case
-//         break;
-//     }// switch
-// }
+                    zA += NB * nbyte;
+                    
+                    for ( size_t  k = 0; k < NB; ++k )
+                        y_j += row[k] * x[i+k];
+                }// for
+
+                y[j] += alpha * y_j;
+            }// for
+        }// case
+        break;
+
+        default:
+            HLR_ERROR( "TODO" );
+    }// switch
+}
+
+}// namespace anonymous
+
+template < typename value_t >
+void
+mulvec ( const size_t     nrows,
+         const size_t     ncols,
+         const matop_t    op_A,
+         const value_t    alpha,
+         const zarray &   zA,
+         const value_t *  x,
+         value_t *        y )
+{
+    using  real_t = Hpro::real_type_t< value_t >;
+
+    const uint8_t  nbyte = zA[0];
+    
+    mulvec( nbyte, nrows, ncols, op_A, alpha, zA.data() + efl_header_ofs, x, y );
+}
+
+template < typename value_t >
+void
+mulvec_lr ( const size_t     nrows,
+            const size_t     ncols,
+            const matop_t    op_A,
+            const value_t    alpha,
+            const zarray &   zA,
+            const value_t *  x,
+            value_t *        y )
+{
+    using  real_t = Hpro::real_type_t< value_t >;
+
+    size_t  pos = 0;
+
+    switch ( op_A )
+    {
+        case  apply_normal :
+        {
+            for ( uint  l = 0; l < ncols; ++l )
+            {
+                const uint8_t  nbyte = zA[pos];
+        
+                mulvec( nbyte, nrows, 1, op_A, alpha, zA.data() + pos + efl_header_ofs, x+l, y );
+                pos += efl_header_ofs + nbyte * nrows;
+            }// for
+        }// case
+        break;
+        
+        case  apply_conjugate  : HLR_ERROR( "TODO" );
+            
+        case  apply_transposed : HLR_ERROR( "TODO" );
+
+        case  apply_adjoint :
+        {
+            for ( uint  l = 0; l < ncols; ++l )
+            {
+                const uint8_t  nbyte = zA[pos];
+        
+                mulvec( nbyte, nrows, 1, op_A, alpha, zA.data() + pos + efl_header_ofs, x, y+l );
+                pos += efl_header_ofs + nbyte * nrows;
+            }// for
+        }// case
+        break;
+    }// switch
+}
 
 }}}// namespace hlr::compress::efl
 

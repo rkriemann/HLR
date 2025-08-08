@@ -572,7 +572,7 @@ using hlr::compress::efl::get_config;
 using hlr::compress::efl::byte_size;
 using hlr::compress::efl::compressed_size;
 
-// namespace zblas { using hlr::compress::mixedprec::mulvec; }
+namespace zblas { using hlr::compress::efl::mulvec; }
 
 }} // namespace hlr::compress
 
