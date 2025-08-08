@@ -171,6 +171,7 @@ compress< double > ( const config &   config,
         case  6 : dfl< byte6_t >::compress( data, nsize, zdata.data() + dfl_header_ofs ); break;
         case  7 : dfl< byte7_t >::compress( data, nsize, zdata.data() + dfl_header_ofs ); break;
         case  8 : dfl< byte8_t >::compress( data, nsize, zdata.data() + dfl_header_ofs ); break;
+        default : HLR_ERROR( "invalid byte size" );
     }// switch
     
     return zdata;
@@ -258,6 +259,7 @@ decompress< double > ( const zarray &  zdata,
         case  6 : dfl< byte6_t >::decompress( dest, nsize, zdata.data() + dfl_header_ofs ); break;
         case  7 : dfl< byte7_t >::decompress( dest, nsize, zdata.data() + dfl_header_ofs ); break;
         case  8 : dfl< byte8_t >::decompress( dest, nsize, zdata.data() + dfl_header_ofs ); break;
+        default : HLR_ERROR( "invalid byte size" );
     }// switch
 }
 
@@ -372,6 +374,7 @@ compress_lr< double > ( const blas::matrix< double > &  U,
             case  6 : dfl< byte6_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
             case  7 : dfl< byte7_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
             case  8 : dfl< byte8_t >::compress( U.data() + l*n, n, zdata.data() + pos ); break;
+            default : HLR_ERROR( "invalid byte size" );
         }// switch
         
         pos += n*nbyte;
@@ -414,6 +417,7 @@ decompress_lr< double > ( const zarray &            zdata,
             case  6 : dfl< byte6_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
             case  7 : dfl< byte7_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
             case  8 : dfl< byte8_t >::decompress( U.data() + l*n, n, zdata.data() + pos ); break;
+            default : HLR_ERROR( "invalid byte size" );
         }// switch
         
         pos += nbyte * n;
@@ -513,8 +517,7 @@ mulvec ( const size_t     nrows,
         case  6 : mulvec( nrows, ncols, op_A, alpha, reinterpret_cast< const byte6_t * >( zA.data() + dfl_header_ofs ), x, y ); break;
         case  7 : mulvec( nrows, ncols, op_A, alpha, reinterpret_cast< const byte7_t * >( zA.data() + dfl_header_ofs ), x, y ); break;
         case  8 : mulvec( nrows, ncols, op_A, alpha, reinterpret_cast< const byte8_t * >( zA.data() + dfl_header_ofs ), x, y ); break;
-        default :
-            HLR_ERROR( "unsupported byte size" );
+        default : HLR_ERROR( "invalid byte size" );
     }// switch
 }
 
@@ -549,8 +552,7 @@ mulvec_lr ( const size_t     nrows,
                     case  6 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte6_t * >( zA.data() + pos + dfl_header_ofs ), x+l, y ); break;
                     case  7 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte7_t * >( zA.data() + pos + dfl_header_ofs ), x+l, y ); break;
                     case  8 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte8_t * >( zA.data() + pos + dfl_header_ofs ), x+l, y ); break;
-                    default :
-                        HLR_ERROR( "unsupported byte size" );
+                    default : HLR_ERROR( "invalid byte size" );
                 }// switch
 
                 pos += dfl_header_ofs + nbyte * nrows;
@@ -577,8 +579,7 @@ mulvec_lr ( const size_t     nrows,
                     case  6 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte6_t * >( zA.data() + pos + dfl_header_ofs ), x, y+l ); break;
                     case  7 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte7_t * >( zA.data() + pos + dfl_header_ofs ), x, y+l ); break;
                     case  8 : mulvec( nrows, 1, op_A, alpha, reinterpret_cast< const byte8_t * >( zA.data() + pos + dfl_header_ofs ), x, y+l ); break;
-                    default :
-                        HLR_ERROR( "unsupported byte size" );
+                    default : HLR_ERROR( "invalid byte size" );
                 }// switch
 
                 pos += dfl_header_ofs + nbyte * nrows;
