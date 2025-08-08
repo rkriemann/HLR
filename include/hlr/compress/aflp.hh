@@ -393,7 +393,7 @@ decompress ( float *         data,
             const uint32_t  mant  = zval & prec_mask;
             const uint32_t  exp   = (zval >> prec_bits) & exp_mask;
             const uint32_t  sign  = ( zval >> sign_shift ) << FP32::sign_bit;
-            fp32int_t       fival = { ((exp | FP32::exp_highbit) << FP32::mant_bits) | (mant << prec_ofs) };
+            fp32int_t       fival = { .u = ((exp | FP32::exp_highbit) << FP32::mant_bits) | (mant << prec_ofs) };
 
             fival.f  = ( fival.f - 1.f ) * scale;
             fival.u |= sign;
@@ -433,7 +433,7 @@ decompress ( float *         data,
             const uint32_t  mant  = zval & prec_mask;
             const uint32_t  exp   = (zval >> prec_bits) & exp_mask;
             const uint32_t  sign  = ( zval >> sign_shift ) << FP32::sign_bit;
-            fp32int_t       fival = { ((exp | FP32::exp_highbit) << FP32::mant_bits) | (mant << prec_ofs) };
+            fp32int_t       fival = { .u = ((exp | FP32::exp_highbit) << FP32::mant_bits) | (mant << prec_ofs) };
 
             fival.f  = ( fival.f - 1.f ) * scale;
             fival.u |= sign;
@@ -655,7 +655,7 @@ decompress ( double *        data,
             const uint64_t  mant  = zval & prec_mask;
             const uint64_t  exp   = (zval >> prec_bits) & exp_mask;
             const uint64_t  sign  = (zval >> sign_shift) << FP64::sign_bit;
-            fp64int_t       fival = { ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
+            fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
 
             fival.f  = ( fival.f - 1.0 ) * scale;
             fival.u |= sign;
@@ -699,7 +699,7 @@ decompress ( double *        data,
             const uint64_t  mant  = zval & prec_mask;
             const uint64_t  exp   = (zval >> prec_bits) & exp_mask;
             const uint64_t  sign  = (zval >> sign_shift) << FP64::sign_bit;
-            fp64int_t       fival = { ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
+            fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
             
             fival.f  = ( fival.f - 1.0 ) * scale;
             fival.u |= sign;
@@ -772,6 +772,27 @@ compress ( const config &   config,
 
     compress( data, nsize, zdata.data(), scale, exp_bits, prec_bits );
 
+    // // DEBUG
+    // {
+    //     std::vector< double >  tmp( nsize );
+
+    //     decompress( tmp.data(), nsize, zdata.data(), exp_bits, prec_bits );
+
+    //     double  err = 0;
+    //     double  nrm = 0;
+
+    //     for ( size_t  i = 0; i < nsize; ++i )
+    //     {
+    //         const auto  d_i = data[i] - tmp[i];
+            
+    //         err += d_i * d_i;
+    //         nrm += data[i] * data[i];
+    //     }// for
+
+    //     std::cout << std::sqrt( err ) << " / " << std::sqrt( err ) / std::sqrt( nrm ) << std::endl;
+    // }
+    // // DEBUG
+    
     return zdata;
 }
 
@@ -1365,7 +1386,7 @@ mulvec ( const size_t                        nrows,
                         const uint64_t  mant  = z_ij & prec_mask;
                         const uint64_t  exp   = (z_ij >> prec_bits) & exp_mask;
                         const uint64_t  sign  = (z_ij >> sign_shift) << FP64::sign_bit;
-                        fp64int_t       fival = { ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
+                        fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
                      
                         fival.f  = ( fival.f - 1.0 );
                         fival.u |= sign;
@@ -1421,7 +1442,7 @@ mulvec ( const size_t                        nrows,
                         const uint64_t  mant = z_ij & prec_mask;
                         const uint64_t  exp  = (z_ij >> prec_bits) & exp_mask;
                         const uint64_t  sign = (z_ij >> sign_shift) << FP64::sign_bit;
-                        fp64int_t       fival = { ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
+                        fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
 
                         fival.f  = ( fival.f - 1.0 );
                         fival.u |= sign;
