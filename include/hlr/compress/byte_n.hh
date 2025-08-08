@@ -48,10 +48,10 @@ union fp64int_t
 using byte1_t = uint8_t;
 using byte2_t = uint16_t;
 
-struct byte3_t
+struct __attribute__((packed)) byte3_t
 {
-    uint16_t  data01;
-    uint8_t   data2;
+    uint16_t  data0;
+    uint8_t   data1;
 
     byte3_t ( const uint32_t  n )
     {
@@ -60,24 +60,25 @@ struct byte3_t
     
     void operator = ( const uint32_t  n )
     {
-        data01 = (n & 0x00ffff);
-        data2  = (n & 0xff0000) >> 16;
+        data0 = uint16_t( n & 0x00ffff );
+        data1 = uint8_t( (n & 0xff0000) >> 16 );
     }
 
     void operator = ( const uint64_t  n )
     {
-        data01 = (n & 0x00ffff) >> 8;
-        data2  = (n & 0xff0000) >> 16;
+        data0 = uint16_t( n & 0x00ffff );
+        data1 = uint8_t( (n & 0xff0000) >> 16 );
     }
 
-    operator uint32_t () const { return ( data2 << 16 ) | ( data01 ); }
+    operator uint32_t () const { return ( data1 << 16 ) | ( data0 ); }
 };
 
 using byte4_t = uint32_t;
 
-struct byte5_t
+struct __attribute__((packed)) byte5_t
 {
-    byte_t  data[5];
+    uint32_t  data0;
+    uint8_t   data1;
     
     byte5_t ( const uint64_t  n )
     {
@@ -86,16 +87,17 @@ struct byte5_t
     
     void operator = ( const uint64_t  n )
     {
-        *reinterpret_cast< uint32_t * >( data ) = uint32_t(n & 0xffffffff);
-        data[4] = byte_t( (n >> 32) & 0xff );
+        data0 = uint32_t( n & 0xffffffff );
+        data1 = uint8_t( (n >> 32) & 0xff );
     }
 
-    operator uint64_t () const { return uint64_t(data[4]) << 32 | uint64_t(*reinterpret_cast< const uint32_t * >( data )); }
+    operator uint64_t () const { return uint64_t(data1) << 32 | uint64_t(data0); }
 };
 
-struct byte6_t
+struct __attribute__((packed)) byte6_t
 {
-    byte_t  data[6];
+    uint32_t  data0;
+    uint16_t  data1;
     
     byte6_t ( const uint64_t  n )
     {
@@ -104,17 +106,18 @@ struct byte6_t
     
     void operator = ( const uint64_t  n )
     {
-        *reinterpret_cast< uint32_t * >( data   ) = uint32_t( n & 0xffffffff );
-        *reinterpret_cast< uint16_t * >( data+4 ) = uint16_t( (n >> 32) & 0xffff );
+        data0 = uint32_t( n & 0xffffffff );
+        data1 = uint16_t( (n >> 32) & 0xffff );
     }
 
-    operator uint64_t () const { return ( uint64_t(*reinterpret_cast< const uint16_t * >( data+4 )) << 32 |
-                                          uint64_t(*reinterpret_cast< const uint32_t * >( data   )) ); }
+    operator uint64_t () const { return uint64_t(data1) << 32 | uint64_t(data0); }
 };
 
-struct byte7_t
+struct __attribute__((packed)) byte7_t
 {
-    byte_t  data[7];
+    uint32_t  data0;
+    uint16_t  data1;
+    uint8_t   data2;
     
     byte7_t ( const uint64_t  n )
     {
@@ -123,16 +126,12 @@ struct byte7_t
     
     void operator = ( const uint64_t  n )
     {
-        *reinterpret_cast< uint32_t * >( data ) = uint32_t( n & 0xffffffff );
-
-        const uint32_t  n1 = n >> 32;
-        
-        data[4] = (n1 & 0x0000ff);
-        data[5] = (n1 & 0x00ff00) >> 8;
-        data[6] = (n1 & 0xff0000) >> 16;
+        data0 = uint32_t( n & 0xffffffff );
+        data1 = uint16_t( (n >> 32) & 0xffff );
+        data2 = uint8_t( (n >> 48) & 0xff );
     }
 
-    operator uint64_t () const { return uint64_t(data[6]) << 48 | uint64_t(data[5]) << 40 | uint64_t(data[4]) << 32 | uint64_t(*reinterpret_cast< const uint32_t * >( data )); }
+    operator uint64_t () const { return uint64_t(data2) << 48 | uint64_t(data1) << 32 | uint64_t(data0); }
 };
 
 using byte8_t = unsigned long;
