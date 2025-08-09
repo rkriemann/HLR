@@ -120,6 +120,82 @@ static const int8_t     from_fp24_16[64]  = {
 };
 static const auto       from_fp24_idxs_16 = _mm512_loadu_si512( reinterpret_cast< const __m512i * >( from_fp24_16 ) );
 
+//
+// convert 8 FP64 <-> FP40 (1-11-28) :   seeeeeee eeemmmmm mmmmmmmm mmmmmmmm mmmmmmmm
+//                              byte :       4        3        2        1        0
+//
+
+static const __mmask64  to_fp40_mask_8 = 0b0000000000000000000000001111111111111111111111111111111111111111;  // upper 24 bytes will be zero
+static const int8_t     to_fp40_8[64]  = { // use upper 5 bytes for FP40
+    3,   4,  5,  6,  7,   11, 12, 13, 14, 15,
+    19, 20, 21, 22, 23,   27, 28, 29, 30, 31,
+    35, 36, 37, 38, 39,   43, 44, 45, 46, 47,
+    51, 52, 53, 54, 55,   59, 60, 61, 62, 63,
+
+    -1, -1, -1, -1,   -1, -1, -1, -1,   -1, -1, -1, -1,
+    -1, -1, -1, -1,   -1, -1, -1, -1,   -1, -1, -1, -1
+};
+static const auto       to_fp40_idxs_8 = _mm512_loadu_si512( reinterpret_cast< const __m512i * >( to_fp40_8 ) );
+
+static const __mmask64  from_fp40_mask_8 = 0b1111100011111000111110001111100011111000111110001111100011111000;  // first three bytes are zet to zero
+static const int8_t     from_fp40_8[64]  = {  
+    -1, -1, -1,  0,  1,  2,  3,  4,    -1, -1, -1,  5,  6,  7,  8,  9,
+    -1, -1, -1, 10, 11, 12, 13, 14,    -1, -1, -1, 15, 16, 17, 18, 19,
+    -1, -1, -1, 20, 21, 22, 23, 24,    -1, -1, -1, 25, 26, 27, 28, 29,
+    -1, -1, -1, 30, 31, 32, 33, 34,    -1, -1, -1, 35, 36, 37, 38, 39
+};
+static const auto       from_fp40_idxs_8 = _mm512_loadu_si512( reinterpret_cast< const __m512i * >( from_fp40_8 ) );
+
+//
+// convert 8 FP64 <-> FP48 (1-11-36) :   seeeeeee eeemmmmm mmmmmmmm mmmmmmmm mmmmmmmm mmmmmmmm
+//                              byte :       5        4        3        2        1        0
+//
+
+static const __mmask64  to_fp48_mask_8 = 0b0000000000000000111111111111111111111111111111111111111111111111;  // upper 16 bytes will be zero
+static const int8_t     to_fp48_8[64]  = { // use upper 6 bytes for FP48
+    2,   3,  4,  5,  6,  7,    10, 11, 12, 13, 14, 15,
+    18, 19, 20, 21, 22, 23,    26, 27, 28, 29, 30, 31,
+    34, 35, 36, 37, 38, 39,    42, 43, 44, 45, 46, 47,
+    50, 51, 52, 53, 54, 55,    58, 59, 60, 61, 62, 63,
+
+    -1, -1, -1, -1,   -1, -1, -1, -1,   -1, -1, -1, -1,   -1, -1, -1, -1,
+};
+static const auto       to_fp48_idxs_8 = _mm512_loadu_si512( reinterpret_cast< const __m512i * >( to_fp48_8 ) );
+
+static const __mmask64  from_fp48_mask_8 = 0b1111110011111100111111001111110011111100111111001111110011111100;  // first two bytes are zet to zero
+static const int8_t     from_fp48_8[64]  = {  
+    -1, -1,  0,  1,  2,  3,  4,  5,    -1, -1,  6,  7,  8,  9, 10, 11
+    -1, -1, 12, 13, 14, 15, 16, 17     -1, -1, 18, 19, 20, 21, 22, 23,
+    -1, -1, 24, 25, 26, 27, 28, 29     -1, -1, 30, 31, 32, 33, 34, 35,
+    -1, -1, 36, 37, 38, 39, 40, 41,    -1, -1, 42, 43, 44, 45, 46, 47
+};
+static const auto       from_fp48_idxs_8 = _mm512_loadu_si512( reinterpret_cast< const __m512i * >( from_fp48_8 ) );
+
+//
+// convert 8 FP64 <-> FP56 (1-11-44) :   seeeeeee eeemmmmm mmmmmmmm mmmmmmmm mmmmmmmm mmmmmmmm mmmmmmmm
+//                              byte :       6        5        4        3        2        1        0
+//
+
+static const __mmask64  to_fp56_mask_8 = 0b0000000011111111111111111111111111111111111111111111111111111111;  // upper 8 bytes will be zero
+static const int8_t     to_fp56_8[64]  = { // use upper 7 bytes for FP56
+    1,  2,   3,  4,  5,  6,  7,     9, 10, 11, 12, 13, 14, 15,
+    17, 18, 19, 20, 21, 22, 23,    25, 26, 27, 28, 29, 30, 31,
+    33, 34, 35, 36, 37, 38, 39,    41, 42, 43, 44, 45, 46, 47,
+    49, 50, 51, 52, 53, 54, 55,    57, 58, 59, 60, 61, 62, 63,
+
+    -1, -1, -1, -1,   -1, -1, -1, -1,
+};
+static const auto       to_fp56_idxs_8 = _mm512_loadu_si512( reinterpret_cast< const __m512i * >( to_fp56_8 ) );
+
+static const __mmask64  from_fp56_mask_8 = 0b1111111011111110111111101111111011111110111111101111111011111110;  // first two bytes are zet to zero
+static const int8_t     from_fp56_8[64]  = {  
+    -1,  0,  1,  2,  3,  4,  5,  6,    -1,  7,  8,  9, 10, 11, 12, 13
+    -1, 14, 15, 16, 17, 18, 19, 20     -1, 21, 22, 23, 24, 25, 26, 27,
+    -1, 28, 29, 30, 31, 32, 33, 34     -1, 35, 36, 37, 38, 39, 40, 41,
+    -1, 42, 43, 44, 45, 46, 47, 48,    -1, 49, 50, 51, 52, 53, 54, 55,
+};
+static const auto       from_fp56_idxs_8 = _mm512_loadu_si512( reinterpret_cast< const __m512i * >( from_fp56_8 ) );
+
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -378,7 +454,15 @@ compress_fp40 ( const double *  data,
 {
     #if defined (__AVX512F__)
     
-    HLR_ERROR( "TODO" );
+    auto  zptr = zdata;
+    
+    for ( size_t  i = 0; i < nsize; i += 8, zptr += 40 )
+    {
+        const auto  vd = _mm512_loadu_pd( data + i );
+        const auto  vb = _mm512_maskz_permutexvar_epi8( to_fp40_mask_8, to_fp40_idxs_8, reinterpret_cast< __m512i >( vd ) );
+
+        _mm512_storeu_si512( reinterpret_cast< __m512i * >( zptr ), vb );
+    }// for
 
     #else
 
@@ -403,7 +487,15 @@ decompress_fp40 ( double *        data,
 {
     #if defined (__AVX512F__)
     
-    HLR_ERROR( "TODO" );
+    auto  zptr = zdata;
+    
+    for ( size_t  i = 0; i < nsize; i += 8, zptr += 40 )
+    {
+        const auto  vb = _mm512_loadu_si512( reinterpret_cast< const __m512i * >( zptr ) );
+        const auto  vd = reinterpret_cast< __m512d >( _mm512_maskz_permutexvar_epi8( from_fp40_mask_8, from_fp40_idxs_8, vb ) );
+
+        _mm512_storeu_pd( data + i, vd );
+    }// for
 
     #else
 
@@ -433,7 +525,15 @@ compress_fp48 ( const double *  data,
 {
     #if defined (__AVX512F__)
     
-    HLR_ERROR( "TODO" );
+    auto  zptr = zdata;
+    
+    for ( size_t  i = 0; i < nsize; i += 8, zptr += 48 )
+    {
+        const auto  vd = _mm512_loadu_pd( data + i );
+        const auto  vb = _mm512_maskz_permutexvar_epi8( to_fp48_mask_8, to_fp48_idxs_8, reinterpret_cast< __m512i >( vd ) );
+
+        _mm512_storeu_si512( reinterpret_cast< __m512i * >( zptr ), vb );
+    }// for
 
     #else
 
@@ -458,7 +558,15 @@ decompress_fp48 ( double *        data,
 {
     #if defined (__AVX512F__)
     
-    HLR_ERROR( "TODO" );
+    auto  zptr = zdata;
+    
+    for ( size_t  i = 0; i < nsize; i += 8, zptr += 48 )
+    {
+        const auto  vb = _mm512_loadu_si512( reinterpret_cast< const __m512i * >( zptr ) );
+        const auto  vd = reinterpret_cast< __m512d >( _mm512_maskz_permutexvar_epi8( from_fp48_mask_8, from_fp48_idxs_8, vb ) );
+
+        _mm512_storeu_pd( data + i, vd );
+    }// for
 
     #else
 
@@ -488,7 +596,15 @@ compress_fp56 ( const double *  data,
 {
     #if defined (__AVX512F__)
     
-    HLR_ERROR( "TODO" );
+    auto  zptr = zdata;
+    
+    for ( size_t  i = 0; i < nsize; i += 8, zptr += 56 )
+    {
+        const auto  vd = _mm512_loadu_pd( data + i );
+        const auto  vb = _mm512_maskz_permutexvar_epi8( to_fp56_mask_8, to_fp56_idxs_8, reinterpret_cast< __m512i >( vd ) );
+
+        _mm512_storeu_si512( reinterpret_cast< __m512i * >( zptr ), vb );
+    }// for
 
     #else
 
@@ -513,7 +629,15 @@ decompress_fp56 ( double *        data,
 {
     #if defined (__AVX512F__)
     
-    HLR_ERROR( "TODO" );
+    auto  zptr = zdata;
+    
+    for ( size_t  i = 0; i < nsize; i += 8, zptr += 56 )
+    {
+        const auto  vb = _mm512_loadu_si512( reinterpret_cast< const __m512i * >( zptr ) );
+        const auto  vd = reinterpret_cast< __m512d >( _mm512_maskz_permutexvar_epi8( from_fp56_mask_8, from_fp56_idxs_8, vb ) );
+
+        _mm512_storeu_pd( data + i, vd );
+    }// for
 
     #else
 
