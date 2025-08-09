@@ -8,6 +8,8 @@
 // Copyright   : Max Planck Institute MIS 2004-2025. All Rights Reserved.
 //
 
+#include <cstring>
+
 #include <hlr/compress/byte_n.hh>
 
 //
@@ -913,29 +915,31 @@ compress_lr< double > ( const blas::matrix< double > &  U,
     // convert each column to compressed form
     //
 
-    auto    zdata = std::vector< byte_t >( zsize );
-    size_t  pos   = 0;
+    auto  zdata = std::vector< byte_t >( zsize );
+    auto  zptr  = zdata.data();
+    auto  vptr  = U.data();
         
     for ( uint  l = 0; l < k; ++l )
     {
         const auto  nbyte = b[l];
 
-        zdata[pos] = nbyte;
-        pos       += efl_header_ofs;
+        *zptr  = nbyte;
+        zptr  += efl_header_ofs;
 
         switch ( nbyte )
         {
-            case  2 : compress_fp16( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  3 : compress_fp24( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  4 : compress_fp32( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  5 : compress_fp40( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  6 : compress_fp48( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  7 : compress_fp56( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  8 : compress_fp64( U.data() + l*n, n, zdata.data() + pos ); break;
+            case  2 : compress_fp16( vptr, n, zptr ); break;
+            case  3 : compress_fp24( vptr, n, zptr ); break;
+            case  4 : compress_fp32( vptr, n, zptr ); break;
+            case  5 : compress_fp40( vptr, n, zptr ); break;
+            case  6 : compress_fp48( vptr, n, zptr ); break;
+            case  7 : compress_fp56( vptr, n, zptr ); break;
+            case  8 : compress_fp64( vptr, n, zptr ); break;
             default : HLR_ERROR( "invalid byte size" );
         }// switch
         
-        pos += n*nbyte;
+        zptr += n*nbyte;
+        vptr += n;
     }// for
 
     return zdata;
@@ -956,29 +960,32 @@ void
 decompress_lr< double > ( const zarray &            zdata,
                           blas::matrix< double > &  U )
 {
-    const size_t    n   = U.nrows();
-    const uint32_t  k   = U.ncols();
-    size_t          pos = 0;
+    const size_t    n    = U.nrows();
+    const uint32_t  k    = U.ncols();
+    size_t          pos  = 0;
+    auto            vptr = U.data();
+    auto            zptr = zdata.data();
 
     for ( uint32_t  l = 0; l < k; ++l )
     {
-        const uint8_t  nbyte = zdata[ pos ];
+        const uint8_t  nbyte = *zptr;
 
-        pos += efl_header_ofs;
+        zptr += efl_header_ofs;
 
         switch ( nbyte )
         {
-            case  2 : decompress_fp16( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  3 : decompress_fp24( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  4 : decompress_fp32( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  5 : decompress_fp40( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  6 : decompress_fp48( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  7 : decompress_fp56( U.data() + l*n, n, zdata.data() + pos ); break;
-            case  8 : decompress_fp64( U.data() + l*n, n, zdata.data() + pos ); break;
+            case  2 : decompress_fp16( vptr, n, zptr ); break;
+            case  3 : decompress_fp24( vptr, n, zptr ); break;
+            case  4 : decompress_fp32( vptr, n, zptr ); break;
+            case  5 : decompress_fp40( vptr, n, zptr ); break;
+            case  6 : decompress_fp48( vptr, n, zptr ); break;
+            case  7 : decompress_fp56( vptr, n, zptr ); break;
+            case  8 : decompress_fp64( vptr, n, zptr ); break;
             default : HLR_ERROR( "invalid byte size" );
         }// switch
         
-        pos += nbyte * n;
+        zptr += nbyte * n;
+        vptr += n;
     }// for
 }
 
@@ -1123,7 +1130,7 @@ mulvec_lr ( const size_t     nrows,
 {
     using  real_t = Hpro::real_type_t< value_t >;
 
-    size_t  pos = 0;
+    auto  zptr = zA.data();
 
     switch ( op_A )
     {
@@ -1131,10 +1138,11 @@ mulvec_lr ( const size_t     nrows,
         {
             for ( uint  l = 0; l < ncols; ++l )
             {
-                const uint8_t  nbyte = zA[pos];
-        
-                mulvec( nbyte, nrows, 1, op_A, alpha, zA.data() + pos + efl_header_ofs, x+l, y );
-                pos += efl_header_ofs + nbyte * nrows;
+                const uint8_t  nbyte = *zptr;
+
+                zptr += efl_header_ofs;
+                mulvec( nbyte, nrows, 1, op_A, alpha, zptr, x+l, y );
+                zptr += nbyte * nrows;
             }// for
         }// case
         break;
@@ -1147,10 +1155,11 @@ mulvec_lr ( const size_t     nrows,
         {
             for ( uint  l = 0; l < ncols; ++l )
             {
-                const uint8_t  nbyte = zA[pos];
+                const uint8_t  nbyte = *zptr;
         
-                mulvec( nbyte, nrows, 1, op_A, alpha, zA.data() + pos + efl_header_ofs, x, y+l );
-                pos += efl_header_ofs + nbyte * nrows;
+                zptr += efl_header_ofs;
+                mulvec( nbyte, nrows, 1, op_A, alpha, zptr, x, y+l );
+                zptr += nbyte * nrows;
             }// for
         }// case
         break;
