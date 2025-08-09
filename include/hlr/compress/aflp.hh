@@ -147,6 +147,7 @@ nzmin_max ( const value_t *  data,
 #if defined(__AVX512F__)
 
 template <>
+inline
 std::pair< float, float >
 nzmin_max ( const float *  data,
             const size_t   nsize )
@@ -160,9 +161,9 @@ nzmin_max ( const float *  data,
     auto        vMIN  = _mm512_set1_ps( FP_info< float >::maximum );
     auto        vMAX  = _mm512_setzero_ps();
         
-    for ( myint_t  i = 0; i < nsize; i += simd_size )
+    for ( size_t  i = 0; i < nsize; i += simd_size )
     {
-        __m512     vd   = _mm512_abs_ps( _mm512_load_ps( vptr + i ) );
+        __m512     vd   = _mm512_abs_ps( _mm512_load_ps( data + i ) );
         __mmask16  mask = _mm512_cmp_ps_mask( vd, vzero, _CMP_NEQ_OQ );
 
         vMAX = _mm512_max_ps( vMAX, vd );
@@ -173,6 +174,7 @@ nzmin_max ( const float *  data,
 }
 
 template <>
+inline
 std::pair< double, double >
 nzmin_max ( const double *  data,
             const size_t    nsize )
@@ -186,9 +188,9 @@ nzmin_max ( const double *  data,
     auto        vMIN  = _mm512_set1_pd( FP_info< double >::maximum );
     auto        vMAX  = _mm512_setzero_pd();
         
-    for ( myint_t  i = 0; i < nsize; i += simd_size )
+    for ( size_t  i = 0; i < nsize; i += simd_size )
     {
-        const auto  vd   = _mm512_abs_pd( _mm512_load_pd( vptr + i ) );
+        const auto  vd   = _mm512_abs_pd( _mm512_load_pd( data + i ) );
         const auto  mask = _mm512_cmp_pd_mask( vd, vzero, _CMP_NEQ_OQ );
 
         vMAX = _mm512_max_pd( vMAX, vd );
