@@ -59,49 +59,49 @@ inline config  get_config      ( const double    eps ) { return config{ eps_to_r
 // convert 8 FP64 <-> FP32 <-> FP16 (1-8-7)
 //
 
-static const __mmask32  fp64_to_fp16_mask = 0b00000000000000001111111111111111;  // upper 16 bytes will be zero
-static const int8_t     fp64_to_fp16[32]  = { // use upper 2 bytes for FP16
+static const __mmask32  to_fp16_mask_8 = 0b00000000000000001111111111111111;  // upper 16 bytes will be zero
+static const int8_t     to_fp16_8[32]  = { // use upper 2 bytes for FP16
     2,  3,    6,  7,    10, 11,   14, 15,
     18, 19,   22, 23,   26, 27,   30, 31,
 
     -1, -1, -1, -1,   -1, -1, -1, -1,   -1, -1, -1, -1,   -1, -1, -1, -1
 };
-static const auto       fp64_to_fp16_idxs = _mm256_loadu_si256( reinterpret_cast< const __m256i * >( fp64_to_fp16 ) );
+static const auto       to_fp16_idxs_8 = _mm256_loadu_si256( reinterpret_cast< const __m256i * >( to_fp16_8 ) );
 
-static const __mmask32  from_fp16_mask = 0b11001100110011001100110011001100;  // first two bytes are zet to zero
-static const int8_t     from_fp16[32]  = {  
+static const __mmask32  from_fp16_mask_8 = 0b11001100110011001100110011001100;  // first two bytes are zet to zero
+static const int8_t     from_fp16_8[32]  = {  
     -1, -1, 0, 1,   -1, -1,  2,  3,   -1, -1,  4,  5,   -1, -1,  6,  7,
     -1, -1, 8, 9,   -1, -1, 10, 11,   -1, -1, 12, 13,   -1, -1, 14, 15
 };
-static const auto       fp64_from_fp16_idxs = _mm256_loadu_si256( reinterpret_cast< const __m256i * >( fp64_from_fp16 ) );
+static const auto       from_fp16_idxs_8 = _mm256_loadu_si256( reinterpret_cast< const __m256i * >( from_fp16_8 ) );
 
 
 //
 // convert 8 FP64 <-> FP32 <-> FP24 (1-8-15)
 //
 
-static const __mmask32  fp64_to_fp24_mask = 0b00000000111111111111111111111111;  // upper 8 bytes will be zero
-static const int8_t     fp64_to_fp24[32]  = { // use upper 3 bytes for FP24
+static const __mmask32  to_fp24_mask_8 = 0b00000000111111111111111111111111;  // upper 8 bytes will be zero
+static const int8_t     to_fp24_8[32]  = { // use upper 3 bytes for FP24
     1,   2,  3,    5,  6,  7,    9, 10, 11,   13, 14, 15,
     17, 18, 19,   21, 22, 23,   25, 26, 27,   29, 30, 31,
 
     -1, -1, -1, -1,   -1, -1, -1, -1
 };
-static const auto       fp64_to_fp24_idxs = _mm256_loadu_si256( reinterpret_cast< const __m256i * >( fp64_to_fp24 ) );
+static const auto       to_fp24_idxs_8 = _mm256_loadu_si256( reinterpret_cast< const __m256i * >( to_fp24_8 ) );
 
-static const __mmask32  from_fp24_mask = 0b11101110111011101110111011101110;  // first byte is zet to zero
-static const int8_t     from_fp24[32]  = {  
+static const __mmask32  from_fp24_mask_8 = 0b11101110111011101110111011101110;  // first byte is zet to zero
+static const int8_t     from_fp24_8[32]  = {  
     -1,  0,  1,  2,   -1,  3,  4,  5,   -1,  6,  7,  8,   -1,  9, 10, 11,
     -1, 12, 13, 14,   -1, 15, 16, 17,   -1, 18, 19, 20,   -1, 21, 22, 23
 };
-static const auto       fp64_from_fp24_idxs = _mm256_loadu_si256( reinterpret_cast< const __m256i * >( fp64_from_fp24 ) );
+static const auto       from_fp24_idxs_8 = _mm256_loadu_si256( reinterpret_cast< const __m256i * >( from_fp24_8 ) );
 
 
 //
 // convert 16 FP32 <-> FP24 (1-8-15)
 //
-static const __mmask64  fp32_to_fp24_mask = 0b0000000000000000111111111111111111111111111111111111111111111111;  // upper 16 bytes will be zero
-static const int8_t     fp32_to_fp24[64]  = {   // use upper 3 bytes for FP24
+static const __mmask64  to_fp24_mask_16 = 0b0000000000000000111111111111111111111111111111111111111111111111;  // upper 16 bytes will be zero
+static const int8_t     to_fp24_16[64]  = {   // use upper 3 bytes for FP24
     1,   2,  3,    5,  6,  7,    9, 10, 11,   13, 14, 15,
     17, 18, 19,   21, 22, 23,   25, 26, 27,   29, 30, 31,
     33, 34, 35,   37, 38, 39,   41, 42, 43,   45, 46, 47,
@@ -109,16 +109,16 @@ static const int8_t     fp32_to_fp24[64]  = {   // use upper 3 bytes for FP24
             
     -1, -1, -1, -1,   -1, -1, -1, -1,   -1, -1, -1, -1,   -1, -1, -1, -1
 };
-static const auto       fp32_to_fp24_idxs = _mm512_loadu_si512( reinterpret_cast< const __m512i * >( fp32_to_fp24 ) );
+static const auto       to_fp24_idxs_16 = _mm512_loadu_si512( reinterpret_cast< const __m512i * >( to_fp24_16 ) );
 
-static const __mmask64  fp32_from_fp24_mask = 0b1110111011101110111011101110111011101110111011101110111011101110;  // first byte is zet to zero
-static const int8_t     fp32_from_fp24[64]  = {  
+static const __mmask64  from_fp24_mask_16 = 0b1110111011101110111011101110111011101110111011101110111011101110;  // first byte is zet to zero
+static const int8_t     from_fp24_16[64]  = {  
     -1,  0,  1,  2,   -1,  3,  4,  5,   -1,  6,  7,  8,   -1,  9, 10, 11,
     -1, 12, 13, 14,   -1, 15, 16, 17,   -1, 18, 19, 20,   -1, 21, 22, 23,
     -1, 24, 25, 26,   -1, 27, 28, 29,   -1, 30, 31, 32,   -1, 33, 34, 35,
     -1, 36, 37, 38,   -1, 39, 40, 41,   -1, 42, 43, 45,   -1, 45, 46, 47
 };
-static const auto       fp32_from_fp24_idxs = _mm512_loadu_si512( reinterpret_cast< const __m512i * >( fp32_from_fp24 ) );
+static const auto       from_fp24_idxs_16 = _mm512_loadu_si512( reinterpret_cast< const __m512i * >( from_fp24_16 ) );
 
 #endif
 
@@ -161,9 +161,9 @@ compress_fp16 ( const double *  data,
     {
         const auto  vd = _mm512_loadu_pd( data + i );
         const auto  vf = _mm512_cvtpd_ps( vd );
-        const auto  vb = _mm256_maskz_permutexvar_epi8( fp64_to_fp16_mask, fp64_to_fp16_idxs, reinterpret_cast< __m256i >( vf ) );
+        const auto  vb = _mm256_maskz_permutexvar_epi8( to_fp16_mask_8, to_fp16_idxs_8, reinterpret_cast< __m256i >( vf ) );
 
-        _mm256_storeu_ps( reinterpret_cast< __m256i * >( zptr ), vb );
+        _mm256_storeu_si256( reinterpret_cast< __m256i * >( zptr ), vb );
     }// for
 
     #else
@@ -189,15 +189,15 @@ decompress_fp16 ( double *        data,
 {
     #if defined (__AVX512F__)
 
-    auto  zptr = reinterpret_cast< uint8_t * >( zdata );
+    auto  zptr = zdata;
     
     for ( size_t  i = 0; i < nsize; i += 8, zptr += 16 )
     {
-        const auto  vb = _mm256_loadu_ps( zptr + i );
-        const auto  vf = _mm256_maskz_permutexvar_epi8( fp64_from_fp16_mask, fp64_from_fp16_idxs, reinterpret_cast< __m256i >( vf ) );
-        const auto  vd = _mm512_cvtps_pd( vf );
+        const auto  vb = _mm256_loadu_si256( reinterpret_cast< const __m256i * >( zptr ) );
+        const auto  vf = _mm256_maskz_permutexvar_epi8( from_fp16_mask_8, from_fp16_idxs_8, vb );
+        const auto  vd = _mm512_cvtps_pd( reinterpret_cast< __m256 >( vf ) );
 
-        _mm512_storeu_pd( zptr + i, vd );
+        _mm512_storeu_pd( data + i, vd );
     }// for
     
     #else
@@ -234,9 +234,9 @@ compress_fp24 ( const double *  data,
     {
         const auto  vd = _mm512_loadu_pd( data + i );
         const auto  vf = _mm512_cvtpd_ps( vd );
-        const auto  vb = _mm256_maskz_permutexvar_epi8( fp64_to_fp24_mask, fp64_to_fp24_idxs, reinterpret_cast< __m256i >( vf ) );
+        const auto  vb = _mm256_maskz_permutexvar_epi8( to_fp24_mask_8, to_fp24_idxs_8, reinterpret_cast< __m256i >( vf ) );
 
-        _mm256_storeu_ps( reinterpret_cast< __m256i * >( zptr ), vb );
+        _mm256_storeu_si256( reinterpret_cast< __m256i * >( zptr ), vb );
     }// for
 
     #else
@@ -262,15 +262,15 @@ decompress_fp24 ( double *        data,
 {
     #if defined (__AVX512F__)
     
-    auto  zptr = reinterpret_cast< uint8_t * >( zdata );
+    auto  zptr = zdata;
     
     for ( size_t  i = 0; i < nsize; i += 8, zptr += 24 )
     {
-        const auto  vb = _mm256_loadu_ps( zptr + i );
-        const auto  vf = _mm256_maskz_permutexvar_epi8( fp64_from_fp24_mask, fp64_from_fp24_idxs, reinterpret_cast< __m256i >( vf ) );
-        const auto  vd = _mm512_cvtps_pd( vf );
+        const auto  vb = _mm256_loadu_si256( reinterpret_cast< const __m256i * >( zptr ) );
+        const auto  vf = _mm256_maskz_permutexvar_epi8( from_fp24_mask_8, from_fp24_idxs_8, vb );
+        const auto  vd = _mm512_cvtps_pd( reinterpret_cast< __m256 >( vf ) );
 
-        _mm512_storeu_pd( zptr + i, vd );
+        _mm512_storeu_pd( data + i, vd );
     }// for
 
     #else
@@ -343,7 +343,7 @@ decompress_fp32 ( double *        data,
     for ( size_t  i = 0; i < nsize; i += 8 )
     {
         const auto  vf = _mm256_loadu_ps( zptr + i );
-        const auto  vd = _mm512_cvtps_pd( vd );
+        const auto  vd = _mm512_cvtps_pd( vf );
 
         _mm512_storeu_pd( data + i, vd );
     }// for
