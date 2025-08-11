@@ -27,7 +27,13 @@
 
 namespace hlr { namespace compress { namespace efl {
 
-constexpr uint8_t  efl_header_ofs = 8;
+constexpr    uint8_t  efl_header_ofs = 1;
+
+#if defined (__AVX512VBMI__) && defined (__EVEX512__)
+static const uint8_t  efl_mem_pad[8] = { 0, 0, 16, 8, 24, 16, 8, 0 }; // memory padding due to AVX512 zero bytes
+#else
+static const uint8_t  efl_mem_pad[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+#endif
 
 //
 // return bitrate for given accuracy
@@ -166,9 +172,9 @@ static const auto       to_fp48_idxs_8 = _mm512_loadu_si512( reinterpret_cast< c
 
 static const __mmask64  from_fp48_mask_8 = 0b1111110011111100111111001111110011111100111111001111110011111100;  // first two bytes are zet to zero
 static const int8_t     from_fp48_8[64]  = {  
-    -1, -1,  0,  1,  2,  3,  4,  5,    -1, -1,  6,  7,  8,  9, 10, 11
-    -1, -1, 12, 13, 14, 15, 16, 17     -1, -1, 18, 19, 20, 21, 22, 23,
-    -1, -1, 24, 25, 26, 27, 28, 29     -1, -1, 30, 31, 32, 33, 34, 35,
+    -1, -1,  0,  1,  2,  3,  4,  5,    -1, -1,  6,  7,  8,  9, 10, 11,
+    -1, -1, 12, 13, 14, 15, 16, 17,    -1, -1, 18, 19, 20, 21, 22, 23,
+    -1, -1, 24, 25, 26, 27, 28, 29,    -1, -1, 30, 31, 32, 33, 34, 35,
     -1, -1, 36, 37, 38, 39, 40, 41,    -1, -1, 42, 43, 44, 45, 46, 47
 };
 static const auto       from_fp48_idxs_8 = _mm512_loadu_si512( reinterpret_cast< const __m512i * >( from_fp48_8 ) );
@@ -191,9 +197,9 @@ static const auto       to_fp56_idxs_8 = _mm512_loadu_si512( reinterpret_cast< c
 
 static const __mmask64  from_fp56_mask_8 = 0b1111111011111110111111101111111011111110111111101111111011111110;  // first two bytes are zet to zero
 static const int8_t     from_fp56_8[64]  = {  
-    -1,  0,  1,  2,  3,  4,  5,  6,    -1,  7,  8,  9, 10, 11, 12, 13
-    -1, 14, 15, 16, 17, 18, 19, 20     -1, 21, 22, 23, 24, 25, 26, 27,
-    -1, 28, 29, 30, 31, 32, 33, 34     -1, 35, 36, 37, 38, 39, 40, 41,
+    -1,  0,  1,  2,  3,  4,  5,  6,    -1,  7,  8,  9, 10, 11, 12, 13,
+    -1, 14, 15, 16, 17, 18, 19, 20,    -1, 21, 22, 23, 24, 25, 26, 27,
+    -1, 28, 29, 30, 31, 32, 33, 34,    -1, 35, 36, 37, 38, 39, 40, 41,
     -1, 42, 43, 44, 45, 46, 47, 48,    -1, 49, 50, 51, 52, 53, 54, 55,
 };
 static const auto       from_fp56_idxs_8 = _mm512_loadu_si512( reinterpret_cast< const __m512i * >( from_fp56_8 ) );
@@ -231,7 +237,7 @@ compress_fp16 ( const double *  data,
                 const size_t    nsize,
                 byte_t *        zdata )
 {
-    #if defined (__AVX512F__)
+    #if defined (__AVX512VBMI__) && defined (__EVEX512__)
 
     auto  zptr = zdata;
     
@@ -265,7 +271,7 @@ decompress_fp16 ( double *        data,
                   const size_t    nsize,
                   const byte_t *  zdata )
 {
-    #if defined (__AVX512F__)
+    #if defined (__AVX512VBMI__) && defined (__EVEX512__)
 
     auto  zptr = zdata;
     
@@ -304,7 +310,7 @@ compress_fp24 ( const double *  data,
                 const size_t    nsize,
                 byte_t *        zdata )
 {
-    #if defined (__AVX512F__)
+    #if defined (__AVX512VBMI__) && defined (__EVEX512__)
     
     auto  zptr = zdata;
     
@@ -338,7 +344,7 @@ decompress_fp24 ( double *        data,
                   const size_t    nsize,
                   const byte_t *  zdata )
 {
-    #if defined (__AVX512F__)
+    #if defined (__AVX512VBMI__) && defined (__EVEX512__)
     
     auto  zptr = zdata;
     
@@ -454,7 +460,7 @@ compress_fp40 ( const double *  data,
                 const size_t    nsize,
                 byte_t *        zdata )
 {
-    #if defined (__AVX512F__)
+    #if defined (__AVX512VBMI__) && defined (__EVEX512__)
     
     auto  zptr = zdata;
     
@@ -487,7 +493,7 @@ decompress_fp40 ( double *        data,
                   const size_t    nsize,
                   const byte_t *  zdata )
 {
-    #if defined (__AVX512F__)
+    #if defined (__AVX512VBMI__) && defined (__EVEX512__)
     
     auto  zptr = zdata;
     
@@ -525,7 +531,7 @@ compress_fp48 ( const double *  data,
                 const size_t    nsize,
                 byte_t *        zdata )
 {
-    #if defined (__AVX512F__)
+    #if defined (__AVX512VBMI__) && defined (__EVEX512__)
     
     auto  zptr = zdata;
     
@@ -558,7 +564,7 @@ decompress_fp48 ( double *        data,
                   const size_t    nsize,
                   const byte_t *  zdata )
 {
-    #if defined (__AVX512F__)
+    #if defined (__AVX512VBMI__) && defined (__EVEX512__)
     
     auto  zptr = zdata;
     
@@ -596,7 +602,7 @@ compress_fp56 ( const double *  data,
                 const size_t    nsize,
                 byte_t *        zdata )
 {
-    #if defined (__AVX512F__)
+    #if defined (__AVX512VBMI__) && defined (__EVEX512__)
     
     auto  zptr = zdata;
     
@@ -629,7 +635,7 @@ decompress_fp56 ( double *        data,
                   const size_t    nsize,
                   const byte_t *  zdata )
 {
-    #if defined (__AVX512F__)
+    #if defined (__AVX512VBMI__) && defined (__EVEX512__)
     
     auto  zptr = zdata;
     
@@ -720,7 +726,7 @@ compress< double > ( const config &   config,
 {
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
     const auto    nbyte = precision_byte_size( config.bitrate );
-    zarray        zdata( efl_header_ofs + nbyte * nsize );
+    zarray        zdata( efl_header_ofs + nbyte * nsize + efl_mem_pad[ nbyte ] );
 
     zdata[0] = nbyte;
 
@@ -736,6 +742,39 @@ compress< double > ( const config &   config,
         default : HLR_ERROR( "invalid byte size" );
     }// switch
     
+    // // DEBUG
+    // {
+    //     std::vector< double >  tmp( nsize );
+
+    //     switch ( nbyte )
+    //     {
+    //         case  2 : decompress_fp16( tmp.data(), nsize, zdata.data() + efl_header_ofs ); break;
+    //         case  3 : decompress_fp24( tmp.data(), nsize, zdata.data() + efl_header_ofs ); break;
+    //         case  4 : decompress_fp32( tmp.data(), nsize, zdata.data() + efl_header_ofs ); break;
+    //         case  5 : decompress_fp40( tmp.data(), nsize, zdata.data() + efl_header_ofs ); break;
+    //         case  6 : decompress_fp48( tmp.data(), nsize, zdata.data() + efl_header_ofs ); break;
+    //         case  7 : decompress_fp56( tmp.data(), nsize, zdata.data() + efl_header_ofs ); break;
+    //         case  8 : decompress_fp64( tmp.data(), nsize, zdata.data() + efl_header_ofs ); break;
+    //         default : HLR_ERROR( "invalid byte size" );
+    //     }// switch
+
+    //     double  err = 0;
+    //     double  nrm = 0;
+
+    //     for ( size_t  i = 0; i < nsize; ++i )
+    //     {
+    //         HLR_ASSERT( std::isfinite( tmp[i] ) );
+            
+    //         const auto  d_i = data[i] - tmp[i];
+            
+    //         err += d_i * d_i;
+    //         nrm += data[i] * data[i];
+    //     }// for
+
+    //     std::cout << std::sqrt( err ) << " / " << std::sqrt( err ) / std::sqrt( nrm ) << std::endl;
+    // }
+    // // DEBUG
+
     return zdata;
 }
 
@@ -823,6 +862,13 @@ decompress< double > ( const zarray &  zdata,
         case  8 : decompress_fp64( dest, nsize, zdata.data() + efl_header_ofs ); break;
         default : HLR_ERROR( "invalid byte size" );
     }// switch
+
+    // // DEBUG
+    // {
+    //     for ( size_t  i = 0; i < nsize; ++i )
+    //         HLR_ASSERT( std::isfinite( dest[i] ) );
+    // }
+    // // DEBUG
 }
 
 template <>
@@ -903,6 +949,17 @@ compress_lr< double > ( const blas::matrix< double > &  U,
     auto          b     = std::vector< uint8_t >( k );
     size_t        zsize = 0;
 
+    // // DEBUG
+    // {
+    //     for ( uint32_t  l = 0; l < k; ++l )
+    //         for ( size_t  i = 0; i < n; ++i )
+    //             HLR_ASSERT( std::isfinite( U(i,l) ) );
+
+    //     for ( uint32_t  l = 0; l < k; ++l )
+    //         HLR_ASSERT( std::isfinite( S(l) ) );
+    // }
+    // // DEBUG
+
     for ( uint  l = 0; l < k; ++l )
     {
         const uint8_t  nbyte = precision_byte_size( eps_to_rate_valr( S(l) ) );
@@ -915,7 +972,7 @@ compress_lr< double > ( const blas::matrix< double > &  U,
     // convert each column to compressed form
     //
 
-    auto  zdata = std::vector< byte_t >( zsize );
+    auto  zdata = std::vector< byte_t >( zsize + efl_mem_pad[ b[k-1] ] );
     auto  zptr  = zdata.data();
     auto  vptr  = U.data();
         
@@ -987,6 +1044,14 @@ decompress_lr< double > ( const zarray &            zdata,
         zptr += nbyte * n;
         vptr += n;
     }// for
+
+    // // DEBUG
+    // {
+    //     for ( uint32_t  l = 0; l < k; ++l )
+    //         for ( size_t  i = 0; i < n; ++i )
+    //             HLR_ASSERT( std::isfinite( U(i,l) ) );
+    // }
+    // // DEBUG
 }
 
 //
