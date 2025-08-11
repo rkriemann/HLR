@@ -30,9 +30,9 @@ namespace hlr { namespace compress { namespace fpx {
 constexpr    uint8_t  fpx_header_ofs = 1;
 
 #if defined (__AVX512VBMI__) && defined (__EVEX512__)
-static const uint8_t  fpx_mem_pad[8] = { 0, 0, 16, 8, 24, 16, 8, 0 }; // memory padding due to AVX512 zero bytes
+static const uint8_t  fpx_mem_pad[9] = { 0, 0, 16, 8, 0, 24, 16, 8, 0 }; // memory padding due to AVX512 zero bytes
 #else
-static const uint8_t  fpx_mem_pad[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+static const uint8_t  fpx_mem_pad[9] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 #endif
 
 //
