@@ -167,12 +167,17 @@ cpu ()
         else if (( pos + 4  <= nlen) && (model_name.substr( pos,   4 ) == " CPU"       )) pos += 3;
         else if (( pos + 10 <= nlen) && (model_name.substr( pos,  10 ) == " Processor" )) pos += 9;
         else if (( pos + 4  <= nlen) && (model_name.substr( pos,   4 ) == " PRO"       )) pos += 3;
-        else if (( pos + 21 <= nlen) && (model_name.substr( pos,  21 ) == " with Radeon Graphics" )) pos += 20;
+        // else if (( pos + 21 <= nlen) && (model_name.substr( pos,  21 ) == " with Radeon Graphics" )) pos += 20;
         else if (( pos + 2  <= nlen) && (model_name.substr( pos,   2 ) == " @"         )) pos = nlen;
         else
             cpu += model_name[ pos ];
     }// for
-    
+
+    size_t  pos = 0;
+
+    if      (( pos = cpu.find( " w/ Radeon"   )) != std::string::npos ) cpu = cpu.substr( 0, pos );
+    else if (( pos = cpu.find( " with Radeon" )) != std::string::npos ) cpu = cpu.substr( 0, pos );
+
     return cpu;
 
     #elif defined(__APPLE__)
