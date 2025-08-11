@@ -1,9 +1,9 @@
-#ifndef __HLR_UTILS_DETAIL_EFL_HH
-#define __HLR_UTILS_DETAIL_EFL_HH
+#ifndef __HLR_UTILS_DETAIL_FPX_HH
+#define __HLR_UTILS_DETAIL_FPX_HH
 //
 // Project     : HLR
-// Module      : compress/efl
-// Description : extended floating point compression functions
+// Module      : compress/fpx
+// Description : compression based on extended floating point format (FP16, FP24, ...)
 // Author      : Ronald Kriemann
 // Copyright   : Max Planck Institute MIS 2004-2025. All Rights Reserved.
 //
@@ -20,19 +20,19 @@
 
 ////////////////////////////////////////////////////////////
 //
-// compression using general efl format
+// compression using general fpx format
 // - use FP64 exponent size and precision dependend mantissa size (1+11+X bits)
 //
 ////////////////////////////////////////////////////////////
 
-namespace hlr { namespace compress { namespace efl {
+namespace hlr { namespace compress { namespace fpx {
 
-constexpr    uint8_t  efl_header_ofs = 1;
+constexpr    uint8_t  fpx_header_ofs = 1;
 
 #if defined (__AVX512VBMI__) && defined (__EVEX512__)
-static const uint8_t  efl_mem_pad[8] = { 0, 0, 16, 8, 24, 16, 8, 0 }; // memory padding due to AVX512 zero bytes
+static const uint8_t  fpx_mem_pad[8] = { 0, 0, 16, 8, 24, 16, 8, 0 }; // memory padding due to AVX512 zero bytes
 #else
-static const uint8_t  efl_mem_pad[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+static const uint8_t  fpx_mem_pad[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 #endif
 
 //
@@ -726,19 +726,19 @@ compress< double > ( const config &   config,
 {
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
     const auto    nbyte = precision_byte_size( config.bitrate );
-    zarray        zdata( efl_header_ofs + nbyte * nsize + efl_mem_pad[ nbyte ] );
+    zarray        zdata( fpx_header_ofs + nbyte * nsize + fpx_mem_pad[ nbyte ] );
 
     zdata[0] = nbyte;
 
     switch ( nbyte )
     {
-        case  2 : compress_fp16( data, nsize, zdata.data() + efl_header_ofs ); break;
-        case  3 : compress_fp24( data, nsize, zdata.data() + efl_header_ofs ); break;
-        case  4 : compress_fp32( data, nsize, zdata.data() + efl_header_ofs ); break;
-        case  5 : compress_fp40( data, nsize, zdata.data() + efl_header_ofs ); break;
-        case  6 : compress_fp48( data, nsize, zdata.data() + efl_header_ofs ); break;
-        case  7 : compress_fp56( data, nsize, zdata.data() + efl_header_ofs ); break;
-        case  8 : compress_fp64( data, nsize, zdata.data() + efl_header_ofs ); break;
+        case  2 : compress_fp16( data, nsize, zdata.data() + fpx_header_ofs ); break;
+        case  3 : compress_fp24( data, nsize, zdata.data() + fpx_header_ofs ); break;
+        case  4 : compress_fp32( data, nsize, zdata.data() + fpx_header_ofs ); break;
+        case  5 : compress_fp40( data, nsize, zdata.data() + fpx_header_ofs ); break;
+        case  6 : compress_fp48( data, nsize, zdata.data() + fpx_header_ofs ); break;
+        case  7 : compress_fp56( data, nsize, zdata.data() + fpx_header_ofs ); break;
+        case  8 : compress_fp64( data, nsize, zdata.data() + fpx_header_ofs ); break;
         default : HLR_ERROR( "invalid byte size" );
     }// switch
     
@@ -748,13 +748,13 @@ compress< double > ( const config &   config,
 
     //     switch ( nbyte )
     //     {
-    //         case  2 : decompress_fp16( tmp.data(), nsize, zdata.data() + efl_header_ofs ); break;
-    //         case  3 : decompress_fp24( tmp.data(), nsize, zdata.data() + efl_header_ofs ); break;
-    //         case  4 : decompress_fp32( tmp.data(), nsize, zdata.data() + efl_header_ofs ); break;
-    //         case  5 : decompress_fp40( tmp.data(), nsize, zdata.data() + efl_header_ofs ); break;
-    //         case  6 : decompress_fp48( tmp.data(), nsize, zdata.data() + efl_header_ofs ); break;
-    //         case  7 : decompress_fp56( tmp.data(), nsize, zdata.data() + efl_header_ofs ); break;
-    //         case  8 : decompress_fp64( tmp.data(), nsize, zdata.data() + efl_header_ofs ); break;
+    //         case  2 : decompress_fp16( tmp.data(), nsize, zdata.data() + fpx_header_ofs ); break;
+    //         case  3 : decompress_fp24( tmp.data(), nsize, zdata.data() + fpx_header_ofs ); break;
+    //         case  4 : decompress_fp32( tmp.data(), nsize, zdata.data() + fpx_header_ofs ); break;
+    //         case  5 : decompress_fp40( tmp.data(), nsize, zdata.data() + fpx_header_ofs ); break;
+    //         case  6 : decompress_fp48( tmp.data(), nsize, zdata.data() + fpx_header_ofs ); break;
+    //         case  7 : decompress_fp56( tmp.data(), nsize, zdata.data() + fpx_header_ofs ); break;
+    //         case  8 : decompress_fp64( tmp.data(), nsize, zdata.data() + fpx_header_ofs ); break;
     //         default : HLR_ERROR( "invalid byte size" );
     //     }// switch
 
@@ -853,13 +853,13 @@ decompress< double > ( const zarray &  zdata,
 
     switch ( nbyte )
     {
-        case  2 : decompress_fp16( dest, nsize, zdata.data() + efl_header_ofs ); break;
-        case  3 : decompress_fp24( dest, nsize, zdata.data() + efl_header_ofs ); break;
-        case  4 : decompress_fp32( dest, nsize, zdata.data() + efl_header_ofs ); break;
-        case  5 : decompress_fp40( dest, nsize, zdata.data() + efl_header_ofs ); break;
-        case  6 : decompress_fp48( dest, nsize, zdata.data() + efl_header_ofs ); break;
-        case  7 : decompress_fp56( dest, nsize, zdata.data() + efl_header_ofs ); break;
-        case  8 : decompress_fp64( dest, nsize, zdata.data() + efl_header_ofs ); break;
+        case  2 : decompress_fp16( dest, nsize, zdata.data() + fpx_header_ofs ); break;
+        case  3 : decompress_fp24( dest, nsize, zdata.data() + fpx_header_ofs ); break;
+        case  4 : decompress_fp32( dest, nsize, zdata.data() + fpx_header_ofs ); break;
+        case  5 : decompress_fp40( dest, nsize, zdata.data() + fpx_header_ofs ); break;
+        case  6 : decompress_fp48( dest, nsize, zdata.data() + fpx_header_ofs ); break;
+        case  7 : decompress_fp56( dest, nsize, zdata.data() + fpx_header_ofs ); break;
+        case  8 : decompress_fp64( dest, nsize, zdata.data() + fpx_header_ofs ); break;
         default : HLR_ERROR( "invalid byte size" );
     }// switch
 
@@ -965,14 +965,14 @@ compress_lr< double > ( const blas::matrix< double > &  U,
         const uint8_t  nbyte = precision_byte_size( eps_to_rate_valr( S(l) ) );
 
         b[l]   = nbyte;
-        zsize += efl_header_ofs + n * nbyte;
+        zsize += fpx_header_ofs + n * nbyte;
     }// for
 
     //
     // convert each column to compressed form
     //
 
-    auto  zdata = std::vector< byte_t >( zsize + efl_mem_pad[ b[k-1] ] );
+    auto  zdata = std::vector< byte_t >( zsize + fpx_mem_pad[ b[k-1] ] );
     auto  zptr  = zdata.data();
     auto  vptr  = U.data();
         
@@ -981,7 +981,7 @@ compress_lr< double > ( const blas::matrix< double > &  U,
         const auto  nbyte = b[l];
 
         *zptr  = nbyte;
-        zptr  += efl_header_ofs;
+        zptr  += fpx_header_ofs;
 
         switch ( nbyte )
         {
@@ -1027,7 +1027,7 @@ decompress_lr< double > ( const zarray &            zdata,
     {
         const uint8_t  nbyte = *zptr;
 
-        zptr += efl_header_ofs;
+        zptr += fpx_header_ofs;
 
         switch ( nbyte )
         {
@@ -1180,7 +1180,7 @@ mulvec ( const size_t     nrows,
 
     const uint8_t  nbyte = zA[0];
     
-    mulvec( nbyte, nrows, ncols, op_A, alpha, zA.data() + efl_header_ofs, x, y );
+    mulvec( nbyte, nrows, ncols, op_A, alpha, zA.data() + fpx_header_ofs, x, y );
 }
 
 template < typename value_t >
@@ -1205,7 +1205,7 @@ mulvec_lr ( const size_t     nrows,
             {
                 const uint8_t  nbyte = *zptr;
 
-                zptr += efl_header_ofs;
+                zptr += fpx_header_ofs;
                 mulvec( nbyte, nrows, 1, op_A, alpha, zptr, x+l, y );
                 zptr += nbyte * nrows;
             }// for
@@ -1222,7 +1222,7 @@ mulvec_lr ( const size_t     nrows,
             {
                 const uint8_t  nbyte = *zptr;
         
-                zptr += efl_header_ofs;
+                zptr += fpx_header_ofs;
                 mulvec( nbyte, nrows, 1, op_A, alpha, zptr, x, y+l );
                 zptr += nbyte * nrows;
             }// for
@@ -1231,6 +1231,6 @@ mulvec_lr ( const size_t     nrows,
     }// switch
 }
 
-}}}// namespace hlr::compress::efl
+}}}// namespace hlr::compress::fpx
 
-#endif // __HLR_UTILS_DETAIL_EFL_HH
+#endif // __HLR_UTILS_DETAIL_FPX_HH

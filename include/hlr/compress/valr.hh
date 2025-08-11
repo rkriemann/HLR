@@ -399,19 +399,19 @@ mulvec ( const size_t     nrows,
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#elif HLR_VALR_COMPRESSOR == HLR_COMPRESSOR_EFL
+#elif HLR_VALR_COMPRESSOR == HLR_COMPRESSOR_FPX
 
-#include <hlr/compress/efl.hh>
+#include <hlr/compress/fpx.hh>
 
 namespace hlr { namespace compress { namespace valr {
 
-using zarray = hlr::compress::efl::zarray;
-using hlr::compress::efl::compress_lr;
-using hlr::compress::efl::decompress_lr;
-using hlr::compress::efl::byte_size;
-using hlr::compress::efl::compressed_size;
+using zarray = hlr::compress::fpx::zarray;
+using hlr::compress::fpx::compress_lr;
+using hlr::compress::fpx::decompress_lr;
+using hlr::compress::fpx::byte_size;
+using hlr::compress::fpx::compressed_size;
 
-static const char provider[] = "efl";
+static const char provider[] = "fpx";
 
 namespace zblas
 {
@@ -426,7 +426,7 @@ mulvec ( const size_t     nrows,
          const value_t *  x,
          value_t *        y )
 {
-    hlr::compress::efl::mulvec_lr( nrows, ncols, op_A, alpha, zA, x, y );
+    hlr::compress::fpx::mulvec_lr( nrows, ncols, op_A, alpha, zA, x, y );
 }
 
 }// namespace zblas

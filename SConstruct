@@ -163,7 +163,7 @@ COMPRESSORS   = [ 'help',       # print help
                   'sfl2',       # 23
                   'dfl',        # 4
                   'dfl2',       # 22
-                  'efl',        # 24
+                  'fpx',        # 24
                   'mp',         # 18
                   'fp32',       # 13
                   'zfp',        # 5
@@ -190,7 +190,7 @@ COMPRESSORS_HELP = { 'none'   : 'no compression used',
                      'sfl2'   : 'use SFL2',
                      'dfl'    : 'use DFL',
                      'dfl2'   : 'use DFL2',
-                     'efl'    : 'use extended float',
+                     'fpx'    : 'use extended float',
                      'mp'     : 'use mixed precision storage with FP64/FP32/BF16',
                      'fp32'   : 'use FP32 for storage',
                      'zfp'    : 'use ZFP     (see also {0}zfp_dir{1})',
@@ -708,7 +708,7 @@ elif compressor == 'dfl' :
 elif compressor == 'dfl2' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=22' )
     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=22' )
-elif compressor == 'efl' :
+elif compressor == 'fpx' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=24' )
     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=24' )
 elif compressor == 'mp' :

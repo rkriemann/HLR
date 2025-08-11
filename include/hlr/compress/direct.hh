@@ -555,24 +555,24 @@ namespace zblas { using hlr::compress::mixedprec::mulvec; }
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#elif HLR_COMPRESSOR == HLR_COMPRESSOR_EFL
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_FPX
 
-#include <hlr/compress/efl.hh>
+#include <hlr/compress/fpx.hh>
 
 namespace hlr { namespace compress {
 
-static const char provider[] = "efl";
+static const char provider[] = "fpx";
 
-using  zconfig_t = hlr::compress::efl::config;
-using  zarray    = hlr::compress::efl::zarray;
+using  zconfig_t = hlr::compress::fpx::config;
+using  zarray    = hlr::compress::fpx::zarray;
 
-using hlr::compress::efl::compress;
-using hlr::compress::efl::decompress;
-using hlr::compress::efl::get_config;
-using hlr::compress::efl::byte_size;
-using hlr::compress::efl::compressed_size;
+using hlr::compress::fpx::compress;
+using hlr::compress::fpx::decompress;
+using hlr::compress::fpx::get_config;
+using hlr::compress::fpx::byte_size;
+using hlr::compress::fpx::compressed_size;
 
-namespace zblas { using hlr::compress::efl::mulvec; }
+namespace zblas { using hlr::compress::fpx::mulvec; }
 
 }} // namespace hlr::compress
 
