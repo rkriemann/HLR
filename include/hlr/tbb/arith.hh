@@ -275,12 +275,13 @@ using hlr::build_cluster_blocks;
 template < typename value_t >
 std::unique_ptr< cluster_matrix_t< value_t > >
 build_cluster_matrix ( const matop_t                     op_M,
-                       const Hpro::TMatrix< value_t > &  M )
+                       const Hpro::TMatrix< value_t > &  M,
+                       const accuracy &                  acc )
 {
     auto  cm = std::make_unique< cluster_matrix_t< value_t > >( M.row_is( op_M ) );
 
     hlr::detail::build_cluster_matrix( op_M, M, *cm );
-    hlr::tbb::detail::build_joined_matrix( op_M, *cm );
+    hlr::tbb::detail::build_joined_matrix( op_M, *cm, acc );
     
     return cm;
 }
