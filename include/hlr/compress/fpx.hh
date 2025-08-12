@@ -231,65 +231,69 @@ precision_byte_size ( const uint8_t  bitrate )
 //
 // FP16 : 1-8-7  (aka BF16)
 //
-static
+inline
 void
 compress_fp16 ( const double *  data,
                 const size_t    nsize,
                 byte_t *        zdata )
 {
-    #if defined (__AVX512VBMI__) && defined (__EVEX512__)
-
-    auto  zptr = zdata;
+    size_t  i = 0;
     
-    for ( size_t  i = 0; i < nsize; i += 8, zptr += 16 )
+    #if defined (__AVX512VBMI__) && defined (__EVEX512__)
     {
-        const auto  vd = _mm512_loadu_pd( data + i );
-        const auto  vf = _mm512_cvtpd_ps( vd );
-        const auto  vb = _mm256_maskz_permutexvar_epi8( to_fp16_mask_8, to_fp16_idxs_8, reinterpret_cast< __m256i >( vf ) );
-
-        _mm256_storeu_si256( reinterpret_cast< __m256i * >( zptr ), vb );
-    }// for
-
-    #else
+        const size_t  nsize8 = nsize - nsize % 8;
+        auto          zptr   = zdata;
+    
+        for ( ; i < nsize8; i += 8, zptr += 16 )
+        {
+            const auto  vd = _mm512_loadu_pd( data + i );
+            const auto  vf = _mm512_cvtpd_ps( vd );
+            const auto  vb = _mm256_maskz_permutexvar_epi8( to_fp16_mask_8, to_fp16_idxs_8, reinterpret_cast< __m256i >( vf ) );
+            
+            _mm256_storeu_si256( reinterpret_cast< __m256i * >( zptr ), vb );
+        }// for
+    }
+    #endif
 
     auto  zptr = reinterpret_cast< byte2_t * >( zdata );
 
     #pragma GCC ivdep
-    for ( size_t  i = 0; i < nsize; ++i )
+    for ( ; i < nsize; ++i )
     {
         const fp32int_t  v{ .f = float(data[i]) };
-        
+            
         zptr[i] = v.u >> 16;
     }// for
-    
-    #endif
 }
 
-static
+inline
 void
 decompress_fp16 ( double *        data,
                   const size_t    nsize,
                   const byte_t *  zdata )
 {
+    size_t  i = 0;
+        
     #if defined (__AVX512VBMI__) && defined (__EVEX512__)
-
-    auto  zptr = zdata;
-    
-    for ( size_t  i = 0; i < nsize; i += 8, zptr += 16 )
     {
-        const auto  vb = _mm256_loadu_si256( reinterpret_cast< const __m256i * >( zptr ) );
-        const auto  vf = _mm256_maskz_permutexvar_epi8( from_fp16_mask_8, from_fp16_idxs_8, vb );
-        const auto  vd = _mm512_cvtps_pd( reinterpret_cast< __m256 >( vf ) );
-
-        _mm512_storeu_pd( data + i, vd );
-    }// for
+        const size_t  nsize8 = nsize - nsize % 8;
+        auto          zptr   = zdata;
     
-    #else
+        for ( ; i < nsize8; i += 8, zptr += 16 )
+        {
+            const auto  vb = _mm256_loadu_si256( reinterpret_cast< const __m256i * >( zptr ) );
+            const auto  vf = _mm256_maskz_permutexvar_epi8( from_fp16_mask_8, from_fp16_idxs_8, vb );
+            const auto  vd = _mm512_cvtps_pd( reinterpret_cast< __m256 >( vf ) );
+
+            _mm512_storeu_pd( data + i, vd );
+        }// for
+    }
+    #endif
 
     auto  zptr = reinterpret_cast< const byte2_t * >( zdata );
     
     #pragma GCC ivdep
-    for ( size_t  i = 0; i < nsize; ++i )
+    for ( ; i < nsize; ++i )
     {
         const fp32int_t  v{ .u = uint32_t(zptr[i]) << 16 };
         
@@ -297,33 +301,35 @@ decompress_fp16 ( double *        data,
 
         HLR_DBG_ASSERT( std::isfinite( data[i] ) );
     }// for
-
-    #endif
 }
 
 //
 // FP24 : 1-8-15
 //
-static
+inline
 void
 compress_fp24 ( const double *  data,
                 const size_t    nsize,
                 byte_t *        zdata )
 {
+    size_t  i = 0;
+        
     #if defined (__AVX512VBMI__) && defined (__EVEX512__)
-    
-    auto  zptr = zdata;
-    
-    for ( size_t  i = 0; i < nsize; i += 8, zptr += 24 )
     {
-        const auto  vd = _mm512_loadu_pd( data + i );
-        const auto  vf = _mm512_cvtpd_ps( vd );
-        const auto  vb = _mm256_maskz_permutexvar_epi8( to_fp24_mask_8, to_fp24_idxs_8, reinterpret_cast< __m256i >( vf ) );
+        const size_t  nsize8 = nsize - nsize % 8;
+        auto          zptr   = zdata;
+    
+        for ( ; i < nsize8; i += 8, zptr += 24 )
+        {
+            const auto  vd = _mm512_loadu_pd( data + i );
+            const auto  vf = _mm512_cvtpd_ps( vd );
+            const auto  vb = _mm256_maskz_permutexvar_epi8( to_fp24_mask_8, to_fp24_idxs_8, reinterpret_cast< __m256i >( vf ) );
 
-        _mm256_storeu_si256( reinterpret_cast< __m256i * >( zptr ), vb );
-    }// for
-
-    #else
+            _mm256_storeu_si256( reinterpret_cast< __m256i * >( zptr ), vb );
+        }// for
+    }// 
+    
+    #endif
 
     auto  zptr = reinterpret_cast< byte3_t * >( zdata );
     
@@ -334,35 +340,36 @@ compress_fp24 ( const double *  data,
         
         zptr[i] = v.u >> 8;
     }// for
-
-    #endif
 }
 
-static
+inline
 void
 decompress_fp24 ( double *        data,
                   const size_t    nsize,
                   const byte_t *  zdata )
 {
+    size_t  i = 0;
+        
     #if defined (__AVX512VBMI__) && defined (__EVEX512__)
-    
-    auto  zptr = zdata;
-    
-    for ( size_t  i = 0; i < nsize; i += 8, zptr += 24 )
     {
-        const auto  vb = _mm256_loadu_si256( reinterpret_cast< const __m256i * >( zptr ) );
-        const auto  vf = _mm256_maskz_permutexvar_epi8( from_fp24_mask_8, from_fp24_idxs_8, vb );
-        const auto  vd = _mm512_cvtps_pd( reinterpret_cast< __m256 >( vf ) );
+        const size_t  nsize8 = nsize - nsize % 8;
+        auto          zptr   = zdata;
+    
+        for ( ; i < nsize8; i += 8, zptr += 24 )
+        {
+            const auto  vb = _mm256_loadu_si256( reinterpret_cast< const __m256i * >( zptr ) );
+            const auto  vf = _mm256_maskz_permutexvar_epi8( from_fp24_mask_8, from_fp24_idxs_8, vb );
+            const auto  vd = _mm512_cvtps_pd( reinterpret_cast< __m256 >( vf ) );
 
-        _mm512_storeu_pd( data + i, vd );
-    }// for
-
-    #else
+            _mm512_storeu_pd( data + i, vd );
+        }// for
+    }
+    #endif
 
     auto  zptr = reinterpret_cast< const byte3_t * >( zdata );
     
     #pragma GCC ivdep
-    for ( size_t  i = 0; i < nsize; ++i )
+    for ( ; i < nsize; ++i )
     {
         const fp32int_t  v{ .u = uint32_t( zptr[i] ) << 8 };
         
@@ -370,147 +377,155 @@ decompress_fp24 ( double *        data,
 
         HLR_DBG_ASSERT( std::isfinite( data[i] ) );
     }// for
-
-    #endif
 }
 
 //
 // FP32 : 1-8-23
 //
-static
+inline
 void
 compress_fp32 ( const double *  data,
                 const size_t    nsize,
                 byte_t *        zdata )
 {
-    auto  zptr = reinterpret_cast< float * >( zdata );
+    size_t  i    = 0;
+    auto    zptr = reinterpret_cast< float * >( zdata );
 
     #if defined (__AVX512F__)
-    
-    for ( size_t  i = 0; i < nsize; i += 8 )
     {
-        const auto  vd = _mm512_loadu_pd( data + i );
-        const auto  vf = _mm512_cvtpd_ps( vd );
+        const size_t  nsize8 = nsize - nsize % 8;
+        
+        for ( ; i < nsize8; i += 8 )
+        {
+            const auto  vd = _mm512_loadu_pd( data + i );
+            const auto  vf = _mm512_cvtpd_ps( vd );
 
-        _mm256_storeu_ps( zptr + i, vf );
-    }// for
-    
+            _mm256_storeu_ps( zptr + i, vf );
+        }// for
+    }
     #elif defined(__AVX__)
-
-    for ( size_t  i = 0; i < nsize; i += 4 )
     {
-        const auto  vd = _mm256_loadu_pd( data + i );
-        const auto  vf = _mm256_cvtpd_ps( vd );
+        const size_t  nsize4 = nsize - nsize % 4;
+        
+        for ( ; i < nsize4; i += 4 )
+        {
+            const auto  vd = _mm256_loadu_pd( data + i );
+            const auto  vf = _mm256_cvtpd_ps( vd );
 
-        _mm_storeu_ps( zptr + i, vf );
-    }// for
-
-    #else
+            _mm_storeu_ps( zptr + i, vf );
+        }// for
+    }
+    #endif
 
     #pragma GCC ivdep
-    for ( size_t  i = 0; i < nsize; ++i )
-        zptr[i] = float( data[i] ) );
-    
-    #endif
+    for ( ; i < nsize; ++i )
+        zptr[i] = float( data[i] );
 }
 
-static
+inline
 void
 decompress_fp32 ( double *        data,
                   const size_t    nsize,
                   const byte_t *  zdata )
 {
-    auto  zptr = reinterpret_cast< const float * >( zdata );
+    size_t  i    = 0;
+    auto    zptr = reinterpret_cast< const float * >( zdata );
 
     #if defined (__AVX512F__)
-    
-    for ( size_t  i = 0; i < nsize; i += 8 )
     {
-        const auto  vf = _mm256_loadu_ps( zptr + i );
-        const auto  vd = _mm512_cvtps_pd( vf );
+        const size_t  nsize8 = nsize - nsize % 8;
+        
+        for ( ; i < nsize8; i += 8 )
+        {
+            const auto  vf = _mm256_loadu_ps( zptr + i );
+            const auto  vd = _mm512_cvtps_pd( vf );
 
-        _mm512_storeu_pd( data + i, vd );
-    }// for
-    
+            _mm512_storeu_pd( data + i, vd );
+        }// for
+    }
     #elif defined(__AVX__)
-
-    for ( size_t  i = 0; i < nsize; i += 4 )
     {
-        const auto  vf = _mm_loadu_ps( zptr + i );
-        const auto  vd = _mm256_cvtps_pd( vf );
+        const size_t  nsize4 = nsize - nsize % 4;
+        
+        for ( ; i < nsize4; i += 4 )
+        {
+            const auto  vf = _mm_loadu_ps( zptr + i );
+            const auto  vd = _mm256_cvtps_pd( vf );
 
-        _mm256_storeu_pd( data + i, vd );
-    }// for
-
-    #else
+            _mm256_storeu_pd( data + i, vd );
+        }// for
+    }
+    #endif
 
     #pragma GCC ivdep
-    for ( size_t  i = 0; i < nsize; ++i )
-        data[i] = double( zptr[i] ) );
-    
-    #endif
+    for ( ; i < nsize; ++i )
+        data[i] = double( zptr[i] );
 }
 
 //
 // FP40 : 1-11-28
 //
-static
+inline
 void
 compress_fp40 ( const double *  data,
                 const size_t    nsize,
                 byte_t *        zdata )
 {
+    size_t  i = 0;
+    
     #if defined (__AVX512VBMI__) && defined (__EVEX512__)
-    
-    auto  zptr = zdata;
-    
-    for ( size_t  i = 0; i < nsize; i += 8, zptr += 40 )
     {
-        const auto  vd = _mm512_loadu_pd( data + i );
-        const auto  vb = _mm512_maskz_permutexvar_epi8( to_fp40_mask_8, to_fp40_idxs_8, reinterpret_cast< __m512i >( vd ) );
-
-        _mm512_storeu_si512( reinterpret_cast< __m512i * >( zptr ), vb );
-    }// for
-
-    #else
+        const size_t  nsize8 = nsize - nsize % 8;
+        auto          zptr   = zdata;
+    
+        for ( ; i < nsize8; i += 8, zptr += 40 )
+        {
+            const auto  vd = _mm512_loadu_pd( data + i );
+            const auto  vb = _mm512_maskz_permutexvar_epi8( to_fp40_mask_8, to_fp40_idxs_8, reinterpret_cast< __m512i >( vd ) );
+            
+            _mm512_storeu_si512( reinterpret_cast< __m512i * >( zptr ), vb );
+        }// for
+    }
+    #endif
 
     auto  zptr = reinterpret_cast< byte5_t * >( zdata );
     
     #pragma GCC ivdep
-    for ( size_t  i = 0; i < nsize; ++i )
+    for ( ; i < nsize; ++i )
     {
         const fp64int_t  v{ .f = data[i] };
         
         zptr[i] = v.u >> 24;
     }// for
-
-    #endif
 }
 
-static
+inline
 void
 decompress_fp40 ( double *        data,
                   const size_t    nsize,
                   const byte_t *  zdata )
 {
+    size_t  i = 0;
+    
     #if defined (__AVX512VBMI__) && defined (__EVEX512__)
-    
-    auto  zptr = zdata;
-    
-    for ( size_t  i = 0; i < nsize; i += 8, zptr += 40 )
     {
-        const auto  vb = _mm512_loadu_si512( reinterpret_cast< const __m512i * >( zptr ) );
-        const auto  vd = reinterpret_cast< __m512d >( _mm512_maskz_permutexvar_epi8( from_fp40_mask_8, from_fp40_idxs_8, vb ) );
+        const size_t  nsize8 = nsize - nsize % 8;
+        auto          zptr   = zdata;
+    
+        for ( ; i < nsize8; i += 8, zptr += 40 )
+        {
+            const auto  vb = _mm512_loadu_si512( reinterpret_cast< const __m512i * >( zptr ) );
+            const auto  vd = reinterpret_cast< __m512d >( _mm512_maskz_permutexvar_epi8( from_fp40_mask_8, from_fp40_idxs_8, vb ) );
 
-        _mm512_storeu_pd( data + i, vd );
-    }// for
-
-    #else
+            _mm512_storeu_pd( data + i, vd );
+        }// for
+    }
+    #endif
 
     auto  zptr = reinterpret_cast< const byte5_t * >( zdata );
     
     #pragma GCC ivdep
-    for ( size_t  i = 0; i < nsize; ++i )
+    for ( ; i < nsize; ++i )
     {
         const fp64int_t  v{ .u = uint64_t( zptr[i] ) << 24 };
         
@@ -518,70 +533,72 @@ decompress_fp40 ( double *        data,
 
         HLR_DBG_ASSERT( std::isfinite( data[i] ) );
     }// for
-
-    #endif
 }
 
 //
 // FP48 : 1-11-36
 //
-static
+inline
 void
 compress_fp48 ( const double *  data,
                 const size_t    nsize,
                 byte_t *        zdata )
 {
+    size_t  i = 0;
+    
     #if defined (__AVX512VBMI__) && defined (__EVEX512__)
-    
-    auto  zptr = zdata;
-    
-    for ( size_t  i = 0; i < nsize; i += 8, zptr += 48 )
     {
-        const auto  vd = _mm512_loadu_pd( data + i );
-        const auto  vb = _mm512_maskz_permutexvar_epi8( to_fp48_mask_8, to_fp48_idxs_8, reinterpret_cast< __m512i >( vd ) );
+        const size_t  nsize8 = nsize - nsize % 8;
+        auto          zptr   = zdata;
+    
+        for ( ; i < nsize8; i += 8, zptr += 48 )
+        {
+            const auto  vd = _mm512_loadu_pd( data + i );
+            const auto  vb = _mm512_maskz_permutexvar_epi8( to_fp48_mask_8, to_fp48_idxs_8, reinterpret_cast< __m512i >( vd ) );
 
-        _mm512_storeu_si512( reinterpret_cast< __m512i * >( zptr ), vb );
-    }// for
-
-    #else
+            _mm512_storeu_si512( reinterpret_cast< __m512i * >( zptr ), vb );
+        }// for
+    }
+    #endif
 
     auto  zptr = reinterpret_cast< byte6_t * >( zdata );
     
     #pragma GCC ivdep
-    for ( size_t  i = 0; i < nsize; ++i )
+    for ( ; i < nsize; ++i )
     {
         const fp64int_t  v{ .f = data[i] };
         
         zptr[i] = v.u >> 16;
     }// for
-
-    #endif
 }
 
-static
+inline
 void
 decompress_fp48 ( double *        data,
                   const size_t    nsize,
                   const byte_t *  zdata )
 {
+    size_t  i = 0;
+    
     #if defined (__AVX512VBMI__) && defined (__EVEX512__)
-    
-    auto  zptr = zdata;
-    
-    for ( size_t  i = 0; i < nsize; i += 8, zptr += 48 )
     {
-        const auto  vb = _mm512_loadu_si512( reinterpret_cast< const __m512i * >( zptr ) );
-        const auto  vd = reinterpret_cast< __m512d >( _mm512_maskz_permutexvar_epi8( from_fp48_mask_8, from_fp48_idxs_8, vb ) );
+        const size_t  nsize8 = nsize - nsize % 8;
+        auto          zptr   = zdata;
+    
+        for ( ; i < nsize8; i += 8, zptr += 48 )
+        {
+            const auto  vb = _mm512_loadu_si512( reinterpret_cast< const __m512i * >( zptr ) );
+            const auto  vd = reinterpret_cast< __m512d >( _mm512_maskz_permutexvar_epi8( from_fp48_mask_8, from_fp48_idxs_8, vb ) );
 
-        _mm512_storeu_pd( data + i, vd );
-    }// for
-
-    #else
+            _mm512_storeu_pd( data + i, vd );
+        }// for
+    }
+    #endif
 
     auto  zptr = reinterpret_cast< const byte6_t * >( zdata );
     
     #pragma GCC ivdep
-    for ( size_t  i = 0; i < nsize; ++i )
+    for ( ; i < nsize; ++i )
     {
         const fp64int_t  v{ .u = uint64_t( zptr[i] ) << 16 };
         
@@ -589,70 +606,72 @@ decompress_fp48 ( double *        data,
 
         HLR_DBG_ASSERT( std::isfinite( data[i] ) );
     }// for
-
-    #endif
 }
 
 //
 // FP56 : 1-11-44
 //
-static
+inline
 void
 compress_fp56 ( const double *  data,
                 const size_t    nsize,
                 byte_t *        zdata )
 {
+    size_t  i = 0;
+    
     #if defined (__AVX512VBMI__) && defined (__EVEX512__)
-    
-    auto  zptr = zdata;
-    
-    for ( size_t  i = 0; i < nsize; i += 8, zptr += 56 )
     {
-        const auto  vd = _mm512_loadu_pd( data + i );
-        const auto  vb = _mm512_maskz_permutexvar_epi8( to_fp56_mask_8, to_fp56_idxs_8, reinterpret_cast< __m512i >( vd ) );
-
-        _mm512_storeu_si512( reinterpret_cast< __m512i * >( zptr ), vb );
-    }// for
-
-    #else
+        const size_t  nsize8 = nsize - nsize % 8;
+        auto          zptr   = zdata;
+    
+        for ( ; i < nsize8; i += 8, zptr += 56 )
+        {
+            const auto  vd = _mm512_loadu_pd( data + i );
+            const auto  vb = _mm512_maskz_permutexvar_epi8( to_fp56_mask_8, to_fp56_idxs_8, reinterpret_cast< __m512i >( vd ) );
+            
+            _mm512_storeu_si512( reinterpret_cast< __m512i * >( zptr ), vb );
+        }// for
+    }
+    #endif
 
     auto  zptr = reinterpret_cast< byte7_t * >( zdata );
     
     #pragma GCC ivdep
-    for ( size_t  i = 0; i < nsize; ++i )
+    for ( ; i < nsize; ++i )
     {
         const fp64int_t  v{ .f = data[i] };
         
         zptr[i] = v.u >> 8;
     }// for
-
-    #endif
 }
 
-static
+inline
 void
 decompress_fp56 ( double *        data,
                   const size_t    nsize,
                   const byte_t *  zdata )
 {
+    size_t  i = 0;
+    
     #if defined (__AVX512VBMI__) && defined (__EVEX512__)
-    
-    auto  zptr = zdata;
-    
-    for ( size_t  i = 0; i < nsize; i += 8, zptr += 56 )
     {
-        const auto  vb = _mm512_loadu_si512( reinterpret_cast< const __m512i * >( zptr ) );
-        const auto  vd = reinterpret_cast< __m512d >( _mm512_maskz_permutexvar_epi8( from_fp56_mask_8, from_fp56_idxs_8, vb ) );
-
-        _mm512_storeu_pd( data + i, vd );
-    }// for
-
-    #else
+        const size_t  nsize8 = nsize - nsize % 8;
+        auto          zptr   = zdata;
+    
+        for ( ; i < nsize8; i += 8, zptr += 56 )
+        {
+            const auto  vb = _mm512_loadu_si512( reinterpret_cast< const __m512i * >( zptr ) );
+            const auto  vd = reinterpret_cast< __m512d >( _mm512_maskz_permutexvar_epi8( from_fp56_mask_8, from_fp56_idxs_8, vb ) );
+            
+            _mm512_storeu_pd( data + i, vd );
+        }// for
+    }
+    #endif
 
     auto  zptr = reinterpret_cast< const byte7_t * >( zdata );
     
     #pragma GCC ivdep
-    for ( size_t  i = 0; i < nsize; ++i )
+    for ( ; i < nsize; ++i )
     {
         const fp64int_t  v{ .u = uint64_t( zptr[i] ) << 8 };
         
@@ -660,14 +679,12 @@ decompress_fp56 ( double *        data,
 
         HLR_DBG_ASSERT( std::isfinite( data[i] ) );
     }// for
-
-    #endif
 }
 
 //
 // FP64 : 1-11-52
 //
-static
+inline
 void
 compress_fp64 ( const double *  data,
                 const size_t    nsize,
@@ -676,7 +693,7 @@ compress_fp64 ( const double *  data,
     std::memcpy( zdata, data, sizeof(double) * nsize );
 }
 
-static
+inline
 void
 decompress_fp64 ( double *        data,
                   const size_t    nsize,
@@ -1087,11 +1104,12 @@ mulvec ( const uint8_t   nbyte,
          double *        y )
 {
     using  value_t = double;
-    
-    constexpr size_t  NB  = 64;
-    value_t           row[ NB ];
 
-    HLR_DBG_ASSERT( nrows % NB == 0 );
+    constexpr size_t  max_nbuf = 64;
+    const size_t      nbuf     = std::min< size_t >( max_nbuf, nrows );
+    value_t           row[ max_nbuf ];
+
+    HLR_DBG_ASSERT( nrows % nbuf == 0 );
     
     switch ( op_A )
     {
@@ -1103,23 +1121,23 @@ mulvec ( const uint8_t   nbyte,
             {
                 const auto  x_j = alpha * x[j];
 
-                for ( size_t  i = 0; i < nrows; i += NB )
+                for ( size_t  i = 0; i < nrows; i += nbuf )
                 {
                     switch ( nbyte )
                     {
-                        case  2 : decompress_fp16( row, NB, zA ); break;
-                        case  3 : decompress_fp24( row, NB, zA ); break;
-                        case  4 : decompress_fp32( row, NB, zA ); break;
-                        case  5 : decompress_fp40( row, NB, zA ); break;
-                        case  6 : decompress_fp48( row, NB, zA ); break;
-                        case  7 : decompress_fp56( row, NB, zA ); break;
-                        case  8 : decompress_fp64( row, NB, zA ); break;
+                        case  2 : decompress_fp16( row, nbuf, zA ); break;
+                        case  3 : decompress_fp24( row, nbuf, zA ); break;
+                        case  4 : decompress_fp32( row, nbuf, zA ); break;
+                        case  5 : decompress_fp40( row, nbuf, zA ); break;
+                        case  6 : decompress_fp48( row, nbuf, zA ); break;
+                        case  7 : decompress_fp56( row, nbuf, zA ); break;
+                        case  8 : decompress_fp64( row, nbuf, zA ); break;
                         default : HLR_ERROR( "invalid byte size" );
                     }// switch
 
-                    zA += NB * nbyte;
+                    zA += nbuf * nbyte;
                     
-                    for ( size_t  k = 0; k < NB; ++k )
+                    for ( size_t  k = 0; k < nbuf; ++k )
                         y[i+k] += row[k] * x_j;
                 }// for
             }// for
@@ -1134,23 +1152,23 @@ mulvec ( const uint8_t   nbyte,
             {
                 value_t  y_j = value_t(0);
                 
-                for ( size_t  i = 0; i < nrows; i += NB )
+                for ( size_t  i = 0; i < nrows; i += nbuf )
                 {
                     switch ( nbyte )
                     {
-                        case  2 : decompress_fp16( row, NB, zA ); break;
-                        case  3 : decompress_fp24( row, NB, zA ); break;
-                        case  4 : decompress_fp32( row, NB, zA ); break;
-                        case  5 : decompress_fp40( row, NB, zA ); break;
-                        case  6 : decompress_fp48( row, NB, zA ); break;
-                        case  7 : decompress_fp56( row, NB, zA ); break;
-                        case  8 : decompress_fp64( row, NB, zA ); break;
+                        case  2 : decompress_fp16( row, nbuf, zA ); break;
+                        case  3 : decompress_fp24( row, nbuf, zA ); break;
+                        case  4 : decompress_fp32( row, nbuf, zA ); break;
+                        case  5 : decompress_fp40( row, nbuf, zA ); break;
+                        case  6 : decompress_fp48( row, nbuf, zA ); break;
+                        case  7 : decompress_fp56( row, nbuf, zA ); break;
+                        case  8 : decompress_fp64( row, nbuf, zA ); break;
                         default : HLR_ERROR( "invalid byte size" );
                     }// switch
 
-                    zA += NB * nbyte;
+                    zA += nbuf * nbyte;
                     
-                    for ( size_t  k = 0; k < NB; ++k )
+                    for ( size_t  k = 0; k < nbuf; ++k )
                         y_j += row[k] * x[i+k];
                 }// for
 
