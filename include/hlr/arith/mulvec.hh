@@ -434,7 +434,8 @@ build_cluster_matrix ( const matop_t                     op_M,
 template < typename value_t >
 void
 build_joined_matrix ( const matop_t                  op_M,
-                      cluster_matrix_t< value_t > &  cm )
+                      cluster_matrix_t< value_t > &  cm,
+                      const accuracy &               acc )
 {
     using  real_t = Hpro::real_type_t< value_t >;
     
@@ -555,7 +556,6 @@ build_joined_matrix ( const matop_t                  op_M,
                         kpos += k_i;
                     }// for
                     
-                    auto  acc   = fixed_prec( 1e-4 );
                     auto  S_tol = compress::valr::get_tolerances( acc, cm.S );
                     
                     cm.zU         = compress::valr::compress_lr( U, S_tol );
@@ -600,7 +600,7 @@ build_joined_matrix ( const matop_t                  op_M,
     }// if
 
     for ( auto  sub : cm.sub_blocks )
-        build_joined_matrix( op_M, *sub );
+        build_joined_matrix( op_M, *sub, acc );
 }
 
 }// namespace detail
@@ -608,12 +608,13 @@ build_joined_matrix ( const matop_t                  op_M,
 template < typename value_t >
 std::unique_ptr< cluster_matrix_t< value_t > >
 build_cluster_matrix ( const matop_t                     op_M,
-                       const Hpro::TMatrix< value_t > &  M )
+                       const Hpro::TMatrix< value_t > &  M,
+                       const accuracy &                  acc )
 {
     auto  cm = std::make_unique< cluster_matrix_t< value_t > >( M.row_is( op_M ) );
 
     detail::build_cluster_matrix( op_M, M, *cm );
-    detail::build_joined_matrix( op_M, *cm );
+    detail::build_joined_matrix( op_M, *cm, acc );
     
     return cm;
 }
