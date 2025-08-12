@@ -515,49 +515,50 @@ build_joined_matrix ( const matop_t                  op_M,
                     // determine joined rank and compressed size
                     //
                 
-                    uint    k     = 0;
-                    size_t  zsize = 0;
+                    uint    k = 0;
                 
                     for ( auto  M : cm.R )
-                    {
-                        auto  R = cptrcast( M, matrix::lrsvmatrix< value_t > );
-                    
-                        k += R->rank();
-                    
-                        if ( op_M == apply_normal ) zsize += R->zU().size();
-                        else                        zsize += R->zV().size();
-                    }// for
+                        k += cptrcast( M, matrix::lrsvmatrix< value_t > )->rank();
                 
                     //
                     // build joined U factor
                     //
-                
-                    uint    kpos = 0;
-                    size_t  zpos = 0;
-                
+
+                    const auto  nrows = cm.is.size();
+                    uint        kpos  = 0;
+                    auto        U     = blas::matrix< value_t >( nrows, k );
+
                     cm.S = blas::vector< real_t >( k );
-                    cm.zU.resize( zsize );
-                
+
                     for ( auto  M : cm.R )
                     {
-                        auto  R   = cptrcast( M, matrix::lrsvmatrix< value_t > );
-                        auto  UR  = R->U( op_M );
-                        auto  k_i = R->rank();
-                        auto  S_i = blas::vector< value_t >( cm.S, blas::range( kpos, kpos + k_i - 1 ) );
+                        const auto  R   = cptrcast( M, matrix::lrsvmatrix< value_t > );
+                        const auto  k_i = R->rank();
+                        auto        U_i = blas::matrix< value_t >( U, blas::range::all, blas::range( kpos, kpos + k_i - 1 ) );
+                        auto        S_i = blas::vector< value_t >( cm.S, blas::range( kpos, kpos + k_i - 1 ) );
 
                         blas::copy( R->S(), S_i );
+                        
+                        if ( op_M == apply_normal )
+                        {
+                            auto  RU = R->U();
+
+                            blas::copy( RU, U_i );
+                        }// if
+                        else
+                        {
+                            auto  RV = R->V();
+
+                            blas::copy( RV, U_i );
+                        }// else
+
                         kpos += k_i;
-
-                        auto  zsize_i = ( op_M == apply_normal ? R->zU().size() : R->zV().size() );
-                
-                        if ( op_M == apply_normal ) memcpy( cm.zU.data() + zpos, R->zU().data(), zsize_i );
-                        else                        memcpy( cm.zU.data() + zpos, R->zV().data(), zsize_i );
-
-                        zpos += zsize_i;
                     }// for
-
-                    HLR_ASSERT( zpos == zsize );
-            
+                    
+                    auto  acc   = fixed_prec( 1e-4 );
+                    auto  S_tol = compress::valr::get_tolerances( acc, cm.S );
+                    
+                    cm.zU         = compress::valr::compress_lr( U, S_tol );
                     cm.compressed = true;
                 }// if
                 else
