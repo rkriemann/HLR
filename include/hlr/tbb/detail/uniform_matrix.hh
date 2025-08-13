@@ -132,8 +132,6 @@ init_cluster_bases ( const Hpro::TMatrix< value_t > &   M,
             {
                 auto  rowcb_i = rowcb.son( i );
             
-                HLR_ASSERT( ! is_null( rowcb_i ) );
-                
                 for ( uint  j = 0; j < B->nblock_cols(); ++j )
                 {
                     auto  M_ij = B->block( i, j );
@@ -161,8 +159,6 @@ init_cluster_bases ( const Hpro::TMatrix< value_t > &   M,
             for ( uint  j = 0; j < B->nblock_cols(); ++j )
             {
                 auto  colcb_j = colcb.son( j );
-
-                HLR_ASSERT( ! is_null( colcb_j ) );
                 
                 for ( uint  i = 0; i < B->nblock_rows(); ++i )
                 {
