@@ -132,9 +132,11 @@ init_cluster_bases ( const Hpro::TMatrix< value_t > &   M,
             {
                 auto  rowcb_i = rowcb.son( i );
             
+                HLR_ASSERT( ! is_null( rowcb_i ) );
+                
                 for ( uint  j = 0; j < B->nblock_cols(); ++j )
                 {
-                    auto  M_ij    = B->block( i, j );
+                    auto  M_ij = B->block( i, j );
                 
                     if ( ! is_null( M_ij ) )
                     {
@@ -159,7 +161,9 @@ init_cluster_bases ( const Hpro::TMatrix< value_t > &   M,
             for ( uint  j = 0; j < B->nblock_cols(); ++j )
             {
                 auto  colcb_j = colcb.son( j );
-            
+
+                HLR_ASSERT( ! is_null( colcb_j ) );
+                
                 for ( uint  i = 0; i < B->nblock_rows(); ++i )
                 {
                     auto  M_ij = B->block( i, j );
@@ -2030,14 +2034,15 @@ build_uniform_sep ( const Hpro::TCluster *                                      
 // together with computing QR factorization of each.
 // Also set up structure of cluster bases.
 // 
-// template < typename value_t >
-// using  lr_coupling_map_t  = std::unordered_map< indexset, std::list< std::pair< const hlr::matrix::lrmatrix< value_t > *, blas::matrix< value_t > > >, indexset_hash >;
 
 template < typename value_t >
 using lr_cond_mat_t = std::pair< const hlr::matrix::lrmatrix< value_t > *, blas::matrix< value_t > >;
 
 template < typename value_t >
 using lr_cond_mat_list_t = std::list< lr_cond_mat_t< value_t > >;
+
+// template < typename value_t >
+// using  lr_coupling_map_t  = std::unordered_map< indexset, std::list< std::pair< const hlr::matrix::lrmatrix< value_t > *, blas::matrix< value_t > > >, indexset_hash >;
 
 template < typename value_t >
 using  lr_coupling_map_t  = ::tbb::concurrent_hash_map< indexset, lr_cond_mat_list_t< value_t >, indexset_hash >;
@@ -2047,7 +2052,7 @@ using  lr_accessor_t = typename lr_coupling_map_t< value_t >::accessor;
 
 
 template < typename value_t >
-using lrsv_mat_list_t  = std::list< const hlr::matrix::lrsvmatrix< value_t > * >;
+using  lrsv_mat_list_t = std::list< const hlr::matrix::lrsvmatrix< value_t > * >;
 
 template < typename value_t >
 using  lrsv_mat_map_t  = ::tbb::concurrent_hash_map< indexset, lrsv_mat_list_t< value_t >, indexset_hash >;
@@ -2099,6 +2104,9 @@ build_mat_map ( const Hpro::TMatrix< value_t > &   A,
         // add matrix to block row/column together with respectively other(!) semi-coupling
         //
         
+        // lr_row_map[ A.row_is() ].push_back( { R, std::move( Cv ) } );
+        // lr_col_map[ A.col_is() ].push_back( { R, std::move( Cu ) } );
+
         {
             auto  accessor = lr_accessor_t< value_t >();
             auto  entry    = lr_cond_mat_t< value_t >{ R, std::move( Cv ) };
@@ -2150,6 +2158,19 @@ build_mat_map ( const Hpro::TMatrix< value_t > &   A,
         //
         // recurse
         //
+
+        // for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        // {
+        //     auto  rowcb_i = rowcb.son( i );
+            
+        //     for ( uint  j = 0; j < B->nblock_cols(); ++j )
+        //     {
+        //         auto  colcb_j = colcb.son( j );
+                
+        //         if ( ! is_null( B->block( i, j ) ) )
+        //             build_mat_map( *B->block( i, j ), *rowcb_i, *colcb_j, lr_row_map, lr_col_map, lrsv_row_map, lrsv_col_map );
+        //     }// for
+        // }// for
         
         ::tbb::parallel_for(
             ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
@@ -2179,6 +2200,78 @@ build_mat_map ( const Hpro::TMatrix< value_t > &   A,
 // build cluster basis using precomputed QR decomposition of lowrank matrices
 // in block row/columns
 //
+// template < typename value_t,
+//            typename basisapx_t >
+// void
+// build_cluster_basis ( shared_cluster_basis< value_t > &     cb,
+//                       const basisapx_t &                    basisapx,
+//                       const accuracy &                      acc,
+//                       const lr_coupling_map_t< value_t > &  mat_map,
+//                       const bool                            transposed,
+//                       const bool                            compress = false )
+// {
+//     using  real_t  = Hpro::real_type_t< value_t >;
+
+//     const matop_t  op = ( transposed ? apply_transposed : apply_normal );
+
+//     //
+//     // construct cluster basis for all precollected blocks
+//     //
+
+//     if ( mat_map.find( cb.is() ) != mat_map.end() )
+//     {
+//         //
+//         // compute column basis for block row
+//         //
+//         //  ( U₀·V₀'  U₁·V₁'  U₂·V₂'  … )
+//         //
+//         // as 
+//         //
+//         //   ( U₀·C₀'·Q₀'  U₁·C₁'·Q₁'  U₂'·C₂'·Q₂' … )
+//         //
+//         // with QR decomposition V_i = Q_i C_i
+//         // (precomputed in "build_mat_map" above)
+//         //
+//         // As Q_i is orthogonal, it can be neglected in column basis computation!
+//         //
+
+//         const uint  nrows = cb.is().size();
+//         uint        ncols = 0;
+
+//         // determine total number of columns
+//         for ( const auto  [ M_i, C_i ] : mat_map.at( cb.is() ) )
+//             ncols += C_i.nrows();
+
+//         // build ( U_0·C_0'  U_1·C_1'  U_2'·C_2' … )
+//         auto  X   = blas::matrix< value_t >( nrows, ncols );
+//         uint  pos = 0;
+
+//         for ( const auto  [ R_i, C_i ] : mat_map.at( cb.is() ) )
+//         {
+//             auto  X_i   = blas::prod( R_i->U( op ), blas::adjoint( C_i ) );
+//             auto  X_sub = blas::matrix< value_t >( X, blas::range::all, blas::range( pos, pos + C_i.nrows() - 1 ) );
+
+//             blas::copy( X_i, X_sub );
+//             pos += C_i.nrows();
+//         }// for
+
+//         // actually build cluster basis
+//         auto  Ws = blas::vector< real_t >(); // singular values corresponding to basis vectors
+//         auto  W  = basisapx.column_basis( X, acc, & Ws );
+
+//         cb.set_basis( std::move( W ), std::move( Ws ) );
+//     }// if
+
+//     //
+//     // recurse
+//     //
+    
+//     for ( uint  i = 0; i < cb.nsons(); ++i )
+//     {
+//         if ( ! is_null( cb.son( i ) ) )
+//             build_cluster_basis( *cb.son( i ), basisapx, acc, mat_map, transposed );
+//     }// for
+// }
 template < typename value_t,
            typename basisapx_t >
 void
@@ -2255,7 +2348,8 @@ build_cluster_basis ( shared_cluster_basis< value_t > &     cb,
             //
             // recurse
             //
-    
+
+            // for ( uint  i = 0; i < cb.nsons(); ++i )
             ::tbb::parallel_for< uint >(
                 0, cb.nsons(),
                 [&,transposed] ( const uint  i )
@@ -2360,7 +2454,7 @@ build_uniform ( const Hpro::TMatrix< value_t > &   A,
     // decide upon cluster type, how to construct matrix
     //
 
-    std::unique_ptr< Hpro::TMatrix< value_t > >  M;
+    auto  M = std::unique_ptr< Hpro::TMatrix< value_t > >();
     
     if ( hlr::matrix::is_lowrank( A ) )
     {
@@ -2370,11 +2464,20 @@ build_uniform ( const Hpro::TMatrix< value_t > &   A,
         //
         
         auto  R  = cptrcast( &A, hlr::matrix::lrmatrix< value_t > );
-        auto  SU = blas::prod( blas::adjoint( rowcb.basis() ), R->U_direct() );
-        auto  SV = blas::prod( blas::adjoint( colcb.basis() ), R->V_direct() );
+        auto  U  = R->U();
+        auto  V  = R->V();
+        auto  SU = rowcb.transform_forward( U );
+        auto  SV = colcb.transform_forward( V );
+        // auto  SU = blas::prod( blas::adjoint( rowcb.basis() ), RU );
+        // auto  SV = blas::prod( blas::adjoint( colcb.basis() ), RV );
         auto  S  = blas::prod( SU, blas::adjoint( SV ) );
 
-        M = std::make_unique< uniform_lrmatrix< value_t > >( A.row_is(), A.col_is(), rowcb, colcb, std::move( S ) );
+        auto  UR = std::make_unique< uniform_lrmatrix< value_t > >( A.row_is(), A.col_is(), rowcb, colcb, std::move( S ) );
+
+        if ( compress )
+            UR->compress( acc );
+
+        M = std::move( UR );
     }// if
     else if ( hlr::matrix::is_lowrank_sv( A ) )
     {
@@ -2386,18 +2489,20 @@ build_uniform ( const Hpro::TMatrix< value_t > &   A,
         auto  R  = cptrcast( &A, hlr::matrix::lrsvmatrix< value_t > );
         auto  U  = R->U();
         auto  V  = R->V();
-        auto  SU = blas::prod( blas::adjoint( rowcb.basis() ), U );
-        auto  SV = blas::prod( blas::adjoint( colcb.basis() ), V );
+        auto  SU = rowcb.transform_forward( U );
+        auto  SV = colcb.transform_forward( V );
+        // auto  SU = blas::prod( blas::adjoint( rowcb.basis() ), U );
+        // auto  SV = blas::prod( blas::adjoint( colcb.basis() ), V );
 
         blas::prod_diag_ip( SU, R->S() );
         
         auto  S  = blas::prod( SU, blas::adjoint( SV ) );
-        auto  RU = std::make_unique< uniform_lrmatrix< value_t > >( A.row_is(), A.col_is(), rowcb, colcb, std::move( S ) );
+        auto  UR = std::make_unique< uniform_lrmatrix< value_t > >( A.row_is(), A.col_is(), rowcb, colcb, std::move( S ) );
 
         if ( compress )
-            RU->compress( acc );
+            UR->compress( acc );
 
-        M = std::move( RU );
+        M = std::move( UR );
     }// if
     else if ( is_blocked( A ) )
     {
@@ -2409,6 +2514,28 @@ build_uniform ( const Hpro::TMatrix< value_t > &   A,
 
         B->copy_struct_from( BA );
 
+        // for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        // {
+        //     auto  rowcb_i = rowcb.son( i );
+            
+        //     HLR_ASSERT( ! is_null( rowcb_i ) );
+            
+        //     for ( uint  j = 0; j < B->nblock_cols(); ++j )
+        //     {
+        //         auto  colcb_j = colcb.son( j );
+        //         auto  A_ij    = BA->block( i, j );
+
+        //         HLR_ASSERT( ! is_null( colcb_j ) );
+                        
+        //         if ( ! is_null( A_ij ) )
+        //         {
+        //             auto  B_ij = build_uniform( *A_ij, *rowcb_i, *colcb_j, acc, compress );
+
+        //             B->set_block( i, j, B_ij.release() );
+        //         }// if
+        //     }// for
+        // }// for
+        
         ::tbb::parallel_for(
             ::tbb::blocked_range2d< uint >( 0, B->nblock_rows(),
                                             0, B->nblock_cols() ),

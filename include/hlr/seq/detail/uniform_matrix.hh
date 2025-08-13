@@ -2114,6 +2114,9 @@ build_uniform ( const Hpro::TMatrix< value_t > &   A,
         auto  R  = cptrcast( &A, lrsvmatrix< value_t > );
         auto  SU = rowcb.transform_forward( R->U() );
         auto  SV = colcb.transform_forward( R->V() );
+
+        blas::prod_diag_ip( SU, R->S() );
+        
         auto  S  = blas::prod( SU, blas::adjoint( SV ) );
         auto  UR = std::make_unique< uniform_lrmatrix< value_t > >( A.row_is(), A.col_is(), rowcb, colcb, std::move( S ) );
 
