@@ -119,7 +119,11 @@ public:
     const shared_cluster_basis *  son       ( const uint  i ) const { return _sons[i]; }
 
     void                          set_son   ( const uint              i,
-                                              shared_cluster_basis *  cb ) { _sons[i] = cb; }
+                                              shared_cluster_basis *  cb )
+    {
+        HLR_DBG_ASSERT( i < nsons() );
+        _sons[i] = cb;
+    }
 
     //
     // access basis
