@@ -1107,10 +1107,9 @@ mulvec ( const uint8_t   nbyte,
 
     constexpr size_t  max_nbuf = 64;
     const size_t      nbuf     = std::min< size_t >( max_nbuf, nrows );
+    const size_t      nrowsbuf = ( nrows > nbuf ? nrows - nrows % nbuf : nrows );
     value_t           row[ max_nbuf ];
 
-    HLR_DBG_ASSERT( nrows % nbuf == 0 );
-    
     switch ( op_A )
     {
         case  apply_normal :
@@ -1120,8 +1119,9 @@ mulvec ( const uint8_t   nbyte,
             for ( size_t  j = 0; j < ncols; ++j )
             {
                 const auto  x_j = alpha * x[j];
-
-                for ( size_t  i = 0; i < nrows; i += nbuf )
+                size_t      i   = 0;
+                
+                for ( ; i < nrowsbuf; i += nbuf )
                 {
                     switch ( nbyte )
                     {
@@ -1140,6 +1140,28 @@ mulvec ( const uint8_t   nbyte,
                     for ( size_t  k = 0; k < nbuf; ++k )
                         y[i+k] += row[k] * x_j;
                 }// for
+
+                if ( i != nrows )
+                {
+                    const size_t  nrest = nrows - i;
+                    
+                    switch ( nbyte )
+                    {
+                        case  2 : decompress_fp16( row, nrest, zA ); break;
+                        case  3 : decompress_fp24( row, nrest, zA ); break;
+                        case  4 : decompress_fp32( row, nrest, zA ); break;
+                        case  5 : decompress_fp40( row, nrest, zA ); break;
+                        case  6 : decompress_fp48( row, nrest, zA ); break;
+                        case  7 : decompress_fp56( row, nrest, zA ); break;
+                        case  8 : decompress_fp64( row, nrest, zA ); break;
+                        default : HLR_ERROR( "invalid byte size" );
+                    }// switch
+
+                    zA += nrest * nbyte;
+                    
+                    for ( size_t  k = 0; k < nrest; ++k )
+                        y[i+k] += row[k] * x_j;
+                }// for
             }// for
         }// case
         break;
@@ -1151,8 +1173,9 @@ mulvec ( const uint8_t   nbyte,
             for ( size_t  j = 0; j < ncols; ++j )
             {
                 value_t  y_j = value_t(0);
+                size_t   i   = 0;
                 
-                for ( size_t  i = 0; i < nrows; i += nbuf )
+                for ( ; i < nrowsbuf; i += nbuf )
                 {
                     switch ( nbyte )
                     {
@@ -1172,6 +1195,28 @@ mulvec ( const uint8_t   nbyte,
                         y_j += row[k] * x[i+k];
                 }// for
 
+                if ( i != nrows )
+                {
+                    const size_t  nrest = nrows - i;
+                    
+                    switch ( nbyte )
+                    {
+                        case  2 : decompress_fp16( row, nrest, zA ); break;
+                        case  3 : decompress_fp24( row, nrest, zA ); break;
+                        case  4 : decompress_fp32( row, nrest, zA ); break;
+                        case  5 : decompress_fp40( row, nrest, zA ); break;
+                        case  6 : decompress_fp48( row, nrest, zA ); break;
+                        case  7 : decompress_fp56( row, nrest, zA ); break;
+                        case  8 : decompress_fp64( row, nrest, zA ); break;
+                        default : HLR_ERROR( "invalid byte size" );
+                    }// switch
+
+                    zA += nrest * nbyte;
+                    
+                    for ( size_t  k = 0; k < nrest; ++k )
+                        y_j += row[k] * x[i+k];
+                }// for
+                
                 y[j] += alpha * y_j;
             }// for
         }// case
