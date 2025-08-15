@@ -34,11 +34,7 @@ namespace hlr { namespace compress { namespace fpx {
 constexpr    uint8_t  fpx_header_ofs = 1;
 
 #if defined (__AVX512VBMI__) && defined (__EVEX512__)
-#  if HLR_FPX_USE_FP16 == 1
 static const uint8_t  fpx_mem_pad[9] = { 0, 0, 0, 8, 0, 24, 16, 8, 0 }; // memory padding due to AVX512 zero bytes
-#  else
-static const uint8_t  fpx_mem_pad[9] = { 0, 0, 0, 8, 0, 24, 16, 8, 0 }; // memory padding due to AVX512 zero bytes
-#  endif
 #else
 static const uint8_t  fpx_mem_pad[9] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 #endif
@@ -270,6 +266,19 @@ compress_fp16 ( const double *  data,
             _mm_store_ph( zptr, vh );
         }// for
     }
+    #  elif defined (__AVX512F__) && defined(__F16C__)
+    {
+        const size_t  nsize8 = nsize - nsize % 8;
+        auto          zptr   = zdata;
+        
+        for ( ; i < nsize8; i += 8, zptr += 16 )
+        {
+            const auto  vd = _mm512_loadu_pd( data + i );
+            const auto  vh = _mm256_cvtps_ph( _mm512_cvtpd_ps( vd ), _MM_ROUND_NEAREST );
+
+            _mm_storeu_si128( reinterpret_cast< __m128i * >( zptr ), vh );
+        }// for
+    }
     #  elif defined(__AVX__) && defined(__F16C__)
     {
         const size_t  nsize4 = nsize - nsize % 4;
@@ -299,16 +308,21 @@ compress_fp16 ( const double *  data,
     
     #  if defined (__AVX512VBMI__) && defined (__EVEX512__)
     {
+        union m256_128_t {
+            __m256i  i256;
+            __m128i  i128;
+        };
+        
         const size_t  nsize8 = nsize - nsize % 8;
         auto          zptr   = zdata;
     
         for ( ; i < nsize8; i += 8, zptr += 16 )
         {
-            const auto  vd = _mm512_loadu_pd( data + i );
-            const auto  vf = _mm512_cvtpd_ps( vd );
-            const auto  vb = _mm256_maskz_permutexvar_epi8( to_fp16_mask_8, to_fp16_idxs_8, reinterpret_cast< __m256i >( vf ) );
+            const auto        vd = _mm512_loadu_pd( data + i );
+            const auto        vf = _mm512_cvtpd_ps( vd );
+            const m256_128_t  vb{ .i256 = _mm256_maskz_permutexvar_epi8( to_fp16_mask_8, to_fp16_idxs_8, reinterpret_cast< __m256i >( vf ) ) };
             
-            _mm_storeu_si128( reinterpret_cast< __m128i * >( zptr ), reinterpret_cast< __m128i >( vb ) );
+            _mm_storeu_si128( reinterpret_cast< __m128i * >( zptr ), vb.i128 );
         }// for
     }
     #  endif
@@ -353,6 +367,19 @@ decompress_fp16 ( double *        data,
             _mm512_storeu_pd( data + i, vd );
         }// for
     }
+    #  elif defined (__AVX512F__) && defined(__F16C__)
+    {
+        const size_t  nsize8 = nsize - nsize % 8;
+        auto          zptr   = zdata;
+    
+        for ( ; i < nsize8; i += 8, zptr += 16 )
+        {
+            const auto  vh = _mm_loadu_si128( reinterpret_cast< const __m128i * >( zptr ) );
+            const auto  vd = _mm512_cvtps_pd( _mm256_cvtph_ps( vh ) );
+
+            _mm512_storeu_pd( data + i, vd );
+        }// for
+    }
     #  elif defined(__AVX__) && defined(__F16C__)
     {
         const size_t  nsize4 = nsize - nsize % 4;
@@ -386,14 +413,19 @@ decompress_fp16 ( double *        data,
 
     #if defined (__AVX512VBMI__) && defined (__EVEX512__)
     {
+        union m256_128_t {
+            __m256i  i256;
+            __m128i  i128;
+        };
+        
         const size_t  nsize8 = nsize - nsize % 8;
         auto          zptr   = zdata;
     
         for ( ; i < nsize8; i += 8, zptr += 16 )
         {
-            const auto  vb = _mm256_loadu_si256( reinterpret_cast< const __m256i * >( zptr ) );
-            const auto  vf = _mm256_maskz_permutexvar_epi8( from_fp16_mask_8, from_fp16_idxs_8, vb );
-            const auto  vd = _mm512_cvtps_pd( reinterpret_cast< __m256 >( vf ) );
+            const m256_128_t  vb{ .i128 = _mm_loadu_si128( reinterpret_cast< const __m128i * >( zptr ) ) };
+            const auto        vf = _mm256_maskz_permutexvar_epi8( from_fp16_mask_8, from_fp16_idxs_8, vb.i256 );
+            const auto        vd = _mm512_cvtps_pd( reinterpret_cast< __m256 >( vf ) );
 
             _mm512_storeu_pd( data + i, vd );
         }// for
