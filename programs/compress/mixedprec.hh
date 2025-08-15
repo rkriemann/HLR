@@ -553,7 +553,7 @@ program_main ()
 
             x->fill( 1 );
 
-            auto  blocks = impl::build_cluster_matrix< value_t >( apply_normal, *A );
+            auto  blocks = impl::build_cluster_matrix< value_t >( apply_normal, *A, acc );
             
             for ( int i = 0; i < nbench; ++i )
             {
@@ -791,7 +791,7 @@ program_main ()
 
             x->fill( 1 );
 
-            auto  blocks = impl::build_cluster_matrix< value_t >( apply_normal, *zA );
+            auto  blocks = impl::build_cluster_matrix< value_t >( apply_normal, *zA, acc );
             
             for ( int i = 0; i < nbench; ++i )
             {
