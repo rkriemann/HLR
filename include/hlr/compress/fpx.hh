@@ -9,6 +9,7 @@
 //
 
 #include <cstring>
+#include <immintrin.h>
 
 #include <hlr/compress/byte_n.hh>
 
