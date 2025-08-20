@@ -20,7 +20,7 @@
 //
 #define HLR_HAS_ZBLAS_DIRECT
 #define HLR_HAS_ZBLAS_VALR
-// #define HLR_AFLP_BUFFERED_MVM
+#define HLR_AFLP_BUFFERED_MVM
 
 ////////////////////////////////////////////////////////////
 //
@@ -1336,11 +1336,10 @@ mulvec ( const size_t                        nrows,
     const auto        scale      = alpha * zscale;
 
     #if defined(HLR_AFLP_BUFFERED_MVM)
-    constexpr size_t  nbuf       = 8;
+    constexpr size_t  max_nbuf = 64;
+    const size_t      nbuf     = std::min< size_t >( max_nbuf, nrows );
+    const size_t      nrowsbuf = ( nrows > nbuf ? nrows - nrows % nbuf : nrows );
     value_t           fcache[nbuf];
-    const size_t      nrows_buf  = (nrows / nbuf) * nbuf; // for <nbuf> step width
-
-    HLR_DBG_ASSERT( nrows_buf == nrows ); // simplification for now (else have shared "i" in loops below)
     #endif
 
     switch ( op_A )
@@ -1352,10 +1351,11 @@ mulvec ( const size_t                        nrows,
             for ( size_t  j = 0; j < ncols; ++j )
             {
                 const auto  x_j = scale * x[j];
-
+                size_t      i   = 0;
+                
                 #if defined(HLR_AFLP_BUFFERED_MVM)
                 
-                for ( size_t  i = 0; i < nrows_buf; i += nbuf, pos += nbuf )
+                for ( ; i < nrowsbuf; i += nbuf, pos += nbuf )
                 {
                     #pragma GCC ivdep
                     for ( uint  ii = 0; ii < nbuf; ++ii )
@@ -1364,7 +1364,7 @@ mulvec ( const size_t                        nrows,
                         const uint64_t  mant  = z_ij & prec_mask;
                         const uint64_t  exp   = (z_ij >> prec_bits) & exp_mask;
                         const uint64_t  sign  = (z_ij >> sign_shift) << FP64::sign_bit;
-                        fp64int_t       fival = { ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
+                        fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
                         
                         fival.f  = ( fival.f - 1.0 );
                         fival.u |= sign;
@@ -1377,9 +1377,9 @@ mulvec ( const size_t                        nrows,
                         y[i+ii] += fcache[ii] * x_j;
                 }// for
 
-                #else
+                #endif
                 
-                for ( size_t  i = 0 ; i < nrows; ++i, pos++ )
+                for ( ; i < nrows; ++i, pos++ )
                 {
                     const auto  z_ij = uint64_t( zA[pos] );
 
@@ -1396,8 +1396,6 @@ mulvec ( const size_t                        nrows,
                         y[i] += fival.f * x_j;
                     }// if
                 }// for
-
-                #endif
             }// for
         }// case
         break;
@@ -1409,10 +1407,11 @@ mulvec ( const size_t                        nrows,
             for ( size_t  j = 0; j < ncols; ++j )
             {
                 value_t  y_j = value_t(0);
-
+                size_t   i   = 0;
+                
                 #if defined(HLR_AFLP_BUFFERED_MVM)
 
-                for ( size_t  i = 0; i < nrows_buf; i += nbuf, pos += nbuf )
+                for ( ; i < nrowsbuf; i += nbuf, pos += nbuf )
                 {
                     #pragma GCC ivdep
                     for ( uint  ii = 0; ii < nbuf; ++ii )
@@ -1421,7 +1420,7 @@ mulvec ( const size_t                        nrows,
                         const uint64_t  mant  = z_ij & prec_mask;
                         const uint64_t  exp   = (z_ij >> prec_bits) & exp_mask;
                         const uint64_t  sign  = (z_ij >> sign_shift) << FP64::sign_bit;
-                        fp64int_t       fival = { ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
+                        fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
                         
                         fival.f  = ( fival.f - 1.0 );
                         fival.u |= sign;
@@ -1433,9 +1432,9 @@ mulvec ( const size_t                        nrows,
                         y_j += fcache[ii] * x[i+ii];
                 }// for
 
-                #else
+                #endif
                 
-                for ( size_t  i = 0; i < nrows; ++i, pos++ )
+                for ( ; i < nrows; ++i, pos++ )
                 {
                     const auto  z_ij = uint64_t( zA[pos] );
 
@@ -1452,8 +1451,6 @@ mulvec ( const size_t                        nrows,
                         y_j += fival.f * x[i];
                     }// if
                 }// for
-
-                #endif
 
                 y[j] += scale * y_j;
             }// for
