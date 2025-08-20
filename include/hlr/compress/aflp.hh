@@ -11,6 +11,7 @@
 #include <cstring>
 #include <cstdint>
 #include <limits>
+#include <immintrin.h>
 
 #include <hlr/compress/byte_n.hh>
 #include <hlr/compress/ztypes.hh>
@@ -546,7 +547,7 @@ compress ( const double *  data,  // points to actual start of buffer
             case  6 : { auto ptr = reinterpret_cast< byte6_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = ibuf[j]; } break;
             case  7 : { auto ptr = reinterpret_cast< byte7_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = ibuf[j]; } break;
             case  8 : { auto ptr = reinterpret_cast< byte8_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = ibuf[j]; } break;
-            default : HLR_ERROR( "unsupported storage size" );
+            default : HLR_ERROR( "invalid storage size" );
         }// switch
 
         pos += nbyte * nbuf;
@@ -575,15 +576,15 @@ compress ( const double *  data,  // points to actual start of buffer
         
         switch ( nbyte )
         {
-            case  8 : zdata[pos+7] = ( zval & 0xff00000000000000 ) >> 56;
-            case  7 : zdata[pos+6] = ( zval & 0x00ff000000000000 ) >> 48;
-            case  6 : zdata[pos+5] = ( zval & 0x0000ff0000000000 ) >> 40;
-            case  5 : zdata[pos+4] = ( zval & 0x000000ff00000000 ) >> 32;
-            case  4 : zdata[pos+3] = ( zval & 0x00000000ff000000 ) >> 24;
-            case  3 : zdata[pos+2] = ( zval & 0x0000000000ff0000 ) >> 16;
-            case  2 : zdata[pos+1] = ( zval & 0x000000000000ff00 ) >> 8;
-            case  1 : zdata[pos]   = ( zval & 0x00000000000000ff ); break;
-            default : HLR_ERROR( "unsupported storage size" );
+            case  1 : { auto ptr =                                & zdata[pos];   *ptr = zval; } break;
+            case  2 : { auto ptr = reinterpret_cast< byte2_t * >( & zdata[pos] ); *ptr = zval; } break;
+            case  3 : { auto ptr = reinterpret_cast< byte3_t * >( & zdata[pos] ); *ptr = zval; } break;
+            case  4 : { auto ptr = reinterpret_cast< byte4_t * >( & zdata[pos] ); *ptr = zval; } break;
+            case  5 : { auto ptr = reinterpret_cast< byte5_t * >( & zdata[pos] ); *ptr = zval; } break;
+            case  6 : { auto ptr = reinterpret_cast< byte6_t * >( & zdata[pos] ); *ptr = zval; } break;
+            case  7 : { auto ptr = reinterpret_cast< byte7_t * >( & zdata[pos] ); *ptr = zval; } break;
+            case  8 : { auto ptr = reinterpret_cast< byte8_t * >( & zdata[pos] ); *ptr = zval; } break;
+            default : HLR_ERROR( "invalid storage size" );
         }// switch
             
         pos += nbyte;
@@ -644,7 +645,7 @@ decompress ( double *        data,
             case  6 : { auto ptr = reinterpret_cast< const byte6_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
             case  7 : { auto ptr = reinterpret_cast< const byte7_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
             case  8 : { auto ptr = reinterpret_cast< const byte8_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
-            default : HLR_ERROR( "unsupported storage size" );
+            default : HLR_ERROR( "invalid storage size" );
         }// switch
             
         // convert from compressed format
@@ -683,15 +684,15 @@ decompress ( double *        data,
             
         switch ( nbyte )
         {
-            case  8 : zval |= uint64_t(zdata[pos+7]) << 56;
-            case  7 : zval |= uint64_t(zdata[pos+6]) << 48;
-            case  6 : zval |= uint64_t(zdata[pos+5]) << 40;
-            case  5 : zval |= uint64_t(zdata[pos+4]) << 32;
-            case  4 : zval |= uint64_t(zdata[pos+3]) << 24;
-            case  3 : zval |= uint64_t(zdata[pos+2]) << 16;
-            case  2 : zval |= uint64_t(zdata[pos+1]) << 8;
-            case  1 : zval |= uint64_t(zdata[pos]); break;
-            default : HLR_ERROR( "unsupported byte size" );
+            case  1 : { auto ptr = & zdata[pos];                                        zval = *ptr; } break;
+            case  2 : { auto ptr = reinterpret_cast< const byte2_t * >( & zdata[pos] ); zval = *ptr; } break;
+            case  3 : { auto ptr = reinterpret_cast< const byte3_t * >( & zdata[pos] ); zval = *ptr; } break;
+            case  4 : { auto ptr = reinterpret_cast< const byte4_t * >( & zdata[pos] ); zval = *ptr; } break;
+            case  5 : { auto ptr = reinterpret_cast< const byte5_t * >( & zdata[pos] ); zval = *ptr; } break;
+            case  6 : { auto ptr = reinterpret_cast< const byte6_t * >( & zdata[pos] ); zval = *ptr; } break;
+            case  7 : { auto ptr = reinterpret_cast< const byte7_t * >( & zdata[pos] ); zval = *ptr; } break;
+            case  8 : { auto ptr = reinterpret_cast< const byte8_t * >( & zdata[pos] ); zval = *ptr; } break;
+            default : HLR_ERROR( "invalid storage size" );
         }// switch
 
         if ( zval == zero_val )
