@@ -982,9 +982,6 @@ check_uniform_matrix ( const Hpro::TMatrix< value_t > &                      A,
     }// if
     else if ( matrix::is_uniform_lowrank2( A ) )
     {
-        if ( R->id() == 90 )
-            breakpoint();
-        
         auto  R = cptrcast( & A, hlr::matrix::uniform_lr2matrix< value_t > );
 
         HLR_ASSERT( R->row_rank() == rowcb.rank() );

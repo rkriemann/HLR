@@ -1052,6 +1052,8 @@ build_uniform_rec_sep ( const Hpro::TMatrix< typename basisapx_t::value_t > &   
     return  { std::move( rowcb ), std::move( colcb ), std::move( M ) };
 }
 
+using hlr::seq::matrix::check_uniform_matrix;
+
 namespace tlr
 {
 //

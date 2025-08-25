@@ -456,8 +456,8 @@ build_id2blocks ( const shared_cluster_basis< value_t > &                       
             
             for ( uint  j = 0; j < B->nblock_cols( op ); ++j )
             {
-                if ( ! is_null( B->block( i, j ) ) )
-                    build_id2blocks( *cb_i, * B->block( i, j ), blockmap, transposed );
+                if ( ! is_null( B->block( i, j, op ) ) )
+                    build_id2blocks( *cb_i, * B->block( i, j, op ), blockmap, transposed );
             }// for
         }// if
     }// else
@@ -576,10 +576,9 @@ mul_vec_col ( const shared_cluster_basis< value_t > &                           
 
     if ( blockcol.size() > 0 )
     {
-        auto        colis = colcb.is();
-        auto        x_j   = blas::vector< value_t >( blas::vec( sx ), colis - sx.ofs() );
-        auto        u_j   = blas::vector< value_t >();
-        const auto  op    = ( op_M == apply_normal ? apply_adjoint : op_M );
+        auto  colis = colcb.is();
+        auto  x_j   = blas::vector< value_t >( blas::vec( sx ), colis - sx.ofs() );
+        auto  u_j   = blas::vector< value_t >();
             
         for ( auto  M : blockcol )
         {
@@ -592,9 +591,7 @@ mul_vec_col ( const shared_cluster_basis< value_t > &                           
                 if ( u_j.length() == 0 )
                     u_j = colcb.transform_forward( x_j );
 
-                HLR_ASSERT( R->col_rank() == colcb.rank() );
-                
-                blas::mulvec( value_t(1), R->col_coupling( op ), u_j, value_t(0), s );
+                blas::mulvec( value_t(1), blas::adjoint( R->col_coupling( op_M ) ), u_j, value_t(0), s );
                 scoeff[ R->id() ] = std::move( s );
             }// if
             else if ( matrix::is_dense( M ) )
@@ -643,8 +640,6 @@ mul_vec_row ( const shared_cluster_basis< value_t > &                           
         auto  u_j   = blas::vector< value_t >( rowcb.rank() );
         auto  t_j   = blas::vector< value_t >( y_j.length() );
 
-        std::cout << rowis.to_string() << " / " << rowcb.rank() << std::endl;
-        
         for ( auto  M : blockrow )
         {
             if ( matrix::is_uniform_lowrank2( M ) )

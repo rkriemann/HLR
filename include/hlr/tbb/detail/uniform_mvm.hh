@@ -441,8 +441,8 @@ build_id2blocks ( const shared_cluster_basis< value_t > &                       
             
             for ( uint  j = 0; j < B->nblock_cols( op ); ++j )
             {
-                if ( ! is_null( B->block( i, j ) ) )
-                    build_id2blocks( *cb_i, * B->block( i, j ), blockmap, transposed );
+                if ( ! is_null( B->block( i, j, op ) ) )
+                    build_id2blocks( *cb_i, * B->block( i, j, op ), blockmap, transposed );
             }// for
         }// if
         // ::tbb::parallel_for(
@@ -591,20 +591,20 @@ mul_vec_col ( const shared_cluster_basis< value_t > &                           
         auto  colis = colcb.is();
         auto  x_j   = blas::vector< value_t >( blas::vec( sx ), colis - sx.ofs() );
         auto  u_j   = blas::vector< value_t >();
-        auto  s     = blas::vector< value_t >( colcb.rank() );
             
         for ( auto  M : blockcol )
         {
             if ( matrix::is_uniform_lowrank2( M ) )
             {
                 auto  R = cptrcast( M, matrix::uniform_lr2matrix< value_t > );
+                auto  s = blas::vector< value_t >( R->rank() );
 
                 // forward transformation if not yet done
                 if ( u_j.length() == 0 )
                     u_j = colcb.transform_forward( x_j );
                     
-                blas::mulvec( value_t(1), R->col_coupling( op_M ), u_j, value_t(0), s );
-                scoeff[ R->id() ] = std::move( blas::copy( s ) );
+                blas::mulvec( value_t(1), blas::adjoint( R->col_coupling( op_M ) ), u_j, value_t(0), s );
+                scoeff[ R->id() ] = std::move( s );
             }// if
             else if ( matrix::is_dense( M ) )
             {
@@ -651,7 +651,7 @@ mul_vec_row ( const shared_cluster_basis< value_t > &                           
     {
         auto  rowis = rowcb.is();
         auto  y_j   = blas::vector< value_t >( blas::vec( sy ), rowis - sy.ofs() );
-        auto  u_j   = blas::vector< value_t >( rowcb.rank() );
+        auto  u_j   = blas::vector< value_t >();
         auto  t_j   = blas::vector< value_t >( y_j.length() );
             
         for ( auto  M : blockrow )
@@ -661,13 +661,16 @@ mul_vec_row ( const shared_cluster_basis< value_t > &                           
                 auto  R = cptrcast( M, matrix::uniform_lr2matrix< value_t > );
                 auto  s = scoeff[ R->id() ];
 
+                if ( u_j.length() == 0 )
+                    u_j = blas::vector< value_t >( rowcb.rank() );
+                
                 blas::mulvec( value_t(1), R->row_coupling( op_M ), s, value_t(1), u_j );
             }// if
             else if ( matrix::is_dense( M ) )
             {
                 auto  x_i = blas::vector< value_t >( blas::vec( sx ), M->col_is( op_M ) - sx.ofs() );
                         
-                M->apply_add( alpha, x_i, t_j, op_M );
+                M->apply_add( value_t(1), x_i, t_j, op_M );
             }// if
             else if ( matrix::is_uniform_lowrank( M ) )
             {

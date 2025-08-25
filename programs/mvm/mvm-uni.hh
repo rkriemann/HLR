@@ -98,8 +98,6 @@ program_main ()
     
     toc = timer::since( tic );
 
-    impl::matrix::check_uniform_matrix( *A, *rowcb, *colcb );
-    
     const auto  mem_A   = A->byte_size();
     const auto  mem_rcb = rowcb->byte_size();
     const auto  mem_ccb = colcb->byte_size();
@@ -369,7 +367,7 @@ program_main ()
 
             auto  colblocks = impl::uniform::build_id2blocks( *colcb, *A, true );
             auto  rowblocks = impl::uniform::build_id2blocks( *rowcb, *A, false );
-            
+
             x->fill( 1 );
 
             for ( int i = 0; i < nbench; ++i )
