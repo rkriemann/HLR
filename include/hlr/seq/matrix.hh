@@ -947,6 +947,52 @@ build_uniform_sep ( const Hpro::TBlockCluster *  bc,
 }
 
 template < typename value_t >
+void
+check_uniform_matrix ( const Hpro::TMatrix< value_t > &                      A,
+                       const hlr::matrix::shared_cluster_basis< value_t > &  rowcb,
+                       const hlr::matrix::shared_cluster_basis< value_t > &  colcb )
+{
+    if ( is_blocked( A ) )
+    {
+        auto  B = cptrcast( &A, Hpro::TBlockMatrix< value_t > );
+
+        HLR_ASSERT( ( B->nblock_rows() == rowcb.nsons() ) &&
+                    ( B->nblock_cols() == colcb.nsons() ) );
+                    
+        for ( uint  i = 0; i < B->nblock_rows(); ++i )
+        {
+            for ( uint  j = 0; j < B->nblock_cols(); ++j )
+            {
+                if ( B->block( i, j ) == nullptr )
+                    continue;
+
+                HLR_ASSERT( ! is_null( rowcb.son( i ) ) );
+                HLR_ASSERT( ! is_null( colcb.son( j ) ) );
+                
+                check_uniform_matrix( * B->block( i, j ), * rowcb.son( i ), * colcb.son( j ) );
+            }// for
+        }// for
+    }// if
+    else if ( matrix::is_uniform_lowrank( A ) )
+    {
+        auto  R = cptrcast( & A, hlr::matrix::uniform_lrmatrix< value_t > );
+
+        HLR_ASSERT( R->row_rank() == rowcb.rank() );
+        HLR_ASSERT( R->col_rank() == colcb.rank() );
+    }// if
+    else if ( matrix::is_uniform_lowrank2( A ) )
+    {
+        if ( R->id() == 90 )
+            breakpoint();
+        
+        auto  R = cptrcast( & A, hlr::matrix::uniform_lr2matrix< value_t > );
+
+        HLR_ASSERT( R->row_rank() == rowcb.rank() );
+        HLR_ASSERT( R->col_rank() == colcb.rank() );
+    }// if
+}
+
+template < typename value_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
 build_uniform_sep ( const Hpro::TMatrix< value_t > &                A,
                     hlr::matrix::shared_cluster_basis< value_t > &  rowcb,

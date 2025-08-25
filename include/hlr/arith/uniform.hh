@@ -253,6 +253,32 @@ build_id2blocks ( const matrix::shared_cluster_basis< value_t > &  cb,
 }
 
 //
+// multiply with vector by separatly handling column/row cluster basis and
+// use thread local destination vectors
+//
+template < typename value_t >
+void
+mul_vec_colrow ( const value_t                                                         alpha,
+                 const hpro::matop_t                                                   op_M,
+                 const Hpro::TMatrix< value_t > &                                      M,
+                 const std::vector< std::list< const Hpro::TMatrix< value_t > * > > &  colblocks,
+                 const std::vector< std::list< const Hpro::TMatrix< value_t > * > > &  rowblocks,
+                 const vector::scalar_vector< value_t > &                              x,
+                 vector::scalar_vector< value_t > &                                    y,
+                 const matrix::shared_cluster_basis< value_t > &                       rowcb,
+                 const matrix::shared_cluster_basis< value_t > &                       colcb )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    // holds intermediate coefficients for uniform blocks
+    auto  scoeff = std::vector< blas::vector< value_t > >( M.id() + 1 );
+
+    detail::mul_vec_col< value_t >( colcb,        op_M, colblocks, x, scoeff );
+    detail::mul_vec_row< value_t >( rowcb, alpha, op_M, rowblocks, x, y, scoeff );
+}
+
+//
 // return FLOPs needed for computing y = y + α op( M ) x
 // (implicit vectors)
 //

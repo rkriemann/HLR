@@ -213,7 +213,7 @@ mul_vec_hier ( const value_t                                        alpha,
 }
 
 //
-// parallelism of all block rows per level without synchronization
+// multiply with vector by handling all blocks sharing cluster in single task
 //
 template < typename value_t >
 void
@@ -235,6 +235,9 @@ mul_vec_row ( const value_t                                                     
     detail::mul_vec_row< value_t >( alpha, op_M, rowcb, colcb_map, blockmap, xcoeff, x, y );
 }
 
+//
+// build mapping from cluster basis id to cluster basis pointer
+//
 template < typename value_t >
 std::vector< matrix::shared_cluster_basis< value_t > * >
 build_id2cb ( matrix::shared_cluster_basis< value_t > &  cb )
@@ -248,6 +251,9 @@ build_id2cb ( matrix::shared_cluster_basis< value_t > &  cb )
     return idmap;
 }
 
+//
+// build mapping from cluster basis id to list of matrix blocks sharing the cluster (basis)
+//
 template < typename value_t >
 std::vector< std::list< const Hpro::TMatrix< value_t > * > >
 build_id2blocks ( const matrix::shared_cluster_basis< value_t > &  cb,
@@ -261,6 +267,32 @@ build_id2blocks ( const matrix::shared_cluster_basis< value_t > &  cb,
     detail::build_id2blocks( cb, M, blockmap, transposed );
 
     return blockmap;
+}
+
+//
+// multiply with vector by separatly handling column/row cluster basis and
+// use thread local destination vectors
+//
+template < typename value_t >
+void
+mul_vec_colrow ( const value_t                                                         alpha,
+                 const hpro::matop_t                                                   op_M,
+                 const Hpro::TMatrix< value_t > &                                      M,
+                 const std::vector< std::list< const Hpro::TMatrix< value_t > * > > &  colblocks,
+                 const std::vector< std::list< const Hpro::TMatrix< value_t > * > > &  rowblocks,
+                 const vector::scalar_vector< value_t > &                              x,
+                 vector::scalar_vector< value_t > &                                    y,
+                 const matrix::shared_cluster_basis< value_t > &                       rowcb,
+                 const matrix::shared_cluster_basis< value_t > &                       colcb )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    // holds intermediate coefficients for uniform blocks
+    auto  scoeff = std::vector< blas::vector< value_t > >( M.id() + 1 );
+
+    detail::mul_vec_col< value_t >( colcb,        op_M, colblocks, x, scoeff );
+    detail::mul_vec_row< value_t >( rowcb, alpha, op_M, rowblocks, x, y, scoeff );
 }
 
 //

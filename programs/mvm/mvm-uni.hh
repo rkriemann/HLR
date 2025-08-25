@@ -97,6 +97,8 @@ program_main ()
     // impl::matrix::compress( *A, acc );
     
     toc = timer::since( tic );
+
+    impl::matrix::check_uniform_matrix( *A, *rowcb, *colcb );
     
     const auto  mem_A   = A->byte_size();
     const auto  mem_rcb = rowcb->byte_size();
@@ -262,7 +264,7 @@ program_main ()
             std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
-        if ( true )
+        if ( false )
         {
             runtime.clear();
             
@@ -327,6 +329,55 @@ program_main ()
     
                 for ( int j = 0; j < nmvm; ++j )
                     impl::uniform::mul_vec_row< value_t >( 2.0, Hpro::apply_normal, *x, *y, *rowcb, *colcb, cbmap, blockmap );
+
+                toc = timer::since( tic );
+                runtime.push_back( toc.seconds() );
+        
+                std::cout << term::rollback << term::clearline << "      mvm in   " << format_time( toc ) << term::flush;
+
+                if ( i < nbench-1 )
+                    y->fill( 0 );
+            }// for
+        
+            if ( nbench > 1 )
+                std::cout << term::rollback << term::clearline << "      runtime = "
+                          << format( "%.3e s / %.3e s / %.3e s" ) % min( runtime ) % median( runtime ) % max( runtime );
+            std::cout << std::endl;
+
+            std::cout << "      flops   = " << format_flops( flops_uh, min( runtime ) ) << std::endl;
+            std::cout << "      bandw.  = " << format_bandwidth( double(bytes_uh) / min( runtime ) ) << std::endl;
+            
+            t_ref = min( runtime );
+            
+            auto  diff = y_ref->copy();
+
+            diff->axpy( value_t(-1), y.get() );
+
+            const auto  error = diff->norm2();
+            
+            std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
+        }
+
+        if ( sep_coup )
+        {
+            runtime.clear();
+            
+            std::cout << "  " << term::bullet << term::bold << "separate row/col handling" << term::reset << std::endl;
+        
+            auto  x = std::make_unique< vector::scalar_vector< value_t > >( A->col_is() );
+            auto  y = std::make_unique< vector::scalar_vector< value_t > >( A->row_is() );
+
+            auto  colblocks = impl::uniform::build_id2blocks( *colcb, *A, true );
+            auto  rowblocks = impl::uniform::build_id2blocks( *rowcb, *A, false );
+            
+            x->fill( 1 );
+
+            for ( int i = 0; i < nbench; ++i )
+            {
+                tic = timer::now();
+    
+                for ( int j = 0; j < nmvm; ++j )
+                    impl::uniform::mul_vec_colrow< value_t >( 2.0, Hpro::apply_normal, *A, colblocks, rowblocks, *x, *y, *rowcb, *colcb );
 
                 toc = timer::since( tic );
                 runtime.push_back( toc.seconds() );
