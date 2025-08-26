@@ -586,53 +586,60 @@ mul_vec_col ( const shared_cluster_basis< value_t > &                           
 {
     auto &  blockcol = colblocks[ colcb.id() ];
 
-    if ( blockcol.size() > 0 )
-    {
-        auto  colis = colcb.is();
-        auto  x_j   = blas::vector< value_t >( blas::vec( sx ), colis - sx.ofs() );
-        auto  u_j   = blas::vector< value_t >();
-            
-        for ( auto  M : blockcol )
+    ::tbb::parallel_invoke(
+        [&,op_M] ()
         {
-            if ( matrix::is_uniform_lowrank2( M ) )
+            if ( blockcol.size() > 0 )
             {
-                auto  R = cptrcast( M, matrix::uniform_lr2matrix< value_t > );
-                auto  s = blas::vector< value_t >( R->rank() );
+                auto  colis = colcb.is();
+                auto  x_j   = blas::vector< value_t >( blas::vec( sx ), colis - sx.ofs() );
+                auto  u_j   = blas::vector< value_t >();
+            
+                for ( auto  M : blockcol )
+                {
+                    if ( matrix::is_uniform_lowrank2( M ) )
+                    {
+                        auto  R = cptrcast( M, matrix::uniform_lr2matrix< value_t > );
+                        auto  s = blas::vector< value_t >( R->rank() );
 
-                // forward transformation if not yet done
-                if ( u_j.length() == 0 )
-                    u_j = colcb.transform_forward( x_j );
+                        // forward transformation if not yet done
+                        if ( u_j.length() == 0 )
+                            u_j = colcb.transform_forward( x_j );
                     
-                blas::mulvec( value_t(1), blas::adjoint( R->col_coupling( op_M ) ), u_j, value_t(0), s );
-                scoeff[ R->id() ] = std::move( s );
+                        blas::mulvec( value_t(1), blas::adjoint( R->col_coupling( op_M ) ), u_j, value_t(0), s );
+                        scoeff[ R->id() ] = std::move( s );
+                    }// if
+                    else if ( matrix::is_dense( M ) )
+                    {
+                        // ignored
+                    }// if
+                    else if ( matrix::is_uniform_lowrank( M ) )
+                    {
+                        HLR_ERROR( "uniform_lrmatrix not supported" );
+                    }// if
+                    else
+                        HLR_ERROR( "unsupported matrix type : " + M->typestr() );
+                }// for
             }// if
-            else if ( matrix::is_dense( M ) )
-            {
-                // ignored
-            }// if
-            else if ( matrix::is_uniform_lowrank( M ) )
-            {
-                HLR_ERROR( "uniform_lrmatrix not supported" );
-            }// if
-            else
-                HLR_ERROR( "unsupported matrix type : " + M->typestr() );
-        }// for
-    }// if
+        },
 
-    //
-    // recurse
-    //
+        [&,op_M] ()
+        {
+            //
+            // recurse
+            //
 
-    if ( colcb.nsons() > 0 )
-    {
-        ::tbb::parallel_for< uint >(
-            0, colcb.nsons(),
-            [&] ( const auto  i )
+            if ( colcb.nsons() > 0 )
             {
-                if ( ! is_null( colcb.son( i ) ) )
-                    mul_vec_col( * colcb.son( i ), op_M, colblocks, sx, scoeff );
-            } );
-    }// if
+                ::tbb::parallel_for< uint >(
+                    0, colcb.nsons(),
+                    [&,op_M] ( const auto  i )
+                    {
+                        if ( ! is_null( colcb.son( i ) ) )
+                            mul_vec_col( * colcb.son( i ), op_M, colblocks, sx, scoeff );
+                    } );
+            }// if
+        } );
 }
 
 template < typename value_t >
@@ -642,68 +649,77 @@ mul_vec_row ( const shared_cluster_basis< value_t > &                           
               const Hpro::matop_t                                                   op_M,
               const std::vector< std::list< const Hpro::TMatrix< value_t > * > > &  rowblocks,
               const scalar_vector< value_t > &                                      sx,
-              const scalar_vector< value_t > &                                      sy,
+              // const scalar_vector< value_t > &                                      sy,
+              ::tbb::enumerable_thread_specific< blas::vector< value_t > > &        sy,
               const std::vector< blas::vector< value_t > > &                        scoeff )
 {
-    auto &  blockrow = rowblocks[ rowcb.id() ];
-
-    if ( blockrow.size() > 0 )
-    {
-        auto  rowis = rowcb.is();
-        auto  y_j   = blas::vector< value_t >( blas::vec( sy ), rowis - sy.ofs() );
-        auto  u_j   = blas::vector< value_t >();
-        auto  t_j   = blas::vector< value_t >( y_j.length() );
-            
-        for ( auto  M : blockrow )
+    ::tbb::parallel_invoke(
+        [&,op_M,alpha] ()
         {
-            if ( matrix::is_uniform_lowrank2( M ) )
-            {
-                auto  R = cptrcast( M, matrix::uniform_lr2matrix< value_t > );
-                auto  s = scoeff[ R->id() ];
+            auto &  blockrow = rowblocks[ rowcb.id() ];
 
-                if ( u_j.length() == 0 )
-                    u_j = blas::vector< value_t >( rowcb.rank() );
+            if ( blockrow.size() > 0 )
+            {
+                auto  rowis = rowcb.is();
+                auto  y_loc = sy.local();
+                auto  y_j   = blas::vector< value_t >( y_loc, rowis ); // actually: rowis - y_loc.ofs()
+                auto  u_j   = blas::vector< value_t >();
+                auto  t_j   = blas::vector< value_t >( y_j.length() );
+            
+                for ( auto  M : blockrow )
+                {
+                    if ( matrix::is_uniform_lowrank2( M ) )
+                    {
+                        auto  R = cptrcast( M, matrix::uniform_lr2matrix< value_t > );
+                        auto  s = scoeff[ R->id() ];
+
+                        if ( u_j.length() == 0 )
+                            u_j = blas::vector< value_t >( rowcb.rank() );
                 
-                blas::mulvec( value_t(1), R->row_coupling( op_M ), s, value_t(1), u_j );
-            }// if
-            else if ( matrix::is_dense( M ) )
-            {
-                auto  x_i = blas::vector< value_t >( blas::vec( sx ), M->col_is( op_M ) - sx.ofs() );
+                        blas::mulvec( value_t(1), R->row_coupling( op_M ), s, value_t(1), u_j );
+                    }// if
+                    else if ( matrix::is_dense( M ) )
+                    {
+                        auto  x_i = blas::vector< value_t >( blas::vec( sx ), M->col_is( op_M ) - sx.ofs() );
                         
-                M->apply_add( value_t(1), x_i, t_j, op_M );
-            }// if
-            else if ( matrix::is_uniform_lowrank( M ) )
-            {
-                HLR_ERROR( "uniform_lrmatrix not supported" );
-            }// if
-            else
-                HLR_ERROR( "unsupported matrix type : " + M->typestr() );
-        }// for
+                        M->apply_add( value_t(1), x_i, t_j, op_M );
+                    }// if
+                    else if ( matrix::is_uniform_lowrank( M ) )
+                    {
+                        HLR_ERROR( "uniform_lrmatrix not supported" );
+                    }// if
+                    else
+                        HLR_ERROR( "unsupported matrix type : " + M->typestr() );
+                }// for
 
-        //
-        // add uniform part to y
-        //
+                //
+                // add uniform part to y
+                //
         
-        if ( u_j.length() > 0 )
-            rowcb.transform_backward( u_j, t_j );
+                if ( u_j.length() > 0 )
+                    rowcb.transform_backward( u_j, t_j );
         
-        blas::add( alpha, t_j, y_j );
-    }// if
+                blas::add( alpha, t_j, y_j );
+            }// if
+        },
 
-    //
-    // recurse
-    //
+        [&,op_M,alpha] ()
+        {
+            //
+            // recurse
+            //
 
-    if ( rowcb.nsons() > 0 )
-    {
-        ::tbb::parallel_for< uint >(
-            0, rowcb.nsons(),
-            [&] ( const auto  i )
+            if ( rowcb.nsons() > 0 )
             {
-                if ( ! is_null( rowcb.son( i ) ) )
-                    mul_vec_row( * rowcb.son( i ), alpha, op_M, rowblocks, sx, sy, scoeff );
-            } );
-    }// if
+                ::tbb::parallel_for< uint >(
+                    0, rowcb.nsons(),
+                    [&,op_M,alpha] ( const auto  i )
+                    {
+                        if ( ! is_null( rowcb.son( i ) ) )
+                            mul_vec_row( * rowcb.son( i ), alpha, op_M, rowblocks, sx, sy, scoeff );
+                    } );
+            }// if
+        } );
 }
 
 }}}}// namespace hlr::tbb::uniform::detail

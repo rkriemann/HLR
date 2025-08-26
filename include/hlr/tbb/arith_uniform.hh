@@ -290,9 +290,31 @@ mul_vec_colrow ( const value_t                                                  
 
     // holds intermediate coefficients for uniform blocks
     auto  scoeff = std::vector< blas::vector< value_t > >( M.id() + 1 );
+    auto  y_ts   = ::tbb::enumerable_thread_specific< blas::vector< value_t > >( M.nrows( op_M ) );
 
     detail::mul_vec_col< value_t >( colcb,        op_M, colblocks, x, scoeff );
-    detail::mul_vec_row< value_t >( rowcb, alpha, op_M, rowblocks, x, y, scoeff );
+    detail::mul_vec_row< value_t >( rowcb, alpha, op_M, rowblocks, x, y_ts, scoeff );
+
+    //
+    // add local results to destination
+    //
+
+    auto &  sy = y.blas_vec();
+    
+    ::tbb::parallel_for(
+        ::tbb::blocked_range< size_t >( 0, sy.length(), 1024 ),
+        [&] ( const auto &  r )
+        {
+            auto  sub   = blas::range( r.begin(), r.end()-1 );
+            auto  y_sub = sy( sub );
+
+            for ( auto &  t : y_ts )
+            {
+                auto  t_sub = t( sub );
+                    
+                blas::add( value_t(1), t_sub, y_sub );
+            }// for
+        } );
 }
 
 //
