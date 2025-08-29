@@ -21,7 +21,7 @@
 //
 #define HLR_HAS_ZBLAS_DIRECT
 #define HLR_HAS_ZBLAS_VALR
-#define HLR_AFLP_BUFFERED_MVM
+// #define HLR_AFLP_BUFFERED_MVM // (disabled by default as it seems slower)
 
 // enable disable rounding up
 #define HLR_AFLP_ROUNDUP  0
