@@ -23,6 +23,9 @@
 #define HLR_HAS_ZBLAS_VALR
 #define HLR_AFLP_BUFFERED_MVM
 
+// enable disable rounding up
+#define HLR_AFLP_ROUNDUP  0
+
 ////////////////////////////////////////////////////////////
 //
 // compression using adaptive float representation
@@ -603,6 +606,9 @@ decompress ( double *        data,
     const uint8_t   nbyte      = nbits / 8;
     const uint64_t  prec_mask  = ( 1ul << prec_bits ) - 1;
     const uint8_t   prec_ofs   = FP64::mant_bits - prec_bits;
+    #if HLR_AFLP_ROUNDUP == 1
+    const uint64_t  prec_round = 1ul << prec_ofs;
+    #endif
     const uint64_t  exp_mask   = ( 1ul << exp_bits  ) - 1;
     const uint32_t  sign_shift = exp_bits + prec_bits;
     const uint64_t  zero_val   = FP64::zero_val & (( 1ul << nbits) - 1 );
@@ -658,7 +664,11 @@ decompress ( double *        data,
             const uint64_t  mant  = zval & prec_mask;
             const uint64_t  exp   = (zval >> prec_bits) & exp_mask;
             const uint64_t  sign  = (zval >> sign_shift) << FP64::sign_bit;
+            #if HLR_AFLP_ROUNDUP == 1
+            fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) | prec_round };
+            #else
             fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
+            #endif
 
             fival.f  = ( fival.f - 1.0 ) * scale;
             fival.u |= sign;
@@ -702,7 +712,11 @@ decompress ( double *        data,
             const uint64_t  mant  = zval & prec_mask;
             const uint64_t  exp   = (zval >> prec_bits) & exp_mask;
             const uint64_t  sign  = (zval >> sign_shift) << FP64::sign_bit;
+            #if HLR_AFLP_ROUNDUP == 1
+            fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) | prec_round };
+            #else
             fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
+            #endif
             
             fival.f  = ( fival.f - 1.0 ) * scale;
             fival.u |= sign;
@@ -1331,6 +1345,9 @@ mulvec ( const size_t                        nrows,
     const uint8_t     nbits      = 1 + exp_bits + prec_bits;
     const uint64_t    prec_mask  = ( 1ul << prec_bits ) - 1;
     const uint8_t     prec_ofs   = FP64::mant_bits - prec_bits;
+    #if HLR_AFLP_ROUNDUP == 1
+    const uint64_t    prec_round = 1ul << prec_ofs;
+    #endif
     const uint64_t    exp_mask   = ( 1ul << exp_bits  ) - 1;
     const uint32_t    sign_shift = exp_bits + prec_bits;
     const uint64_t    zero_val   = FP64::zero_val & (( 1ul << nbits) - 1 );
@@ -1365,7 +1382,11 @@ mulvec ( const size_t                        nrows,
                         const uint64_t  mant  = z_ij & prec_mask;
                         const uint64_t  exp   = (z_ij >> prec_bits) & exp_mask;
                         const uint64_t  sign  = (z_ij >> sign_shift) << FP64::sign_bit;
+                        #if HLR_AFLP_ROUNDUP == 1
+                        fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) | prec_round };
+                        #else
                         fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
+                        #endif
                         
                         fival.f  = ( fival.f - 1.0 );
                         fival.u |= sign;
@@ -1389,7 +1410,11 @@ mulvec ( const size_t                        nrows,
                         const uint64_t  mant  = z_ij & prec_mask;
                         const uint64_t  exp   = (z_ij >> prec_bits) & exp_mask;
                         const uint64_t  sign  = (z_ij >> sign_shift) << FP64::sign_bit;
+                        #if HLR_AFLP_ROUNDUP == 1
+                        fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) | prec_round };
+                        #else
                         fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
+                        #endif
                      
                         fival.f  = ( fival.f - 1.0 );
                         fival.u |= sign;
@@ -1421,7 +1446,11 @@ mulvec ( const size_t                        nrows,
                         const uint64_t  mant  = z_ij & prec_mask;
                         const uint64_t  exp   = (z_ij >> prec_bits) & exp_mask;
                         const uint64_t  sign  = (z_ij >> sign_shift) << FP64::sign_bit;
+                        #if HLR_AFLP_ROUNDUP == 1
+                        fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) | prec_round };
+                        #else
                         fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
+                        #endif
                         
                         fival.f  = ( fival.f - 1.0 );
                         fival.u |= sign;
@@ -1444,7 +1473,11 @@ mulvec ( const size_t                        nrows,
                         const uint64_t  mant = z_ij & prec_mask;
                         const uint64_t  exp  = (z_ij >> prec_bits) & exp_mask;
                         const uint64_t  sign = (z_ij >> sign_shift) << FP64::sign_bit;
+                        #if HLR_AFLP_ROUNDUP == 1
+                        fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) | prec_round };
+                        #else
                         fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
+                        #endif
 
                         fival.f  = ( fival.f - 1.0 );
                         fival.u |= sign;
