@@ -474,8 +474,9 @@ compress_fp24 ( const double *  data,
         
     #if defined (__AVX512VBMI__) && defined (__EVEX512__) && HLR_FPX_ENABLE_SIMD == 1
     {
-        const size_t  nsize8 = nsize - nsize % 8;
-        auto          zptr   = zdata;
+        constexpr __mmask32  smask  = 0b00000000111111111111111111111111;
+        const size_t         nsize8 = nsize - nsize % 8;
+        auto                 zptr   = zdata;
     
         for ( ; i < nsize8; i += 8, zptr += 24 )
         {
@@ -483,7 +484,8 @@ compress_fp24 ( const double *  data,
             const auto  vf = _mm512_cvtpd_ps( vd );
             const auto  vb = _mm256_maskz_permutexvar_epi8( to_fp24_mask_8, to_fp24_idxs_8, reinterpret_cast< __m256i >( vf ) );
 
-            _mm256_storeu_si256( reinterpret_cast< __m256i * >( zptr ), vb );
+            // _mm256_storeu_si256( reinterpret_cast< __m256i * >( zptr ), vb );
+            _mm256_mask_compressstoreu_epi8( reinterpret_cast< __m256i * >( zptr ), smask, vb );
         }// for
     }// 
     
@@ -633,15 +635,17 @@ compress_fp40 ( const double *  data,
     
     #if defined (__AVX512VBMI__) && defined (__EVEX512__) && HLR_FPX_ENABLE_SIMD == 1
     {
-        const size_t  nsize8 = nsize - nsize % 8;
-        auto          zptr   = zdata;
+        constexpr __mmask64  smask  = 0b0000000000000000000000001111111111111111111111111111111111111111;
+        const size_t         nsize8 = nsize - nsize % 8;
+        auto                 zptr   = zdata;
     
         for ( ; i < nsize8; i += 8, zptr += 40 )
         {
             const auto  vd = _mm512_loadu_pd( data + i );
             const auto  vb = _mm512_maskz_permutexvar_epi8( to_fp40_mask_8, to_fp40_idxs_8, reinterpret_cast< __m512i >( vd ) );
             
-            _mm512_storeu_si512( reinterpret_cast< __m512i * >( zptr ), vb );
+            // _mm512_storeu_si512( reinterpret_cast< __m512i * >( zptr ), vb );
+            _mm512_mask_compressstoreu_epi8( reinterpret_cast< __m512i * >( zptr ), smask, vb );
         }// for
     }
     #endif
@@ -706,15 +710,17 @@ compress_fp48 ( const double *  data,
     
     #if defined (__AVX512VBMI__) && defined (__EVEX512__) && HLR_FPX_ENABLE_SIMD == 1
     {
-        const size_t  nsize8 = nsize - nsize % 8;
-        auto          zptr   = zdata;
+        constexpr __mmask64  smask  = 0b0000000000000000111111111111111111111111111111111111111111111111;
+        const size_t         nsize8 = nsize - nsize % 8;
+        auto                 zptr   = zdata;
     
         for ( ; i < nsize8; i += 8, zptr += 48 )
         {
             const auto  vd = _mm512_loadu_pd( data + i );
             const auto  vb = _mm512_maskz_permutexvar_epi8( to_fp48_mask_8, to_fp48_idxs_8, reinterpret_cast< __m512i >( vd ) );
 
-            _mm512_storeu_si512( reinterpret_cast< __m512i * >( zptr ), vb );
+            // _mm512_storeu_si512( reinterpret_cast< __m512i * >( zptr ), vb );
+            _mm512_mask_compressstoreu_epi8( reinterpret_cast< __m512i * >( zptr ), smask, vb );
         }// for
     }
     #endif
@@ -779,15 +785,17 @@ compress_fp56 ( const double *  data,
     
     #if defined (__AVX512VBMI__) && defined (__EVEX512__) && HLR_FPX_ENABLE_SIMD == 1
     {
-        const size_t  nsize8 = nsize - nsize % 8;
-        auto          zptr   = zdata;
+        constexpr __mmask64  smask  = 0b0000000011111111111111111111111111111111111111111111111111111111;
+        const size_t         nsize8 = nsize - nsize % 8;
+        auto                 zptr   = zdata;
     
         for ( ; i < nsize8; i += 8, zptr += 56 )
         {
             const auto  vd = _mm512_loadu_pd( data + i );
             const auto  vb = _mm512_maskz_permutexvar_epi8( to_fp56_mask_8, to_fp56_idxs_8, reinterpret_cast< __m512i >( vd ) );
             
-            _mm512_storeu_si512( reinterpret_cast< __m512i * >( zptr ), vb );
+            // _mm512_storeu_si512( reinterpret_cast< __m512i * >( zptr ), vb );
+            _mm512_mask_compressstoreu_epi8( reinterpret_cast< __m512i * >( zptr ), smask, vb );
         }// for
     }
     #endif
