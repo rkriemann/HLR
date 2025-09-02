@@ -41,9 +41,24 @@ namespace hlr { namespace compress { namespace fpx {
 constexpr    uint8_t  fpx_header_ofs = 1;
 
 #if defined (__AVX512VBMI__) && defined (__EVEX512__)
-static const uint8_t  fpx_mem_pad[9] = { 0, 0, 0, 8, 0, 24, 16, 8, 0 }; // memory padding due to AVX512 zero bytes
+// static const uint8_t  fpx_mem_pad[9] = { 0, 0, 0, 8, 0, 24, 16, 8, 0 }; // memory padding due to AVX512 zero bytes
+static const uint8_t  fpx_mem_pad[9] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 #else
 static const uint8_t  fpx_mem_pad[9] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+#endif
+
+// cast operators
+#if defined (__AVX512VBMI__) && defined (__EVEX512__) && HLR_FPX_ENABLE_SIMD == 1
+#  define HLR_FPX_CAST_256( n )    reinterpret_cast< __m256 >( n )
+#  define HLR_FPX_CAST_512d( n )   reinterpret_cast< __m512d >( n )
+
+#  define HLR_FPX_CAST_256i( n )   reinterpret_cast< __m256i >( n )
+#  define HLR_FPX_CAST_p256i( n )  reinterpret_cast< __m256i * >( n )
+#  define HLR_FPX_CAST_cp256i( n ) reinterpret_cast< const __m256i * >( n )
+
+#  define HLR_FPX_CAST_512i( n )   reinterpret_cast< __m512i >( n )
+#  define HLR_FPX_CAST_p512i( n )  reinterpret_cast< __m512i * >( n )
+#  define HLR_FPX_CAST_cp512i( n ) reinterpret_cast< const __m512i * >( n )
 #endif
 
 //
@@ -474,6 +489,11 @@ compress_fp24 ( const double *  data,
         
     #if defined (__AVX512VBMI__) && defined (__EVEX512__) && HLR_FPX_ENABLE_SIMD == 1
     {
+        static const auto   rbits = _mm256_set_epi8( 0, 0, 0, 0, 0, 0, 0, 0,
+                                                     0, 0, 1,  0, 0, 1,
+                                                     0, 0, 1,  0, 0, 1,
+                                                     0, 0, 1,  0, 0, 1,
+                                                     0, 0, 1,  0, 0, 1 );
         constexpr __mmask32  smask  = 0b00000000111111111111111111111111;
         const size_t         nsize8 = nsize - nsize % 8;
         auto                 zptr   = zdata;
@@ -482,10 +502,14 @@ compress_fp24 ( const double *  data,
         {
             const auto  vd = _mm512_loadu_pd( data + i );
             const auto  vf = _mm512_cvtpd_ps( vd );
-            const auto  vb = _mm256_maskz_permutexvar_epi8( to_fp24_mask_8, to_fp24_idxs_8, reinterpret_cast< __m256i >( vf ) );
-
-            // _mm256_storeu_si256( reinterpret_cast< __m256i * >( zptr ), vb );
-            _mm256_mask_compressstoreu_epi8( reinterpret_cast< __m256i * >( zptr ), smask, vb );
+            #if HLR_FPX_ROUNDUP == 1
+            const auto  vb = _mm256_or_si256( _mm256_maskz_permutexvar_epi8( to_fp24_mask_8, to_fp24_idxs_8, HLR_FPX_CAST_256i( vf ) ) );
+            #else
+            const auto  vb = _mm256_maskz_permutexvar_epi8( to_fp24_mask_8, to_fp24_idxs_8, HLR_FPX_CAST_256i( vf ) );
+            #endif
+            
+            // _mm256_storeu_si256( HLR_FPX_CAST_p256i( zptr ), vb );
+            _mm256_mask_compressstoreu_epi8( HLR_FPX_CAST_p256i( zptr ), smask, vb );
         }// for
     }// 
     
@@ -517,9 +541,9 @@ decompress_fp24 ( double *        data,
     
         for ( ; i < nsize8; i += 8, zptr += 24 )
         {
-            const auto  vb = _mm256_loadu_si256( reinterpret_cast< const __m256i * >( zptr ) );
+            const auto  vb = _mm256_loadu_si256( HLR_FPX_CAST_cp256i( zptr ) );
             const auto  vf = _mm256_maskz_permutexvar_epi8( from_fp24_mask_8, from_fp24_idxs_8, vb );
-            const auto  vd = _mm512_cvtps_pd( reinterpret_cast< __m256 >( vf ) );
+            const auto  vd = _mm512_cvtps_pd( HLR_FPX_CAST_256( vf ) );
 
             _mm512_storeu_pd( data + i, vd );
         }// for
@@ -642,10 +666,10 @@ compress_fp40 ( const double *  data,
         for ( ; i < nsize8; i += 8, zptr += 40 )
         {
             const auto  vd = _mm512_loadu_pd( data + i );
-            const auto  vb = _mm512_maskz_permutexvar_epi8( to_fp40_mask_8, to_fp40_idxs_8, reinterpret_cast< __m512i >( vd ) );
+            const auto  vb = _mm512_maskz_permutexvar_epi8( to_fp40_mask_8, to_fp40_idxs_8, HLR_FPX_CAST_512i( vd ) );
             
             // _mm512_storeu_si512( reinterpret_cast< __m512i * >( zptr ), vb );
-            _mm512_mask_compressstoreu_epi8( reinterpret_cast< __m512i * >( zptr ), smask, vb );
+            _mm512_mask_compressstoreu_epi8( HLR_FPX_CAST_p512i( zptr ), smask, vb );
         }// for
     }
     #endif
@@ -676,8 +700,8 @@ decompress_fp40 ( double *        data,
     
         for ( ; i < nsize8; i += 8, zptr += 40 )
         {
-            const auto  vb = _mm512_loadu_si512( reinterpret_cast< const __m512i * >( zptr ) );
-            const auto  vd = reinterpret_cast< __m512d >( _mm512_maskz_permutexvar_epi8( from_fp40_mask_8, from_fp40_idxs_8, vb ) );
+            const auto  vb = _mm512_loadu_si512( HLR_FPX_CAST_cp512i( zptr ) );
+            const auto  vd = HLR_FPX_CAST_512d( _mm512_maskz_permutexvar_epi8( from_fp40_mask_8, from_fp40_idxs_8, vb ) );
 
             _mm512_storeu_pd( data + i, vd );
         }// for
@@ -717,10 +741,10 @@ compress_fp48 ( const double *  data,
         for ( ; i < nsize8; i += 8, zptr += 48 )
         {
             const auto  vd = _mm512_loadu_pd( data + i );
-            const auto  vb = _mm512_maskz_permutexvar_epi8( to_fp48_mask_8, to_fp48_idxs_8, reinterpret_cast< __m512i >( vd ) );
+            const auto  vb = _mm512_maskz_permutexvar_epi8( to_fp48_mask_8, to_fp48_idxs_8, HLR_FPX_CAST_512i( vd ) );
 
-            // _mm512_storeu_si512( reinterpret_cast< __m512i * >( zptr ), vb );
-            _mm512_mask_compressstoreu_epi8( reinterpret_cast< __m512i * >( zptr ), smask, vb );
+            // _mm512_storeu_si512( HLR_FPX_CAST_p512i( zptr ), vb );
+            _mm512_mask_compressstoreu_epi8( HLR_FPX_CAST_p512i( zptr ), smask, vb );
         }// for
     }
     #endif
@@ -751,8 +775,8 @@ decompress_fp48 ( double *        data,
     
         for ( ; i < nsize8; i += 8, zptr += 48 )
         {
-            const auto  vb = _mm512_loadu_si512( reinterpret_cast< const __m512i * >( zptr ) );
-            const auto  vd = reinterpret_cast< __m512d >( _mm512_maskz_permutexvar_epi8( from_fp48_mask_8, from_fp48_idxs_8, vb ) );
+            const auto  vb = _mm512_loadu_si512( HLR_FPX_CAST_cp512i( zptr ) );
+            const auto  vd = HLR_FPX_CAST_512d( _mm512_maskz_permutexvar_epi8( from_fp48_mask_8, from_fp48_idxs_8, vb ) );
 
             _mm512_storeu_pd( data + i, vd );
         }// for
@@ -792,10 +816,10 @@ compress_fp56 ( const double *  data,
         for ( ; i < nsize8; i += 8, zptr += 56 )
         {
             const auto  vd = _mm512_loadu_pd( data + i );
-            const auto  vb = _mm512_maskz_permutexvar_epi8( to_fp56_mask_8, to_fp56_idxs_8, reinterpret_cast< __m512i >( vd ) );
+            const auto  vb = _mm512_maskz_permutexvar_epi8( to_fp56_mask_8, to_fp56_idxs_8, HLR_FPX_CAST_512i( vd ) );
             
-            // _mm512_storeu_si512( reinterpret_cast< __m512i * >( zptr ), vb );
-            _mm512_mask_compressstoreu_epi8( reinterpret_cast< __m512i * >( zptr ), smask, vb );
+            // _mm512_storeu_si512( HLR_FPX_CAST_p512i( zptr ), vb );
+            _mm512_mask_compressstoreu_epi8( HLR_FPX_CAST_p512i( zptr ), smask, vb );
         }// for
     }
     #endif
@@ -826,8 +850,8 @@ decompress_fp56 ( double *        data,
     
         for ( ; i < nsize8; i += 8, zptr += 56 )
         {
-            const auto  vb = _mm512_loadu_si512( reinterpret_cast< const __m512i * >( zptr ) );
-            const auto  vd = reinterpret_cast< __m512d >( _mm512_maskz_permutexvar_epi8( from_fp56_mask_8, from_fp56_idxs_8, vb ) );
+            const auto  vb = _mm512_loadu_si512( HLR_FPX_CAST_cp512i( zptr ) );
+            const auto  vd = HLR_FPX_CAST_512d( _mm512_maskz_permutexvar_epi8( from_fp56_mask_8, from_fp56_idxs_8, vb ) );
             
             _mm512_storeu_pd( data + i, vd );
         }// for
