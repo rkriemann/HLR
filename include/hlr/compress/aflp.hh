@@ -24,7 +24,7 @@
 // #define HLR_AFLP_BUFFERED_MVM // (disabled by default as it seems slower)
 
 // enable disable rounding up
-#define HLR_AFLP_ROUNDUP  0
+#define HLR_AFLP_ROUNDUP  1
 
 ////////////////////////////////////////////////////////////
 //
@@ -92,8 +92,13 @@ using FP64 = FP_info< double >;
 //
 //   |d_i - ~d_i| ≤ 2^(-m) ≤ ε with mantissa length m = ⌈-log₂ ε⌉
 //
+#if HLR_AFLP_ROUNDUP == 1
+// lowest bit is always set to one so we do not have to store it
+inline byte_t eps_to_rate      ( const double  eps ) { return std::max< double >( 1, std::ceil( -std::log2( eps ) )-1 ); }
+#else
 inline byte_t eps_to_rate      ( const double  eps ) { return std::max< double >( 1, std::ceil( -std::log2( eps ) ) ); }
-inline byte_t eps_to_rate_valr ( const double  eps ) { return eps_to_rate( eps ) + 1; }
+#endif
+inline byte_t eps_to_rate_valr ( const double  eps ) { return eps_to_rate( eps ); }
 
 struct config
 {
@@ -607,7 +612,7 @@ decompress ( double *        data,
     const uint64_t  prec_mask  = ( 1ul << prec_bits ) - 1;
     const uint8_t   prec_ofs   = FP64::mant_bits - prec_bits;
     #if HLR_AFLP_ROUNDUP == 1
-    const uint64_t  prec_round = 1ul << prec_ofs;
+    const uint64_t  prec_round = 1ul << (prec_ofs-1);
     #endif
     const uint64_t  exp_mask   = ( 1ul << exp_bits  ) - 1;
     const uint32_t  sign_shift = exp_bits + prec_bits;
@@ -1346,7 +1351,7 @@ mulvec ( const size_t                        nrows,
     const uint64_t    prec_mask  = ( 1ul << prec_bits ) - 1;
     const uint8_t     prec_ofs   = FP64::mant_bits - prec_bits;
     #if HLR_AFLP_ROUNDUP == 1
-    const uint64_t    prec_round = 1ul << prec_ofs;
+    const uint64_t    prec_round = 1ul << (prec_ofs-1);
     #endif
     const uint64_t    exp_mask   = ( 1ul << exp_bits  ) - 1;
     const uint32_t    sign_shift = exp_bits + prec_bits;
