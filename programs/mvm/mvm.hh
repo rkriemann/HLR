@@ -72,7 +72,7 @@ program_main ()
         if constexpr ( problem_t::supports_hca )
         {
             std::cout << "    using HCA"
-                      << ( cmdline::compress ? std::string( " (" ) + hlr::compress::provider + " + " + hlr::compress::valr::provider + ")" : "" )
+                      << ( cmdline::compress ? std::string( " (" ) + hlr::compress::valr::provider + ")" : "" )
                       << std::endl;
                 
             auto  hcagen = problem->hca_gen_func( *ct );
