@@ -24,7 +24,7 @@ CXX          = 'g++'
 CXXFLAGS     = '-std=c++23'
 CPUFLAGS     = 'cpuflags'
 
-ARCHFLAGS    = '-march=native'
+ARCHFLAGS    = '-march=tigerlake'
 DBGFLAGS     = '-g -frounding-math'
 RELDBGFLAGS  = '-g -O2'
 RELFLAGS     = '-O3 -fomit-frame-pointer -ffast-math -funroll-loops'
@@ -60,8 +60,6 @@ scorep        = False
 SCOREP_DIR    = '/'
 
 # compressors
-half          = False
-HALF_DIR      = '/'
 zfp           = False
 ZFP_DIR       = '/'
 sz            = False
@@ -70,18 +68,10 @@ sz3           = False
 SZ3_DIR       = '/'
 mgard         = False
 MGARD_DIR     = '/'
-lz4           = False
-LZ4_DIR       = '/'
-zlib          = False
-ZLIB_DIR      = '/'
-zstd          = False
-ZSTD_DIR      = '/'
 universal     = False
 UNIVERSAL_DIR = '/'
 blosc         = False
 BLOSC_DIR     = '/'
-# atc           = False
-# ATC_DIR       = '/'
 
 zblas         = True
 
@@ -157,42 +147,25 @@ MALLOCS_HELP = { 'default'   : 'default malloc, i.e., no overwrite',
 # supported and active compressor
 COMPRESSORS   = [ 'help',       # print help
                   'none',       # numeric ID:
-                  'afl',        # 1
-                  'aflp',       # 2
-                  'sfl',        # 3
-                  'sfl2',       # 23
-                  'dfl',        # 4
-                  'dfl2',       # 22
-                  'fpx',        # 24
-                  'mp',         # 18
-                  'fp32',       # 13
+                  'fp32',       # 1
+                  'afl',        # 2
+                  'aflp',       # 3
+                  'fpx',        # 4
                   'zfp',        # 5
-                  'posits',     # 12
-                  'cfloat',     # 20
                   'sz',         # 6
                   'sz3',        # 7
                   'mgard',      # 8
-                  'blosc',      # 21
-                  # 'fp16',
-                  # 'bf16',
-                  # 'tf32',
-                  # 'bf24',
-                  # 'lz4',
-                  # 'zlib',
-                  # 'zstd'
+                  'blosc',      # 9
+                  'posits',     # 10
+                  'cfloat',     # 11
                  ]
 compressor    = 'none'
 
 COMPRESSORS_HELP = { 'none'   : 'no compression used',
+                     'fp32'   : 'use FP32 for storage',
                      'afl'    : 'use AFL',
                      'aflp'   : 'use AFLP',
-                     'sfl'    : 'use SFL',
-                     'sfl2'   : 'use SFL2',
-                     'dfl'    : 'use DFL',
-                     'dfl2'   : 'use DFL2',
                      'fpx'    : 'use extended float',
-                     'mp'     : 'use mixed precision storage with FP64/FP32/BF16',
-                     'fp32'   : 'use FP32 for storage',
                      'zfp'    : 'use ZFP     (see also {0}zfp_dir{1})',
                      'posits' : 'use Posits  (see also {0}universal_dir{1})',
                      'cfloat' : 'use CFloats (see also {0}universal_dir{1})',
@@ -200,9 +173,6 @@ COMPRESSORS_HELP = { 'none'   : 'no compression used',
                      'sz3'    : 'use SZ3     (see also {0}sz3_dir{1})',
                      'mgard'  : 'use MGARD   (see also {0}mgard_dir{1})',
                      'blosc'  : 'use Blosc   (see also {0}blosc_dir{1})',
-                     # 'lz4'    : 'use LZ4     (see also {0}lz4_dir{1})',
-                     # 'zlib'   : 'use Zlib    (see also {0}zlib_dir{1})',
-                     # 'zstd'   : 'use Zstd    (see also {0}zstd_dir{1})',
                     }
 
 ######################################################################
@@ -361,8 +331,6 @@ opts.Add( BoolVariable( 'likwid',        'use likwid library',                 l
 opts.Add( PathVariable( 'likwid_dir',    'likwid installation directory',      LIKWID_DIR, PathVariable.PathIsDir ) )
 opts.Add( BoolVariable( 'scorep',        'use Score-P library',                scorep ) )
 opts.Add( PathVariable( 'scorep_dir',    'Score-P installation directory',     SCOREP_DIR, PathVariable.PathIsDir ) )
-opts.Add( BoolVariable( 'half',          'use half precision library',         half ) )
-opts.Add( PathVariable( 'half_dir',      'half installation directory',        HALF_DIR, PathVariable.PathIsDir ) )
 opts.Add( BoolVariable( 'zfp',           'use ZFP compression library',        zfp ) )
 opts.Add( PathVariable( 'zfp_dir',       'ZFP installation directory',         ZFP_DIR, PathVariable.PathIsDir ) )
 opts.Add( BoolVariable( 'sz',            'use SZ compression library',         sz ) )
@@ -371,21 +339,12 @@ opts.Add( BoolVariable( 'sz3',           'use SZ3 compression library',        s
 opts.Add( PathVariable( 'sz3_dir',       'SZ3 installation directory',         SZ3_DIR, PathVariable.PathIsDir ) )
 opts.Add( BoolVariable( 'mgard',         'use MGARD compression library',      mgard ) )
 opts.Add( PathVariable( 'mgard_dir',     'MGARD installation directory',       MGARD_DIR, PathVariable.PathIsDir ) )
-# opts.Add( BoolVariable( 'lz4',           'use LZ4 compression library',        lz4 ) )
-# opts.Add( PathVariable( 'lz4_dir',       'LZ4 installation directory',         LZ4_DIR, PathVariable.PathIsDir ) )
-# opts.Add( BoolVariable( 'zlib',          'use ZLIB compression library',       zlib ) )
-# opts.Add( PathVariable( 'zlib_dir',      'ZLIB installation directory',        ZLIB_DIR, PathVariable.PathIsDir ) )
-# opts.Add( BoolVariable( 'zstd',          'use Zstd compression library',       zstd ) )
-# opts.Add( PathVariable( 'zstd_dir',      'Zstd installation directory',        ZSTD_DIR, PathVariable.PathIsDir ) )
 opts.Add( BoolVariable( 'universal',     'use universal number library',       universal ) )
 opts.Add( PathVariable( 'universal_dir', 'universal installation directory',   UNIVERSAL_DIR, PathVariable.PathIsDir ) )
 opts.Add( BoolVariable( 'blosc',         'use blosc compression library',      blosc ) )
 opts.Add( PathVariable( 'blosc_dir',     'blosc installation directory',       BLOSC_DIR, PathVariable.PathIsDir ) )
-# opts.Add( BoolVariable( 'atc',           'use ATC compression library',        atc ) )
-# opts.Add( PathVariable( 'atc_dir',       'ATC installation directory',         ATC_DIR, PathVariable.PathIsDir ) )
 
 opts.Add( EnumVariable( 'compressor',    'defined compressor',                  'none', allowed_values = COMPRESSORS,      ignorecase = 2 ) )
-# opts.Add( EnumVariable( 'valr',          'defined VALR compressor',             'none', allowed_values = VALR_COMPRESSORS, ignorecase = 2 ) )
 opts.Add( BoolVariable( 'zblas',         'activate/deactivate compressed BLAS', zblas ) )
 
 opts.Add( BoolVariable( 'fullmsg',   'enable full command line output',           fullmsg ) )
@@ -448,8 +407,6 @@ likwid        = opt_env['likwid']
 LIKWID_DIR    = opt_env['likwid_dir']
 scorep        = opt_env['scorep']
 SCOREP_DIR    = opt_env['scorep_dir']
-half          = opt_env['half']
-HALF_DIR      = opt_env['half_dir']
 zfp           = opt_env['zfp']
 ZFP_DIR       = opt_env['zfp_dir']
 sz            = opt_env['sz']
@@ -458,18 +415,10 @@ sz3           = opt_env['sz3']
 SZ3_DIR       = opt_env['sz3_dir']
 mgard         = opt_env['mgard']
 MGARD_DIR     = opt_env['mgard_dir']
-# lz4           = opt_env['lz4']
-# LZ4_DIR       = opt_env['lz4_dir']
-# zlib          = opt_env['zlib']
-# ZLIB_DIR      = opt_env['zlib_dir']
-# zstd          = opt_env['zstd']
-# ZSTD_DIR      = opt_env['zstd_dir']
 universal     = opt_env['universal']
 UNIVERSAL_DIR = opt_env['universal_dir']
 blosc         = opt_env['blosc']
 BLOSC_DIR     = opt_env['blosc_dir']
-# atc           = opt_env['atc']
-# ATC_DIR       = opt_env['atc_dir']
 
 compressor    = opt_env['compressor']
 # valr          = opt_env['valr']
@@ -514,13 +463,6 @@ if compressor == 'help' :
         if opt != 'help' :
             print( '  {0}{1:<11s}{2} : '.format( colors['bold'], opt, colors['reset'] ) + COMPRESSORS_HELP[opt].format( colors['italic'], colors['reset'] ) )
     sys.exit( 1 )
-
-# if valr == 'help' :
-#     print( 'supported {0}valr{1} options: '.format( colors['bold'], colors['reset'] ) )
-#     for opt in VALR_COMPRESSORS :
-#         if opt != 'help' :
-#             print( '  {0}{1:<11s}{2} : '.format( colors['bold'], opt, colors['reset'] ) + VALR_HELP[opt].format( colors['italic'], colors['reset'] ) )
-#     sys.exit( 1 )
 
 opts.Save( opts_file, opt_env )
 
@@ -676,11 +618,6 @@ if 'cuda' in frameworks :
     env.Append( LIBPATH = os.path.join( CUDA_DIR, 'lib64' ) )
     env.Append( LIBS = [ 'cudart', 'cublasLt', 'cublas', 'cusolver' ] )
 
-# support for half precision
-if half :
-    env.Append( CPPDEFINES = 'HLR_HAS_HALF' )
-    env.Append( CPPPATH    = os.path.join( HALF_DIR, 'include' ) )
-
 if zfp :
     env.Append( CPPDEFINES = 'HLR_HAS_ZFP' )
     env.Append( CPPPATH    = os.path.join( ZFP_DIR, 'include' ) )
@@ -690,30 +627,18 @@ if zfp :
 if   compressor == 'none' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=0' )
     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=0' )
-elif   compressor == 'afl' :
+elif compressor == 'fp32' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=1' )
     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=1' )
-elif compressor == 'aflp' :
+elif   compressor == 'afl' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=2' )
     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=2' )
-elif compressor == 'sfl' :
+elif compressor == 'aflp' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=3' )
     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=3' )
-elif compressor == 'sfl2' :
-    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=23' )
-    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=23' )
-elif compressor == 'dfl' :
+elif compressor == 'fpx' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=4' )
     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=4' )
-elif compressor == 'dfl2' :
-    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=22' )
-    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=22' )
-elif compressor == 'fpx' :
-    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=24' )
-    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=24' )
-elif compressor == 'mp' :
-    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=18' )
-    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=18' )
 elif compressor == 'zfp' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=5' )
     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=5' )
@@ -738,37 +663,28 @@ elif compressor == 'mgard' :
     env.Append( CPPPATH    = os.path.join( MGARD_DIR, 'include' ) )
     env.Append( LIBPATH    = os.path.join( MGARD_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'mgard' ] )
-elif compressor == 'posits' :
-    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=12' )
-    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=12' )
-    env.Append( CPPDEFINES = 'HLR_HAS_UNIVERSAL' )
-    env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
-elif compressor == 'cfloat' :
-    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=20' )
-    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=20' )
-    env.Append( CPPDEFINES = 'HLR_HAS_UNIVERSAL' )
-    env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
 elif compressor == 'blosc' :
-    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=21' )
-    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=21' )
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=9' )
+    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=9' )
     env.Append( CPPDEFINES = 'HLR_HAS_BLOSC' )
     env.Append( CPPPATH    = os.path.join( BLOSC_DIR, 'include' ) )
     env.Append( LIBPATH    = os.path.join( BLOSC_DIR, 'lib' ) )
     env.Append( LIBS       = [ 'blosc2' ] )
-elif compressor == 'fp32' :
-    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=13' )
-    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=0' )
+elif compressor == 'posits' :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=10' )
+    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=10' )
+    env.Append( CPPDEFINES = 'HLR_HAS_UNIVERSAL' )
+    env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
+elif compressor == 'cfloat' :
+    env.Append( CPPDEFINES = 'HLR_COMPRESSOR=11' )
+    env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=11' )
+    env.Append( CPPDEFINES = 'HLR_HAS_UNIVERSAL' )
+    env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
 
 if zblas :
     env.Append( CPPDEFINES = 'HLR_USE_ZBLAS=1' )
 else :
     env.Append( CPPDEFINES = 'HLR_USE_ZBLAS=0' )
-
-# if atc :
-#     env.Append( CPPDEFINES = 'HLR_HAS_ATC' )
-#     env.Append( CPPPATH    = os.path.join( ATC_DIR, 'include' ) )
-#     env.Append( LIBPATH    = os.path.join( ATC_DIR, 'lib' ) )
-#     env.Append( LIBS       = [ 'atc', 'hptt' ] )
 
 ######################################################################
 #
@@ -846,7 +762,6 @@ def show_help ( target, source, env ):
     print( '  {0}tcmalloc_dir{1} │ path to tcmalloc              │'.format( colors['bold'], colors['reset'] ) )
     print( ' ──────────────┼───────────────────────────────┼──────────' )
     print( '  {0}compressor{1}   │ compression method to use     │ {2}'.format( colors['bold'], colors['reset'], ', '.join( COMPRESSORS ) ) )
-    # print( '  {0}valr{1}         │ AP compression method to use  │ {2}'.format( colors['bold'], colors['reset'], ', '.join( VALR_COMPRESSORS ) ) )
     print( '  {0}zblas{1}        │ use compressed BLAS           │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( ' ──────────────┼───────────────────────────────┼──────────' )
     print( '  {0}zfp{1}          │ use ZFP library               │'.format( colors['bold'], colors['reset'] ), '0/1' )
@@ -859,18 +774,8 @@ def show_help ( target, source, env ):
     print( '  {0}universal_dir{1}│ path to Universal library     │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}mgard{1}        │ use MGARD library             │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}mgard_dir{1}    │ path to MGARD library         │'.format( colors['bold'], colors['reset'] ) )
-    print( '  {0}half{1}         │ use half number library       │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    print( '  {0}half_dir{1}     │ path to half library          │'.format( colors['bold'], colors['reset'] ) )
-    # print( '  {0}lz4{1}          │ use LZ4 library               │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    # print( '  {0}lz4_dir{1}      │ path to LZ4 library           │'.format( colors['bold'], colors['reset'] ) )
-    # print( '  {0}zlib{1}         │ use zlib library              │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    # print( '  {0}zlib_dir{1}     │ path to zlib library          │'.format( colors['bold'], colors['reset'] ) )
-    # print( '  {0}zstd{1}         │ use Zstd library              │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    # print( '  {0}zstd_dir{1}     │ path to Zstd library          │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}blosc{1}        │ use Blosc2 library            │'.format( colors['bold'], colors['reset'] ), '0/1' )
     print( '  {0}blosc_dir{1}    │ path to Blosc2 library        │'.format( colors['bold'], colors['reset'] ) )
-    # print( '  {0}atc{1}          │ use ATC library               │'.format( colors['bold'], colors['reset'] ), '0/1' )
-    # print( '  {0}atc_dir{1}      │ path to ATC library           │'.format( colors['bold'], colors['reset'] ) )
     print( ' ──────────────┼───────────────────────────────┼──────────' )
     print( '  {0}buildtype{1}    │ how to build the binaries     │'.format( colors['bold'], colors['reset'] ), ', '.join( BUILD_TYPES ) )
     print( '  {0}warn{1}         │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), '0/1' )
@@ -935,7 +840,6 @@ def show_options ( target, source, env ):
     print( '  {0}likwid{1}       │ use LikWid library            │ {2}'.format( colors['bold'], colors['reset'], bool_str[ likwid ] ),     pathstr( LIKWID_DIR    if likwid    else '' ) )
     print( ' ──────────────┼───────────────────────────────┼──────────' )
     print( '  {0}compressor{1}   │ compression method to use     │ {2}'.format( colors['bold'], colors['reset'], compressor ) )
-    # print( '  {0}valr{1}         │ AP compression method to use  │ {2}'.format( colors['bold'], colors['reset'], valr ) )
     print( '  {0}zblas{1}        │ use compressed BLAS           │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zblas ] ) )
     print( ' ──────────────┼───────────────────────────────┼──────────' )
     print( '  {0}zfp{1}          │ use ZFP compression library   │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zfp ] ),        pathstr( ZFP_DIR       if zfp       else '' ) )
@@ -943,12 +847,7 @@ def show_options ( target, source, env ):
     print( '  {0}sz3{1}          │ use SZ3 compression library   │ {2}'.format( colors['bold'], colors['reset'], bool_str[ sz3 ] ),        pathstr( SZ3_DIR       if sz3       else '' ) )
     print( '  {0}mgard{1}        │ use MGARD compression library │ {2}'.format( colors['bold'], colors['reset'], bool_str[ mgard ] ),      pathstr( MGARD_DIR     if mgard     else '' ) )
     print( '  {0}universal{1}    │ use Universal number library  │ {2}'.format( colors['bold'], colors['reset'], bool_str[ universal ] ),  pathstr( UNIVERSAL_DIR if universal else '' ) )
-    print( '  {0}half{1}         │ use half number library       │ {2}'.format( colors['bold'], colors['reset'], bool_str[ half ] ),       pathstr( HALF_DIR      if half      else '' ) )
-    # print( '  {0}lz4{1}          │ use LZ4 library               │ {2}'.format( colors['bold'], colors['reset'], bool_str[ lz4 ] ),        pathstr( LZ4_DIR       if lz4       else '' ) )
-    # print( '  {0}zlib{1}         │ use zlib library              │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zlib ] ),       pathstr( ZLIB_DIR      if zlib      else '' ) )
-    # print( '  {0}zstd{1}         │ use Zstd library              │ {2}'.format( colors['bold'], colors['reset'], bool_str[ zstd ] ),       pathstr( ZSTD_DIR      if zstd      else '' ) )
     print( '  {0}blosc{1}        │ use BLOSC2 library            │ {2}'.format( colors['bold'], colors['reset'], bool_str[ blosc ] ),      pathstr( BLOSC_DIR     if blosc     else '' ) )
-    # print( '  {0}atc{1}          │ use ATC compression library   │ {2}'.format( colors['bold'], colors['reset'], bool_str[ atc ] ),        pathstr( ATC_DIR       if atc       else '' ) )
     print( ' ──────────────┼───────────────────────────────┼──────────' )
     print( '  {0}buildtype{1}    │ how to build the binaries     │'.format( colors['bold'], colors['reset'] ), buildtype )
     print( '  {0}warn{1}         │ enable compiler warnings      │'.format( colors['bold'], colors['reset'] ), bool_str[ warn ] )

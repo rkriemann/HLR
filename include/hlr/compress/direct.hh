@@ -44,25 +44,72 @@ namespace zblas { using hlr::compress::fp32::mulvec; }
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#elif HLR_COMPRESSOR == HLR_COMPRESSOR_FP16
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_AFL
 
-#  if !defined(HLR_HAS_HALF)
-#    error "half library not available"
-#  endif
-
-#include <hlr/compress/fp16.hh>
+#include <hlr/compress/afl.hh>
 
 namespace hlr { namespace compress {
 
-static const char provider[] = "fp16";
+static const char provider[] = "afl";
 
-using  zconfig_t = hlr::compress::fp16::config;
-using  zarray    = hlr::compress::fp16::zarray;
+using  zconfig_t = hlr::compress::afl::config;
+using  zarray    = hlr::compress::afl::zarray;
 
-using hlr::compress::fp16::compress;
-using hlr::compress::fp16::decompress;
-using hlr::compress::fp16::get_config;
-using hlr::compress::fp16::byte_size;
+using hlr::compress::afl::compress;
+using hlr::compress::afl::decompress;
+using hlr::compress::afl::get_config;
+using hlr::compress::afl::byte_size;
+using hlr::compress::afl::compressed_size;
+
+namespace zblas { using hlr::compress::afl::mulvec; }
+
+}} // namespace hlr::compress
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP
+
+#include <hlr/compress/aflp.hh>
+
+namespace hlr { namespace compress {
+
+static const char provider[] = "aflp";
+
+using  zconfig_t = hlr::compress::aflp::config;
+using  zarray    = hlr::compress::aflp::zarray;
+
+using hlr::compress::aflp::compress;
+using hlr::compress::aflp::decompress;
+using hlr::compress::aflp::get_config;
+using hlr::compress::aflp::byte_size;
+using hlr::compress::aflp::compressed_size;
+
+namespace zblas { using hlr::compress::aflp::mulvec; }
+
+}} // namespace hlr::compress
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_FPX
+
+#include <hlr/compress/fpx.hh>
+
+namespace hlr { namespace compress {
+
+static const char provider[] = "fpx";
+
+using  zconfig_t = hlr::compress::fpx::config;
+using  zarray    = hlr::compress::fpx::zarray;
+
+using hlr::compress::fpx::compress;
+using hlr::compress::fpx::decompress;
+using hlr::compress::fpx::get_config;
+using hlr::compress::fpx::byte_size;
+using hlr::compress::fpx::compressed_size;
+
+namespace zblas { using hlr::compress::fpx::mulvec; }
 
 }} // namespace hlr::compress
 
@@ -229,286 +276,6 @@ using hlr::compress::sz3::compressed_size;
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#elif HLR_COMPRESSOR == HLR_COMPRESSOR_LZ4
-
-#  if !defined(HLR_HAS_LZ4)
-#    error "LZ4 library not available"
-#  endif
-
-#include <hlr/compress/lz4.hh>
-
-namespace hlr { namespace compress {
-
-static const char provider[] = "lz4";
-
-using  zconfig_t = hlr::compress::lz4::config;
-using  zarray    = hlr::compress::lz4::zarray;
-
-using hlr::compress::lz4::compress;
-using hlr::compress::lz4::decompress;
-using hlr::compress::lz4::get_config;
-using hlr::compress::lz4::byte_size;
-
-}} // namespace hlr::compress
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-#elif HLR_COMPRESSOR == HLR_COMPRESSOR_ZLIB
-
-#  if !defined(HLR_HAS_ZLIB)
-#    error "ZLIB library not available"
-#  endif
-
-#include <hlr/compress/zlib.hh>
-
-namespace hlr { namespace compress {
-
-static const char provider[] = "zlib";
-
-using  zconfig_t = hlr::compress::zlib::config;
-using  zarray    = hlr::compress::zlib::zarray;
-
-using hlr::compress::zlib::compress;
-using hlr::compress::zlib::decompress;
-using hlr::compress::zlib::get_config;
-using hlr::compress::zlib::byte_size;
-
-}} // namespace hlr::compress
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-#elif HLR_COMPRESSOR == HLR_COMPRESSOR_ZSTD
-
-#  if !defined(HLR_HAS_ZSTD)
-#    error "ZSTD library not available"
-#  endif
-
-#include <hlr/compress/zstd.hh>
-
-namespace hlr { namespace compress {
-
-static const char provider[] = "zstd";
-
-using  zconfig_t = hlr::compress::zstd::config;
-using  zarray    = hlr::compress::zstd::zarray;
-
-using hlr::compress::zstd::compress;
-using hlr::compress::zstd::decompress;
-using hlr::compress::zstd::get_config;
-using hlr::compress::zstd::byte_size;
-
-}} // namespace hlr::compress
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-#elif HLR_COMPRESSOR == HLR_COMPRESSOR_BF16
-
-#include <hlr/compress/bf16.hh>
-
-namespace hlr { namespace compress {
-
-static const char provider[] = "bf16";
-
-using  zconfig_t = hlr::compress::bf16::config;
-using  zarray    = hlr::compress::bf16::zarray;
-
-using hlr::compress::bf16::compress;
-using hlr::compress::bf16::decompress;
-using hlr::compress::bf16::get_config;
-using hlr::compress::bf16::byte_size;
-
-}} // namespace hlr::compress
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-#elif HLR_COMPRESSOR == HLR_COMPRESSOR_TF32
-
-#include <hlr/compress/tf32.hh>
-
-namespace hlr { namespace compress {
-
-static const char provider[] = "tf32";
-
-using  zconfig_t = hlr::compress::tf32::config;
-using  zarray    = hlr::compress::tf32::zarray;
-
-using hlr::compress::tf32::compress;
-using hlr::compress::tf32::decompress;
-using hlr::compress::tf32::get_config;
-using hlr::compress::tf32::byte_size;
-
-}} // namespace hlr::compress
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-#elif HLR_COMPRESSOR == HLR_COMPRESSOR_BF24
-
-#include <hlr/compress/bf24.hh>
-
-namespace hlr { namespace compress {
-
-static const char provider[] = "bf24";
-
-using  zconfig_t = hlr::compress::bf24::config;
-using  zarray    = hlr::compress::bf24::zarray;
-
-using hlr::compress::bf24::compress;
-using hlr::compress::bf24::decompress;
-using hlr::compress::bf24::get_config;
-using hlr::compress::bf24::byte_size;
-
-}} // namespace hlr::compress
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-#elif HLR_COMPRESSOR == HLR_COMPRESSOR_AFL
-
-#include <hlr/compress/afl.hh>
-
-namespace hlr { namespace compress {
-
-static const char provider[] = "afl";
-
-using  zconfig_t = hlr::compress::afl::config;
-using  zarray    = hlr::compress::afl::zarray;
-
-using hlr::compress::afl::compress;
-using hlr::compress::afl::decompress;
-using hlr::compress::afl::get_config;
-using hlr::compress::afl::byte_size;
-using hlr::compress::afl::compressed_size;
-
-namespace zblas { using hlr::compress::afl::mulvec; }
-
-}} // namespace hlr::compress
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-#elif HLR_COMPRESSOR == HLR_COMPRESSOR_AFLP
-
-#include <hlr/compress/aflp.hh>
-
-namespace hlr { namespace compress {
-
-static const char provider[] = "aflp";
-
-using  zconfig_t = hlr::compress::aflp::config;
-using  zarray    = hlr::compress::aflp::zarray;
-
-using hlr::compress::aflp::compress;
-using hlr::compress::aflp::decompress;
-using hlr::compress::aflp::get_config;
-using hlr::compress::aflp::byte_size;
-using hlr::compress::aflp::compressed_size;
-
-namespace zblas { using hlr::compress::aflp::mulvec; }
-
-}} // namespace hlr::compress
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-#elif HLR_COMPRESSOR == HLR_COMPRESSOR_SFL
-
-#include <hlr/compress/sfl.hh>
-
-namespace hlr { namespace compress {
-
-static const char provider[] = "sfl";
-
-using  zconfig_t = hlr::compress::sfl::config;
-using  zarray    = hlr::compress::sfl::zarray;
-
-using hlr::compress::sfl::compress;
-using hlr::compress::sfl::decompress;
-using hlr::compress::sfl::get_config;
-using hlr::compress::sfl::byte_size;
-using hlr::compress::sfl::compressed_size;
-
-namespace zblas { using hlr::compress::sfl::mulvec; }
-
-}} // namespace hlr::compress
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-#elif HLR_COMPRESSOR == HLR_COMPRESSOR_SFL2
-
-#include <hlr/compress/sfl2.hh>
-
-namespace hlr { namespace compress {
-
-static const char provider[] = "sfl2";
-
-using  zconfig_t = hlr::compress::sfl2::config;
-using  zarray    = hlr::compress::sfl2::zarray;
-
-using hlr::compress::sfl2::compress;
-using hlr::compress::sfl2::decompress;
-using hlr::compress::sfl2::get_config;
-using hlr::compress::sfl2::byte_size;
-using hlr::compress::sfl2::compressed_size;
-
-// namespace zblas { using hlr::compress::sfl2::mulvec; }
-
-}} // namespace hlr::compress
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-#elif HLR_COMPRESSOR == HLR_COMPRESSOR_DFL
-
-#include <hlr/compress/dfl.hh>
-
-namespace hlr { namespace compress {
-
-static const char provider[] = "dfl";
-
-using  zconfig_t = hlr::compress::dfl::config;
-using  zarray    = hlr::compress::dfl::zarray;
-
-using hlr::compress::dfl::compress;
-using hlr::compress::dfl::decompress;
-using hlr::compress::dfl::get_config;
-using hlr::compress::dfl::byte_size;
-using hlr::compress::dfl::compressed_size;
-
-namespace zblas { using hlr::compress::dfl::mulvec; }
-
-}} // namespace hlr::compress
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-#elif HLR_COMPRESSOR == HLR_COMPRESSOR_DFL2
-
-#include <hlr/compress/dfl2.hh>
-
-namespace hlr { namespace compress {
-
-static const char provider[] = "dfl2";
-
-using  zconfig_t = hlr::compress::dfl2::config;
-using  zarray    = hlr::compress::dfl2::zarray;
-
-using hlr::compress::dfl2::compress;
-using hlr::compress::dfl2::decompress;
-using hlr::compress::dfl2::get_config;
-using hlr::compress::dfl2::byte_size;
-using hlr::compress::dfl2::compressed_size;
-
-}} // namespace hlr::compress
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
 #elif HLR_COMPRESSOR == HLR_COMPRESSOR_MGARD
 
 #include <hlr/compress/mgard.hh>
@@ -531,55 +298,7 @@ using hlr::compress::mgard::compressed_size;
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#elif HLR_COMPRESSOR == HLR_COMPRESSOR_MP
-
-#include <hlr/compress/mixedprec.hh>
-
-namespace hlr { namespace compress {
-
-static const char provider[] = "mixedprec";
-
-using  zconfig_t = hlr::compress::mixedprec::config;
-using  zarray    = hlr::compress::mixedprec::zarray;
-
-using hlr::compress::mixedprec::compress;
-using hlr::compress::mixedprec::decompress;
-using hlr::compress::mixedprec::get_config;
-using hlr::compress::mixedprec::byte_size;
-using hlr::compress::mixedprec::compressed_size;
-
-namespace zblas { using hlr::compress::mixedprec::mulvec; }
-
-}} // namespace hlr::compress
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-#elif HLR_COMPRESSOR == HLR_COMPRESSOR_FPX
-
-#include <hlr/compress/fpx.hh>
-
-namespace hlr { namespace compress {
-
-static const char provider[] = "fpx";
-
-using  zconfig_t = hlr::compress::fpx::config;
-using  zarray    = hlr::compress::fpx::zarray;
-
-using hlr::compress::fpx::compress;
-using hlr::compress::fpx::decompress;
-using hlr::compress::fpx::get_config;
-using hlr::compress::fpx::byte_size;
-using hlr::compress::fpx::compressed_size;
-
-namespace zblas { using hlr::compress::fpx::mulvec; }
-
-}} // namespace hlr::compress
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-#elif  ( HLR_COMPRESSOR == HLR_COMPRESSOR_NONE ) || ( HLR_COMPRESSOR == HLR_COMPRESSOR_MP )
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_NONE
 
 //
 // dummy compressor

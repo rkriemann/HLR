@@ -21,19 +21,19 @@
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#if HLR_VALR_COMPRESSOR == HLR_COMPRESSOR_MP
+#if HLR_VALR_COMPRESSOR == HLR_COMPRESSOR_AFL
 
-#include <hlr/compress/mixedprec.hh>
+#include <hlr/compress/afl.hh>
 
 namespace hlr { namespace compress { namespace valr {
 
-using zarray = hlr::compress::mixedprec::zarray;
-using hlr::compress::mixedprec::compress_lr;
-using hlr::compress::mixedprec::decompress_lr;
-using hlr::compress::mixedprec::byte_size;
-using hlr::compress::mixedprec::compressed_size;
+using zarray = hlr::compress::afl::zarray;
+using hlr::compress::afl::compress_lr;
+using hlr::compress::afl::decompress_lr;
+using hlr::compress::afl::byte_size;
+using hlr::compress::afl::compressed_size;
 
-static const char provider[] = "mixedprec";
+static const char provider[] = "afl";
 
 namespace zblas
 {
@@ -48,7 +48,81 @@ mulvec ( const size_t     nrows,
          const value_t *  x,
          value_t *        y )
 {
-    hlr::compress::mixedprec::mulvec_lr( nrows, ncols, op_A, alpha, zA, x, y );
+    hlr::compress::afl::mulvec_lr( nrows, ncols, op_A, alpha, zA, x, y );
+}
+
+}// namespace zblas
+
+}}}// namespace hlr::compress::valr
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+#elif HLR_VALR_COMPRESSOR == HLR_COMPRESSOR_AFLP
+
+#include <hlr/compress/aflp.hh>
+
+namespace hlr { namespace compress { namespace valr {
+
+using zarray = hlr::compress::aflp::zarray;
+using hlr::compress::aflp::compress_lr;
+using hlr::compress::aflp::decompress_lr;
+using hlr::compress::aflp::byte_size;
+using hlr::compress::aflp::compressed_size;
+
+static const char provider[] = "aflp";
+
+namespace zblas
+{
+
+template < typename value_t >
+void
+mulvec ( const size_t     nrows,
+         const size_t     ncols,
+         const matop_t    op_A,
+         const value_t    alpha,
+         const zarray &   zA,
+         const value_t *  x,
+         value_t *        y )
+{
+    hlr::compress::aflp::mulvec_lr( nrows, ncols, op_A, alpha, zA, x, y );
+}
+
+}// namespace zblas
+
+}}}// namespace hlr::compress::valr
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
+#elif HLR_VALR_COMPRESSOR == HLR_COMPRESSOR_FPX
+
+#include <hlr/compress/fpx.hh>
+
+namespace hlr { namespace compress { namespace valr {
+
+using zarray = hlr::compress::fpx::zarray;
+using hlr::compress::fpx::compress_lr;
+using hlr::compress::fpx::decompress_lr;
+using hlr::compress::fpx::byte_size;
+using hlr::compress::fpx::compressed_size;
+
+static const char provider[] = "fpx";
+
+namespace zblas
+{
+
+template < typename value_t >
+void
+mulvec ( const size_t     nrows,
+         const size_t     ncols,
+         const matop_t    op_A,
+         const value_t    alpha,
+         const zarray &   zA,
+         const value_t *  x,
+         value_t *        y )
+{
+    hlr::compress::fpx::mulvec_lr( nrows, ncols, op_A, alpha, zA, x, y );
 }
 
 }// namespace zblas
@@ -120,210 +194,6 @@ static const char provider[] = "sz3";
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#elif HLR_VALR_COMPRESSOR == HLR_COMPRESSOR_SFL
-
-#include <hlr/compress/sfl.hh>
-
-namespace hlr { namespace compress { namespace valr {
-
-using zarray = hlr::compress::sfl::zarray;
-using hlr::compress::sfl::compress_lr;
-using hlr::compress::sfl::decompress_lr;
-using hlr::compress::sfl::byte_size;
-using hlr::compress::sfl::compressed_size;
-
-static const char provider[] = "sfl";
-
-namespace zblas
-{
-
-template < typename value_t >
-void
-mulvec ( const size_t     nrows,
-         const size_t     ncols,
-         const matop_t    op_A,
-         const value_t    alpha,
-         const zarray &   zA,
-         const value_t *  x,
-         value_t *        y )
-{
-    hlr::compress::sfl::mulvec_lr( nrows, ncols, op_A, alpha, zA, x, y );
-}
-
-}// namespace zblas
-
-}}}// namespace hlr::compress::valr
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-#elif HLR_VALR_COMPRESSOR == HLR_COMPRESSOR_SFL2
-
-#include <hlr/compress/sfl2.hh>
-
-namespace hlr { namespace compress { namespace valr {
-
-using zarray = hlr::compress::sfl2::zarray;
-using hlr::compress::sfl2::compress_lr;
-using hlr::compress::sfl2::decompress_lr;
-using hlr::compress::sfl2::byte_size;
-using hlr::compress::sfl2::compressed_size;
-
-static const char provider[] = "sfl2";
-
-// namespace zblas
-// {
-
-// template < typename value_t >
-// void
-// mulvec ( const size_t     nrows,
-//          const size_t     ncols,
-//          const matop_t    op_A,
-//          const value_t    alpha,
-//          const zarray &   zA,
-//          const value_t *  x,
-//          value_t *        y )
-// {
-//     hlr::compress::sfl2::mulvec_lr( nrows, ncols, op_A, alpha, zA, x, y );
-// }
-
-// }// namespace zblas
-
-}}}// namespace hlr::compress::valr
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-#elif HLR_VALR_COMPRESSOR == HLR_COMPRESSOR_DFL
-
-#include <hlr/compress/dfl.hh>
-
-namespace hlr { namespace compress { namespace valr {
-
-using zarray = hlr::compress::dfl::zarray;
-using hlr::compress::dfl::compress_lr;
-using hlr::compress::dfl::decompress_lr;
-using hlr::compress::dfl::byte_size;
-using hlr::compress::dfl::compressed_size;
-
-static const char provider[] = "dfl";
-
-namespace zblas
-{
-
-template < typename value_t >
-void
-mulvec ( const size_t     nrows,
-         const size_t     ncols,
-         const matop_t    op_A,
-         const value_t    alpha,
-         const zarray &   zA,
-         const value_t *  x,
-         value_t *        y )
-{
-    hlr::compress::dfl::mulvec_lr( nrows, ncols, op_A, alpha, zA, x, y );
-}
-
-}// namespace zblas
-
-}}}// namespace hlr::compress::valr
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-#elif HLR_VALR_COMPRESSOR == HLR_COMPRESSOR_DFL2
-
-#include <hlr/compress/dfl2.hh>
-
-namespace hlr { namespace compress { namespace valr {
-
-using zarray = hlr::compress::dfl2::zarray;
-using hlr::compress::dfl2::compress_lr;
-using hlr::compress::dfl2::decompress_lr;
-using hlr::compress::dfl2::byte_size;
-using hlr::compress::dfl2::compressed_size;
-
-static const char provider[] = "dfl2";
-
-}}}// namespace hlr::compress::valr
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-#elif HLR_VALR_COMPRESSOR == HLR_COMPRESSOR_AFLP
-
-#include <hlr/compress/aflp.hh>
-
-namespace hlr { namespace compress { namespace valr {
-
-using zarray = hlr::compress::aflp::zarray;
-using hlr::compress::aflp::compress_lr;
-using hlr::compress::aflp::decompress_lr;
-using hlr::compress::aflp::byte_size;
-using hlr::compress::aflp::compressed_size;
-
-static const char provider[] = "aflp";
-
-namespace zblas
-{
-
-template < typename value_t >
-void
-mulvec ( const size_t     nrows,
-         const size_t     ncols,
-         const matop_t    op_A,
-         const value_t    alpha,
-         const zarray &   zA,
-         const value_t *  x,
-         value_t *        y )
-{
-    hlr::compress::aflp::mulvec_lr( nrows, ncols, op_A, alpha, zA, x, y );
-}
-
-}// namespace zblas
-
-}}}// namespace hlr::compress::valr
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-#elif HLR_VALR_COMPRESSOR == HLR_COMPRESSOR_AFL
-
-#include <hlr/compress/afl.hh>
-
-namespace hlr { namespace compress { namespace valr {
-
-using zarray = hlr::compress::afl::zarray;
-using hlr::compress::afl::compress_lr;
-using hlr::compress::afl::decompress_lr;
-using hlr::compress::afl::byte_size;
-using hlr::compress::afl::compressed_size;
-
-static const char provider[] = "afl";
-
-namespace zblas
-{
-
-template < typename value_t >
-void
-mulvec ( const size_t     nrows,
-         const size_t     ncols,
-         const matop_t    op_A,
-         const value_t    alpha,
-         const zarray &   zA,
-         const value_t *  x,
-         value_t *        y )
-{
-    hlr::compress::afl::mulvec_lr( nrows, ncols, op_A, alpha, zA, x, y );
-}
-
-}// namespace zblas
-
-}}}// namespace hlr::compress::valr
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
 #elif HLR_VALR_COMPRESSOR == HLR_COMPRESSOR_POSITS
 
 #include <hlr/compress/posits.hh>
@@ -390,43 +260,6 @@ mulvec ( const size_t     nrows,
          value_t *        y )
 {
     hlr::compress::blosc::mulvec_lr( nrows, ncols, op_A, alpha, zA, x, y );
-}
-
-}// namespace zblas
-
-}}}// namespace hlr::compress::valr
-
-//////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-
-#elif HLR_VALR_COMPRESSOR == HLR_COMPRESSOR_FPX
-
-#include <hlr/compress/fpx.hh>
-
-namespace hlr { namespace compress { namespace valr {
-
-using zarray = hlr::compress::fpx::zarray;
-using hlr::compress::fpx::compress_lr;
-using hlr::compress::fpx::decompress_lr;
-using hlr::compress::fpx::byte_size;
-using hlr::compress::fpx::compressed_size;
-
-static const char provider[] = "fpx";
-
-namespace zblas
-{
-
-template < typename value_t >
-void
-mulvec ( const size_t     nrows,
-         const size_t     ncols,
-         const matop_t    op_A,
-         const value_t    alpha,
-         const zarray &   zA,
-         const value_t *  x,
-         value_t *        y )
-{
-    hlr::compress::fpx::mulvec_lr( nrows, ncols, op_A, alpha, zA, x, y );
 }
 
 }// namespace zblas
