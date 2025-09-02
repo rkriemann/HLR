@@ -21,7 +21,7 @@
 
 // enable/disable using FP16 (1-5-10) instead of BF16 (1-8-7) for
 // two byte storage
-#define HLR_FPX_USE_FP16     1
+#define HLR_FPX_USE_FP16     0
 
 // enable/disable rounding up after truncation
 #define HLR_FPX_ROUNDUP      1
@@ -281,8 +281,9 @@ compress_fp16 ( const double *  data,
     //
     // convert data to FP16 (1-5-10)
     //
-    
-    #  if defined (__AVX512FP16__) && HLR_FPX_ENABLE_SIMD == 1
+
+    #  if HLR_FPX_ENABLE_SIMD == 1
+    #    if defined (__AVX512FP16__)
     {
         const size_t  nsize8 = nsize - nsize % 8;
         auto          zptr   = zdata;
@@ -295,7 +296,7 @@ compress_fp16 ( const double *  data,
             _mm_store_ph( zptr, vh );
         }// for
     }
-    #  elif defined (__AVX512F__) && defined(__F16C__) && HLR_FPX_ENABLE_SIMD == 1
+    #    elif defined (__AVX512F__) && defined(__F16C__) && HLR_FPX_ENABLE_SIMD == 1
     {
         const size_t  nsize8 = nsize - nsize % 8;
         auto          zptr   = zdata;
@@ -308,7 +309,7 @@ compress_fp16 ( const double *  data,
             _mm_storeu_si128( reinterpret_cast< __m128i * >( zptr ), vh );
         }// for
     }
-    #  elif defined(__AVX__) && defined(__F16C__) && HLR_FPX_ENABLE_SIMD == 1
+    #    elif defined(__AVX__) && defined(__F16C__) && HLR_FPX_ENABLE_SIMD == 1
     {
         const size_t  nsize4 = nsize - nsize % 4;
         auto          zptr   = zdata;
@@ -321,6 +322,7 @@ compress_fp16 ( const double *  data,
             _mm_store_sd( reinterpret_cast< double * >( zptr ), reinterpret_cast< __m128d >( vh ) );
         }// for
     }
+    #    endif
     #  endif
 
     auto  zptr = reinterpret_cast< _Float16 * >( zdata );
@@ -337,6 +339,13 @@ compress_fp16 ( const double *  data,
     
     #  if defined (__AVX512VBMI__) && defined (__EVEX512__) && HLR_FPX_ENABLE_SIMD == 1
     {
+        static const auto   rbits = _mm256_set_epi8( 0, 0, 0, 0, 0, 0, 0, 0,
+                                                     0, 0, 0, 0, 0, 0, 0, 0,
+                                                     0, 1,  0, 1,
+                                                     0, 1,  0, 1,
+                                                     0, 1,  0, 1,
+                                                     0, 1,  0, 1 );
+
         union m256_128_t {
             __m256i  i256;
             __m128i  i128;
@@ -349,7 +358,14 @@ compress_fp16 ( const double *  data,
         {
             const auto        vd = _mm512_loadu_pd( data + i );
             const auto        vf = _mm512_cvtpd_ps( vd );
-            const m256_128_t  vb{ .i256 = _mm256_maskz_permutexvar_epi8( to_fp16_mask_8, to_fp16_idxs_8, reinterpret_cast< __m256i >( vf ) ) };
+            #if HLR_FPX_ROUNDUP == 1
+            const m256_128_t  vb{ .i256 = _mm256_or_si256( _mm256_maskz_permutexvar_epi8( to_fp16_mask_8,
+                                                                                          to_fp16_idxs_8,
+                                                                                          HLR_FPX_CAST_256i( vf ) ),
+                                                           rbits ) };
+            #else
+            const m256_128_t  vb{ .i256 = _mm256_maskz_permutexvar_epi8( to_fp16_mask_8, to_fp16_idxs_8, HLR_FPX_CAST_256i( vf ) ) };
+            #endif
             
             _mm_storeu_si128( reinterpret_cast< __m128i * >( zptr ), vb.i128 );
         }// for
@@ -363,7 +379,7 @@ compress_fp16 ( const double *  data,
     {
         const fp32int_t  v{ .f = float(data[i]) };
             
-        zptr[i] = v.u >> 16;
+        zptr[i] = HLR_FPX_ROUND( v.u >> 16 );
     }// for
     
     #endif
@@ -383,7 +399,8 @@ decompress_fp16 ( double *        data,
     // convert data to FP16 (1-5-10)
     //
 
-    #  if defined (__AVX512FP16__) && HLR_FPX_ENABLE_SIMD == 1
+    #  if HLR_FPX_ENABLE_SIMD == 1
+    #    if defined (__AVX512FP16__)
     {
         const size_t  nsize8 = nsize - nsize % 8;
         auto          zptr   = zdata;
@@ -396,7 +413,7 @@ decompress_fp16 ( double *        data,
             _mm512_storeu_pd( data + i, vd );
         }// for
     }
-    #  elif defined (__AVX512F__) && defined(__F16C__) && HLR_FPX_ENABLE_SIMD == 1
+    #    elif defined (__AVX512F__) && defined(__F16C__)
     {
         const size_t  nsize8 = nsize - nsize % 8;
         auto          zptr   = zdata;
@@ -409,7 +426,7 @@ decompress_fp16 ( double *        data,
             _mm512_storeu_pd( data + i, vd );
         }// for
     }
-    #  elif defined(__AVX__) && defined(__F16C__) && HLR_FPX_ENABLE_SIMD == 1
+    #    elif defined(__AVX__) && defined(__F16C__)
     {
         const size_t  nsize4 = nsize - nsize % 4;
         auto          zptr   = zdata;
@@ -422,6 +439,7 @@ decompress_fp16 ( double *        data,
             _mm256_storeu_pd( data + i, vd );
         }// for
     }
+    #    endif
     #  endif
 
     auto  zptr = reinterpret_cast< const _Float16 * >( zdata );
@@ -770,11 +788,11 @@ compress_fp48 ( const double *  data,
                                                                              HLR_FPX_CAST_512i( vd ) ),
                                               rbits );
             #else
-            const auto  vb = _mm512_maskz_permutexvar_epi32( to_fp48_mask_8, to_fp48_idxs_8, HLR_FPX_CAST_512i( vd ) );
+            const auto  vb = _mm512_maskz_permutexvar_epi8( to_fp48_mask_8, to_fp48_idxs_8, HLR_FPX_CAST_512i( vd ) );
             #endif
 
             // _mm512_storeu_si512( HLR_FPX_CAST_p512i( zptr ), vb );
-            _mm512_mask_compressstoreu_epi8( HLR_FPX_CAST_p512i( zptr ), smask, vb );
+            _mm512_mask_compressstoreu_epi32( HLR_FPX_CAST_p512i( zptr ), smask, vb );
         }// for
     }
     #endif
