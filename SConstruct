@@ -24,7 +24,7 @@ CXX          = 'g++'
 CXXFLAGS     = '-std=c++23'
 CPUFLAGS     = 'cpuflags'
 
-ARCHFLAGS    = '-march=tigerlake'
+ARCHFLAGS    = '-march=native'
 DBGFLAGS     = '-g -frounding-math'
 RELDBGFLAGS  = '-g -O2'
 RELFLAGS     = '-O3 -fomit-frame-pointer -ffast-math -funroll-loops'
