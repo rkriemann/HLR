@@ -84,6 +84,16 @@ union m256_128_t {
 
 #endif
 
+#if defined(__AVX512VL__) && defined(__AVX512BF16__) && defined (__EVEX512__) && HLR_FPX_ENABLE_SIMD == 1
+
+union m128hi_t {
+    __m128bh h;
+    __m128i  i;
+};
+
+#endif
+
+
 //
 // return bitrate for given accuracy
 //
@@ -378,7 +388,21 @@ compress_fp16 ( const double *  data,
     // convert data to BF16 (1-8-7)
     //
     
-    #  if defined (__AVX512VBMI__) && defined (__EVEX512__) && HLR_FPX_ENABLE_SIMD == 1
+    #  if defined(__AVX512VL__) && defined(__AVX512BF16__) && defined (__EVEX512__) && HLR_FPX_ENABLE_SIMD == 1
+    {
+        const size_t  nsize8 = nsize - nsize % 8;
+        auto          zptr   = zdata;
+    
+        for ( ; i < nsize8; i += 8, zptr += 16 )
+        {
+            const auto      vd     = _mm512_loadu_pd( data + i );
+            const auto      vf     = _mm512_cvtpd_ps( vd );
+            const m128hi_t  vh{ .h = _mm256_cvtneps_pbh( vf ) };
+            
+            _mm_storeu_si128( reinterpret_cast< __m128i * >( zptr ), vh.i );
+        }// for
+    }
+    #  elif defined (__AVX512VBMI__) && defined (__EVEX512__) && HLR_FPX_ENABLE_SIMD == 1
     {
         const size_t  nsize8 = nsize - nsize % 8;
         auto          zptr   = zdata;
@@ -480,7 +504,21 @@ decompress_fp16 ( double *        data,
     // convert data to BF16 (1-8-7)
     //
 
-    #if defined (__AVX512VBMI__) && defined (__EVEX512__) && HLR_FPX_ENABLE_SIMD == 1
+    #  if defined(__AVX512VL__) && defined(__AVX512BF16__) && defined (__EVEX512__) && HLR_FPX_ENABLE_SIMD == 1
+    {
+        const size_t  nsize8 = nsize - nsize % 8;
+        auto          zptr   = zdata;
+    
+        for ( ; i < nsize8; i += 8, zptr += 16 )
+        {
+            const m128hi_t  vh{ .i = _mm_loadu_si128( reinterpret_cast< const __m128i * >( zptr ) ) };
+            const auto      vf     = _mm256_cvtpbh_ps( vh.h );
+            const auto      vd     = _mm512_cvtps_pd( vf );
+
+            _mm512_storeu_pd( data + i, vd );
+        }// for
+    }
+    #  elif defined (__AVX512VBMI__) && defined (__EVEX512__) && HLR_FPX_ENABLE_SIMD == 1
     {
         #if HLR_FPX_ROUNDUP == 1
         //                                                      7       6       5       4       3       2       1       0
