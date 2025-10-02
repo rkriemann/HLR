@@ -23,8 +23,8 @@
 #define HLR_HAS_ZBLAS_VALR
 // #define HLR_AFLP_BUFFERED_MVM // (disabled by default as it seems slower)
 
-// enable disable rounding up
-#define HLR_AFLP_ROUNDUP  1
+// enable/disable rounding up
+#define HLR_AFLP_ROUNDUP
 
 ////////////////////////////////////////////////////////////
 //
@@ -63,6 +63,7 @@ struct FP_info< float >
     constexpr static uint32_t  mant_mask   = ((1u << mant_bits) - 1);
 
     constexpr static uint32_t  zero_val    = 0xffffffff;
+    constexpr static float     minimum     = std::numeric_limits< float >::min();
     constexpr static float     maximum     = std::numeric_limits< float >::max();
 };
     
@@ -81,6 +82,7 @@ struct FP_info< double >
     constexpr static uint64_t  mant_mask   = ((1ul << mant_bits) - 1);
 
     constexpr static uint64_t  zero_val    = 0xffffffffffffffff;
+    constexpr static double    minimum     = std::numeric_limits< double >::min();
     constexpr static double    maximum     = std::numeric_limits< double >::max();
 };
 
@@ -92,7 +94,7 @@ using FP64 = FP_info< double >;
 //
 //   |d_i - ~d_i| ≤ 2^(-m) ≤ ε with mantissa length m = ⌈-log₂ ε⌉
 //
-#if HLR_AFLP_ROUNDUP == 1
+#if defined(HLR_AFLP_ROUNDUP)
 // lowest bit is always set to one so we do not have to store it
 inline byte_t eps_to_rate      ( const double  eps ) { return std::max< double >( 1, std::ceil( -std::log2( eps ) )-1 ); }
 #else
@@ -138,7 +140,7 @@ nzmin_max ( const value_t *  data,
     for ( size_t  i = 0; i < nsize; ++i )
     {
         const auto  d_i = std::abs( data[i] );
-        const auto  val = ( d_i == real_t(0) ? FP_info< real_t >::maximum : d_i );
+        const auto  val = ( d_i < FP_info< real_t >::minimum ? FP_info< real_t >::maximum : d_i );
 
         vmin = std::min( vmin, val );
         vmax = std::max( vmax, d_i );
@@ -166,14 +168,14 @@ nzmin_max ( const float *  data,
     // TODO: handle non-multiple sizes
     HLR_DBG_ASSERT( nsize % simd_size == 0 );
     
-    const auto  vzero = _mm512_setzero_ps();
+    const auto  vzero = _mm512_set1_ps( FP_info< float >::minimum );
     auto        vMIN  = _mm512_set1_ps( FP_info< float >::maximum );
     auto        vMAX  = _mm512_setzero_ps();
         
     for ( size_t  i = 0; i < nsize; i += simd_size )
     {
         __m512     vd   = _mm512_abs_ps( _mm512_loadu_ps( data + i ) );
-        __mmask16  mask = _mm512_cmp_ps_mask( vd, vzero, _CMP_NEQ_OQ );
+        __mmask16  mask = _mm512_cmp_ps_mask( vd, vzero, _CMP_GE_OQ );
 
         vMAX = _mm512_max_ps( vMAX, vd );
         vMIN = _mm512_mask_min_ps( vMIN, mask, vMIN, vd );
@@ -200,7 +202,7 @@ nzmin_max ( const double *  data,
     for ( size_t  i = 0; i < nsize; i += simd_size )
     {
         const auto  vd   = _mm512_abs_pd( _mm512_loadu_pd( data + i ) );
-        const auto  mask = _mm512_cmp_pd_mask( vd, vzero, _CMP_NEQ_OQ );
+        const auto  mask = _mm512_cmp_pd_mask( vd, vzero, _CMP_GE_OQ );
 
         vMAX = _mm512_max_pd( vMAX, vd );
         vMIN = _mm512_mask_min_pd( vMIN, mask, vMIN, vd );
@@ -246,6 +248,8 @@ compress ( const float *  data,
     memcpy( zdata + FP32::scale_ofs, & scale, sizeof(scale) );
 
     scale = 1.f / scale;
+
+    HLR_DBG_ASSERT( std::isfinite( scale ) );
     
     //
     // compress data in "vectorized" form
@@ -274,11 +278,12 @@ compress ( const float *  data,
             const auto  val  = data[i+j];
             const auto  aval = std::abs( val );
 
-            zero[j] = ( aval == float(0) );
+            zero[j] = ( aval < FP_info< float >::minimum ); // avoid denormalized values
             sign[j] = ( aval != val );
             fbuf[j] = aval * scale + 1.f;
 
-            HLR_DBG_ASSERT( fbuf[j] >= float(2) );
+            HLR_DBG_ASSERT( zero[j] || ( fbuf[j] >= float(2) ));
+            HLR_DBG_ASSERT( zero[j] || std::isfinite( fbuf[j] ));
         }// for
 
         // convert to compressed format
@@ -317,12 +322,12 @@ compress ( const float *  data,
         const float  val  = data[i];
         uint32_t     zval = zero_val;
 
-        if ( std::abs( val ) != float(0) )
+        if ( std::abs( val ) >= FP_info< float >::minimum )
         {
             const bool      zsign = ( val < 0 );
-            const float     sval  = std::abs(val) * scale + 1.f;
+            const float     sval  = std::abs(val) * scale + float(1);
             
-            HLR_DBG_ASSERT( sval >= float(2) );
+            HLR_DBG_ASSERT( std::isfinite( sval ) && ( sval >= float(2) ));
             
             const uint32_t  isval = (*reinterpret_cast< const uint32_t * >( & sval ) );
             const uint32_t  sexp  = ( isval >> FP32::mant_bits ) & FP32::exp_mask;
@@ -362,6 +367,9 @@ decompress ( float *         data,
     const uint8_t   nbyte      = nbits / 8;
     const uint32_t  prec_mask  = ( 1 << prec_bits ) - 1;
     const uint8_t   prec_ofs   = FP32::mant_bits - prec_bits;
+    #if defined(HLR_AFLP_ROUNDUP)
+    const uint32_t  prec_round = 1u << (prec_ofs-1);
+    #endif
     const uint32_t  exp_mask   = ( 1 << exp_bits ) - 1;
     const uint8_t   sign_shift = exp_bits + prec_bits;
     const uint32_t  zero_val   = FP32::zero_val & (( 1 << nbits) - 1 );
@@ -397,18 +405,24 @@ decompress ( float *         data,
         // convert from compressed format
         for ( size_t  j = 0; j < nbuf; ++j )
         {
-            const auto      zval  = ibuf[j];
+            const auto  zval = ibuf[j];
 
             zero[j] = ( zval == zero_val );
             
             const uint32_t  mant  = zval & prec_mask;
             const uint32_t  exp   = (zval >> prec_bits) & exp_mask;
             const uint32_t  sign  = ( zval >> sign_shift ) << FP32::sign_bit;
+            #if defined(HLR_AFLP_ROUNDUP)
+            fp32int_t       fival = { .u = ((exp | FP32::exp_highbit) << FP32::mant_bits) | (mant << prec_ofs) | prec_round };
+            #else
             fp32int_t       fival = { .u = ((exp | FP32::exp_highbit) << FP32::mant_bits) | (mant << prec_ofs) };
-
+            #endif
+            
             fival.f  = ( fival.f - 1.f ) * scale;
             fival.u |= sign;
             fbuf[j]  = fival.f;
+
+            HLR_DBG_ASSERT( zero[j] || std::isfinite( fbuf[j] ) );
         }// for
 
         // correct zeroes
@@ -444,11 +458,17 @@ decompress ( float *         data,
             const uint32_t  mant  = zval & prec_mask;
             const uint32_t  exp   = (zval >> prec_bits) & exp_mask;
             const uint32_t  sign  = ( zval >> sign_shift ) << FP32::sign_bit;
+            #if defined(HLR_AFLP_ROUNDUP)
+            fp32int_t       fival = { .u = ((exp | FP32::exp_highbit) << FP32::mant_bits) | (mant << prec_ofs) | prec_round };
+            #else
             fp32int_t       fival = { .u = ((exp | FP32::exp_highbit) << FP32::mant_bits) | (mant << prec_ofs) };
+            #endif
 
             fival.f  = ( fival.f - 1.f ) * scale;
             fival.u |= sign;
             data[i]  = fival.f;
+
+            HLR_DBG_ASSERT( std::isfinite( data[i] ) );
         }// else
 
         pos += nbyte;
@@ -482,6 +502,8 @@ compress ( const double *  data,  // points to actual start of buffer
     memcpy( zdata + FP64::scale_ofs, & scale, sizeof(scale) );
 
     scale = 1.0 / scale;
+    
+    HLR_DBG_ASSERT( std::isfinite( scale ) );
     
     //
     // in case of 8 byte, just copy data
@@ -520,11 +542,12 @@ compress ( const double *  data,  // points to actual start of buffer
             const auto  val  = data[i+j];
             const auto  aval = std::abs( val );
 
-            zero[j] = ( aval == double(0) );
+            zero[j] = ( aval < FP_info< double >::minimum ); // avoid denormalized values
             sign[j] = ( aval != val );
             fbuf[j] = aval * scale + 1.0;
 
             HLR_DBG_ASSERT( zero[j] || ( fbuf[j] >= double(2) ));
+            HLR_DBG_ASSERT( zero[j] || std::isfinite( fbuf[j] ));
         }// for
 
         // convert to compressed format
@@ -567,10 +590,13 @@ compress ( const double *  data,  // points to actual start of buffer
         const double  val  = data[i];
         uint64_t      zval = zero_val;
             
-        if ( std::abs( val ) != double(0) )
+        if ( std::abs( val ) >= FP_info< double >::minimum )
         {
             const bool      zsign = ( val < 0 );
-            const double    sval  = std::abs(val) * scale + 1.0;
+            const double    sval  = std::abs(val) * scale + double(1);
+            
+            HLR_DBG_ASSERT( std::isfinite( sval ) && ( sval >= double(2) ));
+            
             const uint64_t  isval = (*reinterpret_cast< const uint64_t * >( & sval ) );
             const uint64_t  sexp  = ( isval >> FP64::mant_bits ) & FP64::exp_mask;
             const uint64_t  smant = ( isval & FP64::mant_mask );
@@ -611,7 +637,7 @@ decompress ( double *        data,
     const uint8_t   nbyte      = nbits / 8;
     const uint64_t  prec_mask  = ( 1ul << prec_bits ) - 1;
     const uint8_t   prec_ofs   = FP64::mant_bits - prec_bits;
-    #if HLR_AFLP_ROUNDUP == 1
+    #if defined(HLR_AFLP_ROUNDUP)
     const uint64_t  prec_round = 1ul << (prec_ofs-1);
     #endif
     const uint64_t  exp_mask   = ( 1ul << exp_bits  ) - 1;
@@ -669,7 +695,7 @@ decompress ( double *        data,
             const uint64_t  mant  = zval & prec_mask;
             const uint64_t  exp   = (zval >> prec_bits) & exp_mask;
             const uint64_t  sign  = (zval >> sign_shift) << FP64::sign_bit;
-            #if HLR_AFLP_ROUNDUP == 1
+            #if defined(HLR_AFLP_ROUNDUP)
             fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) | prec_round };
             #else
             fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
@@ -678,6 +704,8 @@ decompress ( double *        data,
             fival.f  = ( fival.f - 1.0 ) * scale;
             fival.u |= sign;
             fbuf[j]  = fival.f;
+
+            HLR_DBG_ASSERT( zero[j] || std::isfinite( fbuf[j] ) );
         }// for
 
         // correct zeroes
@@ -717,7 +745,7 @@ decompress ( double *        data,
             const uint64_t  mant  = zval & prec_mask;
             const uint64_t  exp   = (zval >> prec_bits) & exp_mask;
             const uint64_t  sign  = (zval >> sign_shift) << FP64::sign_bit;
-            #if HLR_AFLP_ROUNDUP == 1
+            #if defined(HLR_AFLP_ROUNDUP)
             fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) | prec_round };
             #else
             fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
@@ -726,6 +754,8 @@ decompress ( double *        data,
             fival.f  = ( fival.f - 1.0 ) * scale;
             fival.u |= sign;
             data[i]  = fival.f;
+
+            HLR_DBG_ASSERT( std::isfinite( data[i] ) );
         }// else
 
         pos += nbyte;
@@ -769,7 +799,7 @@ compress ( const config &   config,
         return zdata;
     }// if
     
-    const auto     scale     = vmin;                                                                         // scale all values v_i such that |v_i| >= 1
+    const auto     scale     = std::max( vmin, FP_info< real_t >::minimum );                                 // scale all values v_i such that |v_i| >= 1
     uint8_t        exp_bits  = std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) );  // no. of bits needed to represent exponent
     uint8_t        prec_bits = std::min< uint32_t >( max_mant_bits, config.bitrate );                        // number of precision bits due to config
     const uint8_t  nbits     = byte_pad( 1 + exp_bits + prec_bits );                                         // rounded up total no. of bits per value
@@ -1350,7 +1380,7 @@ mulvec ( const size_t                        nrows,
     const uint8_t     nbits      = 1 + exp_bits + prec_bits;
     const uint64_t    prec_mask  = ( 1ul << prec_bits ) - 1;
     const uint8_t     prec_ofs   = FP64::mant_bits - prec_bits;
-    #if HLR_AFLP_ROUNDUP == 1
+    #if defined(HLR_AFLP_ROUNDUP)
     const uint64_t    prec_round = 1ul << (prec_ofs-1);
     #endif
     const uint64_t    exp_mask   = ( 1ul << exp_bits  ) - 1;
@@ -1387,7 +1417,7 @@ mulvec ( const size_t                        nrows,
                         const uint64_t  mant  = z_ij & prec_mask;
                         const uint64_t  exp   = (z_ij >> prec_bits) & exp_mask;
                         const uint64_t  sign  = (z_ij >> sign_shift) << FP64::sign_bit;
-                        #if HLR_AFLP_ROUNDUP == 1
+                        #if defined(HLR_AFLP_ROUNDUP)
                         fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) | prec_round };
                         #else
                         fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
@@ -1415,7 +1445,7 @@ mulvec ( const size_t                        nrows,
                         const uint64_t  mant  = z_ij & prec_mask;
                         const uint64_t  exp   = (z_ij >> prec_bits) & exp_mask;
                         const uint64_t  sign  = (z_ij >> sign_shift) << FP64::sign_bit;
-                        #if HLR_AFLP_ROUNDUP == 1
+                        #if defined(HLR_AFLP_ROUNDUP)
                         fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) | prec_round };
                         #else
                         fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
@@ -1451,7 +1481,7 @@ mulvec ( const size_t                        nrows,
                         const uint64_t  mant  = z_ij & prec_mask;
                         const uint64_t  exp   = (z_ij >> prec_bits) & exp_mask;
                         const uint64_t  sign  = (z_ij >> sign_shift) << FP64::sign_bit;
-                        #if HLR_AFLP_ROUNDUP == 1
+                        #if defined(HLR_AFLP_ROUNDUP)
                         fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) | prec_round };
                         #else
                         fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
@@ -1478,7 +1508,7 @@ mulvec ( const size_t                        nrows,
                         const uint64_t  mant = z_ij & prec_mask;
                         const uint64_t  exp  = (z_ij >> prec_bits) & exp_mask;
                         const uint64_t  sign = (z_ij >> sign_shift) << FP64::sign_bit;
-                        #if HLR_AFLP_ROUNDUP == 1
+                        #if defined(HLR_AFLP_ROUNDUP)
                         fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) | prec_round };
                         #else
                         fp64int_t       fival = { .u = ((exp | FP64::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
