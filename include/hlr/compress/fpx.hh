@@ -77,9 +77,19 @@ union m512di_t {
     __m512i  i;
 };
 
+union m512fi_t {
+    __m512   f;
+    __m512i  i;
+};
+
 union m256_128_t {
     __m256i  i256;
     __m128i  i128;
+};
+
+union m512_256_t {
+    __m512i  i512;
+    __m256i  i256;
 };
 
 #endif
@@ -89,6 +99,11 @@ union m256_128_t {
 union m128hi_t {
     __m128bh h;
     __m128i  i;
+};
+
+union m256hi_t {
+    __m256bh h;
+    __m256i  i;
 };
 
 #endif
@@ -142,6 +157,29 @@ static const int8_t     from_fp16_8[32]  = {
 };
 static const auto       from_fp16_idxs_8 = _mm256_loadu_si256( HLR_FPX_CAST_cp256i( from_fp16_8 ) );
 
+//
+// convert 16 FP32 <-> FP16 (1-8-7)
+//
+static const __mmask64  to_fp16_mask_16 = 0b0000000000000000000000000000000011111111111111111111111111111111;  // upper 16 bytes will be zero
+static const int8_t     to_fp16_16[64]  = {   // use upper 3 bytes for FP16
+    2,  3,    6,  7,    10, 11,   14, 15,
+    18, 19,   22, 23,   26, 27,   30, 31,
+    34, 35,   38, 39,   42, 43,   46, 47,
+    50, 51,   54, 55,   58, 59,   62, 63,
+            
+    -1, -1, -1, -1,   -1, -1, -1, -1,   -1, -1, -1, -1,   -1, -1, -1, -1,
+    -1, -1, -1, -1,   -1, -1, -1, -1,   -1, -1, -1, -1,   -1, -1, -1, -1
+};
+static const auto       to_fp16_idxs_16 = _mm512_loadu_si512( HLR_FPX_CAST_cp512i( to_fp16_16 ) );
+
+static const __mmask64  from_fp16_mask_16 = 0b1100110011001100110011001100110011001100110011001100110011001100;  // first byte is zet to zero
+static const int8_t     from_fp16_16[64]  = {  
+    -1, -1,  0, 1,   -1, -1,  2,  3,   -1, -1,  4,  5,   -1, -1,  6,  7,
+    -1, -1,  8, 9,   -1, -1, 10, 11,   -1, -1, 12, 13,   -1, -1, 14, 15,
+    -1, -1, 16, 17,  -1, -1, 18, 19,   -1, -1, 20, 21,   -1, -1, 22, 23,
+    -1, -1, 24, 25,  -1, -1, 26, 27,   -1, -1, 28, 29,   -1, -1, 30, 31,
+};
+static const auto       from_fp16_idxs_16 = _mm512_loadu_si512( HLR_FPX_CAST_cp512i( from_fp16_16 ) );
 
 //
 // convert 8 FP64 <-> FP32 <-> FP24 (1-8-15)
@@ -315,6 +353,259 @@ precision_byte_size ( const uint8_t  bitrate )
 
     #endif
 }
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// single precision data
+//
+////////////////////////////////////////////////////////////////////////////////
+
+//
+// FP16 : 1-8-7  (or 1-5-10)
+//
+inline
+void
+compress_fp16 ( const float *   data,
+                const size_t    nsize,
+                byte_t *        zdata )
+{
+    size_t  i = 0;
+    
+    #if HLR_FPX_USE_FP16 == 1
+
+    HLR_ERROR( "TODO" );
+
+    #else // USE_FP16
+    
+    //
+    // convert data to BF16 (1-8-7)
+    //
+    
+    #  if defined(__AVX512VL__) && defined(__AVX512BF16__) && defined (__EVEX512__) && HLR_FPX_ENABLE_SIMD == 1
+    {
+        const size_t  nsize16 = nsize - nsize % 16;
+        auto          zptr    = zdata;
+    
+        for ( ; i < nsize8; i += 16, zptr += 32 )
+        {
+            const auto      vf     = _mm512_loadu_ps( data + i );
+            const m256hi_t  vh{ .h = _mm512_cvtneps_pbh( vf ) };
+            
+            _mm_storeu_si256( reinterpret_cast< __m256i * >( zptr ), vh.i );
+        }// for
+    }
+    #  elif defined (__AVX512VBMI__) && defined (__EVEX512__) && HLR_FPX_ENABLE_SIMD == 1
+    {
+        const size_t  nsize16 = nsize - nsize % 16;
+        auto          zptr   = zdata;
+    
+        for ( ; i < nsize8; i += 16, zptr += 32 )
+        {
+            const m512fi_t    vf{ .f    = _mm512_loadu_ps( data + i ) };
+            const m512_256_t  vb{ .i512 = _mm512_maskz_permutexvar_epi8( to_fp16_mask_16, to_fp16_idxs_16, vf.i ) };
+            
+            _mm_storeu_si256( reinterpret_cast< __m256i * >( zptr ), vb.i256 );
+        }// for
+    }
+    #  endif
+
+    auto  zptr = reinterpret_cast< byte2_t * >( zdata );
+
+    #pragma GCC ivdep
+    for ( ; i < nsize; ++i )
+    {
+        const fp32int_t  v{ .f = data[i] };
+            
+        zptr[i] = v.u >> 16;
+    }// for
+    
+    #endif
+}
+
+inline
+void
+decompress_fp16 ( float *         data,
+                  const size_t    nsize,
+                  const byte_t *  zdata )
+{
+    size_t  i = 0;
+        
+    #if HLR_FPX_USE_FP16 == 1
+
+    HLR_ERROR( "TODO" );
+    
+    #else // USE_FP16
+    
+    //
+    // convert data to BF16 (1-8-7)
+    //
+
+    #  if defined(__AVX512VL__) && defined(__AVX512BF16__) && defined (__EVEX512__) && HLR_FPX_ENABLE_SIMD == 1
+    {
+        const size_t  nsize16 = nsize - nsize % 16;
+        auto          zptr    = zdata;
+    
+        for ( ; i < nsize8; i += 16, zptr += 32 )
+        {
+            const m256hi_t  vh{ .i = _mm_loadu_si256( reinterpret_cast< const __m256i * >( zptr ) ) };
+            const auto      vf     = _mm256_cvtpbh_ps( vh.h );
+
+            _mm512_storeu_ps( data + i, vf );
+        }// for
+    }
+    #  elif defined (__AVX512VBMI__) && defined (__EVEX512__) && HLR_FPX_ENABLE_SIMD == 1
+    {
+        #if HLR_FPX_ROUNDUP == 1
+        //                                                      3       2       1       0
+        //                                               76543210765432107654321076543210
+        static const auto   rbits = _mm512_set1_epi32( 0b00000000000000001000000000000000 );
+        #endif
+        
+        const size_t  nsize16 = nsize - nsize % 16;
+        auto          zptr    = zdata;
+    
+        for ( ; i < nsize8; i += 16, zptr += 32 )
+        {
+            const m512_256_t  vb{ .i128 = _mm_loadu_si128( reinterpret_cast< const __m128i * >( zptr ) ) };
+            const m512fi_t    vf{ .i    = _mm256_maskz_permutexvar_epi8( from_fp16_mask_16, from_fp16_idxs_16, vb.i512 ) };
+
+            #if HLR_FPX_ROUNDUP == 1
+            vf.i = _mm512_or_si512( vf.i, rbits );
+            #endif
+            
+            _mm512_storeu_ps( data + i, vf.f );
+        }// for
+    }
+    #endif
+
+    constexpr uint32_t  rbits = 1 << 15;
+    auto                zptr  = reinterpret_cast< const byte2_t * >( zdata );
+    
+    #pragma GCC ivdep
+    for ( ; i < nsize; ++i )
+    {
+        const fp32int_t  v{ .u = HLR_FPX_ROUND( uint32_t(zptr[i]) << 16 ) };
+        
+        data[i] = v.f;
+
+        HLR_DBG_ASSERT( std::isfinite( data[i] ) );
+    }// for
+
+    #endif
+}
+
+//
+// FP24 : 1-8-15
+//
+inline
+void
+compress_fp24 ( const float *   data,
+                const size_t    nsize,
+                byte_t *        zdata )
+{
+    size_t  i = 0;
+        
+    #if defined (__AVX512VBMI__) && defined (__EVEX512__) && HLR_FPX_ENABLE_SIMD == 1
+    {
+        constexpr __mmask8   smask   = 0b00111111;
+        const size_t         nsize16 = nsize - nsize % 16;
+        auto                 zptr    = zdata;
+    
+        for ( ; i < nsize8; i += 16, zptr += 48 )
+        {
+            const m512fi_t  vf{ .f = _mm512_loadu_ps( data + i ) };
+            const auto      vb     = _mm512_maskz_permutexvar_epi8( to_fp24_mask_16, to_fp24_idxs_16, vf.i );
+            
+            _mm512_mask_compressstoreu_epi32( HLR_FPX_CAST_p256i( zptr ), smask, vb );
+        }// for
+    }// 
+    
+    #endif
+
+    auto  zptr = reinterpret_cast< byte3_t * >( zdata );
+    
+    #pragma GCC ivdep
+    for ( size_t  i = 0; i < nsize; ++i )
+    {
+        const fp32int_t  v{ .f = data[i] };
+        
+        zptr[i] = v.u >> 8;
+    }// for
+}
+
+inline
+void
+decompress_fp24 ( float *         data,
+                  const size_t    nsize,
+                  const byte_t *  zdata )
+{
+    size_t  i = 0;
+        
+    #if defined (__AVX512VBMI__) && defined (__EVEX512__) && HLR_FPX_ENABLE_SIMD == 1
+    {
+        #if HLR_FPX_ROUNDUP == 1
+        //                                                      3       2       1       0
+        //                                               76543210765432107654321076543210
+        static const auto   rbits = _mm512_set1_epi32( 0b00000000000000000000000010000000 );
+        #endif
+        
+        const size_t  nsize16 = nsize - nsize % 16;
+        auto          zptr    = zdata;
+    
+        for ( ; i < nsize8; i += 16, zptr += 48 )
+        {
+            const auto      vb     = _mm512_loadu_si512( HLR_FPX_CAST_cp512i( zptr ) );
+            const m512fi_t  vf{ .i = _mm256_maskz_permutexvar_epi8( from_fp24_mask_16, from_fp24_idxs_16, vb ) };
+
+            #if HLR_FPX_ROUNDUP == 1
+            vf.i = _mm512_or_si512( vf.i, rbits );
+            #endif
+
+            _mm512_storeu_ps( data + i, vf.f );
+        }// for
+    }
+    #endif
+
+    constexpr uint32_t  rbits = 1 << 7;
+    auto                zptr  = reinterpret_cast< const byte3_t * >( zdata );
+    
+    #pragma GCC ivdep
+    for ( ; i < nsize; ++i )
+    {
+        const fp32int_t  v{ .u = HLR_FPX_ROUND( uint32_t( zptr[i] ) << 8 ) };
+        
+        data[i] = double(v.f);
+
+        HLR_DBG_ASSERT( std::isfinite( data[i] ) );
+    }// for
+}
+
+//
+// FP32 : 1-8-23
+//
+inline
+void
+compress_fp32 ( const float *   data,
+                const size_t    nsize,
+                byte_t *        zdata )
+{
+    std::memcpy( zdata, data, sizeof(float) * nsize );
+}
+
+inline
+void
+decompress_fp32 ( float *         data,
+                  const size_t    nsize,
+                  const byte_t *  zdata )
+{
+    std::memcpy( data, zdata, sizeof(float) * nsize );
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// double precision data
+//
+////////////////////////////////////////////////////////////////////////////////
 
 //
 // FP16 : 1-8-7  (or 1-5-10)
@@ -1042,15 +1333,44 @@ compress< float > ( const config &   config,
 
     zdata[0] = nbyte;
 
-    // switch ( nbyte )
+    switch ( nbyte )
+    {
+        case  2 : compress_fp16( data, nsize, zdata.data() + fpx_header_ofs ); break;
+        case  3 : compress_fp24( data, nsize, zdata.data() + fpx_header_ofs ); break;
+        case  4 : compress_fp32( data, nsize, zdata.data() + fpx_header_ofs ); break;
+        default : HLR_ERROR( "invalid byte size" );
+    }// switch
+
+    // // DEBUG
     // {
-    //     case  2 : compress_fp16( data, nsize, zdata.data() + fpx_header_ofs ); break;
-    //     case  3 : compress_fp24( data, nsize, zdata.data() + fpx_header_ofs ); break;
-    //     case  4 : compress_fp32( data, nsize, zdata.data() + fpx_header_ofs ); break;
-    //     default : HLR_ERROR( "invalid byte size" );
-    // }// switch
-    
-    HLR_ERROR( "TODO" );
+    //     std::vector< float >  tmp( nsize );
+
+    //     switch ( nbyte )
+    //     {
+    //         case  2 : decompress_fp16( tmp.data(), nsize, zdata.data() + fpx_header_ofs ); break;
+    //         case  3 : decompress_fp24( tmp.data(), nsize, zdata.data() + fpx_header_ofs ); break;
+    //         case  4 : decompress_fp32( tmp.data(), nsize, zdata.data() + fpx_header_ofs ); break;
+    //         default : HLR_ERROR( "invalid byte size" );
+    //     }// switch
+
+    //     double  err = 0;
+    //     double  nrm = 0;
+
+    //     for ( size_t  i = 0; i < nsize; ++i )
+    //     {
+    //         HLR_ASSERT( std::isfinite( tmp[i] ) );
+            
+    //         const auto  d_i = data[i] - tmp[i];
+            
+    //         err += d_i * d_i;
+    //         nrm += data[i] * data[i];
+    //     }// for
+
+    //     std::cout << std::sqrt( err ) << " / " << std::sqrt( err ) / std::sqrt( nrm ) << std::endl;
+    // }
+    // // DEBUG
+
+    return zdata;
 }
 
 template <>
@@ -1174,7 +1494,23 @@ decompress< float > ( const zarray &  zdata,
                       const size_t    dim2,
                       const size_t    dim3 )
 {
-    HLR_ERROR( "TODO" );
+    const size_t   nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
+    const uint8_t  nbyte = zdata[0];
+
+    switch ( nbyte )
+    {
+        case  2 : decompress_fp16( dest, nsize, zdata.data() + fpx_header_ofs ); break;
+        case  3 : decompress_fp24( dest, nsize, zdata.data() + fpx_header_ofs ); break;
+        case  4 : decompress_fp32( dest, nsize, zdata.data() + fpx_header_ofs ); break;
+        default : HLR_ERROR( "invalid byte size" );
+    }// switch
+
+    // // DEBUG
+    // {
+    //     for ( size_t  i = 0; i < nsize; ++i )
+    //         HLR_ASSERT( std::isfinite( dest[i] ) );
+    // }
+    // // DEBUG
 }
 
 template <>
@@ -1270,7 +1606,51 @@ zarray
 compress_lr< float > ( const blas::matrix< float > &  U,
                        const blas::vector< float > &  S )
 {
-    HLR_ERROR( "TODO" );
+    //
+    // first, determine mantissa bits for all columns
+    //
+
+    const size_t  n     = U.nrows();
+    const size_t  k     = U.ncols();
+    auto          b     = std::vector< uint8_t >( k );
+    size_t        zsize = 0;
+
+    for ( uint  l = 0; l < k; ++l )
+    {
+        const uint8_t  nbyte = precision_byte_size( eps_to_rate_valr( S(l) ) );
+
+        b[l]   = nbyte;
+        zsize += fpx_header_ofs + n * nbyte;
+    }// for
+
+    //
+    // convert each column to compressed form
+    //
+
+    auto  zdata = std::vector< byte_t >( zsize + fpx_mem_pad[ b[k-1] ] );
+    auto  zptr  = zdata.data();
+    auto  vptr  = U.data();
+        
+    for ( uint  l = 0; l < k; ++l )
+    {
+        const auto  nbyte = b[l];
+
+        *zptr  = nbyte;
+        zptr  += fpx_header_ofs;
+
+        switch ( nbyte )
+        {
+            case  2 : compress_fp16( vptr, n, zptr ); break;
+            case  3 : compress_fp24( vptr, n, zptr ); break;
+            case  4 : compress_fp32( vptr, n, zptr ); break;
+            default : HLR_ERROR( "invalid byte size" );
+        }// switch
+        
+        zptr += n*nbyte;
+        vptr += n;
+    }// for
+
+    return zdata;
 }
 
 template <>
@@ -1347,7 +1727,37 @@ void
 decompress_lr< float > ( const zarray &           zdata,
                          blas::matrix< float > &  U )
 {
-    HLR_ERROR( "TODO" );
+    const size_t    n    = U.nrows();
+    const uint32_t  k    = U.ncols();
+    size_t          pos  = 0;
+    auto            vptr = U.data();
+    auto            zptr = zdata.data();
+
+    for ( uint32_t  l = 0; l < k; ++l )
+    {
+        const uint8_t  nbyte = *zptr;
+
+        zptr += fpx_header_ofs;
+
+        switch ( nbyte )
+        {
+            case  2 : decompress_fp16( vptr, n, zptr ); break;
+            case  3 : decompress_fp24( vptr, n, zptr ); break;
+            case  4 : decompress_fp32( vptr, n, zptr ); break;
+            default : HLR_ERROR( "invalid byte size" );
+        }// switch
+        
+        zptr += nbyte * n;
+        vptr += n;
+    }// for
+
+    // // DEBUG
+    // {
+    //     for ( uint32_t  l = 0; l < k; ++l )
+    //         for ( size_t  i = 0; i < n; ++i )
+    //             HLR_ASSERT( std::isfinite( U(i,l) ) );
+    // }
+    // // DEBUG
 }
 
 template <>
@@ -1411,27 +1821,22 @@ mulvec ( const uint8_t   nbyte,
          const float *   x,
          float *         y )
 {
-    HLR_ERROR( "TODO" );
-}
-
-inline
-void
-mulvec ( const uint8_t   nbyte,
-         const size_t    nrows,
-         const size_t    ncols,
-         const matop_t   op_A,
-         const double    alpha,
-         const byte_t *  zA,
-         const double *  x,
-         double *        y )
-{
-    using  value_t = double;
+    using  value_t = float;
 
     constexpr size_t  max_nbuf = 64;
     const size_t      nbuf     = std::min< size_t >( max_nbuf, nrows );
     const size_t      nrowsbuf = ( nrows > nbuf ? nrows - nrows % nbuf : nrows );
     value_t           row[ max_nbuf ];
-
+    
+    #define DECOMPRESS( row, nbuf, zA )                         \
+        switch ( nbyte )                                        \
+        {                                                       \
+            case  2 : decompress_fp16( row, nbuf, zA ); break;  \
+            case  3 : decompress_fp24( row, nbuf, zA ); break;  \
+            case  4 : decompress_fp32( row, nbuf, zA ); break;  \
+            default : HLR_ERROR( "invalid byte size" );         \
+        }
+        
     switch ( op_A )
     {
         case  apply_normal :
@@ -1445,17 +1850,7 @@ mulvec ( const uint8_t   nbyte,
                 
                 for ( ; i < nrowsbuf; i += nbuf )
                 {
-                    switch ( nbyte )
-                    {
-                        case  2 : decompress_fp16( row, nbuf, zA ); break;
-                        case  3 : decompress_fp24( row, nbuf, zA ); break;
-                        case  4 : decompress_fp32( row, nbuf, zA ); break;
-                        case  5 : decompress_fp40( row, nbuf, zA ); break;
-                        case  6 : decompress_fp48( row, nbuf, zA ); break;
-                        case  7 : decompress_fp56( row, nbuf, zA ); break;
-                        case  8 : decompress_fp64( row, nbuf, zA ); break;
-                        default : HLR_ERROR( "invalid byte size" );
-                    }// switch
+                    DECOMPRESS( row, nbuf, zA );
 
                     zA += nbuf * nbyte;
                     
@@ -1467,17 +1862,7 @@ mulvec ( const uint8_t   nbyte,
                 {
                     const size_t  nrest = nrows - i;
                     
-                    switch ( nbyte )
-                    {
-                        case  2 : decompress_fp16( row, nrest, zA ); break;
-                        case  3 : decompress_fp24( row, nrest, zA ); break;
-                        case  4 : decompress_fp32( row, nrest, zA ); break;
-                        case  5 : decompress_fp40( row, nrest, zA ); break;
-                        case  6 : decompress_fp48( row, nrest, zA ); break;
-                        case  7 : decompress_fp56( row, nrest, zA ); break;
-                        case  8 : decompress_fp64( row, nrest, zA ); break;
-                        default : HLR_ERROR( "invalid byte size" );
-                    }// switch
+                    DECOMPRESS( row, nrest, zA );
 
                     zA += nrest * nbyte;
                     
@@ -1499,17 +1884,7 @@ mulvec ( const uint8_t   nbyte,
                 
                 for ( ; i < nrowsbuf; i += nbuf )
                 {
-                    switch ( nbyte )
-                    {
-                        case  2 : decompress_fp16( row, nbuf, zA ); break;
-                        case  3 : decompress_fp24( row, nbuf, zA ); break;
-                        case  4 : decompress_fp32( row, nbuf, zA ); break;
-                        case  5 : decompress_fp40( row, nbuf, zA ); break;
-                        case  6 : decompress_fp48( row, nbuf, zA ); break;
-                        case  7 : decompress_fp56( row, nbuf, zA ); break;
-                        case  8 : decompress_fp64( row, nbuf, zA ); break;
-                        default : HLR_ERROR( "invalid byte size" );
-                    }// switch
+                    DECOMPRESS( row, nbuf, zA );
 
                     zA += nbuf * nbyte;
                     
@@ -1521,17 +1896,7 @@ mulvec ( const uint8_t   nbyte,
                 {
                     const size_t  nrest = nrows - i;
                     
-                    switch ( nbyte )
-                    {
-                        case  2 : decompress_fp16( row, nrest, zA ); break;
-                        case  3 : decompress_fp24( row, nrest, zA ); break;
-                        case  4 : decompress_fp32( row, nrest, zA ); break;
-                        case  5 : decompress_fp40( row, nrest, zA ); break;
-                        case  6 : decompress_fp48( row, nrest, zA ); break;
-                        case  7 : decompress_fp56( row, nrest, zA ); break;
-                        case  8 : decompress_fp64( row, nrest, zA ); break;
-                        default : HLR_ERROR( "invalid byte size" );
-                    }// switch
+                    DECOMPRESS( row, nrest, zA );
 
                     zA += nrest * nbyte;
                     
@@ -1547,6 +1912,118 @@ mulvec ( const uint8_t   nbyte,
         default:
             HLR_ERROR( "TODO" );
     }// switch
+
+    #undef DECOMPRESS
+}
+
+inline
+void
+mulvec ( const uint8_t   nbyte,
+         const size_t    nrows,
+         const size_t    ncols,
+         const matop_t   op_A,
+         const double    alpha,
+         const byte_t *  zA,
+         const double *  x,
+         double *        y )
+{
+    using  value_t = double;
+
+    constexpr size_t  max_nbuf = 64;
+    const size_t      nbuf     = std::min< size_t >( max_nbuf, nrows );
+    const size_t      nrowsbuf = ( nrows > nbuf ? nrows - nrows % nbuf : nrows );
+    value_t           row[ max_nbuf ];
+
+    #define DECOMPRESS( row, nbuf, zA )                         \
+        switch ( nbyte )                                        \
+        {                                                       \
+            case  2 : decompress_fp16( row, nbuf, zA ); break;  \
+            case  3 : decompress_fp24( row, nbuf, zA ); break;  \
+            case  4 : decompress_fp32( row, nbuf, zA ); break;  \
+            case  5 : decompress_fp40( row, nbuf, zA ); break;  \
+            case  6 : decompress_fp48( row, nbuf, zA ); break;  \
+            case  7 : decompress_fp56( row, nbuf, zA ); break;  \
+            case  8 : decompress_fp64( row, nbuf, zA ); break;  \
+            default : HLR_ERROR( "invalid byte size" );         \
+        }
+        
+    switch ( op_A )
+    {
+        case  apply_normal :
+        {
+            size_t  pos = 0;
+            
+            for ( size_t  j = 0; j < ncols; ++j )
+            {
+                const auto  x_j = alpha * x[j];
+                size_t      i   = 0;
+                
+                for ( ; i < nrowsbuf; i += nbuf )
+                {
+                    DECOMPRESS( row, nbuf, zA );
+
+                    zA += nbuf * nbyte;
+                    
+                    for ( size_t  k = 0; k < nbuf; ++k )
+                        y[i+k] += row[k] * x_j;
+                }// for
+
+                if ( i != nrows )
+                {
+                    const size_t  nrest = nrows - i;
+                    
+                    DECOMPRESS( row, nrest, zA );
+
+                    zA += nrest * nbyte;
+                    
+                    for ( size_t  k = 0; k < nrest; ++k )
+                        y[i+k] += row[k] * x_j;
+                }// for
+            }// for
+        }// case
+        break;
+        
+        case  apply_adjoint :
+        {
+            size_t  pos = 0;
+            
+            for ( size_t  j = 0; j < ncols; ++j )
+            {
+                value_t  y_j = value_t(0);
+                size_t   i   = 0;
+                
+                for ( ; i < nrowsbuf; i += nbuf )
+                {
+                    DECOMPRESS( row, nbuf, zA );
+
+                    zA += nbuf * nbyte;
+                    
+                    for ( size_t  k = 0; k < nbuf; ++k )
+                        y_j += row[k] * x[i+k];
+                }// for
+
+                if ( i != nrows )
+                {
+                    const size_t  nrest = nrows - i;
+                    
+                    DECOMPRESS( row, nrest, zA );
+
+                    zA += nrest * nbyte;
+                    
+                    for ( size_t  k = 0; k < nrest; ++k )
+                        y_j += row[k] * x[i+k];
+                }// for
+                
+                y[j] += alpha * y_j;
+            }// for
+        }// case
+        break;
+
+        default:
+            HLR_ERROR( "TODO" );
+    }// switch
+
+    #undef DECOMPRESS
 }
 
 }// namespace anonymous
