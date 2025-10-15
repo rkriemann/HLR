@@ -291,7 +291,8 @@ parse ( int argc, char ** argv )
                   << "                   if grid is defined use grid points, otherwise n random points in 3D" << std::endl
                   << "  - laplaceslp   : 3D integral equation with Laplace SLP and piecewise constant elements" << std::endl
                   << "  - helmholtzslp : 3D integral equation with Helmholz SLP and piecewise constant elements" << std::endl
-                  << "  - exp          : 3D integral equation with exponential kernel and piecewise constant elements" << std::endl;
+                  << "  - exp          : 3D integral equation with exponential kernel and piecewise constant elements" << std::endl
+                  << "  - volhelmholtz : 3D integral equation in volume" << std::endl;
 
         std::exit( 0 );
     }// if
@@ -423,7 +424,8 @@ parse ( int argc, char ** argv )
              ( appl == "helmholtzslp" ) ||
              ( appl == "exp" )          ||
              ( appl == "materncov" )    ||  
-             ( appl == "gaussian" ) ) )
+             ( appl == "gaussian" )     ||
+             ( appl == "volhelmholtz" ) ) )
         HLR_ERROR( "unknown application : " + appl );
     
     if ( ! ( ( distr == "cyclic2d" ) ||

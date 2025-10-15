@@ -65,7 +65,7 @@ public:
     //!
     virtual void eval  ( const std::vector< Hpro::idx_t > &  rowidxs,
                          const std::vector< Hpro::idx_t > &  colidxs,
-                         value_t *                     matrix ) const
+                         value_t *                           matrix ) const
     {
         const size_t  n = rowidxs.size();
         const size_t  m = colidxs.size();
@@ -335,6 +335,34 @@ struct matern_covariance_function
         #endif
         
         return math::sqrt( asigma ) * std::pow( value_t(2), value_t(1) - nu ) / tgamma_nu;
+    }
+};
+
+//
+// volume helmholtz
+//
+//  ⎛cos(κ |x-y|)⎞
+//  ⎜────────────⎟
+//  ⎝   |x-y|    ⎠
+//
+template < real_or_complex_number T_value = double >
+struct volume_helmholtz
+{
+    using  value_t = T_value;
+
+    // wave number
+    value_t  kappa;
+    
+    volume_helmholtz ( const value_t  k )
+            : kappa( k )
+    {}
+
+    value_t  operator () ( const value_t  r ) const
+    {
+        if ( r != value_t(0) )
+            return std::cos( kappa * r ) / r;
+        else
+            return value_t(0);
     }
 };
 

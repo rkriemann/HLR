@@ -98,6 +98,17 @@ gen_problem< hlr::apps::gaussian > ()
     return std::make_unique< hlr::apps::gaussian >( sigma, gridfile );
 }
 
+template <>
+std::unique_ptr< hlr::apps::volume_helmholtz >
+gen_problem< hlr::apps::volume_helmholtz > ()
+{
+    print_problem_desc( "Volume Helmholtz" );
+
+    HLR_ASSERT( gridfile != "" );
+
+    return std::make_unique< hlr::apps::volume_helmholtz >( kappa.real(), gridfile );
+}
+
 }// namespace hlr
 
 #endif // __HLR_GEN_PROBLEM_HH
