@@ -132,7 +132,11 @@ public:
             , _U( blas::copy( M._U ) )
             , _V( blas::copy( M._V ) )
             , _rank( _U.ncols() )
-    {}
+    {
+        HLR_ASSERT(( _row_is.size() == _U.nrows() ) &&
+                   ( _col_is.size() == _V.nrows() ) &&
+                   ( _U.ncols()     == _V.ncols() ));
+    }
 
     // dtor
     virtual ~lrmatrix ()
@@ -478,7 +482,7 @@ public:
         auto  R = ptrcast( A, lrmatrix< value_t > );
 
         R->_row_is = _row_is;
-        R->_row_is = _col_is;
+        R->_col_is = _col_is;
         R->_U      = std::move( blas::copy( _U ) );
         R->_V      = std::move( blas::copy( _V ) );
         R->_rank   = _rank;
