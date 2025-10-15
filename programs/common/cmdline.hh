@@ -292,6 +292,7 @@ parse ( int argc, char ** argv )
                   << "  - laplaceslp   : 3D integral equation with Laplace SLP and piecewise constant elements" << std::endl
                   << "  - helmholtzslp : 3D integral equation with Helmholz SLP and piecewise constant elements" << std::endl
                   << "  - exp          : 3D integral equation with exponential kernel and piecewise constant elements" << std::endl
+                  << "  - exponential  : 3D exponential kernel" << std::endl
                   << "  - volhelmholtz : 3D integral equation in volume" << std::endl;
 
         std::exit( 0 );
@@ -425,6 +426,7 @@ parse ( int argc, char ** argv )
              ( appl == "exp" )          ||
              ( appl == "materncov" )    ||  
              ( appl == "gaussian" )     ||
+             ( appl == "exponential" )  ||
              ( appl == "volhelmholtz" ) ) )
         HLR_ERROR( "unknown application : " + appl );
     

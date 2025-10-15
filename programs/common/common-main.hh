@@ -44,6 +44,7 @@ hlr_main ( int argc, char ** argv )
         // else if ( hlr::appl == "helmholtzslp" ) framework_main< hlr::apps::helmholtz_slp >();
         else if ( hlr::appl == "exp"          ) framework_main< hlr::apps::exp >();
         else if ( hlr::appl == "gaussian"     ) framework_main< hlr::apps::gaussian >();
+        else if ( hlr::appl == "exponential"  ) framework_main< hlr::apps::exponential >();
         else if ( hlr::appl == "volhelmholtz" ) framework_main< hlr::apps::volume_helmholtz >();
         else
             HLR_ERROR( "unknown application (" + hlr::appl + ")" );

@@ -99,6 +99,17 @@ gen_problem< hlr::apps::gaussian > ()
 }
 
 template <>
+std::unique_ptr< hlr::apps::exponential >
+gen_problem< hlr::apps::exponential > ()
+{
+    print_problem_desc( "Exponential" );
+
+    HLR_ASSERT( gridfile != "" );
+
+    return std::make_unique< hlr::apps::exponential >( sigma, gridfile );
+}
+
+template <>
 std::unique_ptr< hlr::apps::volume_helmholtz >
 gen_problem< hlr::apps::volume_helmholtz > ()
 {
