@@ -57,7 +57,7 @@ lu_std ( const Hpro::TMatrix< value_t > &  A,
     auto  toc    = timer::since( tic );
     auto  C      = impl::matrix::copy( A );
     auto  tstart = timer::now();
-        
+
     for ( int i = 0; i < nbench; ++i )
     {
         impl::matrix::copy_to( A, *C );
@@ -362,16 +362,13 @@ program_main ()
         auto  bct     = gen_bct( *ct, *ct );
     
         if ( Hpro::verbose( 3 ) )
-        {
-            io::eps::print( *ct->root(), "ct" );
-            io::eps::print( *bct->root(), "ct" );
-        }// if
+            io::eps::print( *bct->root(), "bt" );
     
         auto  coeff  = problem->coeff_func();
         auto  pcoeff = Hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
         auto  lrapx  = bem::aca_lrapx( pcoeff );
 
-        A = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, nseq );
+        A = impl::matrix::build( bct->root(), pcoeff, lrapx, acc, false, nseq );
     }// if
     else if ( matrixfile != "" )
     {
@@ -473,7 +470,7 @@ program_main ()
     // standard recursion with immediate updates
     //
 
-    if ( cmdline::arith == "std" || cmdline::arith == "all" )
+    if ( contains( cmdline::arith, "std" ) || contains( cmdline::arith, "all" ) )
     {
         std::cout << "  " << term::bullet << term::bold << "standard" << term::reset << std::endl;
     
@@ -526,12 +523,12 @@ program_main ()
         if ( cmdline::aapprox == "aca"     || cmdline::aapprox == "all" ) lu_std< value_t, hlr::approx::ACA< value_t > >(     *A, acc, "ACA" );
         if ( cmdline::aapprox == "lanczos" || cmdline::aapprox == "all" ) lu_std< value_t, hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
     }// if
-    
+
     //
     // DAG with immediate updates
     //
 
-    if ( cmdline::arith == "dagstd" || cmdline::arith == "all" )
+    if ( contains( cmdline::arith, "dagstd" ) || contains( cmdline::arith, "all" ) )
     {
         std::cout << "  " << term::bullet << term::bold << "DAG standard" << term::reset << std::endl;
     
@@ -547,7 +544,7 @@ program_main ()
     // using accumulators
     //
 
-    if ( cmdline::arith == "accu" || cmdline::arith == "all" )
+    if ( contains( cmdline::arith, "accu" ) || contains( cmdline::arith, "all" ) )
     {
         std::cout << "  " << term::bullet << term::bold << "accumulator" << term::reset << std::endl;
     
@@ -606,7 +603,7 @@ program_main ()
         if ( cmdline::aapprox == "lanczos" || cmdline::aapprox == "all" ) lu_accu< value_t, hlr::approx::Lanczos< value_t > >( *A, acc, "Lanczos" );
     }// if
     
-    if ( cmdline::arith == "dagaccu" || cmdline::arith == "all" )
+    if ( contains( cmdline::arith, "dagaccu" ) || contains( cmdline::arith, "all" ) )
     {
         std::cout << "  " << term::bullet << term::bold << "DAG accumulator" << term::reset << std::endl;
     
@@ -622,7 +619,7 @@ program_main ()
     // lazy evaluation
     //
 
-    if ( cmdline::arith == "lazy" || cmdline::arith == "all" )
+    if ( contains( cmdline::arith, "lazy" ) || contains( cmdline::arith, "all" ) )
     {
         std::cout << "  " << term::bullet << term::bold << "lazy" << term::reset << std::endl;
     
