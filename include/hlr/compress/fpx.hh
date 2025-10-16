@@ -27,7 +27,7 @@
 #define HLR_FPX_ROUNDUP      1
 
 // enable/disable SIMD instructions
-#define HLR_FPX_ENABLE_SIMD  1
+#define HLR_FPX_ENABLE_SIMD  0
 
 ////////////////////////////////////////////////////////////
 //
@@ -120,7 +120,7 @@ inline config  get_config      ( const double    eps ) { return config{ eps_to_r
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-#if defined (__AVX512VBMI__) && defined (__EVEX512__)
+#if defined (__AVX512VBMI__) && defined (__EVEX512__) && HLR_FPX_ENABLE_SIMD == 1
 
 //
 // convert 8 FP64 <-> FP32 <-> FP16 (1-8-7)
