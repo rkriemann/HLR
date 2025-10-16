@@ -102,7 +102,7 @@ template <>
 std::unique_ptr< hlr::apps::exponential >
 gen_problem< hlr::apps::exponential > ()
 {
-    print_problem_desc( "Exponential" );
+    print_problem_desc( "Exponential " + Hpro::to_string( "(ℓ=1)", 1.0 / sigma ) );
 
     HLR_ASSERT( gridfile != "" );
 
