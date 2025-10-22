@@ -159,11 +159,7 @@ public:
 //
 // pad given sizes to multiple of storage size of bitstream
 //
-#if defined(HLR_USE_BITSTREAM)
 template < typename storage_t > size_t  pad_bs  ( const size_t  n ) { return ( n % sizeof(storage_t) != 0 ) ? n + (sizeof(storage_t) - n % sizeof(storage_t)) : n; }
-#else
-template < typename storage_t > size_t  pad_bs  ( const size_t  n ) { return n; }
-#endif
 
 }}// namespace hlr::compress
 
