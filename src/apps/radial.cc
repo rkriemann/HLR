@@ -14,8 +14,9 @@
 #include <hpro/io/TGridIO.hh>
 #include <hpro/io/TCoordIO.hh>
 
-#include "hlr/apps/radial.hh"
-#include "hlr/utils/log.hh"
+#include <hlr/apps/radial.hh>
+#include <hlr/apps/helmholtz.hh>
+#include <hlr/utils/log.hh>
 
 namespace hlr { namespace apps {
 
@@ -191,5 +192,5 @@ make_vertices ( const std::string &  gridfile )
 
     HLR_ERROR( "unknown geometry/grid or failed to read file \"" + gridfile + "\"" );
 }
-    
+
 }}// namespace hlr::apps

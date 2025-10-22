@@ -78,6 +78,26 @@ struct gaussian : public radial< matrix::gaussian_function< double > >
     {}
 };
 
+struct exponential : public radial< matrix::exponential_function< double > >
+{
+    using  value_t = double;
+
+    exponential ( const double         eps,
+                  const std::string &  grid )
+            : radial( matrix::exponential_function< double >( eps ), grid )
+    {}
+};
+
+struct volume_helmholtz : public radial< matrix::volume_helmholtz< double > >
+{
+    using  value_t = double;
+
+    volume_helmholtz ( const double         kappa,
+                       const std::string &  grid )
+            : radial( matrix::volume_helmholtz< double >( kappa ), grid )
+    {}
+};
+
 }}// namespace hlr::apps
 
 #endif  // __HLR_APPS_RADIAL_HH

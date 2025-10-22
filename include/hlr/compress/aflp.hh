@@ -26,6 +26,9 @@
 // enable/disable rounding up
 #define HLR_AFLP_ROUNDUP
 
+// enable/disable compression statistics
+// #define HLR_AFLP_STATS
+
 ////////////////////////////////////////////////////////////
 //
 // compression using adaptive float representation
@@ -65,6 +68,8 @@ struct FP_info< float >
     constexpr static uint32_t  zero_val    = 0xffffffff;
     constexpr static float     minimum     = std::numeric_limits< float >::min();
     constexpr static float     maximum     = std::numeric_limits< float >::max();
+
+    constexpr static float     minval      = 1e-30;
 };
     
 template <>
@@ -84,6 +89,8 @@ struct FP_info< double >
     constexpr static uint64_t  zero_val    = 0xffffffffffffffff;
     constexpr static double    minimum     = std::numeric_limits< double >::min();
     constexpr static double    maximum     = std::numeric_limits< double >::max();
+
+    constexpr static double    minval      = 1e-50;
 };
 
 using FP32 = FP_info< float >;
@@ -117,6 +124,17 @@ inline size_t  compressed_size ( const zarray &  v ) { return v.size(); }
 // return compression configuration for desired accuracy eps
 inline config  get_config ( const double    eps ) { return config{ eps_to_rate( eps ) }; }
 
+#if defined(HLR_AFLP_STATS)
+
+// counter for needed exponent bits
+static std::array< std::atomic< size_t >, 12 >  EXPs;
+
+#  define HLR_COUNT_EXP( e ) EXPs[e]++
+
+#else
+#  define HLR_COUNT_EXP( e )
+#endif
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 // helper functions
@@ -140,7 +158,7 @@ nzmin_max ( const value_t *  data,
     for ( size_t  i = 0; i < nsize; ++i )
     {
         const auto  d_i = std::abs( data[i] );
-        const auto  val = ( d_i < FP_info< real_t >::minimum ? FP_info< real_t >::maximum : d_i );
+        const auto  val = ( d_i < FP_info< real_t >::minval ? FP_info< real_t >::maximum : d_i );
 
         vmin = std::min( vmin, val );
         vmax = std::max( vmax, d_i );
@@ -149,6 +167,16 @@ nzmin_max ( const value_t *  data,
     HLR_ASSERT( vmin > real_t(0) );
 
     return { vmin, vmax };
+}
+
+//
+// return number of bits needed to represent given dynamic range
+//
+constexpr
+uint8_t
+nexpbits ( const auto  drange )
+{
+    return uint8_t( std::max< decltype( drange ) >( 0, std::ceil( std::log2( std::log2( drange ) ) ) ) );
 }
 
 //
@@ -168,7 +196,7 @@ nzmin_max ( const float *  data,
     // TODO: handle non-multiple sizes
     HLR_DBG_ASSERT( nsize % simd_size == 0 );
     
-    const auto  vzero = _mm512_set1_ps( FP_info< float >::minimum );
+    const auto  vzero = _mm512_set1_ps( FP_info< float >::minval );
     auto        vMIN  = _mm512_set1_ps( FP_info< float >::maximum );
     auto        vMAX  = _mm512_setzero_ps();
         
@@ -195,7 +223,7 @@ nzmin_max ( const double *  data,
     // TODO: handle non-multiple sizes
     HLR_DBG_ASSERT( nsize % simd_size == 0 );
     
-    const auto  vzero = _mm512_setzero_pd();
+    const auto  vzero = _mm512_set1_ps( FP_info< double >::minval );
     auto        vMIN  = _mm512_set1_pd( FP_info< double >::maximum );
     auto        vMAX  = _mm512_setzero_pd();
         
@@ -278,7 +306,7 @@ compress ( const float *  data,
             const auto  val  = data[i+j];
             const auto  aval = std::abs( val );
 
-            zero[j] = ( aval < FP_info< float >::minimum ); // avoid denormalized values
+            zero[j] = ( aval < FP_info< float >::minval ); // avoid denormalized values
             sign[j] = ( aval != val );
             fbuf[j] = aval * scale + 1.f;
 
@@ -322,7 +350,7 @@ compress ( const float *  data,
         const float  val  = data[i];
         uint32_t     zval = zero_val;
 
-        if ( std::abs( val ) >= FP_info< float >::minimum )
+        if ( std::abs( val ) >= FP_info< float >::minval )
         {
             const bool      zsign = ( val < 0 );
             const float     sval  = std::abs(val) * scale + float(1);
@@ -542,7 +570,7 @@ compress ( const double *  data,  // points to actual start of buffer
             const auto  val  = data[i+j];
             const auto  aval = std::abs( val );
 
-            zero[j] = ( aval < FP_info< double >::minimum ); // avoid denormalized values
+            zero[j] = ( aval < FP_info< double >::minval ); // avoid denormalized values
             sign[j] = ( aval != val );
             fbuf[j] = aval * scale + 1.0;
 
@@ -590,7 +618,7 @@ compress ( const double *  data,  // points to actual start of buffer
         const double  val  = data[i];
         uint64_t      zval = zero_val;
             
-        if ( std::abs( val ) >= FP_info< double >::minimum )
+        if ( std::abs( val ) >= FP_info< double >::minval )
         {
             const bool      zsign = ( val < 0 );
             const double    sval  = std::abs(val) * scale + double(1);
@@ -799,13 +827,15 @@ compress ( const config &   config,
         return zdata;
     }// if
     
-    const auto     scale     = std::max( vmin, FP_info< real_t >::minimum );                                 // scale all values v_i such that |v_i| >= 1
-    uint8_t        exp_bits  = std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) );  // no. of bits needed to represent exponent
-    uint8_t        prec_bits = std::min< uint32_t >( max_mant_bits, config.bitrate );                        // number of precision bits due to config
-    const uint8_t  nbits     = byte_pad( 1 + exp_bits + prec_bits );                                         // rounded up total no. of bits per value
+    const auto     scale     = std::max( vmin, FP_info< real_t >::minval );                            // scale all values v_i such that |v_i| >= 1
+    uint8_t        exp_bits  = nexpbits( vmax / vmin );                                                // no. of bits needed to represent exponent
+    uint8_t        prec_bits = std::min< uint32_t >( max_mant_bits, config.bitrate );                  // number of precision bits due to config
+    const uint8_t  nbits     = byte_pad( 1 + exp_bits + prec_bits );                                   // rounded up total no. of bits per value
     const uint8_t  nbyte     = nbits / 8;
-    auto           zdata     = std::vector< byte_t >( FP_info< real_t >::header_ofs + nsize * nbyte );       // array storing compressed data
+    auto           zdata     = std::vector< byte_t >( FP_info< real_t >::header_ofs + nsize * nbyte ); // array storing compressed data
 
+    HLR_COUNT_EXP( exp_bits );
+    
     // adjust precision (or exponent bits)
     prec_bits = nbits - 1 - exp_bits;
 
@@ -998,8 +1028,10 @@ compress_lr ( const blas::matrix< value_t > &                       U,
         const auto  [ vmin, vmax ] = nzmin_max( U.ptr(0,l), n );
 
         s[l] = vmin;
-        e[l] = uint8_t( std::max< real_t >( 1, std::ceil( std::log2( std::log2( vmax / vmin ) ) ) ) );
+        e[l] = nexpbits( vmax / vmin );
 
+        HLR_COUNT_EXP( e[l] );
+        
         HLR_ASSERT( std::isfinite( s[l] ) );
 
         const auto  nprecbits = eps_to_rate_valr( S(l) );
@@ -1654,6 +1686,41 @@ mulvec_lr ( const size_t     nrows,
         break;
     }// switch
 }
+
+//
+// ensure printing of stats when program finished
+//
+
+#if defined(HLR_AFLP_STATS)
+
+inline
+void
+finish_aflp ()
+{
+    for ( uint  i = 0; i < 12; ++i )
+    {
+        std::cout << i << " : " << EXPs[i].load() << std::endl;
+    }// for
+}
+
+inline
+bool
+init_aflp ()
+{
+    static bool  is_init = false;
+
+    if ( ! is_init )
+    {
+        std::atexit( finish_aflp );
+        is_init = true;
+    }// if
+    
+    return true;
+}
+
+static bool init = init_aflp();
+
+#endif
 
 }}}// namespace hlr::compress::aflp
 

@@ -173,7 +173,7 @@ program_main ()
 
         tic = timer::now();
         
-        auto  Ac = impl::matrix::convert_to_hodlr( *A, acc, apx );
+        auto  Ac = impl::matrix::convert_to_hodlr_sv( *A, acc, apx );
         
         toc = timer::since( tic );
 
