@@ -170,16 +170,6 @@ nzmin_max ( const value_t *  data,
 }
 
 //
-// return number of bits needed to represent given dynamic range
-//
-constexpr
-uint8_t
-nexpbits ( const auto  drange )
-{
-    return uint8_t( std::max< decltype( drange ) >( 0, std::ceil( std::log2( std::log2( drange ) ) ) ) );
-}
-
-//
 // SIMD specializations
 //
 
@@ -240,6 +230,16 @@ nzmin_max ( const double *  data,
 }
 
 #endif
+
+//
+// return number of bits needed to represent given dynamic range
+//
+constexpr
+uint8_t
+nexpbits ( const auto  drange )
+{
+    return uint8_t( std::max< decltype( drange ) >( 0, std::ceil( std::log2( std::log2( drange ) ) ) ) );
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -396,7 +396,7 @@ decompress ( float *         data,
     const uint32_t  prec_mask  = ( 1 << prec_bits ) - 1;
     const uint8_t   prec_ofs   = FP32::mant_bits - prec_bits;
     #if defined(HLR_AFLP_ROUNDUP)
-    const uint32_t  prec_round = 1u << (prec_ofs-1);
+    const uint32_t  prec_round = ( prec_ofs > 0 ? 1u << (prec_ofs-1) : 0 );
     #endif
     const uint32_t  exp_mask   = ( 1 << exp_bits ) - 1;
     const uint8_t   sign_shift = exp_bits + prec_bits;
@@ -666,7 +666,7 @@ decompress ( double *        data,
     const uint64_t  prec_mask  = ( 1ul << prec_bits ) - 1;
     const uint8_t   prec_ofs   = FP64::mant_bits - prec_bits;
     #if defined(HLR_AFLP_ROUNDUP)
-    const uint64_t  prec_round = 1ul << (prec_ofs-1);
+    const uint64_t  prec_round = ( prec_ofs > 0 ? 1ul << (prec_ofs-1) : 0 );
     #endif
     const uint64_t  exp_mask   = ( 1ul << exp_bits  ) - 1;
     const uint32_t  sign_shift = exp_bits + prec_bits;
@@ -1413,7 +1413,7 @@ mulvec ( const size_t                        nrows,
     const uint64_t    prec_mask  = ( 1ul << prec_bits ) - 1;
     const uint8_t     prec_ofs   = FP64::mant_bits - prec_bits;
     #if defined(HLR_AFLP_ROUNDUP)
-    const uint64_t    prec_round = 1ul << (prec_ofs-1);
+    const uint64_t    prec_round = ( prec_ofs > 0 ? 1ul << (prec_ofs-1) : 0 );
     #endif
     const uint64_t    exp_mask   = ( 1ul << exp_bits  ) - 1;
     const uint32_t    sign_shift = exp_bits + prec_bits;
