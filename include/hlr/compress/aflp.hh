@@ -213,7 +213,7 @@ nzmin_max ( const double *  data,
     // TODO: handle non-multiple sizes
     HLR_DBG_ASSERT( nsize % simd_size == 0 );
     
-    const auto  vzero = _mm512_set1_ps( FP_info< double >::minval );
+    const auto  vzero = _mm512_set1_pd( FP_info< double >::minval );
     auto        vMIN  = _mm512_set1_pd( FP_info< double >::maximum );
     auto        vMAX  = _mm512_setzero_pd();
         
