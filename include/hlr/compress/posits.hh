@@ -14,15 +14,24 @@
 
 #include <universal/number/posit/posit.hpp>
 
-// activate/deactivate bitstreams
-#define HLR_USE_BITSTREAM
 #include <hlr/compress/bitstream.hh>
-
 #include <hlr/compress/byte_n.hh>
 
 namespace hlr { namespace compress { namespace posits {
 
-using byte_t = uint8_t;
+// enable/disable compression statistics
+#define HLR_POSITS_STATS
+
+#if defined(HLR_POSITS_STATS)
+
+// counter for needed exponent bits
+static std::array< std::atomic< size_t >, 65 >  FRACTION;
+
+#  define HLR_POSITS_COUNT_FRACTION( n ) FRACTION[n]++
+
+#else
+#  define HLR_POSITS_COUNT_FRACTION( n )
+#endif
 
 // fixed number of exponent bits
 constexpr uint8_t  ES = 2;
@@ -30,8 +39,22 @@ constexpr uint8_t  ES = 2;
 //
 // return bitrate for given accuracy
 //
-inline byte_t eps_to_rate      ( const double  eps ) { return std::max< double >( 0, std::ceil( -std::log2( eps ) ) ); }
-inline byte_t eps_to_rate_valr ( const double  eps ) { return eps_to_rate( eps ); }
+
+inline
+byte_t
+eps_to_rate  ( const double  eps )
+{
+    #if 0
+    // bit adaptive posits
+    return std::max< double >( 0, std::ceil( -std::log2( eps ) ) );
+    #else
+    // byte aligned posits
+    const auto  prec_bits = std::max< double >( 0, std::ceil( -std::log2( eps ) ) );
+    const auto  nbits     = byte_pad( 1 + ES + prec_bits );
+
+    return nbits - 1 - ES;
+    #endif
+}
 
 //
 // compression configuration
@@ -66,10 +89,8 @@ struct convert
     {
         using  posit_t = sw::universal::posit< nbits, ES >;
 
-        #if defined(HLR_USE_BITSTREAM)
-        
-        const size_t      bssize = pad_bs< uint64_t >( byte_pad( nsize * nbits ) / 8 );
-        auto              bs     = bitstream< uint64_t >( zdata, bssize );
+        const size_t  bssize = pad_bs< uint64_t >( byte_pad( nsize * nbits ) / 8 );
+        auto          bs     = bitstream< uint64_t >( zdata, bssize );
         
         for ( size_t  i = 0; i < nsize; ++i )
         {
@@ -78,36 +99,6 @@ struct convert
 
             bs.write_bits( zval, nbits );
         }// for
-        
-        #else
-        
-        uint32_t  bpos = 0; // start bit position in current byte
-        size_t    pos  = 0; // byte position in <zdata>
-        
-        for ( size_t  i = 0; i < nsize; ++i )
-        {
-            auto      p     = posit_t( data[i] * scale );
-            auto      zval  = p.get().to_ullong();
-            uint32_t  sbits = 0; // number of already stored bits of zval
-            
-            do
-            {
-                const uint32_t  crest = 8 - bpos;       // remaining bits in current byte
-                const uint32_t  zrest = nbits - sbits;  // remaining bits in zval
-                const byte_t    zbyte = zval & 0xff;    // lowest byte of zval
-                    
-                // HLR_DBG_ASSERT( pos < zsize );
-                    
-                zdata[pos] |= (zbyte << bpos);
-                zval      >>= crest;
-                sbits      += crest;
-            
-                if ( crest <= zrest ) { bpos  = 0; ++pos; }
-                else                  { bpos += zrest; }
-            } while ( sbits < nbits );
-        }// for
-
-        #endif
     }
 
     static void
@@ -116,13 +107,11 @@ struct convert
                  const size_t    nsize,
                  const value_t   scale )
     {
-        using  posit_t    = sw::universal::posit< nbits, ES >;
+        using  posit_t = sw::universal::posit< nbits, ES >;
 
-        #if defined(HLR_USE_BITSTREAM)
-
-        const size_t      bssize = pad_bs< uint64_t >( byte_pad( nsize * nbits ) / 8 );
-        auto              bs     = bitstream< uint64_t >( const_cast< byte_t * >( zdata ), bssize );
-        posit_t           p;
+        const size_t  bssize = pad_bs< uint64_t >( byte_pad( nsize * nbits ) / 8 );
+        auto          bs     = bitstream< uint64_t >( const_cast< byte_t * >( zdata ), bssize );
+        posit_t       p;
         
         for ( size_t  i = 0; i < nsize; ++i )
         {
@@ -131,42 +120,6 @@ struct convert
             p.setbits( zval );
             data[i] = value_t( p ) / scale;
         }// for
-
-        #else
-        
-        size_t    count = 0;
-        uint32_t  bpos = 0; // start bit position in current byte
-        size_t    pos  = 0; // byte position in <zdata>
-        
-        do
-        {
-            uint64_t  zval  = 0;
-            uint32_t  sbits = 0;  // already read bits of zval
-            
-            do
-            {
-                // HLR_DBG_ASSERT( pos < zdata );
-        
-                const uint32_t  crest = 8 - bpos;                               // remaining bits in current byte
-                const uint32_t  zrest = nbits - sbits;                          // remaining bits to read for zval
-                const byte_t    zmask = (zrest < 8 ? (1 << zrest) - 1 : 0xff ); // mask for zval data
-                const byte_t    data  = (zdata[pos] >> bpos) & zmask;             // part of zval in current byte
-                
-                zval  |= (uint64_t(data) << sbits); // lowest to highest bit in zdata
-                sbits += crest;
-
-                if ( crest <= zrest ) { bpos  = 0; ++pos; }
-                else                  { bpos += zrest; }
-            } while ( sbits < nbits );
-
-            posit_t  p;
-            
-            p.setbits( zval );
-            data[count] = value_t( p ) / scale;
-            
-        } while ( ++count < nsize );
-
-        #endif
     }
 };
 
@@ -200,6 +153,8 @@ compress ( const config &   config,
     const auto     nbytes = pad_bs< uint64_t >( byte_pad( nsize * nbits ) / 8 );
     const auto     ofs    = 1 + sizeof(value_t);
     zarray         zdata( ofs + nbytes );
+
+    HLR_POSITS_COUNT_FRACTION( config.bitsize );
 
     zdata[0] = nbits;
     memcpy( zdata.data() + 1, & scale, sizeof(value_t) );
@@ -442,8 +397,10 @@ compress_lr ( const blas::matrix< value_t > &                 U,
             vmax = std::max( vmax, std::abs( U(i,l) ) );
 
         s[l] = real_t(1) / vmax;
-        b[l] = 1 + ES + eps_to_rate_valr( S(l) ); // sign + exponent bits
+        b[l] = 1 + ES + eps_to_rate( S(l) ); // sign + exponent bits
 
+        HLR_POSITS_COUNT_FRACTION( b[l] - 1 - ES );
+        
         zsize += 1;                          // for nbits
         zsize += sizeof(real_t);             // for scaling factor
         zsize += pad_bs< uint64_t >( byte_pad( n * b[l] ) / 8 );   // for data
@@ -776,6 +733,44 @@ decompress_lr< std::complex< double > > ( const zarray &                        
 //     }// switch
 // }
     
+//
+// ensure printing of stats when program finished
+//
+
+#if defined(HLR_POSITS_STATS)
+
+inline
+void
+finish_posits ()
+{
+    for ( uint  i = 0; i < 65; ++i )
+    {
+        const auto  n = FRACTION[i].load();
+
+        if ( n > 0 )
+            std::cout << i << " : " << n << std::endl;
+    }// for
+}
+
+inline
+bool
+init_posits ()
+{
+    static bool  is_init = false;
+
+    if ( ! is_init )
+    {
+        std::atexit( finish_posits );
+        is_init = true;
+    }// if
+    
+    return true;
+}
+
+static bool init = init_posits();
+
+#endif
+
 }}}// namespace hlr::compress::posits
 
 #endif // HLR_HAS_UNIVERSAL
