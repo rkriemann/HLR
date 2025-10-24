@@ -135,6 +135,47 @@ struct __attribute__((packed)) byte7_t
     operator uint64_t () const { return uint64_t(data2) << 48 | uint64_t(data1) << 32 | uint64_t(data0); }
 };
 
+////////////////////////////////////////////////////////////////////////////////
+//
+// floating point data
+//
+////////////////////////////////////////////////////////////////////////////////
+
+template < typename real_t >
+struct FPinfo
+{};
+
+template <>
+struct FPinfo< float >
+{
+    constexpr static uint8_t   mant_bits   = 23;
+    constexpr static uint8_t   exp_bits    = 8;
+    constexpr static uint8_t   sign_bit    = 31;
+
+    constexpr static uint32_t  exp_mask    = ((1u <<  exp_bits) - 1);
+    constexpr static uint32_t  mant_mask   = ((1u << mant_bits) - 1);
+
+    constexpr static float     minimum     = std::numeric_limits< float >::min();
+    constexpr static float     maximum     = std::numeric_limits< float >::max();
+};
+    
+template <>
+struct FPinfo< double >
+{
+    constexpr static uint8_t   mant_bits   = 52;
+    constexpr static uint8_t   exp_bits    = 11;
+    constexpr static uint8_t   sign_bit    = 63;
+
+    constexpr static uint64_t  exp_mask    = ((1ul <<  exp_bits) - 1);
+    constexpr static uint64_t  mant_mask   = ((1ul << mant_bits) - 1);
+
+    constexpr static double    minimum     = std::numeric_limits< double >::min();
+    constexpr static double    maximum     = std::numeric_limits< double >::max();
+};
+
+using FP32 = FPinfo< float >;
+using FP64 = FPinfo< double >;
+
 }}// hlr::compress
 
 #endif // __HLR_UTILS_DETAIL_BYTE_N_HH
