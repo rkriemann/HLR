@@ -5,13 +5,13 @@
 //
 
 #include "hlr/omp/matrix.hh"
-#include "hlr/omp/compress.hh"
 #include "hlr/omp/arith.hh"
-#include "hlr/omp/norm.hh"
 #include "hlr/omp/convert.hh"
+#include "hlr/omp/compress.hh"
+#include "hlr/omp/norm.hh"
 
 namespace          impl      = hlr::omp;
 const std::string  impl_name = "omp";
 
-#include "compress.hh"
+#include "mixedprec.hh"
 #include "seq.hh"

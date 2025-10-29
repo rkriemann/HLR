@@ -95,13 +95,14 @@ convert_to_lowrank ( const Hpro::TMatrix< value_t > &  M,
 
 }// namespace detail
 
-template < typename approx_t >
+template < typename value_t,
+           typename approx_t >
 std::unique_ptr< matrix::lrmatrix< value_t > >
 convert_to_lowrank ( const Hpro::TMatrix< value_t > &  M,
                      const Hpro::TTruncAcc &           acc,
                      const approx_t &                  approx )
 {
-    auto  T = std::unique_ptr< Hpro::TRkMatrix< value_t > >();
+    auto  T = std::unique_ptr< matrix::lrmatrix< value_t > >();
     
     #pragma omp parallel
     #pragma omp single

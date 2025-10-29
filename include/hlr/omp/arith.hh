@@ -11,11 +11,12 @@
 #include <hpro/matrix/TBlockMatrix.hh>
 #include <hpro/matrix/structure.hh>
 
-#include "hlr/matrix/lrmatrix.hh"
-#include "hlr/matrix/dense_matrix.hh"
-#include "hlr/arith/multiply.hh"
-#include "hlr/arith/solve.hh"
-#include "hlr/seq/arith.hh"
+#include <hlr/matrix/lrmatrix.hh>
+#include <hlr/matrix/dense_matrix.hh>
+#include <hlr/arith/multiply.hh>
+#include <hlr/arith/solve.hh>
+#include <hlr/seq/arith.hh>
+#include <hlr/omp/detail/arith.hh>
 
 #include <hlr/dag/lu.hh>
 #include <hlr/omp/dag.hh>
@@ -24,85 +25,314 @@ namespace hlr { namespace omp {
 
 ///////////////////////////////////////////////////////////////////////
 //
-// general arithmetic functions
+// matrix vector multiplication
 //
 ///////////////////////////////////////////////////////////////////////
 
 //
-// compute y = y + α op( M ) x
+// chunk based updates
 //
 template < typename value_t >
 void
-mul_vec ( const value_t                     alpha,
-          const matop_t                     op_M,
-          const Hpro::TMatrix< value_t > &  M,
-          const blas::vector< value_t > &   x,
-          blas::vector< value_t > &         y )
+mul_vec_chunk ( const value_t                             alpha,
+                const matop_t                             op_M,
+                const Hpro::TMatrix< value_t > &          M,
+                const vector::scalar_vector< value_t > &  x,
+                vector::scalar_vector< value_t > &        y )
 {
-    // HLR_ASSERT( ! is_null( M ) );
-    // HLR_ASSERT( M->ncols( op_M ) == x.length() );
-    // HLR_ASSERT( M->nrows( op_M ) == y.length() );
+    if ( alpha == value_t(0) )
+        return;
+    
+    const auto  is      = M.row_is( op_M );
+    auto        mtx_map = detail::mutex_map_t( ( is.last() + 1 ) / detail::CHUNK_SIZE + 1 );
 
+    #pragma omp parallel
+    #pragma omp single
+    #pragma omp task
+    detail::mul_vec_chunk( alpha, op_M, M, x.blas_vec(), y.blas_vec(), M.row_is( op_M ).first(), M.col_is( op_M ).first(), mtx_map );
+}
+
+//
+// recursion only w.r.t. block rows to avoid locking
+//
+template < typename value_t >
+void
+mul_vec_row ( const value_t                             alpha,
+              const matop_t                             op_M,
+              const Hpro::TMatrix< value_t > &          M,
+              const vector::scalar_vector< value_t > &  x,
+              vector::scalar_vector< value_t > &        y )
+{
+    if ( alpha == value_t(0) )
+        return;
+    
+    #pragma omp parallel
+    #pragma omp single
+    #pragma omp task
+    detail::mul_vec_row( alpha, op_M, M, x.blas_vec(), y.blas_vec(), x.ofs(), y.ofs() );
+}
+
+//
+// similar to "mul_vec_row" but with special data structure
+// holding list of all matrix blocks per cluster
+//
+template < typename value_t > using  cluster_block_map_t = detail::cluster_block_map_t< value_t >;
+template < typename value_t > using  cluster_blocks_t    = hlr::cluster_blocks_t< value_t >;
+template < typename value_t > using  cluster_matrix_t    = hlr::cluster_matrix_t< value_t >;
+
+template < typename value_t >
+void
+mul_vec_cl ( const value_t                             alpha,
+             const matop_t                             op_M,
+             const Hpro::TMatrix< value_t > &          M,
+             const cluster_block_map_t< value_t > &    blocks,
+             const vector::scalar_vector< value_t > &  x,
+             vector::scalar_vector< value_t > &        y )
+{
     if ( alpha == value_t(0) )
         return;
 
-    if ( is_blocked( M ) )
-    {
-        auto        B       = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
-        const auto  row_ofs = B->row_is( op_M ).first();
-        const auto  col_ofs = B->col_is( op_M ).first();
-
-        for ( uint  i = 0; i < B->nblock_rows(); ++i )
-        {
-            for ( uint  j = 0; j < B->nblock_cols(); ++j )
-            {
-                auto  B_ij = B->block( i, j );
-                
-                if ( ! is_null( B_ij ) )
-                {
-                    auto  x_j = x( B_ij->col_is( op_M ) - col_ofs );
-                    auto  y_i = y( B_ij->row_is( op_M ) - row_ofs );
-
-                    mul_vec( alpha, op_M, *B_ij, x_j, y_i );
-                }// if
-            }// for
-        }// for
-    }// if
-    else if ( hlr::matrix::is_dense( M ) )
-    {
-        auto  D = cptrcast( &M, hlr::matrix::dense_matrix< value_t > );
-        
-        blas::mulvec( alpha, blas::mat_view( op_M, D->mat() ), x, value_t(1), y );
-    }// if
-    else if ( hlr::matrix::is_lowrank( M ) )
-    {
-        auto  R = cptrcast( &M, hlr::matrix::lrmatrix< value_t > );
-
-        if ( op_M == apply_normal )
-        {
-            auto  t = blas::mulvec( value_t(1), blas::adjoint( R->V() ), x );
-
-            blas::mulvec( alpha, R->U(), t, value_t(1), y );
-        }// if
-        else if ( op_M == apply_transposed )
-        {
-            HLR_ASSERT( Hpro::is_complex_type_v< value_t > == false );
-            
-            auto  t = blas::mulvec( value_t(1), blas::transposed( R->U() ), x );
-
-            blas::mulvec( alpha, R->V(), t, value_t(1), y );
-        }// if
-        else if ( op_M == apply_adjoint )
-        {
-            auto  t = blas::mulvec( value_t(1), blas::adjoint( R->U() ), x );
-
-            blas::mulvec( alpha, R->V(), t, value_t(1), y );
-        }// if
-    }// if
-    else
-        HLR_ASSERT( false );
+    #pragma omp parallel
+    #pragma omp single
+    #pragma omp task
+    detail::mul_vec_cl( alpha, op_M, M, blocks, x.blas_vec(), y.blas_vec(), x.ofs(), y.ofs() );
 }
 
+template < typename value_t >
+void
+mul_vec_cl ( const value_t                             alpha,
+             const matop_t                             op_M,
+             const cluster_blocks_t< value_t > &       cb,
+             const vector::scalar_vector< value_t > &  x,
+             vector::scalar_vector< value_t > &        y )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    #pragma omp parallel
+    #pragma omp single
+    #pragma omp task
+    detail::mul_vec_cl( alpha, op_M, cb, x.blas_vec(), y.blas_vec(), x.ofs(), y.ofs() );
+}
+
+template < typename value_t >
+void
+mul_vec_cl2 ( const value_t                             alpha,
+              const matop_t                             op_M,
+              const cluster_blocks_t< value_t > &       cb,
+              const vector::scalar_vector< value_t > &  x,
+              vector::scalar_vector< value_t > &        y )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    #pragma omp parallel
+    #pragma omp single
+    #pragma omp task
+    detail::mul_vec_cl2( alpha, op_M, cb, x.blas_vec(), y.blas_vec(), x.ofs(), y.ofs() );
+}
+
+template < typename value_t >
+void
+mul_vec_hier ( const value_t                               alpha,
+               const Hpro::matop_t                         op_M,
+               const matrix::level_hierarchy< value_t > &  M,
+               const vector::scalar_vector< value_t > &    x,
+               vector::scalar_vector< value_t > &          y )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    #pragma omp parallel
+    #pragma omp single
+    #pragma omp task
+    detail::mul_vec_hier( alpha, op_M, M, x.blas_vec(), y.blas_vec(), x.ofs(), y.ofs() );
+}
+
+template < typename value_t >
+void
+mul_vec_ts ( const value_t                             alpha,
+             const Hpro::matop_t                       op_M,
+             const Hpro::TMatrix< value_t > &          M,
+             const vector::scalar_vector< value_t > &  x,
+             vector::scalar_vector< value_t > &        y )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    //
+    // compute product to thread local vectors
+    //
+    
+    auto    y_ts = boost::thread_specific_ptr< blas::vector< value_t > >();
+    auto &  sy   = y.blas_vec();
+    
+    #pragma omp parallel
+    {
+        #pragma omp single
+        #pragma omp task
+        detail::mul_vec_ts( alpha, op_M, M, x.blas_vec(), y_ts, x.ofs(), M.row_ofs(), M.nrows( op_M ) );
+
+        //
+        // add local results to destination
+        //
+
+        // TODO
+        
+        // #pragma omp for
+        // for ( size_t  i = 0; i < sy.length(); i += 1024 )
+        // {
+        //     auto  sub   = blas::range( i, std::min( i + 1024 - 1, sy.length()-1 ) );
+        //     auto  y_sub = sy( sub );
+            
+        //     for ( auto &  t : y_ts )
+        //     {
+        //         auto  t_sub = t( sub );
+                
+        //         blas::add( value_t(1), t_sub, y_sub );
+        //     }// for
+        // }// for
+    }// omp parallel
+}
+
+//
+// reallocate memory blocks in matrices (for thread-local memory)
+//
+template < typename value_t >
+void
+realloc ( cluster_blocks_t< value_t > &  cb )
+{
+    if ( ! cb.M.empty() )
+    {
+        for ( auto  M : cb.M )
+        {
+            if ( matrix::is_lowrank( M ) )
+            {
+                auto  R = const_cast< matrix::lrmatrix< value_t > * >( cptrcast( M, matrix::lrmatrix< value_t > ) );
+
+                if ( R->is_compressed() )
+                {
+                    HLR_ERROR( "TODO" );
+                }// if
+                else
+                {
+                    auto  U = blas::copy( R->U() );
+                    auto  V = blas::copy( R->V() );
+
+                    R->set_lrmat( std::move( U ), std::move( V ) );
+                }// else
+            }// if
+            else if ( matrix::is_lowrank_sv( M ) )
+            {
+                auto  R = const_cast< matrix::lrsvmatrix< value_t > * >( cptrcast( M, matrix::lrsvmatrix< value_t > ) );
+
+                if ( R->is_compressed() )
+                {
+                    auto  zU = compress::valr::zarray( R->zU() );
+                    auto  zV = compress::valr::zarray( R->zV() );
+
+                    R->set_zlrmat( std::move( zU ), std::move( zV ) );
+                }// if
+                else
+                {
+                    HLR_ERROR( "TODO" );
+                }// else
+            }// if
+            else if ( matrix::is_dense( M ) )
+            {
+                auto  D = const_cast< matrix::dense_matrix< value_t > * >( cptrcast( M, matrix::dense_matrix< value_t > ) );
+
+                if ( D->is_compressed() )
+                {
+                    auto  zD = compress::zarray( D->zmat() );
+
+                    D->set_zmatrix( std::move( zD ) );
+                }// if
+                else
+                {
+                    auto  DM = blas::copy( D->mat() );
+
+                    D->set_matrix( std::move( DM ) );
+                }// else
+            }// if
+            else
+                HLR_ERROR( "unsupported matrix type : " + M->typestr() );
+        }// for
+    }// if
+
+    //
+    // recurse
+    //
+
+    if ( cb.sub_blocks.size() > 0 )
+    {
+        #pragma omp taskloop
+        for ( uint  i = 0; i < cb.sub_blocks.size(); ++i )
+            hlr::omp::realloc( *cb.sub_blocks[i] );
+    }// if
+}
+
+template < typename value_t >
+void
+mul_vec_cl ( const value_t                             alpha,
+             const matop_t                             op_M,
+             const cluster_matrix_t< value_t > &       cm,
+             const vector::scalar_vector< value_t > &  x,
+             vector::scalar_vector< value_t > &        y )
+{
+    if ( alpha == value_t(0) )
+        return;
+
+    #pragma omp parallel
+    #pragma omp single
+    #pragma omp task
+    detail::mul_vec_cl( alpha, op_M, cm, x.blas_vec(), y.blas_vec(), x.ofs(), y.ofs() );
+}
+
+using hlr::setup_cluster_block_map;
+using hlr::build_cluster_blocks;
+
+template < typename value_t >
+std::unique_ptr< cluster_matrix_t< value_t > >
+build_cluster_matrix ( const matop_t                     op_M,
+                       const Hpro::TMatrix< value_t > &  M,
+                       const accuracy &                  acc )
+{
+    auto  cm = std::make_unique< cluster_matrix_t< value_t > >( M.row_is( op_M ) );
+
+    hlr::detail::build_cluster_matrix( op_M, M, *cm );
+
+    #pragma omp parallel
+    #pragma omp single
+    #pragma omp task
+    hlr::omp::detail::build_joined_matrix( op_M, *cm, acc );
+    
+    return cm;
+}
+
+//
+// pure local sub multiplication and summation of sub results
+//
+template < typename value_t >
+void
+mul_vec_reduce ( const value_t                             alpha,
+                 const matop_t                             op_M,
+                 const Hpro::TMatrix< value_t > &          M,
+                 const vector::scalar_vector< value_t > &  x,
+                 vector::scalar_vector< value_t > &        y )
+{
+    // just for now
+    HLR_ASSERT( op_M == apply_normal );
+    
+    #pragma omp parallel
+    #pragma omp single
+    #pragma omp task
+    detail::mul_vec_reduce( alpha, op_M, M, blas::vec( x ), blas::vec( y ) );
+}
+
+//
+// general function
+//
 template < typename value_t >
 void
 mul_vec ( const value_t                             alpha,
@@ -111,8 +341,122 @@ mul_vec ( const value_t                             alpha,
           const vector::scalar_vector< value_t > &  x,
           vector::scalar_vector< value_t > &        y )
 {
-    mul_vec( alpha, op_M, M, blas::vec( x ), blas::vec( y ) );
+    mul_vec_chunk( alpha, op_M, M, x, y );
+    // mul_vec_row( alpha, op_M, M, x, y );
+    // mul_vec_reduce( alpha, op_M, M, blas::vec( x ), blas::vec( y ) );
 }
+
+template < typename value_t >
+void
+mul_vec ( const value_t                     alpha,
+          const matop_t                     op_M,
+          const Hpro::TMatrix< value_t > &  M,
+          const blas::vector< value_t > &   x,
+          blas::vector< value_t > &         y )
+{
+    if ( alpha == value_t(0) )
+        return;
+    
+    const auto  is      = M.row_is( op_M );
+    auto        mtx_map = detail::mutex_map_t( ( is.last() + 1 ) / detail::CHUNK_SIZE + 1 );
+
+    #pragma omp parallel
+    #pragma omp single
+    #pragma omp task
+    detail::mul_vec_chunk( alpha, op_M, M, x, y, M.row_ofs( op_M ), M.col_ofs( op_M ), mtx_map );
+}
+
+///////////////////////////////////////////////////////////////////////
+//
+// general arithmetic functions
+//
+///////////////////////////////////////////////////////////////////////
+
+// //
+// // compute y = y + α op( M ) x
+// //
+// template < typename value_t >
+// void
+// mul_vec ( const value_t                     alpha,
+//           const matop_t                     op_M,
+//           const Hpro::TMatrix< value_t > &  M,
+//           const blas::vector< value_t > &   x,
+//           blas::vector< value_t > &         y )
+// {
+//     // HLR_ASSERT( ! is_null( M ) );
+//     // HLR_ASSERT( M->ncols( op_M ) == x.length() );
+//     // HLR_ASSERT( M->nrows( op_M ) == y.length() );
+
+//     if ( alpha == value_t(0) )
+//         return;
+
+//     if ( is_blocked( M ) )
+//     {
+//         auto        B       = cptrcast( &M, Hpro::TBlockMatrix< value_t > );
+//         const auto  row_ofs = B->row_is( op_M ).first();
+//         const auto  col_ofs = B->col_is( op_M ).first();
+
+//         for ( uint  i = 0; i < B->nblock_rows(); ++i )
+//         {
+//             for ( uint  j = 0; j < B->nblock_cols(); ++j )
+//             {
+//                 auto  B_ij = B->block( i, j );
+                
+//                 if ( ! is_null( B_ij ) )
+//                 {
+//                     auto  x_j = x( B_ij->col_is( op_M ) - col_ofs );
+//                     auto  y_i = y( B_ij->row_is( op_M ) - row_ofs );
+
+//                     mul_vec( alpha, op_M, *B_ij, x_j, y_i );
+//                 }// if
+//             }// for
+//         }// for
+//     }// if
+//     else if ( hlr::matrix::is_dense( M ) )
+//     {
+//         auto  D = cptrcast( &M, hlr::matrix::dense_matrix< value_t > );
+        
+//         blas::mulvec( alpha, blas::mat_view( op_M, D->mat() ), x, value_t(1), y );
+//     }// if
+//     else if ( hlr::matrix::is_lowrank( M ) )
+//     {
+//         auto  R = cptrcast( &M, hlr::matrix::lrmatrix< value_t > );
+
+//         if ( op_M == apply_normal )
+//         {
+//             auto  t = blas::mulvec( value_t(1), blas::adjoint( R->V() ), x );
+
+//             blas::mulvec( alpha, R->U(), t, value_t(1), y );
+//         }// if
+//         else if ( op_M == apply_transposed )
+//         {
+//             HLR_ASSERT( Hpro::is_complex_type_v< value_t > == false );
+            
+//             auto  t = blas::mulvec( value_t(1), blas::transposed( R->U() ), x );
+
+//             blas::mulvec( alpha, R->V(), t, value_t(1), y );
+//         }// if
+//         else if ( op_M == apply_adjoint )
+//         {
+//             auto  t = blas::mulvec( value_t(1), blas::adjoint( R->U() ), x );
+
+//             blas::mulvec( alpha, R->V(), t, value_t(1), y );
+//         }// if
+//     }// if
+//     else
+//         HLR_ASSERT( false );
+// }
+
+// template < typename value_t >
+// void
+// mul_vec ( const value_t                             alpha,
+//           const matop_t                             op_M,
+//           const Hpro::TMatrix< value_t > &          M,
+//           const vector::scalar_vector< value_t > &  x,
+//           vector::scalar_vector< value_t > &        y )
+// {
+//     mul_vec( alpha, op_M, M, blas::vec( x ), blas::vec( y ) );
+// }
 
 namespace detail
 {
