@@ -852,7 +852,7 @@ convert_to_hodlr_sv ( const Hpro::TMatrix< value_t > &  M,
                 {
                     auto  B_ij = convert_to_hodlr_sv( * BM->block( i, j ), acc, approx );
                     
-                    if ( matrix::is_lowrank( *B_ij ) )
+                    if ( matrix::is_lowrank_sv( *B_ij ) )
                         k_sum += cptrcast( B_ij.get(), matrix::lrsvmatrix< value_t > )->rank();
                     else
                         all_lowrank = false;
@@ -881,11 +881,11 @@ convert_to_hodlr_sv ( const Hpro::TMatrix< value_t > &  M,
                     if ( is_null( R_ij ) )
                         continue;
 
-                    auto  RU   = R_ij->U();
-                    auto  RS   = R_ij->S();
-                    auto  RV   = R_ij->V();
-                    auto  U_i  = blas::matrix< value_t >( U_sum, R_ij->row_is() - M.row_ofs(), blas::range( pos, pos + R_ij->rank() - 1 ) );
-                    auto  V_j  = blas::matrix< value_t >( V_sum, R_ij->col_is() - M.col_ofs(), blas::range( pos, pos + R_ij->rank() - 1 ) );
+                    auto  RU  = R_ij->U();
+                    auto  RS  = R_ij->S();
+                    auto  RV  = R_ij->V();
+                    auto  U_i = blas::matrix< value_t >( U_sum, R_ij->row_is() - M.row_ofs(), blas::range( pos, pos + R_ij->rank() - 1 ) );
+                    auto  V_j = blas::matrix< value_t >( V_sum, R_ij->col_is() - M.col_ofs(), blas::range( pos, pos + R_ij->rank() - 1 ) );
 
                     blas::prod_diag_ip( RU, RS );
                     blas::copy( RU, U_i );
