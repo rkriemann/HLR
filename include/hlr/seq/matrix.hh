@@ -2417,9 +2417,6 @@ coarsen ( const Hpro::TMatrix< value_t > &  M,
         HLR_ERROR( "unsupported matrix type : " + M.typestr() );
 }
 
-//
-// same as above but use lrsvmatrix for lowrank blocks
-//
 template < typename                    value_t,
            approx::approximation_type  approx_t >
 std::unique_ptr< Hpro::TMatrix< value_t > >
@@ -2443,7 +2440,7 @@ coarsen_sv ( const Hpro::TMatrix< value_t > &  M,
             {
                 if ( ! is_null( BM->block( i, j ) ) )
                 {
-                    auto  B_ij = coarsen( * BM->block( i, j ), acc, approx );
+                    auto  B_ij = coarsen_sv( * BM->block( i, j ), acc, approx );
                     
                     if ( matrix::is_lowrank_sv( *B_ij ) )
                         k_sum += cptrcast( B_ij.get(), matrix::lrsvmatrix< value_t > )->rank();
@@ -2466,25 +2463,35 @@ coarsen_sv ( const Hpro::TMatrix< value_t > &  M,
             {
                 for ( uint  j = 0; j < B->nblock_cols(); ++j )
                 {
-                    auto  R_ij = cptrcast( B->block( i, j ), matrix::lrmatrix< value_t > );
+                    auto  R_ij = cptrcast( B->block( i, j ), matrix::lrsvmatrix< value_t > );
 
                     if ( is_null( R_ij ) )
                         continue;
 
-                    auto  RU   = R_ij->U();
-                    auto  RV   = R_ij->V();
-                    auto  U_i  = blas::matrix< value_t >( U_sum, R_ij->row_is() - M.row_ofs(), blas::range( pos, pos + R_ij->rank() - 1 ) );
-                    auto  V_j  = blas::matrix< value_t >( V_sum, R_ij->col_is() - M.col_ofs(), blas::range( pos, pos + R_ij->rank() - 1 ) );
+                    auto  RU  = R_ij->U();
+                    auto  RS  = R_ij->S();
+                    auto  RV  = R_ij->V();
+                    auto  U_i = blas::matrix< value_t >( U_sum, R_ij->row_is() - M.row_ofs(), blas::range( pos, pos + R_ij->rank() - 1 ) );
+                    auto  V_j = blas::matrix< value_t >( V_sum, R_ij->col_is() - M.col_ofs(), blas::range( pos, pos + R_ij->rank() - 1 ) );
 
+                    blas::prod_diag_ip( RU, RS );
                     blas::copy( RU, U_i );
                     blas::copy( RV, V_j );
                     pos += R_ij->rank();
                 }// for
             }// for
 
-            auto  [ U, S, V ] = approx.approx_sv( U_sum, V_sum, acc );
+            auto  [ U, S, V ] = approx.approx_ortho( U_sum, V_sum, acc );
             auto  R           = std::make_unique< matrix::lrsvmatrix< value_t > >( M.row_is(), M.col_is(), std::move( U ), std::move( S ), std::move( V ) );
 
+            // {
+            //     auto  diff   = matrix::sum( 1, *B, -1, *R );
+            //     auto  norm_A = norm::spectral( *B );
+            //     auto  error  = norm::spectral( *diff );
+
+            //     std::cout << "    error = " << error << " / " << error / norm_A << std::endl;
+            // }
+            
             if ( R->byte_size() <= B->byte_size() )
                 return R;
         }// if
@@ -2501,8 +2508,8 @@ coarsen_sv ( const Hpro::TMatrix< value_t > &  M,
 
         if ( R->byte_size() <= M.byte_size() )
             return R;
-
-        return M.copy();
+        else 
+            return M.copy();
     }// if
     else
         HLR_ERROR( "unsupported matrix type : " + M.typestr() );
