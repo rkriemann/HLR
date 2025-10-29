@@ -183,6 +183,9 @@ mul_vec_ts ( const value_t                             alpha,
         } );
 }
 
+//
+// reallocate memory blocks in matrices (for thread-local memory)
+//
 template < typename value_t >
 void
 realloc ( cluster_blocks_t< value_t > &  cb )
