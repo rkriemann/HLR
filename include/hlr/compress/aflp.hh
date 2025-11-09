@@ -66,7 +66,7 @@ struct Zconf< double >
 {
     constexpr static uint8_t   scale_ofs   = 4;
     constexpr static uint8_t   header_ofs  = 12;
-    constexpr static uint64_t  exp_highbit = 0b10000000000;
+    constexpr static uint64_t  exp_highbit = 1ul << ( 10 + 52 );
     constexpr static uint64_t  zero_val    = 0xffffffffffffffff;
     constexpr static double    minval      = 1e-50;
 };
@@ -479,12 +479,11 @@ compress ( const double *  data,  // points to actual start of buffer
     const uint8_t   nbits    = 1 + exp_bits + prec_bits;
     const uint8_t   nbyte    = nbits / 8;
     const uint64_t  exp_mask = ( 1u << exp_bits ) - 1;                 // bit mask for exponent
-    const uint8_t   prec_ofs = FP64::mant_bits - prec_bits;
+    const uint8_t   prec_shift = FP64::mant_bits - prec_bits;
     const uint64_t  zero_val = Zconf< value_t >::zero_val & (( 1ul << nbits) - 1 );
-
-    #if defined(HLR_AFL_ROUND)
+    const uint32_t  sign_shift  = nbits - 1;
     const uint32_t  round_shift = prec_bits - 1;
-    #endif
+    const uint64_t  zmask       = ( 1ul << nbits ) - 1;
         
     //
     // store header (exponent bits, precision bits and scaling factor)
@@ -516,7 +515,7 @@ compress ( const double *  data,  // points to actual start of buffer
     const size_t      nbsize = nsize - nsize % nbuf;  // largest multiple of <nchunk> below <nsize>
     uint8_t           zero[ nbuf ]; // mark zero entries
     uint8_t           sign[ nbuf ]; // holds sign per entry
-    double            fbuf[ nbuf ]; // holds rescaled value
+    fp64int_t         fbuf[ nbuf ]; // holds rescaled value
     uint64_t          ibuf[ nbuf ]; // holds value in compressed format
     size_t            pos = Zconf< value_t >::header_ofs;
     size_t            i   = 0;
@@ -532,34 +531,32 @@ compress ( const double *  data,  // points to actual start of buffer
         // scale/shift data to [2,...]
         for ( size_t  j = 0; j < nbuf; ++j )
         {
-            const auto  val  = data[i+j];
-            const auto  aval = std::abs( val );
+            const fp64int_t  val{ .f = data[i+j] };
+            const auto       aval    = std::abs( val.f );
 
-            zero[j] = ( aval < Zconf< value_t >::minval ); // avoid denormalized values
-            sign[j] = ( aval != val );
-            fbuf[j] = aval * scale + 1.0;
+            zero[j]   = ( aval < Zconf< value_t >::minval ); // avoid denormalized values
+            sign[j]   = ( val.u >> FP64::sign_bit ) & 0b1;
+            fbuf[j].f = aval * scale + 1.0;
 
-            HLR_DBG_ASSERT( zero[j] || ( fbuf[j] >= double(2) ));
-            HLR_DBG_ASSERT( zero[j] || std::isfinite( fbuf[j] ));
+            HLR_DBG_ASSERT( zero[j] || ( fbuf[j].f >= double(2) ));
+            HLR_DBG_ASSERT( zero[j] || std::isfinite( fbuf[j].f ));
         }// for
 
         // convert to compressed format
         for ( size_t  j = 0; j < nbuf; ++j )
         {
-            const uint64_t  isval = (*reinterpret_cast< const uint64_t * >( & fbuf[j] ) );
-            const uint64_t  sexp  = ( isval >> FP64::mant_bits ) & FP64::exp_mask;
-            const uint64_t  smant = ( isval & FP64::mant_mask );
-            #if defined(HLR_AFL_ROUND)
-            const uint64_t  srest = ( ival >> round_shift ) & 1;
-            #endif
-            const uint64_t  zexp  = sexp & exp_mask;
-            const uint64_t  zmant = smant >> prec_ofs;
+            const uint64_t  isval = fbuf[j].u;
+            const uint64_t  srest = ( isval >> round_shift ) & 0b1;
+            const uint64_t  zval  = ((( isval >> prec_shift ) & zmask) | ( uint64_t(sign[j]) << sign_shift )) + srest; // ( isval >> FP64::mant_bits ) & FP64::exp_mask;
+            
+            // const uint64_t  sexp  = ( isval >> FP64::mant_bits ) & FP64::exp_mask;
+            // const uint64_t  smant = ( isval & FP64::mant_mask );
+            // const uint64_t  zexp  = sexp & exp_mask;
+            // const uint64_t  zmant = smant >> prec_shift;
                 
-            #if defined(HLR_AFL_ROUND)
-            ibuf[j] = ( (((sign[j] << exp_bits) | zexp) << prec_bits) | zmant ) + srest;
-            #else
-            ibuf[j] = (((sign[j] << exp_bits) | zexp) << prec_bits) | zmant;
-            #endif
+            ibuf[j] = zval; // ( (((uint64_t(sign[j]) << exp_bits) | zexp) << prec_bits) | zmant ) + srest;
+
+            // HLR_ASSERT( ibuf[j] == zval );
         }// for
 
         // correct zeroes
@@ -587,29 +584,27 @@ compress ( const double *  data,  // points to actual start of buffer
     // handle remaining values
     for ( ; i < nsize; ++i )
     {
-        const double  val  = data[i];
-        uint64_t      zval = zero_val;
+        fp64int_t  val{ .f = data[i] };
+        uint64_t   zval    = zero_val;
             
-        if ( std::abs( val ) >= Zconf< value_t >::minval )
+        if ( std::abs( val.f ) >= Zconf< value_t >::minval )
         {
-            const bool       zsign = ( val < 0 );
-            const fp64int_t  fival{ .f = std::abs(val) * scale + double(1) };
-            
-            HLR_DBG_ASSERT( std::isfinite( fival.f ) && ( fival.f >= double(2) ));
-            
-            const uint64_t   sexp  = ( fival.u >> FP64::mant_bits ) & FP64::exp_mask;
-            const uint64_t   smant = ( fival.u & FP64::mant_mask );
-            #if defined(HLR_AFL_ROUND)
-            const uint64_t   srest = ( fival.u >> round_shift ) & 1;
-            #endif
-            const uint64_t   zexp  = sexp & exp_mask;
-            const uint64_t   zmant = smant >> prec_ofs;
+            const uint64_t  zsign = ( val.u >> FP64::sign_bit ) & 0b1;
 
-            #if defined(HLR_AFL_ROUND)
-            zval = ( (((zsign << exp_bits) | zexp) << prec_bits) | zmant ) + srest;
-            #else
-            zval = (((zsign << exp_bits) | zexp) << prec_bits) | zmant;
-            #endif
+            val.f = std::abs(val.f) * scale + value_t(1);
+            
+            const uint64_t  srest = ( val.u >> round_shift ) & 0b1;
+            
+            HLR_DBG_ASSERT( std::isfinite( val.f ) && ( val.f >= double(2) ));
+            
+            zval  = ((( val.u >> prec_shift ) & zmask) | ( uint64_t(zsign) << sign_shift )) + srest; // ( isval >> FP64::mant_bits ) & FP64::exp_mask;
+            
+            // const uint64_t   sexp  = ( fival.u >> FP64::mant_bits ) & FP64::exp_mask;
+            // const uint64_t   smant = ( fival.u & FP64::mant_mask );
+            // const uint64_t   zexp  = sexp & exp_mask;
+            // const uint64_t   zmant = smant >> prec_shift;
+
+            // zval = ( (((zsign << exp_bits) | zexp) << prec_bits) | zmant ) + srest;
 
             HLR_DBG_ASSERT( zval != zero_val );
         }// if
@@ -644,9 +639,10 @@ decompress ( double *        data,
     const uint8_t   nbits      = 1 + exp_bits + prec_bits;
     const uint8_t   nbyte      = nbits / 8;
     const uint64_t  prec_mask  = ( 1ul << prec_bits ) - 1;
-    const uint8_t   prec_ofs   = FP64::mant_bits - prec_bits;
+    const uint8_t   prec_shift   = FP64::mant_bits - prec_bits;
     const uint64_t  exp_mask   = ( 1ul << exp_bits  ) - 1;
     const uint32_t  sign_shift = exp_bits + prec_bits;
+    const uint64_t  zmask      = ( 1ul << sign_shift ) - 1; // filters out sign
     const uint64_t  zero_val   = Zconf< value_t >::zero_val & (( 1ul << nbits) - 1 );
     double          scale;
 
@@ -693,16 +689,19 @@ decompress ( double *        data,
         // convert from compressed format
         for ( size_t  j = 0; j < nbuf; ++j )
         {
-            const auto      zval  = ibuf[j];
+            const auto  zval = ibuf[j];
 
             zero[j] = ( zval == zero_val );
             
-            const uint64_t  mant  = zval & prec_mask;
-            const uint64_t  exp   = (zval >> prec_bits) & exp_mask;
             const uint64_t  sign  = (zval >> sign_shift) << FP64::sign_bit;
-            fp64int_t       fival = { .u = ((exp | Zconf< value_t >::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
+            // const uint64_t  mant  = zval & prec_mask;
+            // const uint64_t  exp   = (zval >> prec_bits) & exp_mask;
+            // fp64int_t       tval  = { .u = ((exp | Zconf< value_t >::exp_highbit) << FP64::mant_bits) | (mant << prec_shift) };
+            fp64int_t       fival = { .u = ( ( zval & zmask ) << prec_shift ) | Zconf< value_t >::exp_highbit };
 
-            fival.f  = ( fival.f - 1.0 ) * scale;
+            // HLR_ASSERT( tval.u == fival.u );
+            
+            fival.f  = ( fival.f - value_t(1) ) * scale;
             fival.u |= sign;
             fbuf[j]  = fival.f;
 
@@ -743,12 +742,14 @@ decompress ( double *        data,
             data[i] = 0;
         else
         {
-            const uint64_t  mant  = zval & prec_mask;
-            const uint64_t  exp   = (zval >> prec_bits) & exp_mask;
             const uint64_t  sign  = (zval >> sign_shift) << FP64::sign_bit;
-            fp64int_t       fival = { .u = ((exp | Zconf< value_t >::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
+            // const uint64_t  mant  = zval & prec_mask;
+            // const uint64_t  exp   = (zval >> prec_bits) & exp_mask;
+            // const uint64_t  sign  = (zval >> sign_shift) << FP64::sign_bit;
+            // fp64int_t       fival = { .u = ((exp | Zconf< value_t >::exp_highbit) << FP64::mant_bits) | (mant << prec_shift) };
+            fp64int_t       fival = { .u = ( ( zval & zmask ) << prec_shift ) | Zconf< value_t >::exp_highbit };
             
-            fival.f  = ( fival.f - 1.0 ) * scale;
+            fival.f  = ( fival.f - value_t(1) ) * scale;
             fival.u |= sign;
             data[i]  = fival.f;
 
@@ -1210,7 +1211,7 @@ struct accessor
     const uint8_t      nbits;
     const uint8_t      nbyte;
     const uint64_t     prec_mask;
-    const uint8_t      prec_ofs;
+    const uint8_t      prec_shift;
     const uint64_t     exp_mask;
     const uint32_t     sign_shift;
     const uint64_t     zero_val;
@@ -1224,7 +1225,7 @@ struct accessor
             , nbits( 1 + nexp_bits + nprec_bits )
             , nbyte( nbits / 8 )
             , prec_mask( ( 1ul << nprec_bits ) - 1 )
-            , prec_ofs( FP64::mant_bits - nprec_bits )
+            , prec_shift( FP64::mant_bits - nprec_bits )
             , exp_mask( ( 1ul << nexp_bits  ) - 1 )
             , sign_shift( nexp_bits + nprec_bits )
             , zero_val( Zconf< real_t >::zero_val & (( 1ul << nbits) - 1 ) )
@@ -1254,7 +1255,7 @@ struct accessor
         const uint64_t  mant  = zval & prec_mask;
         const uint64_t  exp   = (zval >> nprec_bits) & exp_mask;
         const uint64_t  sign  = (zval >> sign_shift) << FP64::sign_bit;
-        fp64int_t       fival = { ((exp | Zconf< value_t >::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
+        fp64int_t       fival = { ((exp | Zconf< value_t >::exp_highbit) << FP64::mant_bits) | (mant << prec_shift) };
 
         fival.f  = scale * ( fival.f - 1.0 );
         fival.u |= sign;
@@ -1299,7 +1300,7 @@ struct accessor
             const uint64_t  mant  = zval & acc->prec_mask;
             const uint64_t  exp   = (zval >> acc->nprec_bits) & acc->exp_mask;
             const uint64_t  sign  = (zval >> acc->sign_shift) << FP64::sign_bit;
-            fp64int_t       fival = { ((exp | Zconf< value_t >::exp_highbit) << FP64::mant_bits) | (mant << acc->prec_ofs) };
+            fp64int_t       fival = { ((exp | Zconf< value_t >::exp_highbit) << FP64::mant_bits) | (mant << acc->prec_shift) };
             
             fival.f  = ( fival.f - 1.0 ) * acc->scale;
             fival.u |= sign;
@@ -1380,10 +1381,11 @@ mulvec ( const size_t                        nrows,
 {
     const uint8_t     nbits      = 1 + exp_bits + prec_bits;
     const uint64_t    prec_mask  = ( 1ul << prec_bits ) - 1;
-    const uint8_t     prec_ofs   = FP64::mant_bits - prec_bits;
+    const uint8_t     prec_shift   = FP64::mant_bits - prec_bits;
     const uint64_t    exp_mask   = ( 1ul << exp_bits  ) - 1;
     const uint32_t    sign_shift = exp_bits + prec_bits;
     const uint64_t    zero_val   = Zconf< value_t >::zero_val & (( 1ul << nbits) - 1 );
+    const uint64_t    zmask      = ( 1ul << sign_shift ) - 1; // filters out sign
     const auto        scale      = alpha * zscale;
 
     #if defined(HLR_AFLP_BUFFERED_MVM)
@@ -1412,11 +1414,9 @@ mulvec ( const size_t                        nrows,
                     for ( uint  ii = 0; ii < nbuf; ++ii )
                     {
                         const uint64_t  z_ij  = zA[pos+ii];
-                        const uint64_t  mant  = z_ij & prec_mask;
-                        const uint64_t  exp   = (z_ij >> prec_bits) & exp_mask;
-                        const uint64_t  sign  = (z_ij >> sign_shift) << FP64::sign_bit;
-                        fp64int_t       fival = { .u = ((exp | Zconf< value_t >::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
-                        
+                        const uint64_t  sign  = ( z_ij >> sign_shift) << FP64::sign_bit;
+                        fp64int_t       fival = { .u = ( ( z_ij & zmask ) << prec_shift ) | Zconf< value_t >::exp_highbit };
+
                         fival.f  = ( fival.f - 1.0 );
                         fival.u |= sign;
 
@@ -1436,11 +1436,9 @@ mulvec ( const size_t                        nrows,
 
                     if ( z_ij != zero_val )
                     {
-                        const uint64_t  mant  = z_ij & prec_mask;
-                        const uint64_t  exp   = (z_ij >> prec_bits) & exp_mask;
-                        const uint64_t  sign  = (z_ij >> sign_shift) << FP64::sign_bit;
-                        fp64int_t       fival = { .u = ((exp | Zconf< value_t >::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
-                     
+                        const uint64_t  sign  = ( z_ij >> sign_shift) << FP64::sign_bit;
+                        fp64int_t       fival = { .u = ( ( z_ij & zmask ) << prec_shift ) | Zconf< value_t >::exp_highbit };
+
                         fival.f  = ( fival.f - 1.0 );
                         fival.u |= sign;
 
@@ -1468,10 +1466,8 @@ mulvec ( const size_t                        nrows,
                     for ( uint  ii = 0; ii < nbuf; ++ii )
                     {
                         const uint64_t  z_ij  = zA[pos+ii];
-                        const uint64_t  mant  = z_ij & prec_mask;
-                        const uint64_t  exp   = (z_ij >> prec_bits) & exp_mask;
                         const uint64_t  sign  = (z_ij >> sign_shift) << FP64::sign_bit;
-                        fp64int_t       fival = { .u = ((exp | Zconf< value_t >::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
+                        fp64int_t       fival = { .u = ( ( z_ij & zmask ) << prec_shift ) | Zconf< value_t >::exp_highbit };
                         
                         fival.f  = ( fival.f - 1.0 );
                         fival.u |= sign;
@@ -1491,10 +1487,8 @@ mulvec ( const size_t                        nrows,
 
                     if ( z_ij != zero_val )
                     {
-                        const uint64_t  mant = z_ij & prec_mask;
-                        const uint64_t  exp  = (z_ij >> prec_bits) & exp_mask;
-                        const uint64_t  sign = (z_ij >> sign_shift) << FP64::sign_bit;
-                        fp64int_t       fival = { .u = ((exp | Zconf< value_t >::exp_highbit) << FP64::mant_bits) | (mant << prec_ofs) };
+                        const uint64_t  sign  = (z_ij >> sign_shift) << FP64::sign_bit;
+                        fp64int_t       fival = { .u = ( ( z_ij & zmask ) << prec_shift ) | Zconf< value_t >::exp_highbit };
 
                         fival.f  = ( fival.f - 1.0 );
                         fival.u |= sign;
