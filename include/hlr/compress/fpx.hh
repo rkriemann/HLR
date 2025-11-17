@@ -366,7 +366,7 @@ compress_fp16 ( const float *   data,
             const auto      vf     = _mm512_loadu_ps( data + i );
             const m256hi_t  vh{ .h = _mm512_cvtneps_pbh( vf ) };
             
-            _mm_storeu_si256( reinterpret_cast< __m256i * >( zptr ), vh.i );
+            _mm256_storeu_si256( reinterpret_cast< __m256i * >( zptr ), vh.i );
         }// for
     }
     #  elif defined (__AVX512VBMI__) && defined (__EVEX512__) && defined(HLR_FPX_USE_SIMD)
@@ -429,7 +429,7 @@ decompress_fp16 ( float *         data,
         for ( ; i < nsize16; i += 16, zptr += 32 )
         {
             const m256hi_t  vh{ .i = _mm256_loadu_si256( reinterpret_cast< const __m256i * >( zptr ) ) };
-            const auto      vf     = _mm256_cvtpbh_ps( vh.h );
+            const auto      vf     = _mm512_cvtpbh_ps( vh.h );
 
             _mm512_storeu_ps( data + i, vf );
         }// for
@@ -449,8 +449,7 @@ decompress_fp16 ( float *         data,
     }
     #endif
 
-    constexpr uint32_t  rbits = 1 << 15;
-    auto                zptr  = reinterpret_cast< const byte2_t * >( zdata );
+    auto  zptr  = reinterpret_cast< const byte2_t * >( zdata );
     
     #pragma GCC ivdep
     for ( ; i < nsize; ++i )
@@ -532,8 +531,7 @@ decompress_fp24 ( float *         data,
     }
     #endif
 
-    constexpr uint32_t  rbits = 1 << 7;
-    auto                zptr  = reinterpret_cast< const byte3_t * >( zdata );
+    auto  zptr  = reinterpret_cast< const byte3_t * >( zdata );
     
     #pragma GCC ivdep
     for ( ; i < nsize; ++i )
@@ -803,8 +801,7 @@ decompress_fp16 ( double *        data,
     }
     #endif
 
-    constexpr uint32_t  rbits = 1 << 15;
-    auto                zptr  = reinterpret_cast< const byte2_t * >( zdata );
+    auto  zptr  = reinterpret_cast< const byte2_t * >( zdata );
     
     #pragma GCC ivdep
     for ( ; i < nsize; ++i )
@@ -898,8 +895,7 @@ decompress_fp24 ( double *        data,
     }
     #endif
 
-    constexpr uint32_t  rbits = 1 << 7;
-    auto                zptr  = reinterpret_cast< const byte3_t * >( zdata );
+    auto  zptr  = reinterpret_cast< const byte3_t * >( zdata );
     
     #pragma GCC ivdep
     for ( ; i < nsize; ++i )
@@ -1071,8 +1067,7 @@ decompress_fp40 ( double *        data,
     }
     #endif
 
-    constexpr uint64_t  rbits = 1 << 23;
-    auto                zptr  = reinterpret_cast< const byte5_t * >( zdata );
+    auto  zptr  = reinterpret_cast< const byte5_t * >( zdata );
     
     #pragma GCC ivdep
     for ( ; i < nsize; ++i )
@@ -1161,8 +1156,7 @@ decompress_fp48 ( double *        data,
     }
     #endif
 
-    constexpr uint64_t  rbits = 1 << 15;
-    auto                zptr  = reinterpret_cast< const byte6_t * >( zdata );
+    auto  zptr  = reinterpret_cast< const byte6_t * >( zdata );
     
     #pragma GCC ivdep
     for ( ; i < nsize; ++i )
@@ -1251,8 +1245,7 @@ decompress_fp56 ( double *        data,
     }
     #endif
 
-    constexpr uint64_t  rbits = 1 << 7;
-    auto                zptr  = reinterpret_cast< const byte7_t * >( zdata );
+    auto  zptr  = reinterpret_cast< const byte7_t * >( zdata );
     
     #pragma GCC ivdep
     for ( ; i < nsize; ++i )
