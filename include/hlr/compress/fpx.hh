@@ -720,7 +720,7 @@ decompress_fp16 ( double *        data,
     #  if defined(HLR_FPX_USE_SIMD)
     #    if defined (__AVX512FP16__)
     {
-        const size_t  nsize8 = nsize - nsize % 8;
+        const size_t  nsize8 = 16 * ( nsize / 16 ); // nsize - nsize % 8;
         auto          zptr   = zdata;
     
         for ( ; i < nsize8; i += 8, zptr += 16 )
@@ -733,7 +733,7 @@ decompress_fp16 ( double *        data,
     }
     #    elif defined (__AVX512F__) && defined(__F16C__)
     {
-        const size_t  nsize8 = nsize - nsize % 8;
+        const size_t  nsize8 = 16 * ( nsize / 16 ); // nsize - nsize % 8;
         auto          zptr   = zdata;
     
         for ( ; i < nsize8; i += 8, zptr += 16 )
@@ -746,7 +746,7 @@ decompress_fp16 ( double *        data,
     }
     #    elif defined(__AVX__) && defined(__F16C__)
     {
-        const size_t  nsize4 = nsize - nsize % 4;
+        const size_t  nsize4 = 8 * ( nsize / 8 ); // nsize - nsize % 4;
         auto          zptr   = zdata;
     
         for ( ; i < nsize4; i += 4, zptr += 8 )
@@ -778,7 +778,7 @@ decompress_fp16 ( double *        data,
 
     #  if defined(__AVX512VL__) && defined(__AVX512BF16__) && defined (__EVEX512__) && defined(HLR_FPX_USE_SIMD)
     {
-        const size_t  nsize8 = nsize - nsize % 8;
+        const size_t  nsize8 = 16 * ( nsize / 16 ); // nsize - nsize % 8;
         auto          zptr   = zdata;
     
         for ( ; i < nsize8; i += 8, zptr += 16 )
@@ -791,7 +791,7 @@ decompress_fp16 ( double *        data,
     }
     #  elif defined (__AVX512VBMI__) && defined (__EVEX512__) && defined(HLR_FPX_USE_SIMD)
     {
-        const size_t  nsize8 = nsize - nsize % 8;
+        const size_t  nsize8 = 16 * ( nsize / 16 ); // nsize - nsize % 8;
         auto          zptr   = zdata;
     
         for ( ; i < nsize8; i += 8, zptr += 16 )
@@ -884,7 +884,7 @@ decompress_fp24 ( double *        data,
         
     #if defined (__AVX512VBMI__) && defined (__EVEX512__) && defined(HLR_FPX_USE_SIMD)
     {
-        const size_t  nsize8 = nsize - nsize % 8;
+        const size_t  nsize8 = 32 * ( nsize / 32 ); // ensure 32 byte loads within data address range
         auto          zptr   = zdata;
     
         for ( ; i < nsize8; i += 8, zptr += 24 )
@@ -1057,7 +1057,8 @@ decompress_fp40 ( double *        data,
     
     #if defined (__AVX512VBMI__) && defined (__EVEX512__) && defined(HLR_FPX_USE_SIMD)
     {
-        const size_t  nsize8 = nsize - nsize % 8;
+        const size_t  nsize8 = 64 * ( nsize / 64 ); // nsize - nsize % 8;
+        // const size_t  nsize8 = nsize - nsize % 8;
         auto          zptr   = zdata;
     
         for ( ; i < nsize8; i += 8, zptr += 40 )
@@ -1146,7 +1147,8 @@ decompress_fp48 ( double *        data,
     
     #if defined (__AVX512VBMI__) && defined (__EVEX512__) && defined(HLR_FPX_USE_SIMD)
     {
-        const size_t  nsize8 = nsize - nsize % 8;
+        const size_t  nsize8 = 64 * ( nsize / 64 ); // nsize - nsize % 8;
+        // const size_t  nsize8 = nsize - nsize % 8;
         auto          zptr   = zdata;
     
         for ( ; i < nsize8; i += 8, zptr += 48 )
@@ -1235,7 +1237,8 @@ decompress_fp56 ( double *        data,
     
     #if defined (__AVX512VBMI__) && defined (__EVEX512__) && defined(HLR_FPX_USE_SIMD)
     {
-        const size_t  nsize8 = nsize - nsize % 8;
+        const size_t  nsize8 = 64 * ( nsize / 64 ); // nsize - nsize % 8;
+        // const size_t  nsize8 = nsize - nsize % 8;
         auto          zptr   = zdata;
     
         for ( ; i < nsize8; i += 8, zptr += 56 )
