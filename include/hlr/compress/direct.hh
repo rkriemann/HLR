@@ -11,6 +11,7 @@
 #include <cstdlib>
 
 #include <hlr/utils/log.hh>
+#include <hlr/utils/timer.hh>
 #include <hlr/arith/blas.hh>
 #include <hlr/arith/tensor.hh>
 #include <hlr/compress/ztypes.hh>
@@ -609,6 +610,56 @@ test ()
 
     std::cout << blas::norm_F( D ) << std::endl
               << blas::norm_F( D ) / blas::norm_F( M ) << std::endl;
+}
+
+//
+// benchmark compression/decompression
+//
+inline
+void
+bench ()
+{
+    srand48( 1 );
+    
+    auto    rand  = [] () { return 2.0 * drand48() - 1.0; };
+    size_t  n     = 1 << 13;
+    auto    M     = blas::matrix< double >( n, n );
+    auto    zM    = zarray();
+    auto    D     = blas::matrix< double >( n, n );
+
+    blas::fill_fn( M, rand );
+
+    for ( double  eps = 1e-3; eps >= 1e-12; eps /= 10 )
+    {
+        std::cout << "ε = " << eps << std::endl;
+        
+        {
+            auto  zconf = get_config( relative_prec( Hpro::frobenius_norm, eps ), M );
+            auto  tic   = timer::now();
+        
+            for ( uint  iter = 0; iter < 10; ++iter )
+                zM = std::move( compress( zconf, M ) );
+
+            auto  toc   = timer::since( tic );
+
+            std::cout << "  compress   : " << toc.seconds() << std::endl;
+        }
+        
+        {
+            auto  tic   = timer::now();
+            
+            decompress( zM, D );
+
+            auto  toc   = timer::since( tic );
+
+            std::cout << "  decompress : " << toc.seconds() << std::endl;
+        }
+        
+        blas::add( -1.0, M, D );
+        
+        std::cout << "  error      : " << blas::norm_F( D ) << " / "
+                  << blas::norm_F( D ) / blas::norm_F( M ) << std::endl;
+    }// for
 }
 
 }}// namespace hlr::compress
