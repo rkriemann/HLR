@@ -9,7 +9,10 @@
 //
 
 #include <cstring>
-#include <immintrin.h>
+
+#if defined(__x86_64__)
+#  include <immintrin.h>
+#endif
 
 #include <hlr/compress/byte_n.hh>
 
