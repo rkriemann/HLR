@@ -29,6 +29,9 @@
 // enable/disable compression statistics
 // #define HLR_AFLP_STATS
 
+// enable/disable SIMD instructions
+// #define HLR_AFLP_USE_SIMD
+
 ////////////////////////////////////////////////////////////
 //
 // compression using adaptive float representation
@@ -143,7 +146,7 @@ nzmin_max ( const value_t *  data,
 // SIMD specializations
 //
 
-#if defined(__AVX512F__)
+#if defined(__AVX512F__) && defined(HLR_AFLP_USE_SIMD)
 
 template <>
 inline
