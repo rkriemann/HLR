@@ -24,12 +24,11 @@
 
 ////////////////////////////////////////////////////////////
 //
-// compression using adaptive float representation
+// compression using integer (fixed point) representation
 //
-// - exponent size based on exponent range of input
-// - scale input D such that |d_i| ≥ 1
-// - mantissa size depends on precision and is rounded
-//   up to next byte size for more efficient memory I/O
+// - #bits defined by dynamic range and precision
+// - scale input values to fit into [0,imax] with imax = 2^#bits-1
+// - #bits rounded up to next multiple of 8
 //
 ////////////////////////////////////////////////////////////
 
@@ -49,13 +48,15 @@ struct Zconf< float >
 {
     constexpr static uint8_t   scale_ofs  = 4;
     constexpr static uint8_t   header_ofs = 8;
+    constexpr static float     minval     = 1e-30;
 };
     
 template <>
 struct Zconf< double >
 {
-    constexpr static uint8_t   scale_ofs   = 4;
-    constexpr static uint8_t   header_ofs  = 12;
+    constexpr static uint8_t   scale_ofs  = 4;
+    constexpr static uint8_t   header_ofs = 12;
+    constexpr static double    minval     = 1e-50;
 };
 
 //
@@ -63,8 +64,8 @@ struct Zconf< double >
 //
 //   |d_i - ~d_i| ≤ 2^(-m) ≤ ε with mantissa length m = ⌈-log₂ ε⌉
 //
-inline byte_t eps_to_rate      ( const double  eps ) { return std::max< double >( 1, std::ceil( -std::log2( eps ) ) ) + 3; }
-inline byte_t eps_to_rate_valr ( const double  eps ) { return eps_to_rate( eps ); }
+inline uint8_t  eps_to_rate      ( const double  eps ) { return std::max< uint8_t >( 0, std::ceil( -std::log2( eps ) ) ); }
+inline uint8_t  eps_to_rate_valr ( const double  eps ) { return eps_to_rate( eps ); }
 
 struct config
 {
@@ -91,20 +92,40 @@ inline config  get_config ( const double    eps ) { return config{ eps_to_rate( 
 // compute min/max non-zero(!) values of given data
 //
 template < typename value_t >
-Hpro::real_type_t< value_t >
-max ( const value_t *  data,
-      const size_t     nsize )
+__attribute__ ((target ("default")))
+std::pair< Hpro::real_type_t< value_t >,   // min
+           Hpro::real_type_t< value_t > >  // max
+nzmin_max ( const value_t *  data,
+            const size_t     nsize )
 {
     using  real_t = Hpro::real_type_t< value_t >;
 
+    auto  vmin = FPinfo< real_t >::maximum;
     auto  vmax = real_t(0);
 
+    #pragma GCC ivdep
     for ( size_t  i = 0; i < nsize; ++i )
     {
-        vmax = std::max( vmax, std::abs( data[i] ) );
+        const auto  d_i = std::abs( data[i] );
+        const auto  val = ( d_i < Zconf< real_t >::minval ? FPinfo< real_t >::maximum : d_i );
+
+        vmin = std::min( vmin, val );
+        vmax = std::max( vmax, d_i );
     }// for
 
-    return vmax;
+    HLR_ASSERT( vmin > real_t(0) );
+
+    return { vmin, vmax };
+}
+
+//
+// return number of bits needed to represent given dynamic range
+//
+constexpr
+uint8_t
+nexpbits ( const auto  drange )
+{
+    return uint8_t( std::max< decltype( drange ) >( 0, std::ceil( std::log2( std::log2( drange ) ) ) ) );
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -415,6 +436,7 @@ compress ( const double *  data,  // points to actual start of buffer
         // lowest <exp_bits> exponent bits
         //
             
+        #pragma GCC ivdep
         for ( size_t  j = 0; j < nbuf; ++j )
         {
             // - scale to [-1,1] and then to [-imax,imax]  (signed int)
@@ -439,6 +461,7 @@ compress ( const double *  data,  // points to actual start of buffer
     }// for
 
     // handle remaining values
+    #pragma GCC ivdep
     for ( ; i < nsize; ++i )
     {
         const auto  zval = uint64_t( data[i] * scale + imax ) & imask;
@@ -512,6 +535,7 @@ decompress ( double *        data,
         }// switch
             
         // convert from compressed format
+        #pragma GCC ivdep
         for ( size_t  j = 0; j < nbuf; ++j )
         {
             data[i+j] = ( double(ibuf[j]) - imax ) * scale;
@@ -519,6 +543,7 @@ decompress ( double *        data,
     }// for
     
     // handle remaining values
+    #pragma GCC ivdep
     for ( ; i < nsize; ++i )
     {
         uint64_t  zval = 0;
@@ -560,7 +585,7 @@ compress ( const config &   config,
     const size_t  nsize = ( dim3 == 0 ? ( dim2 == 0 ? ( dim1 == 0 ? dim0 : dim0 * dim1 ) : dim0 * dim1 * dim2 ) : dim0 * dim1 * dim2 * dim3 );
 
     // determine min/max value (> 0!)
-    const auto  vmax = max( data, nsize );
+    const auto  [ vmin, vmax ] = nzmin_max( data, nsize );
     
     if ( vmax == real_t(0) )
     {
@@ -575,28 +600,17 @@ compress ( const config &   config,
 
         return zdata;
     }// if
-    
-    const auto          scale         = real_t(1) / vmax;                                              // scale all values v_i such that |v_i| >= 1
-    constexpr uint32_t  max_mant_bits = FPinfo< real_t >::mant_bits;
-    uint8_t             prec_bits     = std::min< uint32_t >( max_mant_bits, config.bitrate );         // number of precision bits due to config
-    const uint8_t       nbits         = byte_pad( 1 + prec_bits );                                     // rounded up total no. of bits per value
-    const uint8_t       nbyte         = nbits / 8;
-    auto                zdata         = std::vector< byte_t >( Zconf< real_t >::header_ofs + nsize * nbyte ); // array storing compressed data
 
-    // adjust precision (or exponent bits)
-    prec_bits = nbits - 1;
+    constexpr auto  nmaxbits = sizeof(real_t) * 8;
+    const auto      scale    = real_t(1) / vmax;                                                 // scale all values v_i such that |v_i| >= 1
+    const auto      exp_bits = nexpbits( vmax / vmin );                                          // no. of bits needed to represent exponent
+    const auto      nbits    = std::min( nmaxbits, byte_pad( 1 + exp_bits + config.bitrate ) );  // rounded up total no. of bits per value
+    const auto      nbyte    = nbits / 8;
+    auto            zdata    = std::vector< byte_t >( Zconf< real_t >::header_ofs + nsize * nbyte ); // array storing compressed data
 
-    if ( prec_bits > max_mant_bits )
-    {
-        const auto  diff = prec_bits - max_mant_bits;
-            
-        prec_bits = max_mant_bits;
-    }// if
-            
     HLR_DBG_ASSERT( std::isfinite( scale ) );
     
-    HLR_ASSERT( nbits     <= sizeof(real_t) * 8 );
-    HLR_ASSERT( prec_bits <= max_mant_bits );
+    HLR_ASSERT( nbits <= sizeof(real_t) * 8 );
 
     compress( data, nsize, zdata.data(), scale, nbits );
 
@@ -680,10 +694,9 @@ decompress ( const zarray &  zdata,
     // and then the compressed data
     //
     
-    const uint8_t  nbyte  = zdata[0];
+    const auto  nbyte  = zdata[0];
     
-    // HLR_ASSERT( 1 + exp_bits + prec_bits <= sizeof(value_t) * 8 );
-    // HLR_ASSERT( prec_bits <= FPinfo< real_t >::mant_bits );
+    HLR_ASSERT( nbyte <= sizeof(value_t) );
 
     if ( nbyte == 0 )
     {
@@ -740,8 +753,9 @@ compress_lr ( const blas::matrix< value_t > &                       U,
 {
     using  real_t = Hpro::real_type_t< value_t >;
     
-    constexpr real_t  fp_maximum  = FPinfo< real_t >::maximum;
-    constexpr size_t  header_size = Zconf< real_t >::header_ofs; // sizeof(real_t) + 2;
+    constexpr real_t   fp_maximum  = FPinfo< real_t >::maximum;
+    constexpr size_t   header_size = Zconf< real_t >::header_ofs; // sizeof(real_t) + 2;
+    constexpr uint8_t  nmaxbits    = sizeof(real_t) * 8;
     
     //
     // first, determine exponent bits and mantissa bits for all columns
@@ -757,13 +771,13 @@ compress_lr ( const blas::matrix< value_t > &                       U,
     {
         HLR_DBG_ASSERT( U.row_stride() == 1 );
 
-        const auto  vmax = max( U.ptr(0,l), n );
+        const auto  [ vmin, vmax ] = nzmin_max( U.ptr(0,l), n );
 
         s[l] = real_t(1) / vmax;
 
         HLR_ASSERT( std::isfinite( s[l] ) );
 
-        const auto  nbits = byte_pad( 1 + eps_to_rate_valr( S(l) ) );
+        const auto  nbits = std::min< size_t >( nmaxbits, byte_pad( 1 + nexpbits( vmax / vmin ) + eps_to_rate_valr( S(l) ) ) );
         const auto  nbyte = nbits / 8;
 
         m[l] = nbits;
@@ -977,56 +991,6 @@ namespace
 {
 
 template < typename value_t,
-           typename accessor_t >
-void
-mulvec ( const size_t        nrows,
-         const size_t        ncols,
-         const matop_t       op_A,
-         const value_t       alpha,
-         const accessor_t &  zA,
-         const value_t *     x,
-         value_t *           y )
-{
-    auto  iter_A = zA.begin();
-        
-    switch ( op_A )
-    {
-        case  apply_normal :
-        {
-            size_t  pos = 0;
-            
-            for ( size_t  j = 0; j < ncols; ++j )
-            {
-                const auto  x_j = alpha * x[j];
-                
-                for ( size_t  i = 0; i < nrows; ++i, ++iter_A )
-                    y[i] += *iter_A * x_j;
-            }// for
-        }// case
-        break;
-        
-        case  apply_adjoint :
-        {
-            size_t  pos = 0;
-            
-            for ( size_t  j = 0; j < ncols; ++j )
-            {
-                auto  y_j = value_t(0);
-                
-                for ( size_t  i = 0; i < nrows; ++i, ++iter_A )
-                    y_j += *iter_A * x[i];
-
-                y[j] += alpha * y_j;
-            }// for
-        }// case
-        break;
-
-        default:
-            HLR_ERROR( "TODO" );
-    }// switch
-}
-
-template < typename value_t,
            typename storage_t >
 void
 mulvec ( const size_t                        nrows,
@@ -1039,15 +1003,8 @@ mulvec ( const size_t                        nrows,
          value_t *                           y,
          const uint8_t                       nbyte )
 {
-    const double      imax  = 1ul << (8*nbyte-1);        // maximal signed integer value
-    const auto        scale = alpha * zscale;
-
-    #if defined(HLR_FIXEDPOINT_BUFFERED_MVM)
-    constexpr size_t  max_nbuf = 64;
-    const size_t      nbuf     = std::min< size_t >( max_nbuf, nrows );
-    const size_t      nrowsbuf = ( nrows > nbuf ? nrows - nrows % nbuf : nrows );
-    value_t           fcache[nbuf];
-    #endif
+    const auto  imax  = double( 1ul << (8*nbyte-1) );        // maximal signed integer value
+    const auto  scale = alpha * zscale;
 
     switch ( op_A )
     {
@@ -1058,33 +1015,9 @@ mulvec ( const size_t                        nrows,
             for ( size_t  j = 0; j < ncols; ++j )
             {
                 const auto  x_j = scale * x[j];
-                size_t      i   = 0;
                 
-                #if defined(HLR_FIXEDPOINT_BUFFERED_MVM)
-                
-                for ( ; i < nrowsbuf; i += nbuf, pos += nbuf )
-                {
-                    #pragma GCC ivdep
-                    for ( uint  ii = 0; ii < nbuf; ++ii )
-                    {
-                        const double  A_ij = double(zA[pos+ii]);
-
-                        fcache[ii] = fival.f;
-                    }// for
-
-                    #pragma GCC ivdep
-                    for ( uint  ii = 0; ii < nbuf; ++ii )
-                        y[i+ii] += fcache[ii] * x_j;
-                }// for
-
-                #endif
-                
-                for ( ; i < nrows; ++i, pos++ )
-                {
-                    auto  A_ij = double( zA[pos] ) - imax;
-
-                    y[i] += A_ij * x_j;
-                }// for
+                for ( size_t  i = 0; i < nrows; ++i, pos++ )
+                    y[i] += ( double( zA[pos] ) - imax ) * x_j;
             }// for
         }// case
         break;
@@ -1096,37 +1029,9 @@ mulvec ( const size_t                        nrows,
             for ( size_t  j = 0; j < ncols; ++j )
             {
                 value_t  y_j = value_t(0);
-                size_t   i   = 0;
                 
-                #if defined(HLR_FIXEDPOINT_BUFFERED_MVM)
-
-                for ( ; i < nrowsbuf; i += nbuf, pos += nbuf )
-                {
-                    #pragma GCC ivdep
-                    for ( uint  ii = 0; ii < nbuf; ++ii )
-                    {
-                        const uint64_t  z_ij  = zA[pos+ii];
-                        const uint64_t  sign  = (z_ij >> sign_shift) << FP64::sign_bit;
-                        fp64int_t       fival = { .u = ( ( z_ij & zmask ) << prec_shift ) | Zconf< value_t >::exp_highbit };
-                        
-                        fival.f  = ( fival.f - 1.0 );
-                        fival.u |= sign;
-
-                        fcache[ii] = fival.f;
-                    }// for
-                        
-                    for ( uint  ii = 0; ii < nbuf; ++ii )
-                        y_j += fcache[ii] * x[i+ii];
-                }// for
-
-                #endif
-                
-                for ( ; i < nrows; ++i, pos++ )
-                {
-                    const auto  A_ij = double( zA[pos] ) - imax;
-
-                    y_j += A_ij * x[i];
-                }// for
+                for ( size_t  i = 0; i < nrows; ++i, pos++ )
+                    y_j += ( double( zA[pos] ) - imax ) * x[i];
 
                 y[j] += scale * y_j;
             }// for
@@ -1187,7 +1092,7 @@ mulvec_lr ( const size_t     nrows,
 
     constexpr size_t  scale_ofs = Zconf< real_t >::scale_ofs;
     constexpr size_t  data_ofs  = Zconf< real_t >::header_ofs;
-    size_t            pos       = 0;
+    auto              zdata     = zA.data();
 
     switch ( op_A )
     {
@@ -1195,26 +1100,24 @@ mulvec_lr ( const size_t     nrows,
         {
             for ( uint  l = 0; l < ncols; ++l )
             {
-                const uint8_t  nbyte = zA[pos];
-                const real_t   scale = real_t(1) / ( * ( reinterpret_cast< const real_t * >( zA.data() + pos + scale_ofs ) ) );
+                const uint8_t  nbyte = zdata[0];
+                const real_t   scale = real_t(1) / ( * ( reinterpret_cast< const real_t * >( zdata + scale_ofs ) ) );
                 
-                HLR_ASSERT( pos + data_ofs + nrows * nbyte <= zA.size() );
-
                 switch ( nbyte )
                 {
-                    case  1 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte1_t * >( zA.data() + pos + data_ofs ), x+l, y, nbyte ); break;
-                    case  2 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte2_t * >( zA.data() + pos + data_ofs ), x+l, y, nbyte ); break;
-                    case  3 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte3_t * >( zA.data() + pos + data_ofs ), x+l, y, nbyte ); break;
-                    case  4 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte4_t * >( zA.data() + pos + data_ofs ), x+l, y, nbyte ); break;
-                    case  5 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte5_t * >( zA.data() + pos + data_ofs ), x+l, y, nbyte ); break;
-                    case  6 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte6_t * >( zA.data() + pos + data_ofs ), x+l, y, nbyte ); break;
-                    case  7 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte7_t * >( zA.data() + pos + data_ofs ), x+l, y, nbyte ); break;
-                    case  8 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte8_t * >( zA.data() + pos + data_ofs ), x+l, y, nbyte ); break;
+                    case  1 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte1_t * >( zdata + data_ofs ), x+l, y, nbyte ); break;
+                    case  2 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte2_t * >( zdata + data_ofs ), x+l, y, nbyte ); break;
+                    case  3 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte3_t * >( zdata + data_ofs ), x+l, y, nbyte ); break;
+                    case  4 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte4_t * >( zdata + data_ofs ), x+l, y, nbyte ); break;
+                    case  5 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte5_t * >( zdata + data_ofs ), x+l, y, nbyte ); break;
+                    case  6 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte6_t * >( zdata + data_ofs ), x+l, y, nbyte ); break;
+                    case  7 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte7_t * >( zdata + data_ofs ), x+l, y, nbyte ); break;
+                    case  8 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte8_t * >( zdata + data_ofs ), x+l, y, nbyte ); break;
                     default :
                         HLR_ERROR( "unsupported byte size" );
                 }// switch
 
-                pos += data_ofs + nbyte * nrows;
+                zdata += data_ofs + nbyte * nrows;
             }// for
         }// case
         break;
@@ -1227,26 +1130,24 @@ mulvec_lr ( const size_t     nrows,
         {
             for ( uint  l = 0; l < ncols; ++l )
             {
-                const uint8_t  nbyte = zA[pos];
-                const real_t   scale = real_t(1) / ( * ( reinterpret_cast< const real_t * >( zA.data() + pos + scale_ofs ) ) );
-                
-                HLR_ASSERT( pos + data_ofs + nrows * nbyte <= zA.size() );
+                const uint8_t  nbyte = zdata[0];
+                const real_t   scale = real_t(1) / ( * ( reinterpret_cast< const real_t * >( zdata + scale_ofs ) ) );
                 
                 switch ( nbyte )
                 {
-                    case  1 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte1_t * >( zA.data() + pos + data_ofs ), x, y+l, nbyte ); break;
-                    case  2 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte2_t * >( zA.data() + pos + data_ofs ), x, y+l, nbyte ); break;
-                    case  3 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte3_t * >( zA.data() + pos + data_ofs ), x, y+l, nbyte ); break;
-                    case  4 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte4_t * >( zA.data() + pos + data_ofs ), x, y+l, nbyte ); break;
-                    case  5 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte5_t * >( zA.data() + pos + data_ofs ), x, y+l, nbyte ); break;
-                    case  6 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte6_t * >( zA.data() + pos + data_ofs ), x, y+l, nbyte ); break;
-                    case  7 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte7_t * >( zA.data() + pos + data_ofs ), x, y+l, nbyte ); break;
-                    case  8 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte8_t * >( zA.data() + pos + data_ofs ), x, y+l, nbyte ); break;
+                    case  1 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte1_t * >( zdata + data_ofs ), x, y+l, nbyte ); break;
+                    case  2 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte2_t * >( zdata + data_ofs ), x, y+l, nbyte ); break;
+                    case  3 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte3_t * >( zdata + data_ofs ), x, y+l, nbyte ); break;
+                    case  4 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte4_t * >( zdata + data_ofs ), x, y+l, nbyte ); break;
+                    case  5 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte5_t * >( zdata + data_ofs ), x, y+l, nbyte ); break;
+                    case  6 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte6_t * >( zdata + data_ofs ), x, y+l, nbyte ); break;
+                    case  7 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte7_t * >( zdata + data_ofs ), x, y+l, nbyte ); break;
+                    case  8 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte8_t * >( zdata + data_ofs ), x, y+l, nbyte ); break;
                     default :
                         HLR_ERROR( "unsupported byte size" );
                 }// switch
 
-                pos += data_ofs + nbyte * nrows;
+                zdata += data_ofs + nbyte * nrows;
             }// for
         }// case
         break;
