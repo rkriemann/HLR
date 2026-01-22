@@ -117,6 +117,30 @@ namespace zblas { using hlr::compress::fpx::mulvec; }
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_FIXED
+
+#include <hlr/compress/fixedpoint.hh>
+
+namespace hlr { namespace compress {
+
+static const char provider[] = "fixedpoint";
+
+using  zconfig_t = hlr::compress::fixedpoint::config;
+using  zarray    = hlr::compress::fixedpoint::zarray;
+
+using hlr::compress::fixedpoint::compress;
+using hlr::compress::fixedpoint::decompress;
+using hlr::compress::fixedpoint::get_config;
+using hlr::compress::fixedpoint::byte_size;
+using hlr::compress::fixedpoint::compressed_size;
+
+namespace zblas { using hlr::compress::fixedpoint::mulvec; }
+
+}} // namespace hlr::compress
+
+//////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
+
 #elif HLR_COMPRESSOR == HLR_COMPRESSOR_ZFP
 
 #  if !defined(HLR_HAS_ZFP)
