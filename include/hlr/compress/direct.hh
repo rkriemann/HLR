@@ -622,12 +622,14 @@ bench ()
     srand48( 1 );
     
     auto    rand  = [] () { return 2.0 * drand48() - 1.0; };
-    size_t  n     = 1 << 13;
+    size_t  n     = 8192;
     auto    M     = blas::matrix< double >( n, n );
     auto    zM    = zarray();
     auto    D     = blas::matrix< double >( n, n );
 
     blas::fill_fn( M, rand );
+
+    std::cout << "compressor: " << provider << std::endl;
 
     for ( double  eps = 1e-3; eps >= 1e-12; eps /= 10 )
     {
@@ -648,7 +650,8 @@ bench ()
         {
             auto  tic   = timer::now();
             
-            decompress( zM, D );
+            for ( uint  iter = 0; iter < 10; ++iter )
+                decompress( zM, D );
 
             auto  toc   = timer::since( tic );
 
