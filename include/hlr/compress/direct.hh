@@ -10,6 +10,8 @@
 
 #include <cstdlib>
 
+#include <boost/format.hpp>
+
 #include <hlr/utils/log.hh>
 #include <hlr/utils/timer.hh>
 #include <hlr/arith/blas.hh>
@@ -655,37 +657,51 @@ bench ()
 
     std::cout << "compressor: " << provider << std::endl;
 
-    for ( double  eps = 1e-3; eps >= 1e-12; eps /= 10 )
+    for ( double  dr = 8.0; dr <= 8.0; dr *= 10 )
     {
-        std::cout << "ε = " << eps << std::endl;
+        std::cout << "dr = " << dr << std::endl
+                  << std::endl;
         
-        {
-            auto  zconf = get_config( relative_prec( Hpro::frobenius_norm, eps ), M );
-            auto  tic   = timer::now();
-        
-            for ( uint  iter = 0; iter < 10; ++iter )
-                zM = std::move( compress( zconf, M ) );
+        auto    rand  = [dr] () { return 0.5 * dr * drand48() - ( 0.5 * dr ); };
+        size_t  n     = 1 << 13;
+        auto    M     = blas::matrix< double >( n, n );
+        auto    zM    = zarray();
+        auto    D     = blas::matrix< double >( n, n );
 
-            auto  toc   = timer::since( tic );
+        blas::fill_fn( M, rand );
 
-            std::cout << "  compress   : " << toc.seconds() << std::endl;
-        }
-        
+        for ( double  eps = 1e-3; eps >= 1e-12; eps /= 10 )
         {
-            auto  tic   = timer::now();
+            std::cout << "ε = " << eps << std::endl;
+        
+            {
+                auto  zconf = get_config( relative_prec( Hpro::frobenius_norm, eps ), M );
+                auto  tic   = timer::now();
+        
+                for ( uint  iter = 0; iter < 10; ++iter )
+                    zM = std::move( compress( zconf, M ) );
+
+                auto  toc   = timer::since( tic );
+
+                std::cout << "  compress   : " << boost::format( "%.2es" ) % toc.seconds() << std::endl;
+            }
+        
+            {
+                auto  tic   = timer::now();
             
-            for ( uint  iter = 0; iter < 10; ++iter )
-                decompress( zM, D );
+                for ( uint  iter = 0; iter < 10; ++iter )
+                    decompress( zM, D );
 
-            auto  toc   = timer::since( tic );
+                auto  toc   = timer::since( tic );
 
-            std::cout << "  decompress : " << toc.seconds() << std::endl;
-        }
+                std::cout << "  decompress : " << boost::format( "%.2es" ) % toc.seconds() << std::endl;
+            }
         
-        blas::add( -1.0, M, D );
+            blas::add( -1.0, M, D );
         
-        std::cout << "  error      : " << blas::norm_F( D ) << " / "
-                  << blas::norm_F( D ) / blas::norm_F( M ) << std::endl;
+            std::cout << "  error      : " << boost::format( "%.4e" ) % blas::norm_F( D ) << " / "
+                      << boost::format( "%.4e" ) % ( blas::norm_F( D ) / blas::norm_F( M ) ) << std::endl;
+        }// for
     }// for
 }
 
