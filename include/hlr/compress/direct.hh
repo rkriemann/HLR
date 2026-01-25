@@ -647,6 +647,16 @@ void
 bench ()
 {
     srand48( 1 );
+    
+    auto    rand  = [] () { return 2.0 * drand48() - 1.0; };
+    size_t  n     = 8192;
+    auto    M     = blas::matrix< double >( n, n );
+    auto    zM    = zarray();
+    auto    D     = blas::matrix< double >( n, n );
+
+    blas::fill_fn( M, rand );
+
+    std::cout << "compressor: " << provider << std::endl;
 
     for ( double  dr = 8.0; dr <= 8.0; dr *= 10 )
     {
