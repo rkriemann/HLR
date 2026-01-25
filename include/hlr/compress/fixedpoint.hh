@@ -103,7 +103,7 @@ inline config  get_config ( const double    eps ) { return config{ eps_to_rate( 
 // compute min/max non-zero(!) values of given data
 //
 template < typename value_t >
-__attribute__ ((target ("default")))
+// __attribute__ ((target ("default")))
 std::pair< Hpro::real_type_t< value_t >,   // min
            Hpro::real_type_t< value_t > >  // max
 nzmin_max ( const value_t *  data,
@@ -415,25 +415,34 @@ compress ( const double *  data,  // points to actual start of buffer
 {
     using  value_t = double;
     
-    const uint8_t  nbyte = nbits / 8;
-        
     //
     // store header (exponent bits, precision bits and scaling factor)
     //
         
+    #if defined(HLR_FIXEDPOINT_BITSTREAM)
+    const uint8_t   nbyte = nbits / 8;
     const uint64_t  imask = ( 1ul << nbits ) - 1ul;    // mask to extract nbyte integer value (also maximal unsigned integer value)
-    const double    imax  = imask / 2;             // maximal signed integer value
+    const double    imax  = imask / 2;                 // maximal signed integer value
+    #else
+    constexpr uint8_t   nbyte = sizeof(storage_t);
+    constexpr auto      imax  = double( ( 1ul << ( 8*nbyte - 1 ) ) - 1 );
+    constexpr uint64_t  imask = ( 0xFFFFFFFFFFFFFFFF >> 8 * ( 8 - nbyte ) );
+    #endif
 
     // adjust scaling for integer max
     scale = scale * imax;
 
-    // store number of bits for decompression
+    HLR_DBG_ASSERT( std::isfinite( scale ) );
+    
+    // store number of bits and scaling factor for decompression
+    #if defined(HLR_FIXEDPOINT_BITSTREAM)
     zdata[0] = nbits;
+    #else
+    zdata[0] = nbyte;
+    #endif
     
     memcpy( zdata + Zconf< value_t >::scale_ofs, & scale, sizeof(scale) );
 
-    HLR_DBG_ASSERT( std::isfinite( scale ) );
-    
     zdata += Zconf< value_t >::header_ofs;
     
     //
@@ -462,26 +471,13 @@ compress ( const double *  data,  // points to actual start of buffer
     for ( size_t  i = 0; i < nsize; ++i )
     {
         #if defined(HLR_FIXEDPOINT_BITSTREAM)
-        const auto  zval = uint64_t( data[i] * scale + imax ) & imask;
-
-        bs.write_bits( zval, nbits );
+        
+        bs.write_bits( uint64_t( data[i] * scale + imax ) & imask, nbits );
         
         #else
-        
+
         zptr[i] = uint64_t( data[i] * scale + imax ) & imask;
-        
-        // switch ( nbyte )
-        // {
-        //     case  1 : { auto ptr = zdata + i;                                  *ptr = zval; } break;
-        //     case  2 : { auto ptr = reinterpret_cast< byte2_t * >( zdata ) + i; *ptr = zval; } break;
-        //     case  3 : { auto ptr = reinterpret_cast< byte3_t * >( zdata ) + i; *ptr = zval; } break;
-        //     case  4 : { auto ptr = reinterpret_cast< byte4_t * >( zdata ) + i; *ptr = zval; } break;
-        //     case  5 : { auto ptr = reinterpret_cast< byte5_t * >( zdata ) + i; *ptr = zval; } break;
-        //     case  6 : { auto ptr = reinterpret_cast< byte6_t * >( zdata ) + i; *ptr = zval; } break;
-        //     case  7 : { auto ptr = reinterpret_cast< byte7_t * >( zdata ) + i; *ptr = zval; } break;
-        //     case  8 : { auto ptr = reinterpret_cast< byte8_t * >( zdata ) + i; *ptr = zval; } break;
-        //     default : HLR_ERROR( "invalid storage size" );
-        // }// switch
+
         #endif
     }// for
 }
@@ -503,8 +499,7 @@ decompress ( double *        data,
     const auto  nbits = zdata[0];
     const auto  nbyte = nbits / 8;
     #else
-    const auto  nbits = zdata[0];
-    const auto  nbyte = nbits / 8;
+    const auto  nbyte = zdata[0];
     #endif
     
     HLR_ASSERT( nbyte <= sizeof(double) );
@@ -539,13 +534,17 @@ decompress ( double *        data,
     // decompress in "vectorised" form
     //
         
-    const uint64_t  imax   = 1ul << (nbits-1);        // maximal signed integer value
-
     #if defined(HLR_FIXEDPOINT_BITSTREAM)
+
+    const uint64_t  imax   = 1ul << (nbits-1);        // maximal signed integer value
     const size_t    bssize = pad_bs< uint64_t >( byte_pad( nsize * nbits ) / 8 );
     auto            bs     = bitstream< uint64_t >( const_cast< byte_t * >( zdata ), bssize );
+    
     #else
+    
+    constexpr auto  imax  = double( ( 1ul << ( 8*sizeof(storage_t) - 1 ) ) - 1 );
     auto            zptr   = reinterpret_cast< const storage_t * >( zdata );
+    
     #endif
 
     #pragma GCC ivdep
@@ -553,27 +552,13 @@ decompress ( double *        data,
     {
         #if defined(HLR_FIXEDPOINT_BITSTREAM)
         
-        const uint64_t  zval = bs.read_bits( nbits );
+        data[i] = ( double( uint64_t( bs.read_bits( nbits ) ) ) - imax ) * scale;
         
         #else
         
-        const uint64_t  zval = zptr[i];
-            
-        // switch ( nbyte )
-        // {
-        //     case  1 : { auto ptr = zdata + i;                                        zval = *ptr; } break;
-        //     case  2 : { auto ptr = reinterpret_cast< const byte2_t * >( zdata ) + i; zval = *ptr; } break;
-        //     case  3 : { auto ptr = reinterpret_cast< const byte3_t * >( zdata ) + i; zval = *ptr; } break;
-        //     case  4 : { auto ptr = reinterpret_cast< const byte4_t * >( zdata ) + i; zval = *ptr; } break;
-        //     case  5 : { auto ptr = reinterpret_cast< const byte5_t * >( zdata ) + i; zval = *ptr; } break;
-        //     case  6 : { auto ptr = reinterpret_cast< const byte6_t * >( zdata ) + i; zval = *ptr; } break;
-        //     case  7 : { auto ptr = reinterpret_cast< const byte7_t * >( zdata ) + i; zval = *ptr; } break;
-        //     case  8 : { auto ptr = reinterpret_cast< const byte8_t * >( zdata ) + i; zval = *ptr; } break;
-        //     default : HLR_ERROR( "invalid storage size" );
-        // }// switch
+        data[i] = ( double( uint64_t(zptr[i]) ) - imax ) * scale;
+        
         #endif
-
-        data[i] = ( double(zval) - imax ) * scale;
     }// for
 }
 
@@ -616,21 +601,22 @@ compress ( const config &   config,
     constexpr auto  nmaxbits = sizeof(real_t) * 8;
     const auto      scale    = real_t(1) / vmax;                                             // scale all values v_i such that |v_i| >= 1
     const auto      nbits    = std::min< uint >( nmaxbits, nzbits( vmax / vmin, config.bitrate ) );  // rounded up total no. of bits per value
+
+    HLR_DBG_ASSERT( std::isfinite( scale ) );
+    HLR_ASSERT( nbits <= sizeof(real_t) * 8 );
+
     #if defined(HLR_FIXEDPOINT_BITSTREAM)
     const size_t    nbytes   = pad_bs< uint64_t >( byte_pad( nsize * nbits ) / 8 );
     #else
     const size_t    nbyte    = nbits / 8;
     const size_t    nbytes   = nsize * nbyte;
     #endif
-    auto            zdata    = std::vector< byte_t >( Zconf< real_t >::header_ofs + nbytes ); // array storing compressed data
-
-    HLR_DBG_ASSERT( std::isfinite( scale ) );
     
-    HLR_ASSERT( nbits <= sizeof(real_t) * 8 );
+    auto            zdata    = std::vector< byte_t >( Zconf< real_t >::header_ofs + nbytes ); // array storing compressed data
 
     #if defined(HLR_FIXEDPOINT_BITSTREAM)
 
-    compress< byte1_t >( data, nsize, zdata.data(), scale, nbits );
+    compress< byte_t >( data, nsize, zdata.data(), scale, nbits );
     
     #else
     
@@ -653,7 +639,18 @@ compress ( const config &   config,
     // {
     //     std::vector< double >  tmp( nsize );
 
-    //     decompress( tmp.data(), nsize, zdata.data(), nbyte );
+    //     switch ( nbyte )
+    //     {
+    //         case  1 : decompress< byte1_t >( tmp.data(), nsize, zdata.data() ); break;
+    //         case  2 : decompress< byte2_t >( tmp.data(), nsize, zdata.data() ); break;
+    //         case  3 : decompress< byte3_t >( tmp.data(), nsize, zdata.data() ); break;
+    //         case  4 : decompress< byte4_t >( tmp.data(), nsize, zdata.data() ); break;
+    //         case  5 : decompress< byte5_t >( tmp.data(), nsize, zdata.data() ); break;
+    //         case  6 : decompress< byte6_t >( tmp.data(), nsize, zdata.data() ); break;
+    //         case  7 : decompress< byte7_t >( tmp.data(), nsize, zdata.data() ); break;
+    //         case  8 : decompress< byte8_t >( tmp.data(), nsize, zdata.data() ); break;
+    //         default : HLR_ERROR( "invalid storage size" );
+    //     }// switch
 
     //     double  err = 0;
     //     double  nrm = 0;
@@ -661,6 +658,9 @@ compress ( const config &   config,
     //     for ( size_t  i = 0; i < nsize; ++i )
     //     {
     //         const auto  d_i = data[i] - tmp[i];
+
+    //         if ( std::abs( d_i ) > 1e-8 )
+    //             std::cout << i << " : " << data[i] << " / " << tmp[i] << " / " << d_i << std::endl;
             
     //         err += d_i * d_i;
     //         nrm += data[i] * data[i];
@@ -726,23 +726,23 @@ decompress ( const zarray &  zdata,
 
     #if defined(HLR_FIXEDPOINT_BITSTREAM)
 
-    decompress< byte1_t >( dest, nsize, zdata.data() );
+    decompress< byte_t >( dest, nsize, zdata.data() );
 
     #else
 
-    const auto  nbits = zdata[0];
+    const auto  nbyte = zdata[0];
     
-    switch ( nbits )
+    switch ( nbyte )
     {
-        case   8 : decompress< byte1_t >( dest, nsize, zdata.data() ); break;
-        case  16 : decompress< byte2_t >( dest, nsize, zdata.data() ); break;
-        case  24 : decompress< byte3_t >( dest, nsize, zdata.data() ); break;
-        case  32 : decompress< byte4_t >( dest, nsize, zdata.data() ); break;
-        case  40 : decompress< byte5_t >( dest, nsize, zdata.data() ); break;
-        case  48 : decompress< byte6_t >( dest, nsize, zdata.data() ); break;
-        case  56 : decompress< byte7_t >( dest, nsize, zdata.data() ); break;
-        case  64 : decompress< byte8_t >( dest, nsize, zdata.data() ); break;
-        default  : HLR_ERROR( "invalid storage size" );
+        case  1 : decompress< byte1_t >( dest, nsize, zdata.data() ); break;
+        case  2 : decompress< byte2_t >( dest, nsize, zdata.data() ); break;
+        case  3 : decompress< byte3_t >( dest, nsize, zdata.data() ); break;
+        case  4 : decompress< byte4_t >( dest, nsize, zdata.data() ); break;
+        case  5 : decompress< byte5_t >( dest, nsize, zdata.data() ); break;
+        case  6 : decompress< byte6_t >( dest, nsize, zdata.data() ); break;
+        case  7 : decompress< byte7_t >( dest, nsize, zdata.data() ); break;
+        case  8 : decompress< byte8_t >( dest, nsize, zdata.data() ); break;
+        default : HLR_ERROR( "invalid storage size" );
     }// switch
     
     #endif
@@ -812,19 +812,18 @@ compress_lr ( const blas::matrix< value_t > &                       U,
         HLR_DBG_ASSERT( U.row_stride() == 1 );
 
         const auto  [ vmin, vmax ] = nzmin_max( U.ptr(0,l), n );
-
-        s[l] = real_t(1) / vmax;
-
-        HLR_ASSERT( std::isfinite( s[l] ) );
-
-        const auto    nbits  = std::min( nmaxbits, nzbits( vmax / vmin, eps_to_rate_valr( S(l) ) ) );
+        const auto  nbits          = std::min( nmaxbits, nzbits( vmax / vmin, eps_to_rate_valr( S(l) ) ) );
+        
         #if defined(HLR_FIXEDPOINT_BITSTREAM)
         const size_t  nbytes = pad_bs< uint64_t >( byte_pad( n * nbits ) / 8 );
         #else
         const size_t  nbytes = ( n * nbits ) / 8;
         #endif
 
+        s[l] = real_t(1) / vmax;
         m[l] = nbits;
+
+        HLR_ASSERT( std::isfinite( s[l] ) );
 
         zsize += header_size + nbytes;
     }// for
@@ -854,14 +853,14 @@ compress_lr ( const blas::matrix< value_t > &                       U,
         
         switch ( nbyte )
         {
-            case  1 : compress< byte1_t >( U.ptr(0,l), n, zdata.data() + pos, scale, nbits ); break;
-            case  2 : compress< byte2_t >( U.ptr(0,l), n, zdata.data() + pos, scale, nbits ); break;
-            case  3 : compress< byte3_t >( U.ptr(0,l), n, zdata.data() + pos, scale, nbits ); break;
-            case  4 : compress< byte4_t >( U.ptr(0,l), n, zdata.data() + pos, scale, nbits ); break;
-            case  5 : compress< byte5_t >( U.ptr(0,l), n, zdata.data() + pos, scale, nbits ); break;
-            case  6 : compress< byte6_t >( U.ptr(0,l), n, zdata.data() + pos, scale, nbits ); break;
-            case  7 : compress< byte7_t >( U.ptr(0,l), n, zdata.data() + pos, scale, nbits ); break;
-            case  8 : compress< byte8_t >( U.ptr(0,l), n, zdata.data() + pos, scale, nbits ); break;
+            case  1 : compress< byte1_t >( U.ptr(0,l), n, zdata.data() + pos, scale, 0 ); break;
+            case  2 : compress< byte2_t >( U.ptr(0,l), n, zdata.data() + pos, scale, 0 ); break;
+            case  3 : compress< byte3_t >( U.ptr(0,l), n, zdata.data() + pos, scale, 0 ); break;
+            case  4 : compress< byte4_t >( U.ptr(0,l), n, zdata.data() + pos, scale, 0 ); break;
+            case  5 : compress< byte5_t >( U.ptr(0,l), n, zdata.data() + pos, scale, 0 ); break;
+            case  6 : compress< byte6_t >( U.ptr(0,l), n, zdata.data() + pos, scale, 0 ); break;
+            case  7 : compress< byte7_t >( U.ptr(0,l), n, zdata.data() + pos, scale, 0 ); break;
+            case  8 : compress< byte8_t >( U.ptr(0,l), n, zdata.data() + pos, scale, 0 ); break;
             default : HLR_ERROR( "invalid storage size" );
         }// switch
         
@@ -1002,9 +1001,9 @@ decompress_lr ( const zarray &             zdata,
         // and decompress data
         //
     
-        const uint8_t  nbits = zdata[ pos ];
-
         #if defined(HLR_FIXEDPOINT_BITSTREAM)
+        
+        const uint8_t  nbits = zdata[ pos ];
         
         decompress< byte_t >( U.data() + l * n, n, zdata.data() + pos );
 
@@ -1012,20 +1011,22 @@ decompress_lr ( const zarray &             zdata,
         
         #else
 
-        switch ( nbits )
+        const uint8_t  nbyte = zdata[ pos ];
+        
+        switch ( nbyte )
         {
-            case   8 : decompress< byte1_t >( U.data() + l * n, n, zdata.data() + pos ); break;
-            case  16 : decompress< byte2_t >( U.data() + l * n, n, zdata.data() + pos ); break;
-            case  24 : decompress< byte3_t >( U.data() + l * n, n, zdata.data() + pos ); break;
-            case  32 : decompress< byte4_t >( U.data() + l * n, n, zdata.data() + pos ); break;
-            case  40 : decompress< byte5_t >( U.data() + l * n, n, zdata.data() + pos ); break;
-            case  48 : decompress< byte6_t >( U.data() + l * n, n, zdata.data() + pos ); break;
-            case  56 : decompress< byte7_t >( U.data() + l * n, n, zdata.data() + pos ); break;
-            case  64 : decompress< byte8_t >( U.data() + l * n, n, zdata.data() + pos ); break;
-            default  : HLR_ERROR( "invalid storage size" );
+            case  1 : decompress< byte1_t >( U.data() + l * n, n, zdata.data() + pos ); break;
+            case  2 : decompress< byte2_t >( U.data() + l * n, n, zdata.data() + pos ); break;
+            case  3 : decompress< byte3_t >( U.data() + l * n, n, zdata.data() + pos ); break;
+            case  4 : decompress< byte4_t >( U.data() + l * n, n, zdata.data() + pos ); break;
+            case  5 : decompress< byte5_t >( U.data() + l * n, n, zdata.data() + pos ); break;
+            case  6 : decompress< byte6_t >( U.data() + l * n, n, zdata.data() + pos ); break;
+            case  7 : decompress< byte7_t >( U.data() + l * n, n, zdata.data() + pos ); break;
+            case  8 : decompress< byte8_t >( U.data() + l * n, n, zdata.data() + pos ); break;
+            default : HLR_ERROR( "invalid storage size" );
         }// switch
         
-        pos += header_size + nbits * n / 8;
+        pos += header_size + nbyte * n;
         
         #endif
     }// for
@@ -1092,15 +1093,21 @@ mulvec ( const size_t                        nrows,
          value_t *                           y,
          const uint8_t                       nbits )
 {
+    #if defined(HLR_FIXEDPOINT_BITSTREAM)
+    
     using  bs_storage_t = typename Zconf< value_t >::bs_storage_t;
     
-    const auto  imax  = double( 1ul << (nbits-1) );        // maximal signed integer value
-    const auto  scale = alpha * zscale;
-
-    #if defined(HLR_FIXEDPOINT_BITSTREAM)
-    const size_t  bssize = pad_bs< bs_storage_t >( byte_pad( nrows * ncols * nbits ) / 8 );
-    auto          bs     = bitstream< bs_storage_t >( const_cast< byte_t * >( zA ), bssize );
+    const auto      imax   = double( 1ul << (nbits-1) );        // maximal signed integer value
+    const size_t    bssize = pad_bs< bs_storage_t >( byte_pad( nrows * ncols * nbits ) / 8 );
+    auto            bs     = bitstream< bs_storage_t >( const_cast< byte_t * >( zA ), bssize );
+    
+    #else
+    
+    constexpr auto  imax   = double( ( 1ul << ( 8*sizeof(storage_t) - 1 ) ) - 1 );
+    
     #endif
+    
+    const auto    scale = alpha * zscale;
     
     switch ( op_A )
     {
@@ -1177,29 +1184,30 @@ mulvec ( const size_t     nrows,
 {
     using  real_t = Hpro::real_type_t< value_t >;
 
-    const uint8_t      nbits    = zA[0];
-    real_t             scale    = * ( reinterpret_cast< const real_t * >( zA.data() + Zconf< real_t >::scale_ofs ) );
-    constexpr size_t   data_ofs = Zconf< real_t >::header_ofs;
+    const real_t      scale    = real_t(1) / ( * ( reinterpret_cast< const real_t * >( zA.data() + Zconf< real_t >::scale_ofs ) ) );
+    constexpr size_t  data_ofs = Zconf< real_t >::header_ofs;
 
-    scale = real_t(1) / scale;
-    
     #if defined(HLR_FIXEDPOINT_BITSTREAM)
+
+    const uint8_t     nbits    = zA[0];
 
     mulvec( nrows, ncols, op_A, alpha, scale, reinterpret_cast< const byte_t * >( zA.data() + data_ofs ), x, y, nbits );
     
     #else
     
-    switch ( nbits )
+    const uint8_t     nbyte    = zA[0];
+    
+    switch ( nbyte )
     {
-        case   8 : mulvec( nrows, ncols, op_A, alpha, scale, reinterpret_cast< const byte1_t * >( zA.data() + data_ofs ), x, y, nbits ); break;
-        case  16 : mulvec( nrows, ncols, op_A, alpha, scale, reinterpret_cast< const byte2_t * >( zA.data() + data_ofs ), x, y, nbits ); break;
-        case  24 : mulvec( nrows, ncols, op_A, alpha, scale, reinterpret_cast< const byte3_t * >( zA.data() + data_ofs ), x, y, nbits ); break;
-        case  32 : mulvec( nrows, ncols, op_A, alpha, scale, reinterpret_cast< const byte4_t * >( zA.data() + data_ofs ), x, y, nbits ); break;
-        case  40 : mulvec( nrows, ncols, op_A, alpha, scale, reinterpret_cast< const byte5_t * >( zA.data() + data_ofs ), x, y, nbits ); break;
-        case  48 : mulvec( nrows, ncols, op_A, alpha, scale, reinterpret_cast< const byte6_t * >( zA.data() + data_ofs ), x, y, nbits ); break;
-        case  56 : mulvec( nrows, ncols, op_A, alpha, scale, reinterpret_cast< const byte7_t * >( zA.data() + data_ofs ), x, y, nbits ); break;
-        case  64 : mulvec( nrows, ncols, op_A, alpha, scale, reinterpret_cast< const byte8_t * >( zA.data() + data_ofs ), x, y, nbits ); break;
-        default  : HLR_ERROR( "unsupported byte size" );
+        case  1 : mulvec( nrows, ncols, op_A, alpha, scale, reinterpret_cast< const byte1_t * >( zA.data() + data_ofs ), x, y, 0 ); break;
+        case  2 : mulvec( nrows, ncols, op_A, alpha, scale, reinterpret_cast< const byte2_t * >( zA.data() + data_ofs ), x, y, 0 ); break;
+        case  3 : mulvec( nrows, ncols, op_A, alpha, scale, reinterpret_cast< const byte3_t * >( zA.data() + data_ofs ), x, y, 0 ); break;
+        case  4 : mulvec( nrows, ncols, op_A, alpha, scale, reinterpret_cast< const byte4_t * >( zA.data() + data_ofs ), x, y, 0 ); break;
+        case  5 : mulvec( nrows, ncols, op_A, alpha, scale, reinterpret_cast< const byte5_t * >( zA.data() + data_ofs ), x, y, 0 ); break;
+        case  6 : mulvec( nrows, ncols, op_A, alpha, scale, reinterpret_cast< const byte6_t * >( zA.data() + data_ofs ), x, y, 0 ); break;
+        case  7 : mulvec( nrows, ncols, op_A, alpha, scale, reinterpret_cast< const byte7_t * >( zA.data() + data_ofs ), x, y, 0 ); break;
+        case  8 : mulvec( nrows, ncols, op_A, alpha, scale, reinterpret_cast< const byte8_t * >( zA.data() + data_ofs ), x, y, 0 ); break;
+        default : HLR_ERROR( "unsupported byte size" );
     }// switch
 
     #endif
@@ -1228,31 +1236,31 @@ mulvec_lr ( const size_t     nrows,
         {
             for ( uint  l = 0; l < ncols; ++l )
             {
-                const uint8_t  nbits = zdata[0];
                 const real_t   scale = real_t(1) / ( * ( reinterpret_cast< const real_t * >( zdata + scale_ofs ) ) );
                 
                 #if defined(HLR_FIXEDPOINT_BITSTREAM)
 
-                const auto  nbytes = pad_bs< bs_storage_t >( byte_pad( nrows * nbits ) / 8 );
+                const uint8_t  nbits  = zdata[0];
+                const auto     nbytes = pad_bs< bs_storage_t >( byte_pad( nrows * nbits ) / 8 );
                 
                 mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte1_t * >( zdata + data_ofs ), x+l, y, nbits );
     
                 #else
+
+                const auto  nbyte  = zdata[0];
+                const auto  nbytes = nbyte * nrows;
                 
-                const auto  nbytes = nbits * nrows / 8;
-                
-                switch ( nbits )
+                switch ( nbyte )
                 {
-                    case   8 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte1_t * >( zdata + data_ofs ), x+l, y, nbits ); break;
-                    case  16 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte2_t * >( zdata + data_ofs ), x+l, y, nbits ); break;
-                    case  24 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte3_t * >( zdata + data_ofs ), x+l, y, nbits ); break;
-                    case  32 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte4_t * >( zdata + data_ofs ), x+l, y, nbits ); break;
-                    case  40 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte5_t * >( zdata + data_ofs ), x+l, y, nbits ); break;
-                    case  48 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte6_t * >( zdata + data_ofs ), x+l, y, nbits ); break;
-                    case  56 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte7_t * >( zdata + data_ofs ), x+l, y, nbits ); break;
-                    case  64 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte8_t * >( zdata + data_ofs ), x+l, y, nbits ); break;
-                    default :
-                        HLR_ERROR( "unsupported byte size" );
+                    case  1 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte1_t * >( zdata + data_ofs ), x+l, y, 0 ); break;
+                    case  2 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte2_t * >( zdata + data_ofs ), x+l, y, 0 ); break;
+                    case  3 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte3_t * >( zdata + data_ofs ), x+l, y, 0 ); break;
+                    case  4 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte4_t * >( zdata + data_ofs ), x+l, y, 0 ); break;
+                    case  5 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte5_t * >( zdata + data_ofs ), x+l, y, 0 ); break;
+                    case  6 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte6_t * >( zdata + data_ofs ), x+l, y, 0 ); break;
+                    case  7 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte7_t * >( zdata + data_ofs ), x+l, y, 0 ); break;
+                    case  8 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte8_t * >( zdata + data_ofs ), x+l, y, 0 ); break;
+                    default : HLR_ERROR( "unsupported byte size" );
                 }// switch
 
                 #endif
@@ -1270,30 +1278,31 @@ mulvec_lr ( const size_t     nrows,
         {
             for ( uint  l = 0; l < ncols; ++l )
             {
-                const uint8_t  nbits = zdata[0];
                 const real_t   scale = real_t(1) / ( * ( reinterpret_cast< const real_t * >( zdata + scale_ofs ) ) );
                 
                 #if defined(HLR_FIXEDPOINT_BITSTREAM)
 
-                const auto  nbytes = pad_bs< bs_storage_t >( byte_pad( nrows * nbits ) / 8 );
+                const uint8_t  nbits  = zdata[0];
+                const auto     nbytes = pad_bs< bs_storage_t >( byte_pad( nrows * nbits ) / 8 );
                 
                 mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte1_t * >( zdata + data_ofs ), x, y+l, nbits );
 
                 #else
 
-                const auto  nbytes = nbits * nrows / 8;
+                const auto  nbyte  = zdata[0];
+                const auto  nbytes = nbyte * nrows;
                 
-                switch ( nbits )
+                switch ( nbyte )
                 {
-                    case   8 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte1_t * >( zdata + data_ofs ), x, y+l, nbits ); break;
-                    case  16 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte2_t * >( zdata + data_ofs ), x, y+l, nbits ); break;
-                    case  24 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte3_t * >( zdata + data_ofs ), x, y+l, nbits ); break;
-                    case  32 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte4_t * >( zdata + data_ofs ), x, y+l, nbits ); break;
-                    case  40 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte5_t * >( zdata + data_ofs ), x, y+l, nbits ); break;
-                    case  48 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte6_t * >( zdata + data_ofs ), x, y+l, nbits ); break;
-                    case  56 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte7_t * >( zdata + data_ofs ), x, y+l, nbits ); break;
-                    case  64 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte8_t * >( zdata + data_ofs ), x, y+l, nbits ); break;
-                    default  : HLR_ERROR( "unsupported byte size" );
+                    case  1 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte1_t * >( zdata + data_ofs ), x, y+l, 0 ); break;
+                    case  2 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte2_t * >( zdata + data_ofs ), x, y+l, 0 ); break;
+                    case  3 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte3_t * >( zdata + data_ofs ), x, y+l, 0 ); break;
+                    case  4 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte4_t * >( zdata + data_ofs ), x, y+l, 0 ); break;
+                    case  5 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte5_t * >( zdata + data_ofs ), x, y+l, 0 ); break;
+                    case  6 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte6_t * >( zdata + data_ofs ), x, y+l, 0 ); break;
+                    case  7 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte7_t * >( zdata + data_ofs ), x, y+l, 0 ); break;
+                    case  8 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte8_t * >( zdata + data_ofs ), x, y+l, 0 ); break;
+                    default : HLR_ERROR( "unsupported byte size" );
                 }// switch
 
                 #endif
