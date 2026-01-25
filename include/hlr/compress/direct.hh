@@ -9,6 +9,7 @@
 //
 
 #include <cstdlib>
+#include <random>
 
 #include <boost/format.hpp>
 
@@ -651,8 +652,12 @@ bench ()
     {
         std::cout << "dr = " << dr << std::endl
                   << std::endl;
+
+        auto  rd   = std::random_device();
+        auto  gen  = std::mt19937( rd() );
+        auto  dist = std::uniform_real_distribution<>( 1.0, dr );
+        auto  rand = [&] () { return dist(gen); };
         
-        auto    rand  = [dr] () { return 0.5 * dr * drand48() - ( 0.5 * dr ); };
         size_t  n     = 1 << 13;
         auto    M     = blas::matrix< double >( n, n );
         auto    zM    = zarray();
