@@ -60,7 +60,7 @@ program_main ()
         if constexpr ( problem_t::supports_hca )
         {
             std::cout << "    using HCA"
-                      << ( cmdline::compress ? std::string( " (" ) + hlr::compress::valr::provider + ")" : "" )
+                      << ( cmdline::compress ? std::string( " (" ) + hlr::compress::valr::name + ")" : "" )
                       << std::endl;
                 
             auto  hcagen = problem->hca_gen_func( *ct );
@@ -79,7 +79,7 @@ program_main ()
     if (( cmdline::capprox == "aca" ) || ( cmdline::capprox == "default" ))
     {
         std::cout << "    using ACA"
-                      << ( cmdline::compress ? std::string( " (" ) + hlr::compress::valr::provider + ")" : "" )
+                      << ( cmdline::compress ? std::string( " (" ) + hlr::compress::valr::name + ")" : "" )
                       << std::endl;
 
         auto  lrapx = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
@@ -316,7 +316,7 @@ program_main ()
             std::cout << "      error   = " << format_error( error, error / y_ref->norm2() ) << std::endl;
         }
 
-        if ( true )
+        if ( false )
         {
             runtime.clear();
             

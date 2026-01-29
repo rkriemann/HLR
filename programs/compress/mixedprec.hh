@@ -223,7 +223,7 @@ program_main ()
                   << "single precision compression ("
                   << "δ = " << boost::format( "%.2e" ) % delta
                   << ", "
-                  << hlr::compress::provider << ')'
+                  << hlr::compress::valr::name << ')'
                   << term::reset << std::endl;
 
         std::cout << "    mem   = " << format_mem( mem_sA_lr, mem_sA_d, mem_sA ) << std::endl;
@@ -293,7 +293,7 @@ program_main ()
               << "compression ("
               << "δ = " << boost::format( "%.2e" ) % delta
               << ", "
-              << hlr::compress::provider << " + " << hlr::compress::valr::provider << ")"
+              << hlr::compress::valr::name << ")"
               << term::reset << std::endl;
 
     {

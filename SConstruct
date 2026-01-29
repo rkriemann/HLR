@@ -158,7 +158,7 @@ COMPRESSORS   = [ 'help',       # print help
                   'blosc',      # 9
                   'posits',     # 10
                   'cfloat',     # 11
-                  'fixed',      # 12
+                  'bfp',      # 12
                  ]
 compressor    = 'none'
 
@@ -174,7 +174,7 @@ COMPRESSORS_HELP = { 'none'   : 'no compression used',
                      'sz3'    : 'use SZ3     (see also {0}sz3_dir{1})',
                      'mgard'  : 'use MGARD   (see also {0}mgard_dir{1})',
                      'blosc'  : 'use Blosc   (see also {0}blosc_dir{1})',
-                     'fixed'  : 'use fixed-point',
+                     'bfp'    : 'use block floating point',
                     }
 
 ######################################################################
@@ -682,7 +682,7 @@ elif compressor == 'cfloat' :
     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=11' )
     env.Append( CPPDEFINES = 'HLR_HAS_UNIVERSAL' )
     env.Append( CPPPATH    = os.path.join( UNIVERSAL_DIR, 'include' ) )
-elif compressor == 'fixed' :
+elif compressor == 'bfp' :
     env.Append( CPPDEFINES = 'HLR_COMPRESSOR=12' )
     env.Append( CPPDEFINES = 'HLR_VALR_COMPRESSOR=12' )
 
