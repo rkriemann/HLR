@@ -226,7 +226,7 @@ nexpbits ( const auto  drange )
 //
 // compress data as float
 //
-inline
+template < typename storage_t >
 void
 compress ( const float *  data,
            const size_t   nsize,
@@ -237,11 +237,14 @@ compress ( const float *  data,
 {
     using value_t = float;
     
-    const uint8_t   nbits    = 1 + exp_bits + prec_bits;
-    const uint8_t   nbyte    = nbits / 8;
-    const uint32_t  exp_mask = ( 1 << exp_bits ) - 1;                  // bit mask for exponent
-    const uint8_t   prec_ofs = FP32::mant_bits - prec_bits;
-    const uint32_t  zero_val = Zconf< value_t >::zero_val & (( 1 << nbits) - 1 );
+    constexpr uint8_t   nbits       = sizeof( storage_t ) * 8;
+    constexpr uint32_t  zero_val    = Zconf< value_t >::zero_val & (( 1u << nbits) - 1 );
+    constexpr uint8_t   sign_shift  = nbits - 1;
+    constexpr uint64_t  zmask       = ( 1ul << nbits ) - 1;
+
+    const uint32_t      exp_mask    = ( 1u << exp_bits ) - 1;                  // bit mask for exponent
+    const uint8_t       prec_shift  = FP32::mant_bits - prec_bits;
+    const uint32_t      round_shift = prec_bits - 1;
         
     //
     // store header (exponent bits, precision bits and scaling factor)
@@ -256,6 +259,16 @@ compress ( const float *  data,
     HLR_DBG_ASSERT( std::isfinite( scale ) );
     
     //
+    // in case of 4 byte, just copy data
+    //
+
+    if constexpr ( sizeof( storage_t ) == 4 )
+    {
+        std::copy( data, data + nsize, reinterpret_cast< float * >( zdata + Zconf< value_t >::header_ofs ) );
+        return;
+    }// if
+    
+    //
     // compress data in "vectorized" form
     //
         
@@ -263,10 +276,10 @@ compress ( const float *  data,
     const size_t      nbsize = nsize - nsize % nbuf;  // largest multiple of <nchunk> below <nsize>
     uint8_t           zero[ nbuf ];                   // mark zero entries
     uint8_t           sign[ nbuf ];                   // holds sign per entry
-    float             fbuf[ nbuf ];                   // holds rescaled value
+    fp32int_t         fbuf[ nbuf ];                   // holds rescaled value
     uint32_t          ibuf[ nbuf ];                   // holds value in compressed format
-    size_t            pos = Zconf< value_t >::header_ofs;
-    size_t            i   = 0;
+    auto              zptr = reinterpret_cast< storage_t * >( zdata + Zconf< value_t >::header_ofs );
+    size_t            i    = 0;
         
     for ( ; i < nbsize; i += nbuf )
     {
@@ -279,27 +292,25 @@ compress ( const float *  data,
         // scale/shift data to [2,...]
         for ( size_t  j = 0; j < nbuf; ++j )
         {
-            const auto  val  = data[i+j];
-            const auto  aval = std::abs( val );
+            const fp32int_t  val{ .f = data[i+j] };
+            const auto       aval    = std::abs( val.f );
 
-            zero[j] = ( aval < Zconf< value_t >::minval ); // avoid denormalized values
-            sign[j] = ( aval != val );
-            fbuf[j] = aval * scale + 1.f;
+            zero[j]   = ( aval < Zconf< value_t >::minval ); // avoid denormalized values
+            sign[j]   = ( val.u >> FP32::sign_bit ) & 0b1;
+            fbuf[j].f = aval * scale + 1.f;
 
-            HLR_DBG_ASSERT( zero[j] || ( fbuf[j] >= float(2) ));
-            HLR_DBG_ASSERT( zero[j] || std::isfinite( fbuf[j] ));
+            HLR_DBG_ASSERT( zero[j] || ( fbuf[j].f >= float(2) ));
+            HLR_DBG_ASSERT( zero[j] || std::isfinite( fbuf[j].f ));
         }// for
 
         // convert to compressed format
         for ( size_t  j = 0; j < nbuf; ++j )
         {
-            const uint32_t  isval = (*reinterpret_cast< const uint32_t * >( & fbuf[j] ) );
-            const uint32_t  sexp  = ( isval >> FP32::mant_bits ) & FP32::exp_mask; // extract exponent
-            const uint32_t  smant = ( isval & FP32::mant_mask );                  // and mantissa
-            const uint32_t  zexp  = sexp & exp_mask;                             // extract needed exponent
-            const uint32_t  zmant = smant >> prec_ofs;                           // and precision bits
-                
-            ibuf[j] = (((sign[j] << exp_bits) | zexp) << prec_bits) | zmant;
+            const uint32_t  isval = fbuf[j].u;
+            const uint32_t  srest = ( isval >> round_shift ) & 0b1;
+            const uint32_t  zval  = ((( isval >> prec_shift ) & zmask) | ( uint32_t(sign[j]) << sign_shift )) + srest;
+            
+            ibuf[j] = zval;
         }// for
 
         // correct zeroes
@@ -308,16 +319,8 @@ compress ( const float *  data,
                 ibuf[j] = zero_val;
 
         // write to destination buffer
-        switch ( nbyte )
-        {
-            case  4 : { auto ptr = reinterpret_cast< byte4_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = ibuf[j]; } break;
-            case  3 : { auto ptr = reinterpret_cast< byte3_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = ibuf[j]; } break;
-            case  2 : { auto ptr = reinterpret_cast< byte2_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = uint16_t( ibuf[j] & 0xffff ); } break;
-            case  1 : { auto ptr = & zdata[pos];                                  for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = byte_t( ibuf[j] & 0xff   ); } break;
-            default : HLR_ERROR( "unsupported storage size" );
-        }// switch
-
-        pos += nbyte * nbuf;
+        for ( size_t  j = 0; j < nbuf; ++j )
+            zptr[i+j] = ibuf[j];
     }// for
 
     // handle remaining values
@@ -337,26 +340,18 @@ compress ( const float *  data,
             const uint32_t  sexp  = ( isval >> FP32::mant_bits ) & FP32::exp_mask;
             const uint32_t  smant = ( isval & FP32::mant_mask );
             const uint32_t  zexp  = sexp & exp_mask;
-            const uint32_t  zmant = smant >> prec_ofs;
+            const uint32_t  zmant = smant >> prec_shift;
 
             zval  = (((zsign << exp_bits) | zexp) << prec_bits) | zmant;
 
             HLR_DBG_ASSERT( zval != zero_val );
         }// if
-        
-        switch ( nbyte )
-        {
-            case  4 : zdata[pos+3] = ( zval & 0xff000000 ) >> 24;
-            case  3 : zdata[pos+2] = ( zval & 0x00ff0000 ) >> 16;
-            case  2 : zdata[pos+1] = ( zval & 0x0000ff00 ) >> 8;
-            case  1 : zdata[pos]   = ( zval & 0x000000ff ); break;
-            default : HLR_ERROR( "unsupported storage size" );
-        }// switch
 
-        pos += nbyte;
+        zptr[i] = zval;
     }// for
 }
 
+template < typename storage_t >
 inline
 void
 decompress ( float *         data,
@@ -367,14 +362,24 @@ decompress ( float *         data,
 {
     using  value_t = float;
     
-    const uint8_t   nbits      = 1 + exp_bits + prec_bits;
-    const uint8_t   nbyte      = nbits / 8;
-    const uint32_t  prec_mask  = ( 1 << prec_bits ) - 1;
-    const uint8_t   prec_ofs   = FP32::mant_bits - prec_bits;
-    const uint32_t  exp_mask   = ( 1 << exp_bits ) - 1;
-    const uint8_t   sign_shift = exp_bits + prec_bits;
-    const uint32_t  zero_val   = Zconf< value_t >::zero_val & (( 1 << nbits) - 1 );
-    float           scale;
+    constexpr uint8_t   nbits      = sizeof( storage_t ) * 8;
+    constexpr uint32_t  zero_val   = Zconf< value_t >::zero_val & (( 1u << nbits) - 1 );
+    
+    const uint32_t      prec_mask  = ( 1u << prec_bits ) - 1;
+    const uint8_t       prec_shift = FP32::mant_bits - prec_bits;
+    const uint32_t      exp_mask   = ( 1u << exp_bits ) - 1;
+    const uint8_t       sign_shift = exp_bits + prec_bits;
+    const uint32_t      zmask      = ( 1u << sign_shift ) - 1; // filters out sign
+    float               scale;
+
+    // just retrieve data for nbyte == 4
+    if constexpr ( sizeof( storage_t ) == 4 )
+    {
+        std::copy( reinterpret_cast< const float * >( zdata + Zconf< value_t >::header_ofs ),
+                   reinterpret_cast< const float * >( zdata + Zconf< value_t >::header_ofs ) + nsize,
+                   data );
+        return;
+    }// if
 
     // get scaling factor
     memcpy( & scale, zdata + Zconf< value_t >::scale_ofs, sizeof(scale) );
@@ -388,21 +393,15 @@ decompress ( float *         data,
     uint8_t           zero[ nbuf ]; // mark zero entries
     uint32_t          ibuf[ nbuf ]; // holds value in compressed format
     float             fbuf[ nbuf ]; // holds uncompressed values
-    size_t            pos = Zconf< value_t >::header_ofs;
-    size_t            i   = 0;
+    auto              zptr = reinterpret_cast< const storage_t * >( zdata + Zconf< value_t >::header_ofs );
+    size_t            i    = 0;
 
     for ( ; i < nbsize; i += nbuf )
     {
         // read data
-        switch ( nbyte )
-        {
-            case  4 : { auto ptr = reinterpret_cast< const byte4_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
-            case  3 : { auto ptr = reinterpret_cast< const byte3_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
-            case  2 : { auto ptr = reinterpret_cast< const byte2_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
-            case  1 : { auto ptr = & zdata[pos];                                        for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
-            default : HLR_ERROR( "unsupported storage size" );
-        }// switch
-
+        for ( size_t  j = 0; j < nbuf; ++j )
+            ibuf[j] = zptr[i+j];
+        
         // convert from compressed format
         for ( size_t  j = 0; j < nbuf; ++j )
         {
@@ -410,12 +409,10 @@ decompress ( float *         data,
 
             zero[j] = ( zval == zero_val );
             
-            const uint32_t  mant  = zval & prec_mask;
-            const uint32_t  exp   = (zval >> prec_bits) & exp_mask;
-            const uint32_t  sign  = ( zval >> sign_shift ) << FP32::sign_bit;
-            fp32int_t       fival = { .u = ((exp | Zconf< value_t >::exp_highbit) << FP32::mant_bits) | (mant << prec_ofs) };
-            
-            fival.f  = ( fival.f - 1.f ) * scale;
+            const uint32_t  sign  = (zval >> sign_shift) << FP32::sign_bit;
+            fp32int_t       fival = { .u = ( ( zval & zmask ) << prec_shift ) | Zconf< value_t >::exp_highbit };
+
+            fival.f  = ( fival.f - value_t(1) ) * scale;
             fival.u |= sign;
             fbuf[j]  = fival.f;
 
@@ -430,48 +427,33 @@ decompress ( float *         data,
         // copy values
         for ( size_t  j = 0; j < nbuf; ++j )
             data[i+j] = fbuf[j];
-            
-        pos += nbyte * nbuf;
     }// for
 
     // handle remaining values
     for ( ; i < nsize; ++i )
     {
-        uint32_t  zval = 0;
-            
-        switch ( nbyte )
-        {
-            case  4 : zval |= zdata[pos+3] << 24;
-            case  3 : zval |= zdata[pos+2] << 16;
-            case  2 : zval |= zdata[pos+1] << 8;
-            case  1 : zval |= zdata[pos]; break;
-            default : HLR_ERROR( "unsupported storage size" );
-        }// switch
+        const uint32_t  zval = zptr[i];
 
         if ( zval == zero_val )
             data[i] = 0;
         else
         {
-            const uint32_t  mant  = zval & prec_mask;
-            const uint32_t  exp   = (zval >> prec_bits) & exp_mask;
-            const uint32_t  sign  = ( zval >> sign_shift ) << FP32::sign_bit;
-            fp32int_t       fival = { .u = ((exp | Zconf< value_t >::exp_highbit) << FP32::mant_bits) | (mant << prec_ofs) };
-
-            fival.f  = ( fival.f - 1.f ) * scale;
+            const uint32_t  sign  = (zval >> sign_shift) << FP32::sign_bit;
+            fp32int_t       fival = { .u = ( ( zval & zmask ) << prec_shift ) | Zconf< value_t >::exp_highbit };
+            
+            fival.f  = ( fival.f - value_t(1) ) * scale;
             fival.u |= sign;
             data[i]  = fival.f;
 
             HLR_DBG_ASSERT( std::isfinite( data[i] ) );
         }// else
-
-        pos += nbyte;
     }// for
 }
 
 //
 // compress data needing more than 32 bits
 //
-inline
+template < typename storage_t >
 void
 compress ( const double *  data,  // points to actual start of buffer
            const size_t    nsize,
@@ -482,14 +464,14 @@ compress ( const double *  data,  // points to actual start of buffer
 {
     using  value_t = double;
     
-    const uint8_t   nbits    = 1 + exp_bits + prec_bits;
-    const uint8_t   nbyte    = nbits / 8;
-    const uint64_t  exp_mask = ( 1u << exp_bits ) - 1;                 // bit mask for exponent
-    const uint8_t   prec_shift = FP64::mant_bits - prec_bits;
-    const uint64_t  zero_val = Zconf< value_t >::zero_val & (( 1ul << nbits) - 1 );
-    const uint32_t  sign_shift  = nbits - 1;
-    const uint32_t  round_shift = prec_bits - 1;
-    const uint64_t  zmask       = ( 1ul << nbits ) - 1;
+    constexpr uint8_t   nbits       = sizeof( storage_t ) * 8; // 1 + exp_bits + prec_bits;
+    constexpr uint64_t  zero_val    = Zconf< value_t >::zero_val & (( 1ul << nbits) - 1 );
+    constexpr uint8_t   sign_shift  = nbits - 1;
+    constexpr uint64_t  zmask       = ( 1ul << nbits ) - 1;
+    
+    const uint64_t      exp_mask    = ( 1ul << exp_bits ) - 1;                 // bit mask for exponent
+    const uint8_t       prec_shift  = FP64::mant_bits - prec_bits;
+    const uint32_t      round_shift = prec_bits - 1;
         
     //
     // store header (exponent bits, precision bits and scaling factor)
@@ -507,7 +489,7 @@ compress ( const double *  data,  // points to actual start of buffer
     // in case of 8 byte, just copy data
     //
 
-    if ( nbyte == 8 )
+    if constexpr ( sizeof( storage_t ) == 8 )
     {
         std::copy( data, data + nsize, reinterpret_cast< double * >( zdata + Zconf< value_t >::header_ofs ) );
         return;
@@ -517,78 +499,60 @@ compress ( const double *  data,  // points to actual start of buffer
     // compress data in "vectorized" form
     //
         
-    constexpr size_t  nbuf   = 64;
-    const size_t      nbsize = nsize - nsize % nbuf;  // largest multiple of <nchunk> below <nsize>
-    uint8_t           zero[ nbuf ]; // mark zero entries
-    uint8_t           sign[ nbuf ]; // holds sign per entry
-    fp64int_t         fbuf[ nbuf ]; // holds rescaled value
-    uint64_t          ibuf[ nbuf ]; // holds value in compressed format
-    size_t            pos = Zconf< value_t >::header_ofs;
-    size_t            i   = 0;
+    auto              zptr = reinterpret_cast< storage_t * >( zdata + Zconf< value_t >::header_ofs );
+    
+    // constexpr size_t  nbuf   = 64;
+    // const size_t      nbsize = nsize - nsize % nbuf;  // largest multiple of <nchunk> below <nsize>
+    // uint8_t           zero[ nbuf ]; // mark zero entries
+    // uint8_t           sign[ nbuf ]; // holds sign per entry
+    // fp64int_t         fbuf[ nbuf ]; // holds rescaled value
+    // uint64_t          ibuf[ nbuf ]; // holds value in compressed format
+    // size_t            i    = 0;
         
-    for ( ; i < nbsize; i += nbuf )
-    {
-        //
-        // Use absolute value and scale v_i and add 1 such that v_i >= 2.
-        // With this, highest exponent bit is 1 and we only need to store
-        // lowest <exp_bits> exponent bits
-        //
+    // for ( ; i < nbsize; i += nbuf )
+    // {
+    //     //
+    //     // Use absolute value and scale v_i and add 1 such that v_i >= 2.
+    //     // With this, highest exponent bit is 1 and we only need to store
+    //     // lowest <exp_bits> exponent bits
+    //     //
             
-        // scale/shift data to [2,...]
-        for ( size_t  j = 0; j < nbuf; ++j )
-        {
-            const fp64int_t  val{ .f = data[i+j] };
-            const auto       aval    = std::abs( val.f );
+    //     // scale/shift data to [2,...]
+    //     for ( size_t  j = 0; j < nbuf; ++j )
+    //     {
+    //         const fp64int_t  val{ .f = data[i+j] };
+    //         const auto       aval    = std::abs( val.f );
 
-            zero[j]   = ( aval < Zconf< value_t >::minval ); // avoid denormalized values
-            sign[j]   = ( val.u >> FP64::sign_bit ) & 0b1;
-            fbuf[j].f = aval * scale + 1.0;
+    //         zero[j]   = ( aval < Zconf< value_t >::minval ); // avoid denormalized values
+    //         sign[j]   = ( val.u >> FP64::sign_bit ) & 0b1;
+    //         fbuf[j].f = aval * scale + 1.0;
 
-            HLR_DBG_ASSERT( zero[j] || ( fbuf[j].f >= double(2) ));
-            HLR_DBG_ASSERT( zero[j] || std::isfinite( fbuf[j].f ));
-        }// for
+    //         HLR_DBG_ASSERT( zero[j] || ( fbuf[j].f >= double(2) ));
+    //         HLR_DBG_ASSERT( zero[j] || std::isfinite( fbuf[j].f ));
+    //     }// for
 
-        // convert to compressed format
-        for ( size_t  j = 0; j < nbuf; ++j )
-        {
-            const uint64_t  isval = fbuf[j].u;
-            const uint64_t  srest = ( isval >> round_shift ) & 0b1;
-            const uint64_t  zval  = ((( isval >> prec_shift ) & zmask) | ( uint64_t(sign[j]) << sign_shift )) + srest; // ( isval >> FP64::mant_bits ) & FP64::exp_mask;
-            
-            // const uint64_t  sexp  = ( isval >> FP64::mant_bits ) & FP64::exp_mask;
-            // const uint64_t  smant = ( isval & FP64::mant_mask );
-            // const uint64_t  zexp  = sexp & exp_mask;
-            // const uint64_t  zmant = smant >> prec_shift;
+    //     // convert to compressed format
+    //     for ( size_t  j = 0; j < nbuf; ++j )
+    //     {
+    //         const uint64_t  isval = fbuf[j].u;
+    //         const uint64_t  srest = ( isval >> round_shift ) & 0b1;
+    //         const uint64_t  zval  = ((( isval >> prec_shift ) & zmask) | ( uint64_t(sign[j]) << sign_shift )) + srest; // ( isval >> FP64::mant_bits ) & FP64::exp_mask;
                 
-            ibuf[j] = zval; // ( (((uint64_t(sign[j]) << exp_bits) | zexp) << prec_bits) | zmant ) + srest;
+    //         ibuf[j] = zval;
+    //     }// for
 
-            // HLR_ASSERT( ibuf[j] == zval );
-        }// for
+    //     // correct zeroes
+    //     for ( size_t  j = 0; j < nbuf; ++j )
+    //         if ( zero[j] )
+    //             ibuf[j] = zero_val;
 
-        // correct zeroes
-        for ( size_t  j = 0; j < nbuf; ++j )
-            if ( zero[j] )
-                ibuf[j] = zero_val;
-
-        // write to destination buffer
-        switch ( nbyte )
-        {
-            case  1 : { auto ptr = & zdata[pos];                                  for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = ibuf[j]; } break;
-            case  2 : { auto ptr = reinterpret_cast< byte2_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = ibuf[j]; } break;
-            case  3 : { auto ptr = reinterpret_cast< byte3_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = ibuf[j]; } break;
-            case  4 : { auto ptr = reinterpret_cast< byte4_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = ibuf[j]; } break;
-            case  5 : { auto ptr = reinterpret_cast< byte5_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = ibuf[j]; } break;
-            case  6 : { auto ptr = reinterpret_cast< byte6_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = ibuf[j]; } break;
-            case  7 : { auto ptr = reinterpret_cast< byte7_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = ibuf[j]; } break;
-            case  8 : { auto ptr = reinterpret_cast< byte8_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ptr[j] = ibuf[j]; } break;
-            default : HLR_ERROR( "invalid storage size" );
-        }// switch
-
-        pos += nbyte * nbuf;
-    }// for
+    //     // write to destination buffer
+    //     for ( size_t  j = 0; j < nbuf; ++j )
+    //         zptr[i+j] = ibuf[j];
+    // }// for
 
     // handle remaining values
-    for ( ; i < nsize; ++i )
+    for ( size_t  i = 0; i < nsize; ++i )
     {
         fp64int_t  val{ .f = data[i] };
         uint64_t   zval    = zero_val;
@@ -605,34 +569,14 @@ compress ( const double *  data,  // points to actual start of buffer
             
             zval  = ((( val.u >> prec_shift ) & zmask) | ( uint64_t(zsign) << sign_shift )) + srest; // ( isval >> FP64::mant_bits ) & FP64::exp_mask;
             
-            // const uint64_t   sexp  = ( fival.u >> FP64::mant_bits ) & FP64::exp_mask;
-            // const uint64_t   smant = ( fival.u & FP64::mant_mask );
-            // const uint64_t   zexp  = sexp & exp_mask;
-            // const uint64_t   zmant = smant >> prec_shift;
-
-            // zval = ( (((zsign << exp_bits) | zexp) << prec_bits) | zmant ) + srest;
-
             HLR_DBG_ASSERT( zval != zero_val );
         }// if
-        
-        switch ( nbyte )
-        {
-            case  1 : { auto ptr =                                & zdata[pos];   *ptr = zval; } break;
-            case  2 : { auto ptr = reinterpret_cast< byte2_t * >( & zdata[pos] ); *ptr = zval; } break;
-            case  3 : { auto ptr = reinterpret_cast< byte3_t * >( & zdata[pos] ); *ptr = zval; } break;
-            case  4 : { auto ptr = reinterpret_cast< byte4_t * >( & zdata[pos] ); *ptr = zval; } break;
-            case  5 : { auto ptr = reinterpret_cast< byte5_t * >( & zdata[pos] ); *ptr = zval; } break;
-            case  6 : { auto ptr = reinterpret_cast< byte6_t * >( & zdata[pos] ); *ptr = zval; } break;
-            case  7 : { auto ptr = reinterpret_cast< byte7_t * >( & zdata[pos] ); *ptr = zval; } break;
-            case  8 : { auto ptr = reinterpret_cast< byte8_t * >( & zdata[pos] ); *ptr = zval; } break;
-            default : HLR_ERROR( "invalid storage size" );
-        }// switch
-            
-        pos += nbyte;
+
+        zptr[i] = zval;
     }// for
 }
 
-inline
+template < typename storage_t >
 void
 decompress ( double *        data,
              const size_t    nsize,
@@ -642,18 +586,18 @@ decompress ( double *        data,
 {
     using  value_t = double;
     
-    const uint8_t   nbits      = 1 + exp_bits + prec_bits;
-    const uint8_t   nbyte      = nbits / 8;
-    const uint64_t  prec_mask  = ( 1ul << prec_bits ) - 1;
-    const uint8_t   prec_shift   = FP64::mant_bits - prec_bits;
-    const uint64_t  exp_mask   = ( 1ul << exp_bits  ) - 1;
-    const uint32_t  sign_shift = exp_bits + prec_bits;
-    const uint64_t  zmask      = ( 1ul << sign_shift ) - 1; // filters out sign
-    const uint64_t  zero_val   = Zconf< value_t >::zero_val & (( 1ul << nbits) - 1 );
-    double          scale;
+    constexpr uint8_t   nbits      = sizeof( storage_t ) * 8;
+    constexpr uint64_t  zero_val   = Zconf< value_t >::zero_val & (( 1ul << nbits) - 1 );
+    
+    const uint64_t      prec_mask  = ( 1ul << prec_bits ) - 1;
+    const uint8_t       prec_shift = FP64::mant_bits - prec_bits;
+    const uint64_t      exp_mask   = ( 1ul << exp_bits  ) - 1;
+    const uint32_t      sign_shift = exp_bits + prec_bits;
+    const uint64_t      zmask      = ( 1ul << sign_shift ) - 1; // filters out sign
+    double              scale;
 
     // just retrieve data for nbyte == 8
-    if ( nbyte == 8 )
+    if constexpr ( sizeof( storage_t ) == 8 )
     {
         std::copy( reinterpret_cast< const double * >( zdata + Zconf< value_t >::header_ofs ),
                    reinterpret_cast< const double * >( zdata + Zconf< value_t >::header_ofs ) + nsize,
@@ -668,91 +612,60 @@ decompress ( double *        data,
     // decompress in "vectorised" form
     //
         
-    constexpr size_t  nbuf   = 64;
-    const size_t      nbsize = nsize - nsize % nbuf;  // largest multiple of <nchunk> below <nsize>
-    uint8_t           zero[ nbuf ]; // mark zero entries
-    uint64_t          ibuf[ nbuf ]; // holds value in compressed format
-    double            fbuf[ nbuf ]; // holds uncompressed values
-    size_t            pos = Zconf< value_t >::header_ofs;
-    size_t            i   = 0;
+    auto              zptr = reinterpret_cast< const storage_t * >( zdata + Zconf< value_t >::header_ofs );
+    
+    // constexpr size_t  nbuf   = 64;
+    // const size_t      nbsize = nsize - nsize % nbuf;  // largest multiple of <nchunk> below <nsize>
+    // uint8_t           zero[ nbuf ]; // mark zero entries
+    // uint64_t          ibuf[ nbuf ]; // holds value in compressed format
+    // double            fbuf[ nbuf ]; // holds uncompressed values
+    // size_t            i    = 0;
 
-    for ( ; i < nbsize; i += nbuf )
-    {
-        // read data
-        switch ( nbyte )
-        {
-            case  1 : { auto ptr = & zdata[pos];                                        for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
-            case  2 : { auto ptr = reinterpret_cast< const byte2_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
-            case  3 : { auto ptr = reinterpret_cast< const byte3_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
-            case  4 : { auto ptr = reinterpret_cast< const byte4_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
-            case  5 : { auto ptr = reinterpret_cast< const byte5_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
-            case  6 : { auto ptr = reinterpret_cast< const byte6_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
-            case  7 : { auto ptr = reinterpret_cast< const byte7_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
-            case  8 : { auto ptr = reinterpret_cast< const byte8_t * >( & zdata[pos] ); for ( size_t  j = 0; j < nbuf; ++j ) ibuf[j] = ptr[j]; } break;
-            default : HLR_ERROR( "invalid storage size" );
-        }// switch
+    // for ( ; i < nbsize; i += nbuf )
+    // {
+    //     // read data
+    //     for ( size_t  j = 0; j < nbuf; ++j )
+    //         ibuf[j] = zptr[i+j];
             
-        // convert from compressed format
-        for ( size_t  j = 0; j < nbuf; ++j )
-        {
-            const auto  zval = ibuf[j];
+    //     // convert from compressed format
+    //     for ( size_t  j = 0; j < nbuf; ++j )
+    //     {
+    //         const auto  zval = ibuf[j];
 
-            zero[j] = ( zval == zero_val );
+    //         zero[j] = ( zval == zero_val );
             
-            const uint64_t  sign  = (zval >> sign_shift) << FP64::sign_bit;
-            // const uint64_t  mant  = zval & prec_mask;
-            // const uint64_t  exp   = (zval >> prec_bits) & exp_mask;
-            // fp64int_t       tval  = { .u = ((exp | Zconf< value_t >::exp_highbit) << FP64::mant_bits) | (mant << prec_shift) };
-            fp64int_t       fival = { .u = ( ( zval & zmask ) << prec_shift ) | Zconf< value_t >::exp_highbit };
+    //         const uint64_t  sign  = (zval >> sign_shift) << FP64::sign_bit;
+    //         fp64int_t       fival = { .u = ( ( zval & zmask ) << prec_shift ) | Zconf< value_t >::exp_highbit };
 
-            // HLR_ASSERT( tval.u == fival.u );
+    //         // HLR_ASSERT( tval.u == fival.u );
             
-            fival.f  = ( fival.f - value_t(1) ) * scale;
-            fival.u |= sign;
-            fbuf[j]  = fival.f;
+    //         fival.f  = ( fival.f - value_t(1) ) * scale;
+    //         fival.u |= sign;
+    //         fbuf[j]  = fival.f;
 
-            HLR_DBG_ASSERT( zero[j] || std::isfinite( fbuf[j] ) );
-        }// for
+    //         HLR_DBG_ASSERT( zero[j] || std::isfinite( fbuf[j] ) );
+    //     }// for
 
-        // correct zeroes
-        for ( size_t  j = 0; j < nbuf; ++j )
-            if ( zero[j] )
-                fbuf[j] = double(0);
+    //     // correct zeroes
+    //     for ( size_t  j = 0; j < nbuf; ++j )
+    //         if ( zero[j] )
+    //             fbuf[j] = double(0);
 
-        // copy values
-        for ( size_t  j = 0; j < nbuf; ++j )
-            data[i+j] = fbuf[j];
-            
-        pos += nbyte * nbuf;
-    }// for
+    //     // copy values
+    //     for ( size_t  j = 0; j < nbuf; ++j )
+    //         data[i+j] = fbuf[j];
+    // }// for
     
     // handle remaining values
-    for ( ; i < nsize; ++i )
+    for ( size_t i = 0; i < nsize; ++i )
     {
-        uint64_t  zval = 0;
-            
-        switch ( nbyte )
-        {
-            case  1 : { auto ptr = & zdata[pos];                                        zval = *ptr; } break;
-            case  2 : { auto ptr = reinterpret_cast< const byte2_t * >( & zdata[pos] ); zval = *ptr; } break;
-            case  3 : { auto ptr = reinterpret_cast< const byte3_t * >( & zdata[pos] ); zval = *ptr; } break;
-            case  4 : { auto ptr = reinterpret_cast< const byte4_t * >( & zdata[pos] ); zval = *ptr; } break;
-            case  5 : { auto ptr = reinterpret_cast< const byte5_t * >( & zdata[pos] ); zval = *ptr; } break;
-            case  6 : { auto ptr = reinterpret_cast< const byte6_t * >( & zdata[pos] ); zval = *ptr; } break;
-            case  7 : { auto ptr = reinterpret_cast< const byte7_t * >( & zdata[pos] ); zval = *ptr; } break;
-            case  8 : { auto ptr = reinterpret_cast< const byte8_t * >( & zdata[pos] ); zval = *ptr; } break;
-            default : HLR_ERROR( "invalid storage size" );
-        }// switch
+        const uint64_t  zval = zptr[i];
 
         if ( zval == zero_val )
             data[i] = 0;
         else
         {
             const uint64_t  sign  = (zval >> sign_shift) << FP64::sign_bit;
-            // const uint64_t  mant  = zval & prec_mask;
-            // const uint64_t  exp   = (zval >> prec_bits) & exp_mask;
-            // const uint64_t  sign  = (zval >> sign_shift) << FP64::sign_bit;
-            // fp64int_t       fival = { .u = ((exp | Zconf< value_t >::exp_highbit) << FP64::mant_bits) | (mant << prec_shift) };
             fp64int_t       fival = { .u = ( ( zval & zmask ) << prec_shift ) | Zconf< value_t >::exp_highbit };
             
             fival.f  = ( fival.f - value_t(1) ) * scale;
@@ -761,9 +674,103 @@ decompress ( double *        data,
 
             HLR_DBG_ASSERT( std::isfinite( data[i] ) );
         }// else
-
-        pos += nbyte;
     }// for
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// auxiliary functions to avoid compiler warning due to too large bit shifts
+//
+////////////////////////////////////////////////////////////////////////////////
+
+inline
+void
+call_compress ( const float *  data,
+                const size_t   nsize,
+                byte_t *       zdata,
+                float          scale,
+                const uint8_t  exp_bits,
+                const uint8_t  prec_bits )
+{
+    const auto  nbyte = ( 1 + exp_bits + prec_bits ) / 8;
+    
+    switch ( nbyte )
+    {
+        case  1 : compress< byte1_t >( data, nsize, zdata, scale, exp_bits, prec_bits ); break;
+        case  2 : compress< byte2_t >( data, nsize, zdata, scale, exp_bits, prec_bits ); break;
+        case  3 : compress< byte3_t >( data, nsize, zdata, scale, exp_bits, prec_bits ); break;
+        // case  4 : compress< byte4_t >( data, nsize, zdata, scale, exp_bits, prec_bits ); break;
+        default : HLR_ERROR( "invalid storage size" );
+    }// switch
+}
+
+inline
+void
+call_compress ( const double *  data,
+                const size_t    nsize,
+                byte_t *        zdata,
+                double          scale,
+                const uint8_t   exp_bits,
+                const uint8_t   prec_bits )
+{
+    const auto  nbyte = ( 1 + exp_bits + prec_bits ) / 8;
+    
+    switch ( nbyte )
+    {
+        case  1 : compress< byte1_t >( data, nsize, zdata, scale, exp_bits, prec_bits ); break;
+        case  2 : compress< byte2_t >( data, nsize, zdata, scale, exp_bits, prec_bits ); break;
+        case  3 : compress< byte3_t >( data, nsize, zdata, scale, exp_bits, prec_bits ); break;
+        case  4 : compress< byte4_t >( data, nsize, zdata, scale, exp_bits, prec_bits ); break;
+        case  5 : compress< byte5_t >( data, nsize, zdata, scale, exp_bits, prec_bits ); break;
+        case  6 : compress< byte6_t >( data, nsize, zdata, scale, exp_bits, prec_bits ); break;
+        case  7 : compress< byte7_t >( data, nsize, zdata, scale, exp_bits, prec_bits ); break;
+        // case  8 : compress< byte8_t >( data, nsize, zdata, scale, exp_bits, prec_bits ); break;
+        default : HLR_ERROR( "invalid storage size" );
+    }// switch
+}
+
+inline
+void
+call_decompress ( float *         data,
+                  const size_t    nsize,
+                  const byte_t *  zdata,
+                  const uint8_t   exp_bits,
+                  const uint8_t   prec_bits )
+{
+    const auto  nbyte = ( 1 + exp_bits + prec_bits ) / 8;
+    
+    switch ( nbyte )
+    {
+        case 1 : decompress< byte1_t >( data, nsize, zdata, exp_bits, prec_bits ); break;
+        case 2 : decompress< byte2_t >( data, nsize, zdata, exp_bits, prec_bits ); break;
+        case 3 : decompress< byte3_t >( data, nsize, zdata, exp_bits, prec_bits ); break;
+        // case 4 : decompress< byte4_t >( data, nsize, zdata, exp_bits, prec_bits ); break;
+        default : HLR_ERROR( "invalid storage size" );
+    }// switch
+}
+
+inline
+void
+call_decompress ( double *        data,
+                  const size_t    nsize,
+                  const byte_t *  zdata,
+                  const uint8_t   exp_bits,
+                  const uint8_t   prec_bits )
+{
+    const auto  nbyte = ( 1 + exp_bits + prec_bits ) / 8;
+    
+    switch ( nbyte )
+    {
+        case 1 : decompress< byte1_t >( data, nsize, zdata, exp_bits, prec_bits ); break;
+        case 2 : decompress< byte2_t >( data, nsize, zdata, exp_bits, prec_bits ); break;
+        case 3 : decompress< byte3_t >( data, nsize, zdata, exp_bits, prec_bits ); break;
+        case 4 : decompress< byte4_t >( data, nsize, zdata, exp_bits, prec_bits ); break;
+        case 5 : decompress< byte5_t >( data, nsize, zdata, exp_bits, prec_bits ); break;
+        case 6 : decompress< byte6_t >( data, nsize, zdata, exp_bits, prec_bits ); break;
+        case 7 : decompress< byte7_t >( data, nsize, zdata, exp_bits, prec_bits ); break;
+        // case 8 : decompress< byte8_t >( data, nsize, zdata, exp_bits, prec_bits ); break;
+        default : HLR_ERROR( "invalid storage size" );
+    }// switch
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -828,13 +835,13 @@ compress ( const config &   config,
     HLR_ASSERT( nbits     <= sizeof(real_t) * 8 );
     HLR_ASSERT( prec_bits <= max_mant_bits );
 
-    compress( data, nsize, zdata.data(), scale, exp_bits, prec_bits );
-
+    call_compress( data, nsize, zdata.data(), scale, exp_bits, prec_bits );
+    
     // // DEBUG
     // {
     //     std::vector< double >  tmp( nsize );
 
-    //     decompress( tmp.data(), nsize, zdata.data(), exp_bits, prec_bits );
+    //     call_decompress( tmp.data(), nsize, zdata.data(), exp_bits, prec_bits );
 
     //     double  err = 0;
     //     double  nrm = 0;
@@ -923,7 +930,9 @@ decompress ( const zarray &  zdata,
             dest[i] = value_t(0);
     }// if
     else
-        decompress( dest, nsize, zdata.data(), exp_bits, prec_bits );
+    {
+        call_decompress( dest, nsize, zdata.data(), exp_bits, prec_bits );
+    }// else
 }
 
 template <>
@@ -957,7 +966,7 @@ decompress< std::complex< double > > ( const zarray &            zdata,
     else if ( dim3 == 0 ) decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, dim2, 2 );
     else                  decompress< double >( zdata, reinterpret_cast< double * >( dest ), dim0, dim1, dim2, dim3 * 2 );
 }
-    
+
 //////////////////////////////////////////////////////////////////////////////////////
 //
 // special version for lowrank matrices
@@ -1031,13 +1040,13 @@ compress_lr ( const blas::matrix< value_t > &                       U,
         
     for ( uint32_t  l = 0; l < k; ++l )
     {
-        const uint8_t  exp_bits  = e[l];
-        const uint8_t  prec_bits = m[l];
-        const real_t   scale     = s[l];
-        const uint8_t  nbits     = 1 + exp_bits + prec_bits; // number of bits per value
-        const uint8_t  nbyte     = nbits / 8;
+        const auto  exp_bits  = e[l];
+        const auto  prec_bits = m[l];
+        const auto  scale     = s[l];
+        const auto  nbits     = 1 + exp_bits + prec_bits; // number of bits per value
+        const auto  nbyte     = nbits / 8;
 
-        compress( U.data() + l*n, n, zdata.data() + pos, scale, exp_bits, prec_bits );
+        call_compress( U.data() + l*n, n, zdata.data() + pos, scale, exp_bits, prec_bits );
         pos += header_size + n*nbyte;
     }// for
     
@@ -1114,19 +1123,19 @@ compress_lr< std::complex< double > > ( const blas::matrix< std::complex< double
     // convert each column to compressed form
     //
 
-    auto            zdata = std::vector< byte_t >( zsize );
-    size_t          pos   = 0;
-    const real_t *  U_ptr = reinterpret_cast< const real_t * >( U.data() );
+    auto    zdata = std::vector< byte_t >( zsize );
+    size_t  pos   = 0;
+    auto    U_ptr = reinterpret_cast< const real_t * >( U.data() );
         
     for ( uint32_t  l = 0; l < k; ++l )
     {
-        const uint32_t  exp_bits  = e[l];
-        const uint32_t  prec_bits = m[l];
-        const real_t    scale     = s[l];
-        const size_t    nbits     = 1 + exp_bits + prec_bits; // number of bits per value
-        const size_t    nbyte     = nbits / 8;
+        const auto  exp_bits  = e[l];
+        const auto  prec_bits = m[l];
+        const auto  scale     = s[l];
+        const auto  nbits     = 1 + exp_bits + prec_bits; // number of bits per value
+        const auto  nbyte     = nbits / 8;
 
-        compress( U_ptr + l * n2, n2, zdata.data() + pos, scale, exp_bits, prec_bits );
+        call_compress( U_ptr + l * n2, n2, zdata.data() + pos, scale, exp_bits, prec_bits );
         pos += header_size + n2*nbyte;
     }// for
 
@@ -1157,7 +1166,7 @@ decompress_lr ( const zarray &             zdata,
         const uint8_t  nbits     = 1 + exp_bits + prec_bits;
         const uint8_t  nbyte     = nbits / 8;
 
-        decompress( U.data() + l * n, n, zdata.data() + pos, exp_bits, prec_bits );
+        call_decompress( U.data() + l * n, n, zdata.data() + pos, exp_bits, prec_bits );
         pos += header_size + nbyte * n;
     }// for
 }
@@ -1198,7 +1207,7 @@ decompress_lr< std::complex< double > > ( const zarray &                        
         const uint32_t  nbits     = 1 + exp_bits + prec_bits;
         const uint32_t  nbyte     = nbits / 8;
 
-        decompress( U_ptr + l * n2, n2, zdata.data() + pos, exp_bits, prec_bits );
+        call_decompress( U_ptr + l * n2, n2, zdata.data() + pos, exp_bits, prec_bits );
         pos += header_size + nbyte * n2;
     }// for
 }
@@ -1207,169 +1216,8 @@ decompress_lr< std::complex< double > > ( const zarray &                        
 // compressed blas
 //
 
-template < typename value_t >
-struct accessor
-{
-    using  real_t = Hpro::real_type_t< value_t >;
-    
-    const uint8_t      nexp_bits;
-    const uint8_t      nprec_bits;
-    const uint8_t      nbits;
-    const uint8_t      nbyte;
-    const uint64_t     prec_mask;
-    const uint8_t      prec_shift;
-    const uint64_t     exp_mask;
-    const uint32_t     sign_shift;
-    const uint64_t     zero_val;
-    const real_t       scale;
-    const byte_t *     zptr;
-    
-    accessor ( const zarray &  zdata )
-            : nexp_bits(  zdata[0] )
-            , nprec_bits( zdata[1] )
-            , scale( * reinterpret_cast< const real_t * >( zdata + Zconf< real_t >::scale_ofs ) )
-            , nbits( 1 + nexp_bits + nprec_bits )
-            , nbyte( nbits / 8 )
-            , prec_mask( ( 1ul << nprec_bits ) - 1 )
-            , prec_shift( FP64::mant_bits - nprec_bits )
-            , exp_mask( ( 1ul << nexp_bits  ) - 1 )
-            , sign_shift( nexp_bits + nprec_bits )
-            , zero_val( Zconf< real_t >::zero_val & (( 1ul << nbits) - 1 ) )
-            , zptr( zdata.data() + Zconf< real_t >::header_ofs )
-    {}
-
-    value_t  operator () ( const size_t  i ) const
-    {
-        uint64_t  zval = 0;
-
-        switch ( nbyte )
-        {
-            case  1 : zval = * ( reinterpret_cast< const byte1_t * >( zptr ) + i ); break;
-            case  2 : zval = * ( reinterpret_cast< const byte2_t * >( zptr ) + i ); break;
-            case  3 : zval = * ( reinterpret_cast< const byte3_t * >( zptr ) + i ); break;
-            case  4 : zval = * ( reinterpret_cast< const byte4_t * >( zptr ) + i ); break;
-            case  5 : zval = * ( reinterpret_cast< const byte5_t * >( zptr ) + i ); break;
-            case  6 : zval = * ( reinterpret_cast< const byte6_t * >( zptr ) + i ); break;
-            case  7 : zval = * ( reinterpret_cast< const byte7_t * >( zptr ) + i ); break;
-            case  8 : zval = * ( reinterpret_cast< const byte8_t * >( zptr ) + i ); break;
-            default : HLR_ERROR( "unsupported byte size" );
-        }// switch
-        
-        if ( zval == zero_val )
-            return value_t(0);
-                    
-        const uint64_t  mant  = zval & prec_mask;
-        const uint64_t  exp   = (zval >> nprec_bits) & exp_mask;
-        const uint64_t  sign  = (zval >> sign_shift) << FP64::sign_bit;
-        fp64int_t       fival = { ((exp | Zconf< value_t >::exp_highbit) << FP64::mant_bits) | (mant << prec_shift) };
-
-        fival.f  = scale * ( fival.f - 1.0 );
-        fival.u |= sign;
-
-        return fival.f;
-    }
-
-    struct const_iterator
-    {
-        const accessor *  acc;
-        const byte_t *    zptr;
-
-        const_iterator ( const accessor *  aacc,
-                         const byte_t *    aptr )
-                : acc( aacc )
-                , zptr( aptr )
-        {}
-
-        const_iterator & operator ++ () { zptr += acc->nbyte; return *this; }
-
-        value_t
-        operator * ()
-        {
-            uint64_t  zval = 0;
-
-            switch ( acc->nbyte )
-            {
-                case  1 : zval = * ( reinterpret_cast< const byte1_t * >( zptr ) ); break;
-                case  2 : zval = * ( reinterpret_cast< const byte2_t * >( zptr ) ); break;
-                case  3 : zval = * ( reinterpret_cast< const byte3_t * >( zptr ) ); break;
-                case  4 : zval = * ( reinterpret_cast< const byte4_t * >( zptr ) ); break;
-                case  5 : zval = * ( reinterpret_cast< const byte5_t * >( zptr ) ); break;
-                case  6 : zval = * ( reinterpret_cast< const byte6_t * >( zptr ) ); break;
-                case  7 : zval = * ( reinterpret_cast< const byte7_t * >( zptr ) ); break;
-                case  8 : zval = * ( reinterpret_cast< const byte8_t * >( zptr ) ); break;
-                default : HLR_ERROR( "unsupported byte size" );
-            }// switch
-            
-            if ( zval == acc->zero_val )
-                return value_t(0);
-            
-            const uint64_t  mant  = zval & acc->prec_mask;
-            const uint64_t  exp   = (zval >> acc->nprec_bits) & acc->exp_mask;
-            const uint64_t  sign  = (zval >> acc->sign_shift) << FP64::sign_bit;
-            fp64int_t       fival = { ((exp | Zconf< value_t >::exp_highbit) << FP64::mant_bits) | (mant << acc->prec_shift) };
-            
-            fival.f  = ( fival.f - 1.0 ) * acc->scale;
-            fival.u |= sign;
-            
-            return fival.f;
-        }
-    };
-
-    const_iterator begin () const  { return const_iterator( this, zptr ); }
-};
-
 namespace
 {
-
-template < typename value_t,
-           typename accessor_t >
-void
-mulvec ( const size_t        nrows,
-         const size_t        ncols,
-         const matop_t       op_A,
-         const value_t       alpha,
-         const accessor_t &  zA,
-         const value_t *     x,
-         value_t *           y )
-{
-    auto  iter_A = zA.begin();
-        
-    switch ( op_A )
-    {
-        case  apply_normal :
-        {
-            size_t  pos = 0;
-            
-            for ( size_t  j = 0; j < ncols; ++j )
-            {
-                const auto  x_j = alpha * x[j];
-                
-                for ( size_t  i = 0; i < nrows; ++i, ++iter_A )
-                    y[i] += *iter_A * x_j;
-            }// for
-        }// case
-        break;
-        
-        case  apply_adjoint :
-        {
-            size_t  pos = 0;
-            
-            for ( size_t  j = 0; j < ncols; ++j )
-            {
-                auto  y_j = value_t(0);
-                
-                for ( size_t  i = 0; i < nrows; ++i, ++iter_A )
-                    y_j += *iter_A * x[i];
-
-                y[j] += alpha * y_j;
-            }// for
-        }// case
-        break;
-
-        default:
-            HLR_ERROR( "TODO" );
-    }// switch
-}
 
 template < typename value_t,
            typename storage_t >
@@ -1525,9 +1373,6 @@ mulvec ( const size_t     nrows,
          const value_t *  x,
          value_t *        y )
 {
-    #if 0
-    mulvec( nrows, ncols, op_A, alpha, accessor< value_t >( zA ), x, y );
-    #else
     using  real_t = Hpro::real_type_t< value_t >;
 
     const uint8_t      exp_bits  = zA[0];
@@ -1550,7 +1395,6 @@ mulvec ( const size_t     nrows,
         default :
             HLR_ERROR( "unsupported byte size" );
     }// switch
-    #endif
 }
 
 template < typename value_t >
@@ -1592,8 +1436,7 @@ mulvec_lr ( const size_t     nrows,
                     case  6 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte6_t * >( zA.data() + pos + data_ofs ), x+l, y, exp_bits, prec_bits ); break;
                     case  7 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte7_t * >( zA.data() + pos + data_ofs ), x+l, y, exp_bits, prec_bits ); break;
                     case  8 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte8_t * >( zA.data() + pos + data_ofs ), x+l, y, exp_bits, prec_bits ); break;
-                    default :
-                        HLR_ERROR( "unsupported byte size" );
+                    default : HLR_ERROR( "invalid storage size" );
                 }// switch
 
                 pos += data_ofs + nbyte * nrows;
@@ -1626,8 +1469,7 @@ mulvec_lr ( const size_t     nrows,
                     case  6 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte6_t * >( zA.data() + pos + data_ofs ), x, y+l, exp_bits, prec_bits ); break;
                     case  7 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte7_t * >( zA.data() + pos + data_ofs ), x, y+l, exp_bits, prec_bits ); break;
                     case  8 : mulvec( nrows, 1, op_A, alpha, scale, reinterpret_cast< const byte8_t * >( zA.data() + pos + data_ofs ), x, y+l, exp_bits, prec_bits ); break;
-                    default :
-                        HLR_ERROR( "unsupported byte size" );
+                    default : HLR_ERROR( "invalid storage size" );
                 }// switch
 
                 pos += data_ofs + nbyte * nrows;
