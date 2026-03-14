@@ -50,7 +50,7 @@ struct aca_pivot_next
     //
     // initialise pivot search
     //
-    aca_pivot_next ( const operator_t &  M )
+    aca_pivot_next ( operator_t &  M )
     {
         next_col = 0;
 
@@ -66,7 +66,7 @@ struct aca_pivot_next
                 int,
                 blas::vector< value_t >,
                 blas::vector< value_t > >
-    next ( const operator_t &     M,
+    next ( operator_t &           M,
            const vector_list_t &  U,
            const vector_list_t &  V )
     {
@@ -132,7 +132,7 @@ struct aca_pivot_max
     //
     // initialise pivot search
     //
-    aca_pivot_max ( const operator_t &  M )
+    aca_pivot_max ( operator_t &  M )
     {
         next_col = 0;
 
@@ -148,7 +148,7 @@ struct aca_pivot_max
                 int,
                 blas::vector< value_t >,
                 blas::vector< value_t > >
-    next ( const operator_t &     M,
+    next ( operator_t &           M,
            const vector_list_t &  U,
            const vector_list_t &  V )
     {
@@ -224,7 +224,7 @@ struct aca_pivot_full
     //
     // initialise pivot search
     //
-    aca_pivot_full ( const operator_t &  M )
+    aca_pivot_full ( operator_t &  M )
     {}
     
     //
@@ -235,7 +235,7 @@ struct aca_pivot_full
                 int,
                 blas::vector< value_t >,
                 blas::vector< value_t > >
-    next ( const operator_t &     M,
+    next ( operator_t &           M,
            const vector_list_t &  U,
            const vector_list_t &  V )
     {
@@ -309,10 +309,10 @@ using aca_pivot = aca_pivot_max< operator_t >;
 template < typename pivotsearch_t >
 std::pair< blas::matrix< typename pivotsearch_t::operator_t::value_t >,
            blas::matrix< typename pivotsearch_t::operator_t::value_t > >
-aca  ( const typename pivotsearch_t::operator_t &  M,
-       pivotsearch_t &                             pivot_search,
-       const accuracy &                            acc,
-       std::list< std::pair< idx_t, idx_t > > *    pivots )
+aca  ( typename pivotsearch_t::operator_t &      M,
+       pivotsearch_t &                           pivot_search,
+       const accuracy &                          acc,
+       std::list< std::pair< idx_t, idx_t > > *  pivots )
 {
     using  value_t = typename pivotsearch_t::operator_t::value_t;
     using  real_t  = typename Hpro::real_type< value_t >::type_t;
@@ -336,10 +336,14 @@ aca  ( const typename pivotsearch_t::operator_t &  M,
     real_t      norm_M   = real_t(0);
 
     // low-rank approximation
-    std::deque< blas::vector< value_t > >  U, V;
+    auto  U = std::deque< blas::vector< value_t > >();
+    auto  V = std::deque< blas::vector< value_t > >();
     
     for ( uint  i = 0; i < max_rank; ++i )
     {
+        if constexpr ( supports_adaptive_accuracy( M ) )
+            M.set_accuracy( rel_eps );
+        
         // need to get i, j, row_i, col_j for next iteration
         auto [ pivot_row, pivot_col, column, row ] = pivot_search.next( M, U, V );
 
@@ -697,8 +701,8 @@ struct ACA
     template < typename operator_t >
     std::pair< blas::matrix< typename operator_t::value_t >,
                blas::matrix< typename operator_t::value_t > >
-    operator () ( const operator_t &       op,
-                  const accuracy &         acc ) const
+    operator () ( operator_t &      op,
+                  const accuracy &  acc ) const
     {
         auto  pivot_search = aca_pivot< operator_t >( op );
 
@@ -848,8 +852,8 @@ struct ACAFull
     template < typename operator_t >
     std::pair< blas::matrix< typename operator_t::value_t >,
                blas::matrix< typename operator_t::value_t > >
-    operator () ( const operator_t &  op,
-                  const accuracy &    acc ) const
+    operator () ( operator_t &      op,
+                  const accuracy &  acc ) const
     {
         auto  pivot_search = aca_pivot< operator_t >( op );
 

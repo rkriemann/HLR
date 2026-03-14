@@ -33,13 +33,13 @@ public:
     
 private:
     // coefficient function
-    const coeff_fn_t &  _coeff_fn;
+    coeff_fn_t &  _coeff_fn;
     
 public:
     //
     // ctor
     //
-    aca_lrapx ( const coeff_fn_t &  acoeff_fn )
+    aca_lrapx ( coeff_fn_t &  acoeff_fn )
             : _coeff_fn( acoeff_fn )
     {}
         
@@ -52,7 +52,7 @@ public:
     virtual
     std::unique_ptr< Hpro::TMatrix< value_t > >
     build ( const Hpro::TBlockCluster *   bc,
-            const Hpro::TTruncAcc &       acc ) const
+            const accuracy &              acc ) const
     {
         return build( bc->is(), acc );
     }
@@ -60,7 +60,7 @@ public:
     virtual
     std::unique_ptr< Hpro::TMatrix< value_t > >
     build ( const Hpro::TBlockIndexSet &  bis,
-            const Hpro::TTruncAcc &       acc ) const
+            const accuracy &              acc ) const
     {
         auto  op           = coefffn_operator( bis, _coeff_fn );
         auto  pivot_search = approx::aca_pivot< decltype(op) >( op );
