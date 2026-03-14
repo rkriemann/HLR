@@ -9,6 +9,9 @@
 //
 
 #include <cstdlib>
+#include <random>
+
+#include <boost/format.hpp>
 
 #include <hlr/utils/log.hh>
 #include <hlr/utils/timer.hh>
@@ -27,7 +30,7 @@
 
 namespace hlr { namespace compress {
 
-static const char provider[] = "fp32";
+static const char name[] = "fp32";
 
 using  zconfig_t = hlr::compress::fp32::config;
 using  zarray    = hlr::compress::fp32::zarray;
@@ -51,7 +54,7 @@ namespace zblas { using hlr::compress::fp32::mulvec; }
 
 namespace hlr { namespace compress {
 
-static const char provider[] = "afl";
+static const char name[] = "afl";
 
 using  zconfig_t = hlr::compress::afl::config;
 using  zarray    = hlr::compress::afl::zarray;
@@ -75,7 +78,7 @@ namespace zblas { using hlr::compress::afl::mulvec; }
 
 namespace hlr { namespace compress {
 
-static const char provider[] = "aflp";
+static const char name[] = "aflp";
 
 using  zconfig_t = hlr::compress::aflp::config;
 using  zarray    = hlr::compress::aflp::zarray;
@@ -99,7 +102,7 @@ namespace zblas { using hlr::compress::aflp::mulvec; }
 
 namespace hlr { namespace compress {
 
-static const char provider[] = "fpx";
+static const char name[] = "fpx";
 
 using  zconfig_t = hlr::compress::fpx::config;
 using  zarray    = hlr::compress::fpx::zarray;
@@ -117,24 +120,24 @@ namespace zblas { using hlr::compress::fpx::mulvec; }
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#elif HLR_COMPRESSOR == HLR_COMPRESSOR_FIXED
+#elif HLR_COMPRESSOR == HLR_COMPRESSOR_BFP
 
-#include <hlr/compress/fixedpoint.hh>
+#include <hlr/compress/bfp.hh>
 
 namespace hlr { namespace compress {
 
-static const char provider[] = "fixedpoint";
+static const char name[] = "bfp";
 
-using  zconfig_t = hlr::compress::fixedpoint::config;
-using  zarray    = hlr::compress::fixedpoint::zarray;
+using  zconfig_t = hlr::compress::bfp::config;
+using  zarray    = hlr::compress::bfp::zarray;
 
-using hlr::compress::fixedpoint::compress;
-using hlr::compress::fixedpoint::decompress;
-using hlr::compress::fixedpoint::get_config;
-using hlr::compress::fixedpoint::byte_size;
-using hlr::compress::fixedpoint::compressed_size;
+using hlr::compress::bfp::compress;
+using hlr::compress::bfp::decompress;
+using hlr::compress::bfp::get_config;
+using hlr::compress::bfp::byte_size;
+using hlr::compress::bfp::compressed_size;
 
-namespace zblas { using hlr::compress::fixedpoint::mulvec; }
+namespace zblas { using hlr::compress::bfp::mulvec; }
 
 }} // namespace hlr::compress
 
@@ -152,11 +155,11 @@ namespace zblas { using hlr::compress::fixedpoint::mulvec; }
 namespace hlr { namespace compress {
 
 #if HLR_ZFP_MODE == 0
-static const char provider[] = "zfp fr";
+static const char name[] = "zfp fr";
 #elif HLR_ZFP_MODE == 1
-static const char provider[] = "zfp fp";
+static const char name[] = "zfp fp";
 #elif HLR_ZFP_MODE == 2
-static const char provider[] = "zfp fa";
+static const char name[] = "zfp fa";
 #endif
 
 using  zconfig_t = hlr::compress::zfp::config;
@@ -183,7 +186,7 @@ using hlr::compress::zfp::compressed_size;
 
 namespace hlr { namespace compress {
 
-static const char provider[] = "posits";
+static const char name[] = "posits";
 
 using  zconfig_t = hlr::compress::posits::config;
 using  zarray    = hlr::compress::posits::zarray;
@@ -209,7 +212,7 @@ using hlr::compress::posits::compressed_size;
 
 namespace hlr { namespace compress {
 
-static const char provider[] = "cfloat";
+static const char name[] = "cfloat";
 
 using  zconfig_t = hlr::compress::cfloat::config;
 using  zarray    = hlr::compress::cfloat::zarray;
@@ -231,7 +234,7 @@ using hlr::compress::cfloat::compressed_size;
 
 namespace hlr { namespace compress {
 
-static const char provider[] = "blosc";
+static const char name[] = "blosc";
 
 using  zconfig_t = hlr::compress::blosc::config;
 using  zarray    = hlr::compress::blosc::zarray;
@@ -259,7 +262,7 @@ namespace zblas { using hlr::compress::blosc::mulvec; }
 
 namespace hlr { namespace compress {
 
-static const char provider[] = "sz";
+static const char name[] = "sz";
 
 using  zconfig_t = hlr::compress::sz::config;
 using  zarray    = hlr::compress::sz::zarray;
@@ -285,7 +288,7 @@ using hlr::compress::sz::compressed_size;
 
 namespace hlr { namespace compress {
 
-static const char provider[] = "sz3";
+static const char name[] = "sz3";
 
 using  zconfig_t = hlr::compress::sz3::config;
 using  zarray    = hlr::compress::sz3::zarray;
@@ -307,7 +310,7 @@ using hlr::compress::sz3::compressed_size;
 
 namespace hlr { namespace compress {
 
-static const char provider[] = "mgard";
+static const char name[] = "mgard";
 
 using  zconfig_t = hlr::compress::mgard::config;
 using  zarray    = hlr::compress::mgard::zarray;
@@ -333,7 +336,7 @@ using hlr::compress::mgard::compressed_size;
 
 namespace hlr { namespace compress {
 
-static const char provider[] = "none";
+static const char name[] = "none";
 
 struct zconfig_t {};
 
@@ -400,7 +403,7 @@ inline size_t     compressed_size ( const zarray &   ) { return 0; }
 
 namespace hlr { namespace compress {
 
-static const char provider[] = "none";
+static const char name[] = "none";
 
 struct zconfig_t {};
 
@@ -646,43 +649,66 @@ bench ()
     srand48( 1 );
     
     auto    rand  = [] () { return 2.0 * drand48() - 1.0; };
-    size_t  n     = 1 << 13;
+    size_t  n     = 8192;
     auto    M     = blas::matrix< double >( n, n );
     auto    zM    = zarray();
     auto    D     = blas::matrix< double >( n, n );
 
     blas::fill_fn( M, rand );
 
-    for ( double  eps = 1e-3; eps >= 1e-12; eps /= 10 )
+    std::cout << "compressor: " << name << std::endl;
+
+    for ( double  dr = 8.0; dr <= 8.0; dr *= 10 )
     {
-        std::cout << "ε = " << eps << std::endl;
-        
-        {
-            auto  zconf = get_config( relative_prec( Hpro::frobenius_norm, eps ), M );
-            auto  tic   = timer::now();
-        
-            for ( uint  iter = 0; iter < 10; ++iter )
-                zM = std::move( compress( zconf, M ) );
+        std::cout << "dr = " << dr << std::endl
+                  << std::endl;
 
-            auto  toc   = timer::since( tic );
-
-            std::cout << "  compress   : " << toc.seconds() << std::endl;
-        }
+        auto  rd   = std::random_device();
+        auto  gen  = std::mt19937( rd() );
+        auto  dist = std::uniform_real_distribution<>( 1.0, dr );
+        auto  rand = [&] () { return dist(gen); };
         
+        size_t  n     = 1 << 13;
+        auto    M     = blas::matrix< double >( n, n );
+        auto    zM    = zarray();
+        auto    D     = blas::matrix< double >( n, n );
+
+        blas::fill_fn( M, rand );
+
+        for ( double  eps = 1e-3; eps >= 1e-12; eps /= 10 )
         {
-            auto  tic   = timer::now();
+            std::cout << "ε = " << eps << std::endl;
+        
+            {
+                auto  zconf = get_config( relative_prec( Hpro::frobenius_norm, eps ), M );
+                auto  tic   = timer::now();
+        
+                for ( uint  iter = 0; iter < 10; ++iter )
+                    zM = std::move( compress( zconf, M ) );
+
+                auto  toc   = timer::since( tic );
+
+                std::cout << "  compress   : " << boost::format( "%.2es" ) % toc.seconds() << std::endl;
+            }
+        
+            std::cout << "  size       : " << compressed_size( zM ) << std::endl;
             
-            decompress( zM, D );
+            {
+                auto  tic   = timer::now();
+            
+                for ( uint  iter = 0; iter < 10; ++iter )
+                    decompress( zM, D );
 
-            auto  toc   = timer::since( tic );
+                auto  toc   = timer::since( tic );
 
-            std::cout << "  decompress : " << toc.seconds() << std::endl;
-        }
+                std::cout << "  decompress : " << boost::format( "%.2es" ) % toc.seconds() << std::endl;
+            }
         
-        blas::add( -1.0, M, D );
+            blas::add( -1.0, M, D );
         
-        std::cout << "  error      : " << blas::norm_F( D ) << " / "
-                  << blas::norm_F( D ) / blas::norm_F( M ) << std::endl;
+            std::cout << "  error      : " << boost::format( "%.4e" ) % blas::norm_F( D ) << " / "
+                      << boost::format( "%.4e" ) % ( blas::norm_F( D ) / blas::norm_F( M ) ) << std::endl;
+        }// for
     }// for
 }
 

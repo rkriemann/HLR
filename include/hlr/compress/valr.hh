@@ -33,7 +33,7 @@ using hlr::compress::afl::decompress_lr;
 using hlr::compress::afl::byte_size;
 using hlr::compress::afl::compressed_size;
 
-static const char provider[] = "afl";
+static const char name[] = "afl";
 
 namespace zblas
 {
@@ -70,7 +70,7 @@ using hlr::compress::aflp::decompress_lr;
 using hlr::compress::aflp::byte_size;
 using hlr::compress::aflp::compressed_size;
 
-static const char provider[] = "aflp";
+static const char name[] = "aflp";
 
 namespace zblas
 {
@@ -95,19 +95,19 @@ mulvec ( const size_t     nrows,
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
-#elif HLR_VALR_COMPRESSOR == HLR_COMPRESSOR_FIXED
+#elif HLR_VALR_COMPRESSOR == HLR_COMPRESSOR_BFP
 
-#include <hlr/compress/fixedpoint.hh>
+#include <hlr/compress/bfp.hh>
 
 namespace hlr { namespace compress { namespace valr {
 
-using zarray = hlr::compress::fixedpoint::zarray;
-using hlr::compress::fixedpoint::compress_lr;
-using hlr::compress::fixedpoint::decompress_lr;
-using hlr::compress::fixedpoint::byte_size;
-using hlr::compress::fixedpoint::compressed_size;
+using zarray = hlr::compress::bfp::zarray;
+using hlr::compress::bfp::compress_lr;
+using hlr::compress::bfp::decompress_lr;
+using hlr::compress::bfp::byte_size;
+using hlr::compress::bfp::compressed_size;
 
-static const char provider[] = "fixedpoint";
+static const char name[] = "bfp";
 
 namespace zblas
 {
@@ -122,7 +122,7 @@ mulvec ( const size_t     nrows,
          const value_t *  x,
          value_t *        y )
 {
-    hlr::compress::fixedpoint::mulvec_lr( nrows, ncols, op_A, alpha, zA, x, y );
+    hlr::compress::bfp::mulvec_lr( nrows, ncols, op_A, alpha, zA, x, y );
 }
 
 }// namespace zblas
@@ -144,7 +144,7 @@ using hlr::compress::fpx::decompress_lr;
 using hlr::compress::fpx::byte_size;
 using hlr::compress::fpx::compressed_size;
 
-static const char provider[] = "fpx";
+static const char name[] = "fpx";
 
 namespace zblas
 {
@@ -182,11 +182,11 @@ using hlr::compress::zfp::byte_size;
 using hlr::compress::zfp::compressed_size;
 
 #if HLR_ZFP_MODE == 0
-static const char provider[] = "zfp fr";
+static const char name[] = "zfp fr";
 #elif HLR_ZFP_MODE == 1
-static const char provider[] = "zfp fp";
+static const char name[] = "zfp fp";
 #elif HLR_ZFP_MODE == 2
-static const char provider[] = "zfp fa";
+static const char name[] = "zfp fa";
 #endif
 
 }}}// namespace hlr::compress::valr
@@ -206,7 +206,7 @@ using hlr::compress::sz3::decompress_lr;
 using hlr::compress::sz3::byte_size;
 using hlr::compress::sz3::compressed_size;
 
-static const char provider[] = "sz3";
+static const char name[] = "sz3";
 
 }}}// namespace hlr::compress::valr
 
@@ -224,7 +224,7 @@ static const char provider[] = "sz3";
 // using hlr::compress::mgard::decompress_lr;
 // using hlr::compress::mgard::byte_size;
 
-// static const char provider[] = "mgard";
+// static const char name[] = "mgard";
 
 // }}}// namespace hlr::compress::valr
 
@@ -243,7 +243,7 @@ using hlr::compress::posits::decompress_lr;
 using hlr::compress::posits::byte_size;
 using hlr::compress::posits::compressed_size;
 
-static const char provider[] = "posits";
+static const char name[] = "posits";
 
 }}}// namespace hlr::compress::valr
 
@@ -262,7 +262,7 @@ using hlr::compress::cfloat::decompress_lr;
 using hlr::compress::cfloat::byte_size;
 using hlr::compress::cfloat::compressed_size;
 
-static const char provider[] = "cfloat";
+static const char name[] = "cfloat";
 
 }}}// namespace hlr::compress::valr
 
@@ -281,7 +281,7 @@ using hlr::compress::blosc::decompress_lr;
 using hlr::compress::blosc::byte_size;
 using hlr::compress::blosc::compressed_size;
 
-static const char provider[] = "blosc";
+static const char name[] = "blosc";
 
 namespace zblas
 {
@@ -346,7 +346,7 @@ decompress_lr ( const zarray & , blas::matrix< value_t > & )
 inline size_t  byte_size       ( const zarray & ) { return 0; } // signals failure
 inline size_t  compressed_size ( const zarray & ) { return 0; }
 
-static const char provider[] = "none";
+static const char name[] = "none";
 
 }}}// namespace hlr::compress::valr
 
@@ -367,7 +367,7 @@ using hlr::compress::mixedprec::decompress_lr;
 using hlr::compress::mixedprec::byte_size;
 using hlr::compress::mixedprec::compressed_size;
 
-static const char provider[] = "mixedprec";
+static const char name[] = "mixedprec";
 
 namespace zblas
 {

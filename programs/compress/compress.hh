@@ -141,6 +141,11 @@ program_main ()
     //     // test_compress< value_t >( "D8192.mat" );
     //     return;
     // }
+
+    {
+        compress::bench();
+        return;
+    }
     
     auto  tic     = timer::now();
     auto  toc     = timer::since( tic );
@@ -351,7 +356,7 @@ program_main ()
               << "compression ("
               << "δ = " << boost::format( "%.2e" ) % delta
               << ", "
-              << hlr::compress::provider << ')'
+              << hlr::compress::name << ')'
               << term::reset << std::endl;
 
     {
@@ -462,7 +467,7 @@ program_main ()
                   << "single precision compression ("
                   << "δ = " << boost::format( "%.2e" ) % delta
                   << ", "
-                  << hlr::compress::provider << ')'
+                  << hlr::compress::name << ')'
                   << term::reset << std::endl;
 
         std::cout << "    mem   = " << format_mem( mem_sA_lr, mem_sA_d, mem_sA ) << std::endl;
