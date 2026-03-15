@@ -17,6 +17,10 @@
 namespace hlr
 {
 
+// signal support for accuracy adjustment
+template < typename T >
+constexpr bool  supports_adaptive_accuracy ( const T & ) { return false; }
+
 //////////////////////////////////////////////////////////////////////
 //
 // wrapper functions for blas::matrix
@@ -682,13 +686,19 @@ struct coefffn_operator
     Hpro::TBlockIndexSet  bis;
 
     // coefficient function
-    const coeff_fn_t &    func;
+    coeff_fn_t &    func;
 
     coefffn_operator ( const Hpro::TBlockIndexSet &  abis,
-                       const coeff_fn_t &            afunc )
+                       coeff_fn_t &                  afunc )
             : bis( abis )
             , func( afunc )
     {}
+
+    // set accuracy for coefficient evaluation
+    void set_accuracy ( const double  acc )
+    {
+        func.set_accuracy( acc );
+    }
 };
 
 template < typename coeff_fn_t >
@@ -738,6 +748,10 @@ operator_wrapper ( const Hpro::TBlockIndexSet &  bis,
 {
     return coefffn_operator< coeff_fn_t > ( bis, func );
 }
+
+template < typename coeff_fn_t >
+constexpr bool
+supports_adaptive_accuracy ( const coefffn_operator< coeff_fn_t > & ) { return true; }
 
 }// namespace hlr
 
