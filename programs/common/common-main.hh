@@ -24,18 +24,18 @@ hlr_main ( int argc, char ** argv )
 {
     try
     {
-        hpro::INIT();
+        Hpro::INIT();
 
         hlr::cmdline::parse( argc, argv );
     
-        std::cout << hlr::term::bullet << hlr::term::bold << hpro::Mach::hostname() << hlr::term::reset << std::endl
+        std::cout << hlr::term::bullet << hlr::term::bold << Hpro::Mach::hostname() << hlr::term::reset << std::endl
                   << "    processor : " << hlr::mach::cpu() << std::endl
                   << "    cores     : " << hlr::mach::cpuset() << std::endl;
         
-        hpro::CFG::set_verbosity( hlr::verbosity );
+        Hpro::CFG::set_verbosity( hlr::verbosity );
 
         // if ( hlr::nthreads != 0 )
-        //     hpro::CFG::set_nthreads( hlr::nthreads );
+        //     Hpro::CFG::set_nthreads( hlr::nthreads );
 
         if      ( hlr::appl == "logkernel"    ) framework_main< hlr::apps::log_kernel >();
         else if ( hlr::appl == "log"          ) framework_main< hlr::apps::log_kernel >();
@@ -49,7 +49,7 @@ hlr_main ( int argc, char ** argv )
         else
             HLR_ERROR( "unknown application (" + hlr::appl + ")" );
 
-        hpro::DONE();
+        Hpro::DONE();
     }// try
     catch ( std::exception &  e ) { std::cout << e.what() << std::endl; }
     catch ( char const *      e ) { std::cout << hlr::term::red( hlr::term::bold( e ) ) << std::endl; }
