@@ -33,7 +33,8 @@ template < typename value_t > size_t ncols ( const blas::matrix< value_t > &  M 
 template < typename value_t >
 blas::vector< value_t >
 get_row ( const blas::matrix< value_t > &  M,
-          const size_t                     i )
+          const size_t                     i,
+          const real_type_t< value_t >     eps = 0 )
 {
     return blas::copy( M.row( i ) );
 }
@@ -41,7 +42,8 @@ get_row ( const blas::matrix< value_t > &  M,
 template < typename value_t >
 blas::vector< value_t >
 get_column ( const blas::matrix< value_t > &  M,
-             const size_t                     j )
+             const size_t                     j,
+             const real_type_t< value_t >     eps = 0 )
 {
     return blas::copy( M.column( j ) );
 }
@@ -147,7 +149,8 @@ template < typename value_t > size_t ncols ( const matrixsum_operator< value_t >
 template < typename value_t >
 blas::vector< value_t >
 get_row ( const matrixsum_operator< value_t > &  op,
-          const size_t                           i )
+          const size_t                           i,
+          const real_type_t< value_t >           eps = 0 )
 {
     return op.get_row( i );
 }
@@ -155,7 +158,8 @@ get_row ( const matrixsum_operator< value_t > &  op,
 template < typename value_t >
 blas::vector< value_t >
 get_column ( const matrixsum_operator< value_t > &  op,
-             const size_t                           j )
+             const size_t                           j,
+             const real_type_t< value_t >           eps = 0 )
 {
     return op.get_column( j );
 }
@@ -249,7 +253,8 @@ template < typename value_t > size_t ncols ( const lowrank_operator< value_t > &
 template < typename value_t >
 blas::vector< value_t >
 get_row ( const lowrank_operator< value_t > &  op,
-          const size_t                         i )
+          const size_t                         i,
+          const real_type_t< value_t >         eps = 0 )
 {
     return op.get_row( i );
 }
@@ -257,7 +262,8 @@ get_row ( const lowrank_operator< value_t > &  op,
 template < typename value_t >
 blas::vector< value_t >
 get_column ( const lowrank_operator< value_t > &  op,
-             const size_t                         j )
+             const size_t                         j,
+             const real_type_t< value_t >         eps = 0 )
 {
     return op.get_column( j );
 }
@@ -429,7 +435,8 @@ template < typename value_t > size_t ncols ( const lowranksum_operator< value_t 
 template < typename value_t >
 blas::vector< value_t >
 get_row ( const lowranksum_operator< value_t > &  op,
-          const size_t                            i )
+          const size_t                            i,
+          const real_type_t< value_t >            eps = 0 )
 {
     return op.get_row( i );
 }
@@ -437,7 +444,8 @@ get_row ( const lowranksum_operator< value_t > &  op,
 template < typename value_t >
 blas::vector< value_t >
 get_column ( const lowranksum_operator< value_t > &  op,
-             const size_t                            j )
+             const size_t                            j,
+             const real_type_t< value_t >            eps = 0 )
 {
     return op.get_column( j );
 }
@@ -607,7 +615,8 @@ template < typename value_t > size_t ncols ( const lowranksumT_operator< value_t
 template < typename value_t >
 blas::vector< value_t >
 get_row ( const lowranksumT_operator< value_t > &  op,
-          const size_t                             i )
+          const size_t                             i,
+          const real_type_t< value_t >             eps = 0 )
 {
     return op.get_row( i );
 }
@@ -615,7 +624,8 @@ get_row ( const lowranksumT_operator< value_t > &  op,
 template < typename value_t >
 blas::vector< value_t >
 get_column ( const lowranksumT_operator< value_t > &  op,
-             const size_t                            j )
+             const size_t                             j,
+             const real_type_t< value_t >             eps = 0 )
 {
     return op.get_column( j );
 }
@@ -717,26 +727,28 @@ ncols ( const coefffn_operator< coeff_fn_t > &  op )
 
 template < typename coeff_fn_t >
 blas::vector< typename coeff_fn_t::value_t >
-get_row ( const coefffn_operator< coeff_fn_t > &  op,
-          const size_t                            i )
+get_row ( const coefffn_operator< coeff_fn_t > &             op,
+          const size_t                                       i,
+          const real_type_t< typename coeff_fn_t::value_t >  eps = 0 )
 {
     blas::vector< typename coeff_fn_t::value_t >  v( ncols( op ) );
     const auto                                    ofs = i + op.bis.row_is().first();
 
-    op.func.eval( Hpro::is( ofs, ofs ), op.bis.col_is(), v.data() );
+    op.func.eval( Hpro::is( ofs, ofs ), op.bis.col_is(), v.data(), eps );
                       
     return v;
 }
 
 template < typename coeff_fn_t >
 blas::vector< typename coeff_fn_t::value_t >
-get_column ( const coefffn_operator< coeff_fn_t > &  op,
-             const size_t                            i )
+get_column ( const coefffn_operator< coeff_fn_t > &             op,
+             const size_t                                       i,
+             const real_type_t< typename coeff_fn_t::value_t >  eps = 0 )
 {
     blas::vector< typename coeff_fn_t::value_t >  v( nrows( op ) );
     const auto                                    ofs = i + op.bis.col_is().first();
 
-    op.func.eval( op.bis.row_is(), Hpro::is( ofs, ofs ), v.data() );
+    op.func.eval( op.bis.row_is(), Hpro::is( ofs, ofs ), v.data(), eps );
                       
     return v;
 }

@@ -34,13 +34,18 @@ public:
 private:
     // coefficient function
     coeff_fn_t &  _coeff_fn;
+
+    // flag for adjusting coefficient accuracy
+    bool          _adjust_acc;
     
 public:
     //
     // ctor
     //
-    aca_lrapx ( coeff_fn_t &  acoeff_fn )
+    aca_lrapx ( coeff_fn_t &  acoeff_fn,
+                const bool    aadjust_acc = false )
             : _coeff_fn( acoeff_fn )
+            , _adjust_acc( aadjust_acc )
     {}
         
     //////////////////////////////////////
@@ -64,7 +69,7 @@ public:
     {
         auto  op           = coefffn_operator( bis, _coeff_fn );
         auto  pivot_search = approx::aca_pivot< decltype(op) >( op );
-        auto  [ U, V ]     = approx::aca( op, pivot_search, acc, nullptr );
+        auto  [ U, V ]     = approx::aca( op, pivot_search, acc, nullptr, _adjust_acc );
         auto  R            = std::make_unique< matrix::lrmatrix< value_t > >( bis.row_is(), bis.col_is(), std::move( U ), std::move( V ) );
 
         R->truncate( acc );

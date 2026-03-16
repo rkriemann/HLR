@@ -68,14 +68,15 @@ struct aca_pivot_next
                 blas::vector< value_t > >
     next ( operator_t &           M,
            const vector_list_t &  U,
-           const vector_list_t &  V )
+           const vector_list_t &  V,
+           const real_t           eps = 0 )
     {
         // get "j"'th column
         const auto  pivot_col  = next_col;
 
         used_cols[ pivot_col ] = true;
 
-        auto  column = get_column( M, pivot_col );
+        auto  column = get_column( M, pivot_col, eps );
         
         for ( uint  l = 0; l < U.size(); ++l )
             blas::add( -math::conj( V[l]( pivot_col ) ), U[l], column );
@@ -92,7 +93,7 @@ struct aca_pivot_next
         
         used_rows[ pivot_row ] = true;
         
-        auto  row = get_row( M, pivot_row );
+        auto  row = get_row( M, pivot_row, eps );
         
         // stored as column, hence conjugate
         blas::conj( row );
@@ -150,14 +151,15 @@ struct aca_pivot_max
                 blas::vector< value_t > >
     next ( operator_t &           M,
            const vector_list_t &  U,
-           const vector_list_t &  V )
+           const vector_list_t &  V,
+           const real_t           eps = 0 )
     {
         // get "j"'th column
         const auto  pivot_col  = next_col;
 
         used_cols[ pivot_col ] = true;
 
-        auto  column = get_column( M, pivot_col );
+        auto  column = get_column( M, pivot_col, eps );
         
         for ( uint  l = 0; l < U.size(); ++l )
             blas::add( -math::conj( V[l]( pivot_col ) ), U[l], column );
@@ -174,7 +176,7 @@ struct aca_pivot_max
         
         used_rows[ pivot_row ] = true;
         
-        auto  row = get_row( M, pivot_row );
+        auto  row = get_row( M, pivot_row, eps );
 
         // stored as column, hence conjugate
         blas::conj( row );
@@ -203,6 +205,19 @@ struct aca_pivot_max
                 
         next_col = max_j;
             
+        // check if no column found and use first non-used column
+        if ( next_col == -1 )
+        {
+            for ( size_t  j = 0; j < row.length(); ++j )
+            {
+                if ( ! used_cols[ j ] )
+                {
+                    next_col = j;
+                    break;
+                }// if
+            }// for
+        }// if
+        
         return { pivot_row, pivot_col, std::move( column ), std::move( row ) };
     }
 };
@@ -237,7 +252,8 @@ struct aca_pivot_full
                 blas::vector< value_t > >
     next ( operator_t &           M,
            const vector_list_t &  U,
-           const vector_list_t &  V )
+           const vector_list_t &  V,
+           const real_t           eps = 0 )
     {
         //
         // loop over full M for maximal element
@@ -250,7 +266,7 @@ struct aca_pivot_full
             
         for ( size_t  j = 0; j < ncols_M; ++j )
         {
-            auto  column = get_column( M, j );
+            auto  column = get_column( M, j, eps );
 
             for ( uint  l = 0; l < U.size(); ++l )
                 blas::add( -math::conj( V[l]( j ) ), U[l], column );
@@ -270,7 +286,7 @@ struct aca_pivot_full
         if ( math::abs( max_val ) <= zero_val )
             return { -1, -1, blas::vector< value_t >(), blas::vector< value_t >() };
 
-        auto  column = get_column( M, pivot_col );
+        auto  column = get_column( M, pivot_col, eps );
         
         for ( uint  l = 0; l < U.size(); ++l )
             blas::add( -math::conj( V[l]( pivot_col ) ), U[l], column );
@@ -278,7 +294,7 @@ struct aca_pivot_full
         // scale <col> by inverse of maximal element in u
         blas::scale( value_t(1) / max_val, column );
         
-        auto  row = get_row( M, pivot_row );
+        auto  row = get_row( M, pivot_row, eps );
 
         // stored as column, hence conjugate
         blas::conj( row );
@@ -312,7 +328,8 @@ std::pair< blas::matrix< typename pivotsearch_t::operator_t::value_t >,
 aca  ( typename pivotsearch_t::operator_t &      M,
        pivotsearch_t &                           pivot_search,
        const accuracy &                          acc,
-       std::list< std::pair< idx_t, idx_t > > *  pivots )
+       std::list< std::pair< idx_t, idx_t > > *  pivots,
+       const bool                                adjust_acc = false )
 {
     using  value_t = typename pivotsearch_t::operator_t::value_t;
     using  real_t  = typename Hpro::real_type< value_t >::type_t;
@@ -335,17 +352,17 @@ aca  ( typename pivotsearch_t::operator_t &      M,
     // approximation of |M|
     real_t      norm_M   = real_t(0);
 
+    // accuracy for coefficient evaluation
+    real_t      ceps     = rel_eps;
+
     // low-rank approximation
     auto  U = std::deque< blas::vector< value_t > >();
     auto  V = std::deque< blas::vector< value_t > >();
     
     for ( uint  i = 0; i < max_rank; ++i )
     {
-        if constexpr ( supports_adaptive_accuracy( M ) )
-            M.set_accuracy( rel_eps );
-        
         // need to get i, j, row_i, col_j for next iteration
-        auto [ pivot_row, pivot_col, column, row ] = pivot_search.next( M, U, V );
+        auto [ pivot_row, pivot_col, column, row ] = pivot_search.next( M, U, V, ceps );
 
         if (( pivot_row == -1 ) || ( pivot_col == -1 ))
             break;
@@ -391,6 +408,10 @@ aca  ( typename pivotsearch_t::operator_t &      M,
 
         if ( pivots != nullptr )
             pivots->push_back( { pivot_row, pivot_col } );
+
+        // adjust accuracy of coefficient computation
+        if ( adjust_acc )
+            ceps = rel_eps / norm_i;
     }// while
     
     //

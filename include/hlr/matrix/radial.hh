@@ -65,7 +65,8 @@ public:
     //!
     virtual void eval  ( const std::vector< Hpro::idx_t > &  rowidxs,
                          const std::vector< Hpro::idx_t > &  colidxs,
-                         value_t *                           matrix ) const
+                         value_t *                           matrix,
+                         const double                        eps = 0 ) const
     {
         const size_t  n = rowidxs.size();
         const size_t  m = colidxs.size();
