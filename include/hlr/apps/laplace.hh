@@ -45,7 +45,7 @@ public:
     
     // dtor
     virtual ~laplace_slp () {}
-    
+
     // return coordinates for problem indices
     std::unique_ptr< Hpro::TCoordinate >
     coordinates () const;
@@ -55,13 +55,21 @@ public:
     coeff_func  () const;
 
     // return HCA generator function
-    auto // std::unique_ptr< Hpro::THCA< value_t >::TGeneratorFn >
+    auto
     hca_gen_func ( const Hpro::TClusterTree &  ct )
     {
         using  gen_func_t = Hpro::TLaplaceSLPGenFn< fnspace_t, fnspace_t, value_t >;
         
         return std::make_unique< gen_func_t >( _fnspace.get(), _fnspace.get(), ct.perm_i2e(), ct.perm_i2e(), 5 );
     }
+
+    //
+    // access internal data
+    //
+    
+    auto  grid    () const { return _grid.get(); }
+    auto  fnspace () const { return _fnspace.get(); }
+    auto  bf      () const { return _bf.get(); }
 };
 
 }}//namespace hlr::apps
