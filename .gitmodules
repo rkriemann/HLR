@@ -1,0 +1,3 @@
+[submodule "hpro"]
+	path = hpro
+	url = https://gitlab.mis.mpg.de/rok/HLIBcore
