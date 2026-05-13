@@ -34,7 +34,7 @@ LINKFLAGS    = '-g'
 DEFINES      = 'TBB_PREVIEW_GLOBAL_CONTROL __TBB_show_deprecation_message_task_H'
 
 # directories for the various external libraries
-HPRO_DIR     = '/'
+HPRO_DIR     = 'hpro'
 BOOST_DIR    = '/'
 MKL_DIR      = '/'
 TBB_DIR      = '/'
@@ -311,7 +311,7 @@ opts.Add(               'optflags',  'compiler optimization flags',   OPTFLAGS )
 opts.Add(               'cpuflags',  'path to cpuflags',              CPUFLAGS )
 opts.Add(               'defines',   'preprocessor defines',          DEFINES )
 
-opts.Add( PathVariable( 'hpro_dir',      'base directory of hlibpro',     HPRO_DIR,     PathVariable.PathIsDir ) )
+# opts.Add( PathVariable( 'hpro_dir',      'base directory of hlibpro',     HPRO_DIR,     PathVariable.PathIsDir ) )
 opts.Add( PathVariable( 'boost_dir',     'base directory of Boost',       BOOST_DIR,    PathVariable.PathIsDir ) )
 opts.Add( PathVariable( 'tbb_dir',       'base directory of TBB',         TBB_DIR,      PathVariable.PathIsDir ) )
 opts.Add( PathVariable( 'tf_dir',        'base directory of C++TaskFlow', TASKFLOW_DIR, PathVariable.PathIsDir ) )
@@ -386,7 +386,7 @@ OPTFLAGS      = opt_env['optflags']
 CPUFLAGS      = opt_env['cpuflags']
 DEFINES       = opt_env['defines']
 
-HPRO_DIR      = opt_env['hpro_dir']
+# HPRO_DIR      = opt_env['hpro_dir']
 BOOST_DIR     = opt_env['boost_dir']
 TBB_DIR       = opt_env['tbb_dir']
 TASKFLOW_DIR  = opt_env['tf_dir']
@@ -751,7 +751,7 @@ def show_help ( target, source, env ):
     
     print( '  {0}frameworks{1}   │ software frameworks to use    │'.format( colors['bold'], colors['reset'] ), ', '.join( FRAMEWORKS ) )
     print( ' ──────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}hpro_dir{1}     │ base directory of HLIBpro     │'.format( colors['bold'], colors['reset'] ) )
+    # print( '  {0}hpro_dir{1}     │ base directory of HLIBpro     │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}tbb_dir{1}      │ base directory of TBB         │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}tf_dir{1}       │ base directory of C++TaskFlow │'.format( colors['bold'], colors['reset'] ) )
     print( '  {0}hpx_dir{1}      │ base directory of HPX         │'.format( colors['bold'], colors['reset'] ) )
@@ -836,7 +836,7 @@ def show_options ( target, source, env ):
         
     print( '  {0}frameworks{1}   │ software frameworks to use    │'.format( colors['bold'], colors['reset'] ), ', '.join( frameworks ) )
     print( ' ──────────────┼───────────────────────────────┼──────────' )
-    print( '  {0}hpro_dir{1}     │ base directory of HLIBpro     │'.format( colors['bold'], colors['reset'] ), HPRO_DIR )
+    # print( '  {0}hpro_dir{1}     │ base directory of HLIBpro     │'.format( colors['bold'], colors['reset'] ), HPRO_DIR )
     print( '  {0}boost_dir{1}    │ base directory of Boost       │'.format( colors['bold'], colors['reset'] ), BOOST_DIR )
     print( '  {0}tbb_dir{1}      │ base directory of TBB         │'.format( colors['bold'], colors['reset'] ), TBB_DIR )
     print( '  {0}tf_dir{1}       │ base directory of C++TaskFlow │'.format( colors['bold'], colors['reset'] ), TASKFLOW_DIR )
