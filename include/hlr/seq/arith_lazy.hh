@@ -110,7 +110,8 @@ template < typename value_t > size_t  ncols ( const linopsum_operator< value_t >
 template < typename value_t >
 blas::vector< value_t >
 get_row ( const linopsum_operator< value_t > &  op,
-          const size_t                          i )
+          const size_t                          i,
+          const real_type_t< value_t >          eps = 0 )
 {
     return op.get_row( i );
 }
@@ -118,7 +119,8 @@ get_row ( const linopsum_operator< value_t > &  op,
 template < typename value_t >
 blas::vector< value_t >
 get_column ( const linopsum_operator< value_t > &  op,
-             const size_t                          j )
+             const size_t                          j,
+             const real_type_t< value_t >          eps = 0 )
 {
     return op.get_column( j );
 }
