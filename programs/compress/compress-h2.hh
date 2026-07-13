@@ -227,7 +227,7 @@ program_main ()
               << "compression ("
               << "ε = " << boost::format( "%.2e" ) % cmdline::eps
               << ", "
-              << hlr::compress::provider << " + " << hlr::compress::valr::provider << ')'
+              << hlr::compress::name << " + " << hlr::compress::valr::name << ')'
               << term::reset << std::endl;
 
     {

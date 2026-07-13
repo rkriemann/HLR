@@ -151,10 +151,63 @@ program_main ()
     std::cout << term::bullet << term::bold << "uniform H-matrix" << term::reset << std::endl;
 
     auto  cbapx = approx::SVD< value_t >();
+    auto  A     = std::unique_ptr< Hpro::TMatrix< value_t > >();
+    auto  rowcb = std::unique_ptr< matrix::shared_cluster_basis< value_t > >();
+    auto  colcb = std::unique_ptr< matrix::shared_cluster_basis< value_t > >();
 
     tic = timer::now();
 
-    auto  [ rowcb, colcb, A ] = impl::matrix::build_uniform_rec( *H, cbapx, acc, false );
+    {
+        auto  problem = gen_problem< problem_t >();
+        auto  coord   = problem->coordinates();
+        auto  ct      = gen_ct( *coord );
+        auto  bct     = gen_bct( *ct, *ct );
+
+        if ( hpro::verbose( 3 ) )
+            io::eps::print( * bct->root(), "bt", "id,innerid" );
+    
+        auto  coeff   = problem->coeff_func();
+        auto  pcoeff  = Hpro::TPermCoeffFn< value_t >( coeff.get(), ct->perm_i2e(), ct->perm_i2e() );
+        auto  cbapx   = approx::SVD< value_t >();
+        
+        tic = timer::now();
+        
+        if ( cmdline::capprox == "hca" )
+        {
+            if constexpr ( problem_t::supports_hca )
+            {
+                std::cout << "    using HCA"
+                          << ( cmdline::compress ? std::string( " (" ) + hlr::compress::valr::name + ")" : "" )
+                          << std::endl;
+                
+                auto  hcagen = problem->hca_gen_func( *ct );
+                auto  hca    = bem::hca( pcoeff, *hcagen, cmdline::eps / 100.0, 6 );
+                auto  lrapx  = bem::hca_lrapx( hca );
+
+                if ( sep_coup )
+                    std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_sep( bct->root(), pcoeff, lrapx, cbapx, acc, cmdline::compress );
+                else
+                    std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform( bct->root(), pcoeff, lrapx, cbapx, acc, cmdline::compress );
+            }// if
+            else
+                cmdline::capprox = "default";
+        }// if
+        else if (( cmdline::capprox == "aca" ) || ( cmdline::capprox == "default" ))
+        {
+            std::cout << "    using ACA"
+                      << ( cmdline::compress ? std::string( " (" ) + hlr::compress::valr::name + ")" : "" )
+                      << std::endl;
+
+            auto  lrapx = bem::aca_lrapx< Hpro::TPermCoeffFn< value_t > >( pcoeff );
+
+            if ( sep_coup )
+                std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform_sep( bct->root(), pcoeff, lrapx, cbapx, acc, cmdline::compress );
+            else
+                std::tie( rowcb, colcb, A ) = impl::matrix::build_uniform( bct->root(), pcoeff, lrapx, cbapx, acc, cmdline::compress );
+        }// if
+    }
+    
+    // auto  [ rowcb, colcb, A ] = impl::matrix::build_uniform_rec( *H, cbapx, acc, false );
     
     toc = timer::since( tic );
 
@@ -178,7 +231,7 @@ program_main ()
     
     // assign clusters since needed for cluster bases
     // seq::matrix::assign_cluster( *A, *bct->root() );
-    
+
     //////////////////////////////////////////////////////////////////////
     //
     // further compress matrix
@@ -196,7 +249,7 @@ program_main ()
               << "compression ("
               << "ε = " << boost::format( "%.2e" ) % cmdline::eps
               << ", "
-              << hlr::compress::provider << " + " << hlr::compress::valr::provider << ')'
+              << hlr::compress::name << " + " << hlr::compress::valr::name << ')'
               << term::reset << std::endl;
 
     {
