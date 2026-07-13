@@ -169,7 +169,7 @@ nzmin_max ( const float *  data,
     for ( size_t  i = 0; i < nsize; i += simd_size )
     {
         __m512     vd   = _mm512_abs_ps( _mm512_loadu_ps( data + i ) );
-        __mmask16  mask = _mm512_cmp_ps_mask( vd, vzero, _CMP_GE_OQ );
+        __mmask16  mask = _mm512_cmp_ps_mask( vd, vzero, _CMP_GT_OQ );
 
         vMAX = _mm512_max_ps( vMAX, vd );
         vMIN = _mm512_mask_min_ps( vMIN, mask, vMIN, vd );
@@ -196,7 +196,7 @@ nzmin_max ( const double *  data,
     for ( size_t  i = 0; i < nsize; i += simd_size )
     {
         const auto  vd   = _mm512_abs_pd( _mm512_loadu_pd( data + i ) );
-        const auto  mask = _mm512_cmp_pd_mask( vd, vzero, _CMP_GE_OQ );
+        const auto  mask = _mm512_cmp_pd_mask( vd, vzero, _CMP_GT_OQ );
 
         vMAX = _mm512_max_pd( vMAX, vd );
         vMIN = _mm512_mask_min_pd( vMIN, mask, vMIN, vd );
